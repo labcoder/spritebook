@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "shell-spike-app-preview",
+      "runtimeExecutable": "deno",
+      "runtimeArgs": ["task", "--cwd", "spikes/shell/app", "preview"],
+      "port": 4174
+    }
+  ]
+}

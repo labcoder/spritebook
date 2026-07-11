@@ -18,6 +18,9 @@ tests/failures/
 
 # Spike outputs (measurements go in REPORT.md; pixels are throwaway)
 spikes/*/out/
+spikes/shell/tauri/src-tauri/target/
+spikes/shell/tauri/src-tauri/gen/
+spikes/shell/build/
 
 # Model weights & caches (installed per-machine via the registry)
 .spritebook/

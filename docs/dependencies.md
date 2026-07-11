@@ -9,7 +9,7 @@ Status marks: **✓** license verified during the 2026-07 design cycle · **std*
 | Dependency | Role | License | Status |
 |---|---|---|---|
 | Deno 2.x | TS runtime, workspace, WebGPU, tests | MIT | std |
-| deno desktop **or** Tauri | app shell — **P0-T3 decides (D-005)** | MIT / MIT+Apache-2.0 | std |
+| Tauri 2.x (pin minor) | app shell — **chosen by P0-T3 (D-005)**; `deno desktop` revisit trigger noted in D-005 | MIT+Apache-2.0 | std |
 | wgpu (under Deno WebGPU) | GPU backend | MIT/Apache-2.0 dual | std |
 
 ## Core render, style, pack
