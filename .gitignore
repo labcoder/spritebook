@@ -16,6 +16,9 @@ docs/internal/
 # Test failure artifacts (goldens themselves ARE committed)
 tests/failures/
 
+# Spike outputs (measurements go in REPORT.md; pixels are throwaway)
+spikes/*/out/
+
 # Model weights & caches (installed per-machine via the registry)
 .spritebook/
 
