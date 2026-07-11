@@ -1,0 +1,25 @@
+# Dependencies & build
+node_modules/
+dist/
+coverage/
+.deno/
+
+# Environment & machine-local
+.env
+.env.*
+*.local
+.DS_Store
+
+# Internal planning docs are local-only by design (decision D-015)
+docs/internal/
+
+# Test failure artifacts (goldens themselves ARE committed)
+tests/failures/
+
+# Model weights & caches (installed per-machine via the registry)
+.spritebook/
+
+# ai stuff
+superpowers/
+docs/superpowers/
+.claude/.worktrees/
