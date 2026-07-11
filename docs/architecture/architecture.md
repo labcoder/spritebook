@@ -4,9 +4,9 @@
 
 Three processes, one contract:
 
-- **Core (TypeScript on Deno).** The product. Owns manifests, the job queue, the importer border, the WebGPU render/style/pack/export pipeline, animation retargeting, caching, and the CLI. Headless by design — Deno's WebGPU has no swapchain, which is exactly right for a batch renderer.
+- **Core (TypeScript on Deno).** The product. Owns manifests, the job queue, the importer border, the WebGPU render/style/pack/export pipeline, animation retargeting, caching, and the CLI. Headless by design — Deno's WebGPU has no swapchain, which is exactly right for a batch renderer. *Confirmed by the P0-T2 spike (D-004 ratified): ~190 f/s render+readback at 128 px on the dev GPU, cross-process byte-deterministic; `spikes/webgpu/` doubles as the canary to re-run before any Deno upgrade.*
 - **AI sidecar (Python).** Torch-based adapters for catalog models: background removal, image→3D backends, auto-rigging. Talks to core over a local contract (below). Installed per machine; never bundled.
-- **GUI shell (webview: deno desktop or Tauri — P0-T3 decides).** React 19 + Vite + Base UI + hand-authored tokens. A projection of core: it invokes CLI verbs, renders the NDJSON stream, and displays core-produced pixels. Three.js viewports are inspection instruments only.
+- **GUI shell (Tauri v2 — D-005 ratified, resolved by P0-T3).** React 19 + Vite + Base UI + hand-authored tokens, with Deno as the sole JS toolchain (no Node). A projection of core: it invokes CLI verbs, renders the NDJSON stream, and displays core-produced pixels. Three.js viewports are inspection instruments only — and must be able to degrade to core-rendered PNG sequences (Linux WebKitGTK caveat, see `spikes/shell/REPORT.md`). Production bridge rule from the spike: per-job IPC channels, never global event names. A `deno desktop` revisit trigger is recorded in D-005.
 
 ```mermaid
 flowchart TB

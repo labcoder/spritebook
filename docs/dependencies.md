@@ -83,4 +83,5 @@ Status marks: **✓** license verified during the 2026-07 design cycle · **std*
 ## Open gates
 1. Make-It-Animatable license — before p3-T4.
 2. rembg per-weight licenses — as catalog entries land.
-3. deno desktop vs Tauri — P0-T3 (D-005).
+
+Resolved 2026-07-11: ~~deno desktop vs Tauri~~ → **Tauri v2** by P0-T3 (D-005; `deno desktop` revisit trigger recorded there).
