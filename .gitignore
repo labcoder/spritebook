@@ -22,6 +22,12 @@ spikes/shell/tauri/src-tauri/target/
 spikes/shell/tauri/src-tauri/gen/
 spikes/shell/build/
 
+# P0-T4 autorig spike: upstream clones, python env, working files (evidence goes in REPORT.md)
+spikes/autorig/UniRig/
+spikes/autorig/SkinTokens/
+spikes/autorig/.venv/
+spikes/autorig/work/
+
 # Model weights & caches (installed per-machine via the registry)
 .spritebook/
 

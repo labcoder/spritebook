@@ -1,0 +1,10 @@
+{
+  "lock": false,
+  "tasks": {
+    "strip:humanoid": "deno run -A strip-rig.ts ../assets/src-humanoid-rigged.glb ../assets/humanoid-static.glb ../assets/humanoid-groundtruth-rig.json",
+    "strip:stylized": "deno run -A strip-rig.ts ../assets/src-stylized-rigged.glb ../assets/stylized-static.glb ../assets/stylized-groundtruth-rig.json",
+    "asymmetric": "deno run -A make-asymmetric.ts ../assets/humanoid-static.glb ../assets/humanoid-groundtruth-rig.json ../assets/asymmetric-static.glb",
+    "validate": "deno run -A validate.ts",
+    "all": "deno task strip:humanoid && deno task strip:stylized && deno task asymmetric && deno task validate"
+  }
+}

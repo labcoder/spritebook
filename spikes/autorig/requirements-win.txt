@@ -1,0 +1,20 @@
+# P0-T4: UniRig deps for native Windows via uv — upstream requirements.txt minus
+# flash_attn (installed separately from a prebuilt wheel; source build on Windows
+# is the known landmine) and with numpy pinned <2 (several deps drag in 2.x and
+# UniRig's stack predates it). torch itself installed separately from the cu128 index.
+transformers==4.51.3
+python-box
+einops
+omegaconf
+pytorch_lightning
+lightning
+addict
+timm
+fast-simplification
+bpy==4.2
+trimesh
+open3d
+pyrender
+huggingface_hub
+# wandb intentionally omitted — training-only telemetry, not needed for inference
+numpy==1.26.4
