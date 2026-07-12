@@ -123,18 +123,25 @@ def main():
     tgt_h, _ = skeleton_height_and_base(tgt_arm)
     src_h, _ = skeleton_height_and_base(src_arm)
 
-    # nearest-source mapping per target bone
+    # name-first mapping (works when the rig was renamed via tools/rename-bones.py
+    # — exact matches carry correct left/right sides); nearest-position fallback
+    # for bones that kept generic names
     mapping = {}
+    src_names = set(src_norm.keys())
     for tname, tpos in tgt_norm.items():
+        if tname in src_names:
+            mapping[tname] = (tname, 0.0)
+            continue
         best, bestd = None, 1e9
         for sname, spos in src_norm.items():
             d = (tpos - spos).length
             if d < bestd:
                 best, bestd = sname, d
         mapping[tname] = (best, bestd)
-    print('bone mapping (target <- source, normalized dist):')
+    named = sum(1 for _, (s, d) in mapping.items() if d == 0.0)
+    print(f'bone mapping: {named} by name, {len(mapping) - named} by position:')
     for tname, (sname, d) in sorted(mapping.items()):
-        print(f'  {tname:24s} <- {sname:20s} {d:.3f}')
+        print(f'  {tname:24s} <- {sname:20s} {"NAME" if d == 0.0 else f"{d:.3f}"}')
 
     # hierarchy order: parents before children
     order = []
@@ -164,6 +171,32 @@ def main():
     if src_root is not None:
         needed_src.add(src_root)
     needed_src = sorted(needed_src)
+
+    # facing correction: world-space deltas only transfer correctly if both
+    # skeletons face the same way; otherwise knees hinge backward ("ostrich
+    # legs"). Detect forward via foot->toe(ball) and conjugate deltas by the
+    # yaw difference.
+    def facing_yaw(arm, rest):
+        for foot, ball in (('foot_l', 'ball_l'), ('foot_r', 'ball_r')):
+            if foot in rest and ball in rest:
+                f = rest[ball].translation - rest[foot].translation
+                if f.length > 1e-6:
+                    return math.atan2(f.x, f.y)
+        return None
+
+    yaw_s = facing_yaw(src_arm, src_rest)
+    yaw_t = facing_yaw(tgt_arm, tgt_rest)
+    if yaw_s is None or yaw_t is None:
+        # assets in this spike share glTF orientation conventions: the measured
+        # humanoid correction is ~0 deg, so skeletons lacking named feet get none
+        yaw_fix = 0.0
+        print('facing: foot/ball names missing on one side; assuming 0 deg correction')
+    else:
+        yaw_fix = yaw_t - yaw_s
+        print(f'facing: source yaw {math.degrees(yaw_s):.0f} deg, target yaw {math.degrees(yaw_t):.0f} deg '
+              f'-> conjugating deltas by {math.degrees(yaw_fix):.0f} deg')
+    R_fix = Matrix.Rotation(yaw_fix, 4, 'Z')
+    R_fix_inv = R_fix.inverted()
     for i in range(n):
         f = f0 + (f1 - f0) * (i / (n - 1))
         scene.frame_set(int(round(f)))
@@ -177,40 +210,34 @@ def main():
             spb = src_eval.pose.bones[sname]
             src_pose_w[sname] = (src_eval.matrix_world @ spb.matrix).copy()
 
-        # world rotation deltas from source, applied to target rests
+        # transfer WORLD ORIENTATION per bone (conjugated into the target's
+        # facing frame); the head position rides the already-updated parent
+        # chain — rotating about rest heads + absolute placement detaches
+        # children and produced rigid straight legs (zero knee flexion)
+        inv_arm = tgt_arm.matrix_world.inverted()
         for tname in order:
             sname, _d = mapping[tname]
-            s_pose_w = src_pose_w[sname]
-            s_rest_w = src_rest[sname]
-            delta = s_pose_w @ s_rest_w.inverted()
-            # rotation-only delta; keep target bone position from its own rest
-            delta_rot = delta.to_quaternion().to_matrix().to_4x4()
-            t_rest_w = tgt_rest[tname]
-            # compose: rotate target rest about ITS OWN head position
-            head = t_rest_w.translation
-            desired_w = Matrix.Translation(head) @ delta_rot @ Matrix.Translation(-head) @ t_rest_w
+            delta = src_pose_w[sname] @ src_rest[sname].inverted()
+            delta_rot = R_fix @ delta.to_quaternion().to_matrix().to_4x4() @ R_fix_inv
+            t_rest_rot = tgt_rest[tname].to_quaternion().to_matrix().to_4x4()
+            desired_rot_w = delta_rot @ t_rest_rot
+
+            bpy.context.view_layer.update()  # parents already posed this frame
+            tpb = tgt_arm.pose.bones[tname]
+            cur_w = tgt_arm.matrix_world @ tpb.matrix
+            desired_w = Matrix.Translation(cur_w.translation) @ desired_rot_w
             if tname == tgt_root and src_root is not None:
                 # root motion: translate by source root world delta, scaled
-                s_root_pose = src_pose_w[src_root]
-                s_root_rest = src_rest[src_root]
-                dt = (s_root_pose.translation - s_root_rest.translation) * (tgt_h / src_h)
-                desired_w = Matrix.Translation(dt) @ desired_w
-            tpb = tgt_arm.pose.bones[tname]
-            tpb.matrix = tgt_arm.matrix_world.inverted() @ desired_w
-            bpy.context.view_layer.update()
+                dt = (src_pose_w[src_root].translation - src_rest[src_root].translation) * (tgt_h / src_h)
+                desired_w = Matrix.Translation(R_fix @ dt) @ Matrix.Translation(tgt_rest[tname].translation) @ desired_rot_w
+            tpb.matrix = inv_arm @ desired_w
 
-        if i == n // 2:  # debug: is motion actually reaching the target?
-            probe_t = max(mapping.items(), key=lambda kv: 'arm' in kv[1][0])[0]
-            probe_s = mapping[probe_t][0]
-            dq = (src_pose_w[probe_s] @ src_rest[probe_s].inverted()).to_quaternion()
-            tq = tgt_arm.pose.bones[probe_t].rotation_quaternion
-            print(f'DEBUG mid-frame {probe_t}<-{probe_s}: delta=({dq.w:.3f},{dq.x:.3f},{dq.y:.3f},{dq.z:.3f}) '
-                  f'target_quat=({tq.w:.3f},{tq.x:.3f},{tq.y:.3f},{tq.z:.3f})')
-
+        bpy.context.view_layer.update()
         for tname in order:
             tpb = tgt_arm.pose.bones[tname]
             tpb.keyframe_insert('rotation_quaternion', frame=i)
-            tpb.keyframe_insert('location', frame=i)
+            if tname == tgt_root:
+                tpb.keyframe_insert('location', frame=i)
 
     # remove source armature and purge every action except the bake, so the
     # exported glb contains exactly one animation with a predictable name

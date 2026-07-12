@@ -1,5 +1,17 @@
 # P0-T4 — Mesh2Motion as a retarget harness for externally rigged models
 
+> **UPDATE (2026-07-12): upload the `*-rigged-named.glb` files, not `*-rigged.glb`.**
+> UniRig emits generic `bone_N` names that defeat M2M's name-based Auto-Map (as the
+> maintainer found). `tools/rename-bones.py` now maps our predicted joints onto the
+> M2M/UE-style names by bind-pose position (side-verified against the factory rig), so:
+> - `out/humanoid-rigged-named.glb` — 51/52 bones semantically named; Auto-Map should be ~automatic
+> - `out/asymmetric-rigged-named.glb` — 28/34 named (stump side has fewer; `thigh_r` kept a
+>   generic name — map it by hand to `thigh_r` in the UI if Auto-Map misses it)
+> - `out/stylized-rigged-named.glb` — 12/22 named (giant proportions; arms kept generic names —
+>   hand-map or leave undriven)
+> The 52-vs-66 bone-count difference is fine: M2M's extra bones (fingers, leaf tips) simply
+> stay unmapped and that motion is dropped.
+
 **Verdict: YES — usable.** Mesh2Motion has a dedicated, separate retarget page ("Use Your
 Rigged Model") that imports an externally rigged model with its skin/armature preserved, maps
 its bones to a Mesh2Motion source skeleton, and exports the model with retargeted clips as one

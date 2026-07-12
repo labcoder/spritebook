@@ -19,13 +19,21 @@ spike retarget; the stylized Giant walks at the legs but shreds at the arms.
 | stylized (Quaternius Giant, 3.9 m chunky) | 3,158 v / 3,812 t | **22** | legs/hips walk plausibly; arm/torso boundary shreds mid-cycle |
 | asymmetric (humanoid, left forearm→stump) | 8,483 v / 14,318 t | **34** | **adapted to the missing limb** — no hallucinated mirror arm, stump deforms plausibly, gait intact (D-008 founding-constraint evidence) |
 
-**Retarget caveat (important for the taste call):** animation evidence uses our own
-quick position-mapped retarget (`render/retarget-bpy.py`, nearest-bind-position bone
-mapping + world rotation-delta baking of the Mesh2Motion CC0 Walk clip). It ignores
-bone-roll/twist axes, so **forearm crumpling is partly harness artifact, not purely
-UniRig skinning**. Judge shoulders/hips/torso from the sheets; judge overall quality
-interactively on `out/*-rigged.glb` (bind pose + pose bones by hand), and optionally
-re-run through Mesh2Motion's proper retarget page (`anim/MESH2MOTION-RETARGET.md`).
+**Retarget harness post-mortem (2026-07-12, after maintainer review):** the first
+evidence round showed near-static upper bodies, crumpled forearms, and backward
+("ostrich") knees. All three were **bugs in our spike retarget, not UniRig**: the
+original implementation rotated each bone about its *rest* head and wrote absolute
+placements, detaching children from the parent chain — measured knee flexion was ~zero
+at every frame while the source clip flexed 0.4–0.97. Fixed by transferring world
+*orientations* only (heads ride the updated parent chain), name-based bone mapping via
+`tools/rename-bones.py` (sides verified against the factory rig), and facing-yaw
+conjugation (measured ~0° for these assets). Post-fix, the humanoid walks with correct
+knee hinge (flexion 0.34–0.95, matching source), natural arm swing, and clean shoulder
+deformation — and the earlier "forearm weight weakness" attributed to UniRig largely
+evaporated. Remaining honest weakness: the Giant's arm/torso boundary still shreds
+mid-cycle (sparse 22-bone prediction + human clip force-fit + rough arm weights).
+Judge interactively on `out/*-rigged-named.glb` (semantic bone names — these are also
+the files to upload to Mesh2Motion's retarget page, which needs names for Auto-Map).
 
 ## Sidecar-budget numbers (per mesh, RTX 3090, seed 42)
 
@@ -93,25 +101,44 @@ remains the first thing to try if the maintainer scores this <2-of-3.
 
 ## Failure-mode catalog (seeds tier-1/tier-2 repair design)
 
-1. Forearm/wrist weight quality degrades on stylized+thin geometry (even discounting the
-   retarget twist artifact, the Giant's arm boundary weights are rough).
+1. The Giant's arm/torso boundary weights are rough — visible shredding under
+   animation even after the harness fixes (sparse bones + chunky proportions).
+   (Retracted from round 1: humanoid forearm crumple — that was our harness bug.)
 2. Sparse predictions on chunky characters (22 bones) → large rigid regions; fine for
    sprites at 128 px, limits close-up fidelity.
-3. Finger bones predicted for the humanoid but not articulated by our clip mapping —
-   harmless for sprite-scale work.
+3. Generic `bone_N` names break name-based tooling downstream (Mesh2Motion Auto-Map,
+   retarget profiles) → the production adapter needs a semantic-naming pass; our
+   position-based `tools/rename-bones.py` (side-verified, mirror-guarded) is the seed.
 4. Model-output NaN is a real, silent failure class → adapter-level NaN/row-sum
    validation is mandatory (tier-1 repair candidate: auto-retry with different seed).
 5. Merge-stage weight renormalization needs guarding when inputs contain
    zero-weight vertices.
+6. Left/right assignment on near-symmetric characters is genuinely ambiguous from
+   geometry alone (our mirror-detection tied to float noise until anchored to the
+   factory rig) — retarget profiles should record side anchors explicitly.
 
 ## Maintainer inspection (the ≥2-of-3 call)
 
-- Contact sheets: `spikes/autorig/evidence/{humanoid,stylized,asymmetric}-walk-sheet.png`
-- Rigged characters (bind pose, pose them by hand in Blender):
-  `spikes/autorig/out/{humanoid,stylized,asymmetric}-rigged.glb`
+- Contact sheets (regenerated 2026-07-12 with the fixed retarget):
+  `spikes/autorig/evidence/{humanoid,stylized,asymmetric}-walk-sheet.png`.
+  How to read them: columns = 6 evenly spaced frames of the Walk clip; row 1 = full
+  figure 3/4 view; rows 2–3 = fixed close-up crops framed on shoulders and pelvis (the
+  roadmap's two trouble joints).
+- Rigged characters with semantic bone names (pose by hand in Blender, or upload to
+  Mesh2Motion): `spikes/autorig/out/{humanoid,stylized,asymmetric}-rigged-named.glb`
 - Animated: `spikes/autorig/out/*-walk.glb` (single clip `RetargetBake_Armature`)
-- Optional better retarget: upload a rigged glb at Mesh2Motion's retarget page — steps
-  in `anim/MESH2MOTION-RETARGET.md`
+- Best interactive judge: Mesh2Motion retarget page with the **-named** glbs — steps
+  and per-character mapping notes in `anim/MESH2MOTION-RETARGET.md`
+
+## Clip-source note (Quaternius UAL vs Mesh2Motion)
+
+No dependency decision changed: **D-013 still bundles Quaternius UAL free tiers as the
+primary animation pack**; Mesh2Motion remains the BOM's explicitly-cleared alternate
+(art CC0, code MIT) and is the harness the roadmap itself names for this spike. The
+spike used M2M clips because they are directly downloadable from the repo without an
+account (UAL's free tier had no signup-free URL — provenance in `anim/NOTES.md`), and
+both packs target the same UE-style 66-joint humanoid convention, so the retarget
+profile work transfers.
 
 ## Reproduce
 
