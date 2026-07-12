@@ -1,11 +1,19 @@
 # P0-T4 report — auto-rig taste test (UniRig)
 
-**Status: pipeline proven end-to-end on native Windows; all three test characters rigged,
-skinned, retargeted, and rendered. The ≥2-of-3 "no grotesque deformation" acceptance call
-belongs to the maintainer** — evidence below and in `evidence/*.png`; interactive
-inspection paths at the bottom. The lead's read: humanoid and asymmetric are genuine
-passes at the hips/legs/torso with forearm artifacts partly attributable to our crude
-spike retarget; the stylized Giant walks at the legs but shreds at the arms.
+**VERDICT (maintainer, 2026-07-12): PASS — 3 of 3 with caveats, clearing the ≥2-of-3 bar.**
+- **humanoid: pass.**
+- **stylized: pass** on the contact-sheet evidence; in the Mesh2Motion retarget session some
+  bones failed to map (still `bone_X`) — expected, only 12/22 got semantic names (giant
+  proportions exceed the position-match threshold for arms/feet); manual mapping or a
+  per-body-plan naming profile is the production answer (failure catalog #3).
+- **asymmetric: mostly pass** — mesh oddities accepted as an artifact of how the stump was
+  procedurally created; many M2M clips visually break on this rig (human-symmetric clips on
+  an asymmetric body — exactly the case D-008/tier-2 repair and per-character clip curation
+  exist for).
+
+Original status: pipeline proven end-to-end on native Windows; all three test characters
+rigged, skinned, retargeted, and rendered. Evidence in `evidence/*.png`; interactive
+inspection paths at the bottom.
 
 - Date: 2026-07-12 · Task: P0-T4 (`docs/internal/roadmap/p0.md`) · Seed 42 everywhere
 - Machine: Windows 11, RTX 3090 24 GB, driver 610.47 · uv-managed Python 3.11.15 venv
