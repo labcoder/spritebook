@@ -16,12 +16,14 @@
 // IDENTITY transform; non-skinned mesh nodes (none in these assets, handled for safety)
 // keep their baked world matrix instead.
 
-import { WebIO, type Document, type Node, type Primitive } from 'npm:@gltf-transform/core@4.2.1';
+import { type Document, type Node, type Primitive, WebIO } from 'npm:@gltf-transform/core@4.2.1';
 import { basename } from 'node:path';
 
 const [inPath, outGlbPath, outJsonPath] = Deno.args;
 if (!inPath || !outGlbPath || !outJsonPath) {
-  console.error('usage: deno run -A strip-rig.ts <in-rigged.glb> <out-static.glb> <out-groundtruth.json>');
+  console.error(
+    'usage: deno run -A strip-rig.ts <in-rigged.glb> <out-static.glb> <out-groundtruth.json>',
+  );
   Deno.exit(1);
 }
 
@@ -112,7 +114,8 @@ const bakePrimitive = (prim: Primitive, skinMats: Mat4[], baked: Set<object>) =>
       }
     }
     if (wsum === 0) continue; // unweighted vertex: leave untouched
-    if (Math.abs(wsum - 1) > 1e-6) for (let i = 0; i < 16; i++) m[i] /= wsum; // renormalize sloppy weights
+    if (Math.abs(wsum - 1) > 1e-6) { for (let i = 0; i < 16; i++) m[i] /= wsum; // renormalize sloppy weights
+     }
     const [x, y, z] = [p[v * 3], p[v * 3 + 1], p[v * 3 + 2]];
     p[v * 3] = m[0] * x + m[4] * y + m[8] * z + m[12];
     p[v * 3 + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
@@ -151,7 +154,9 @@ for (const node of meshNodes) {
   const I = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   const dev = Math.max(...skinMats.map((m) => Math.max(...I.map((e, i) => Math.abs(m[i] - e)))));
   if (dev > 1e-5) {
-    for (const prim of node.getMesh()!.listPrimitives()) bakePrimitive(prim, skinMats, bakedAccessors);
+    for (const prim of node.getMesh()!.listPrimitives()) {
+      bakePrimitive(prim, skinMats, bakedAccessors);
+    }
     bakedCount++;
   }
 }
@@ -233,9 +238,13 @@ for (const mesh of root.listMeshes()) {
 }
 const f = (v: number[]) => `[${v.map((x) => x.toFixed(3)).join(', ')}]`;
 console.log(
-  `${basename(inPath)} -> ${basename(outGlbPath)} (${(glb.byteLength / 1024 / 1024).toFixed(2)} MB)\n` +
+  `${basename(inPath)} -> ${basename(outGlbPath)} (${
+    (glb.byteLength / 1024 / 1024).toFixed(2)
+  } MB)\n` +
     `  groundtruth: ${joints.length} joints -> ${basename(outJsonPath)}\n` +
     `  stripped: ${skins.length} skins, ${animCount} animations, ${sweptAccessors} orphaned accessors, ` +
     `${skinnedCount}/${meshNodes.length} mesh nodes skinned, rest-pose bake applied to ${bakedCount} of them\n` +
-    `  static: ${root.listMeshes().length} meshes, ${verts} verts, ${tris} tris, bounds min ${f(min)} max ${f(max)}`,
+    `  static: ${root.listMeshes().length} meshes, ${verts} verts, ${tris} tris, bounds min ${
+      f(min)
+    } max ${f(max)}`,
 );

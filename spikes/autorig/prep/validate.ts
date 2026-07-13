@@ -7,7 +7,7 @@
 //
 // Usage: deno run -A validate.ts   (paths are fixed relative to this script)
 
-import { WebIO, type Document } from 'npm:@gltf-transform/core@4.2.1';
+import { type Document, WebIO } from 'npm:@gltf-transform/core@4.2.1';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -66,7 +66,9 @@ for (const name of GLBS) {
       }
     }
     const mats = mesh.listPrimitives().map((p) => p.getMaterial()?.getName() ?? '(none)');
-    console.log(`  mesh "${mesh.getName()}": ${mv} verts, ${mt} tris, materials [${mats.join(', ')}]`);
+    console.log(
+      `  mesh "${mesh.getName()}": ${mv} verts, ${mt} tris, materials [${mats.join(', ')}]`,
+    );
     verts += mv;
     tris += mt;
   }
@@ -77,12 +79,16 @@ for (const name of GLBS) {
 for (const name of GTS) {
   const gt = JSON.parse(await Deno.readTextFile(join(assetsDir, name)));
   console.log(`${name}`);
-  if (gt.jointCount !== gt.joints.length) fail(`jointCount ${gt.jointCount} != joints.length ${gt.joints.length}`);
+  if (gt.jointCount !== gt.joints.length) {
+    fail(`jointCount ${gt.jointCount} != joints.length ${gt.joints.length}`);
+  }
   const roots = gt.joints.filter((j: { parentIndex: number }) => j.parentIndex === -1).length;
   if (roots < 1) fail('no root joint (parentIndex -1)');
   for (const [i, j] of gt.joints.entries()) {
     if (!j.name) fail(`joint ${i} has no name`);
-    if (j.parentIndex < -1 || j.parentIndex >= gt.joints.length) fail(`joint ${i} parentIndex out of range`);
+    if (j.parentIndex < -1 || j.parentIndex >= gt.joints.length) {
+      fail(`joint ${i} parentIndex out of range`);
+    }
     if (j.parentIndex === i) fail(`joint ${i} is its own parent`);
   }
   console.log(`  ${gt.jointCount} joints, ${roots} root(s), source ${gt.source}`);

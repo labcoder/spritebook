@@ -11,8 +11,8 @@
 // importer-border skill warns about. The only transform needed here is a trivial
 // orphan-texture sweep, done manually below.
 
-import { WebIO, type Document } from 'npm:@gltf-transform/core@4.2.1';
-import { dirname, join, basename } from 'node:path';
+import { type Document, WebIO } from 'npm:@gltf-transform/core@4.2.1';
+import { basename, dirname, join } from 'node:path';
 
 const [inPath, outPath] = Deno.args;
 if (!inPath || !outPath) {

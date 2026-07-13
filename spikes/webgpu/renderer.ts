@@ -99,7 +99,13 @@ export class SpikeRenderer {
   private ib: GPUBuffer;
   private scratch: { mats: Float32Array; worlds: Float32Array };
 
-  constructor(device: GPUDevice, asset: SpikeAsset, shaderSrc: string, width: number, height: number) {
+  constructor(
+    device: GPUDevice,
+    asset: SpikeAsset,
+    shaderSrc: string,
+    width: number,
+    height: number,
+  ) {
     this.device = device;
     this.asset = asset;
     this.width = width;
@@ -238,7 +244,10 @@ export class SpikeRenderer {
     );
     this.device.queue.submit([encoder.finish()]);
     slot.frame = frame;
-    slot.mapped = Promise.all([slot.lit.mapAsync(GPUMapMode.READ), slot.dep.mapAsync(GPUMapMode.READ)]);
+    slot.mapped = Promise.all([
+      slot.lit.mapAsync(GPUMapMode.READ),
+      slot.dep.mapAsync(GPUMapMode.READ),
+    ]);
   }
 
   private stripInto(buf: GPUBuffer, out: Uint8Array): void {
@@ -247,7 +256,10 @@ export class SpikeRenderer {
       out.set(src.subarray(0, out.length));
     } else {
       for (let y = 0; y < this.height; y++) {
-        out.set(src.subarray(y * this.paddedBPR, y * this.paddedBPR + this.unpaddedBPR), y * this.unpaddedBPR);
+        out.set(
+          src.subarray(y * this.paddedBPR, y * this.paddedBPR + this.unpaddedBPR),
+          y * this.unpaddedBPR,
+        );
       }
     }
     buf.unmap();

@@ -1,8 +1,15 @@
 // P0-T2: load the skinned glTF via glTF-Transform and evaluate joint matrices
 // per frame (deterministic function of the frame index — no wall clock anywhere).
 
-import { WebIO, type Node } from 'npm:@gltf-transform/core@4.2.1';
-import { type Mat4, mat4Identity, mat4Multiply, mat4RotationY, mat4RotationZ, mat4Translation } from './math.ts';
+import { type Node, WebIO } from 'npm:@gltf-transform/core@4.2.1';
+import {
+  type Mat4,
+  mat4Identity,
+  mat4Multiply,
+  mat4RotationY,
+  mat4RotationZ,
+  mat4Translation,
+} from './math.ts';
 
 export interface SpikeAsset {
   positions: Float32Array;
@@ -59,7 +66,12 @@ const scratchR: Mat4 = new Float32Array(16);
 const scratchL: Mat4 = new Float32Array(16);
 
 /** Skinning matrices for `frame` into `out` (jointCount*16). Deterministic per frame index. */
-export function evalJointMatrices(asset: SpikeAsset, frame: number, out: Float32Array, worlds: Float32Array): void {
+export function evalJointMatrices(
+  asset: SpikeAsset,
+  frame: number,
+  out: Float32Array,
+  worlds: Float32Array,
+): void {
   for (let i = 0; i < asset.jointCount; i++) {
     const tx = asset.jointTranslations[i * 3];
     const ty = asset.jointTranslations[i * 3 + 1];
@@ -75,10 +87,17 @@ export function evalJointMatrices(asset: SpikeAsset, frame: number, out: Float32
     if (p < 0) world.set(scratchL);
     else mat4Multiply(worlds.subarray(p * 16, p * 16 + 16), scratchL, world);
 
-    mat4Multiply(world, asset.inverseBind.subarray(i * 16, i * 16 + 16), out.subarray(i * 16, i * 16 + 16));
+    mat4Multiply(
+      world,
+      asset.inverseBind.subarray(i * 16, i * 16 + 16),
+      out.subarray(i * 16, i * 16 + 16),
+    );
   }
 }
 
 export function jointScratch(asset: SpikeAsset): { mats: Float32Array; worlds: Float32Array } {
-  return { mats: new Float32Array(asset.jointCount * 16), worlds: new Float32Array(asset.jointCount * 16) };
+  return {
+    mats: new Float32Array(asset.jointCount * 16),
+    worlds: new Float32Array(asset.jointCount * 16),
+  };
 }

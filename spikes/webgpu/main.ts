@@ -40,7 +40,9 @@ async function sha256hex(...parts: Uint8Array[]): Promise<string> {
 function depthToPng16(dep: Uint8Array, width: number, height: number): Uint8Array {
   const f32 = new Float32Array(dep.buffer, dep.byteOffset, width * height);
   const g16 = new Uint16Array(width * height);
-  for (let i = 0; i < g16.length; i++) g16[i] = Math.min(65535, Math.max(0, Math.round(f32[i] * 65535)));
+  for (let i = 0; i < g16.length; i++) {
+    g16[i] = Math.min(65535, Math.max(0, Math.round(f32[i] * 65535)));
+  }
   return encodePng({ width, height, data: g16, channels: 1, depth: 16 });
 }
 
@@ -64,7 +66,9 @@ async function main() {
 
   const asset = await loadAsset(here('./assets/skinned-column.glb'));
   console.log(
-    `asset: ${asset.positions.length / 3} verts, ${asset.indices.length / 3} tris, ${asset.jointCount} joints`,
+    `asset: ${asset.positions.length / 3} verts, ${
+      asset.indices.length / 3
+    } tris, ${asset.jointCount} joints`,
   );
   const shaderSrc = await Deno.readTextFile(here('./shaders.wgsl'));
 
@@ -90,7 +94,9 @@ async function main() {
   } catch { /* first invocation */ }
 
   // ---- 1. official pass-bar batch: 100 frames @128px, 2 attachments, PNGs --
-  console.log(`\n[1/6] pass-bar batch: ${BAR_FRAMES} frames @ ${SIZE}px, MRT lit+depth, PNGs written`);
+  console.log(
+    `\n[1/6] pass-bar batch: ${BAR_FRAMES} frames @ ${SIZE}px, MRT lit+depth, PNGs written`,
+  );
   const run1Hashes: string[] = [];
   const bar = await renderer.runBatch({
     frames: BAR_FRAMES,
@@ -105,7 +111,9 @@ async function main() {
   });
   report.bar = bar;
   console.log(
-    `  ${fmt(bar.fps)} frames/s end-to-end (${fmt(bar.wallMs)} ms wall, map-wait ${fmt(bar.mapWaitMs)} ms, ` +
+    `  ${fmt(bar.fps)} frames/s end-to-end (${fmt(bar.wallMs)} ms wall, map-wait ${
+      fmt(bar.mapWaitMs)
+    } ms, ` +
       `png+write ${fmt(bar.consumeMs)} ms) · readback ${fmt(bar.readbackMBps, 2)} MB/s (unpadded)`,
   );
   console.log(`  pass bar ≥${PASS_BAR_FPS} f/s: ${bar.fps >= PASS_BAR_FPS ? 'PASS' : 'FAIL'}`);
@@ -123,14 +131,22 @@ async function main() {
     run1Hashes.every((h, i) => h === run2Hashes[i]);
   report.renderReadbackOnly = noPng;
   report.inProcessDeterministic = inProcessDeterministic;
-  console.log(`  render+readback-only: ${fmt(noPng.fps)} frames/s · readback ${fmt(noPng.readbackMBps, 2)} MB/s`);
-  console.log(`  same-process double render identical bytes: ${inProcessDeterministic ? 'PASS' : 'FAIL'}`);
+  console.log(
+    `  render+readback-only: ${fmt(noPng.fps)} frames/s · readback ${
+      fmt(noPng.readbackMBps, 2)
+    } MB/s`,
+  );
+  console.log(
+    `  same-process double render identical bytes: ${inProcessDeterministic ? 'PASS' : 'FAIL'}`,
+  );
 
   let crossProcessDeterministic: boolean | null = null;
   if (previousHashes) {
     crossProcessDeterministic = previousHashes.length === run1Hashes.length &&
       previousHashes.every((h, i) => h === run1Hashes[i]);
-    console.log(`  cross-process (vs previous invocation): ${crossProcessDeterministic ? 'PASS' : 'FAIL'}`);
+    console.log(
+      `  cross-process (vs previous invocation): ${crossProcessDeterministic ? 'PASS' : 'FAIL'}`,
+    );
   } else {
     console.log('  cross-process: no previous hashes file — run again to compare');
   }
@@ -142,7 +158,8 @@ async function main() {
   const shearRenderer = new SpikeRenderer(gpu.device, asset, shaderSrc, 100, SIZE);
   const viaPadded = await shearRenderer.renderSinglePadded(0);
   const viaRows = await shearRenderer.renderSingleRowByRow(0);
-  const shearOk = viaPadded.length === viaRows.length && viaPadded.every((b, i) => b === viaRows[i]);
+  const shearOk = viaPadded.length === viaRows.length &&
+    viaPadded.every((b, i) => b === viaRows[i]);
   await Deno.writeFile(
     new URL('./shear-100px-lit.png', outDir),
     encodePng({ width: 100, height: SIZE, data: viaPadded }),
@@ -160,7 +177,9 @@ async function main() {
   const centroidX = alphaCount ? cx / alphaCount : NaN;
   report.shear = { bytesIdentical: shearOk, alphaPixels: alphaCount, centroidX };
   console.log(
-    `  bytes identical: ${shearOk ? 'PASS' : 'FAIL'} · silhouette ${alphaCount} px, centroid x=${fmt(centroidX)}`,
+    `  bytes identical: ${shearOk ? 'PASS' : 'FAIL'} · silhouette ${alphaCount} px, centroid x=${
+      fmt(centroidX)
+    }`,
   );
 
   if (mode === 'bar') {
@@ -169,7 +188,9 @@ async function main() {
   }
 
   // ---- 4. sustained soak: 1000 frames with memory sampling ----------------
-  console.log(`\n[4/6] sustained soak: ${SOAK_FRAMES} frames @ ${SIZE}px, PNG encode (write every 100th)`);
+  console.log(
+    `\n[4/6] sustained soak: ${SOAK_FRAMES} frames @ ${SIZE}px, PNG encode (write every 100th)`,
+  );
   const memSamples: { frame: number; rss: number; heapUsed: number; external: number }[] = [];
   const sampleMem = (frame: number) => {
     const m = Deno.memoryUsage();
@@ -182,8 +203,14 @@ async function main() {
       const litPng = encodePng({ width: SIZE, height: SIZE, data: lit.slice() });
       const depPng = depthToPng16(dep, SIZE, SIZE);
       if (frame % 100 === 0) {
-        await Deno.writeFile(new URL(`./soak-${String(frame).padStart(4, '0')}-lit.png`, framesDir), litPng);
-        await Deno.writeFile(new URL(`./soak-${String(frame).padStart(4, '0')}-depth.png`, framesDir), depPng);
+        await Deno.writeFile(
+          new URL(`./soak-${String(frame).padStart(4, '0')}-lit.png`, framesDir),
+          litPng,
+        );
+        await Deno.writeFile(
+          new URL(`./soak-${String(frame).padStart(4, '0')}-depth.png`, framesDir),
+          depPng,
+        );
       }
     },
     onFrameDone: (n) => {
@@ -196,15 +223,23 @@ async function main() {
   const rssLast = memSamples[memSamples.length - 1].rss;
   const rssGrowthPct = ((rssLast - rssFirst) / rssFirst) * 100;
   report.rssGrowthPct = rssGrowthPct;
-  console.log(`  sustained: ${fmt(soak.fps)} frames/s end-to-end · readback ${fmt(soak.readbackMBps, 2)} MB/s`);
   console.log(
-    `  RSS ${fmt(rssFirst / 1e6)} MB -> ${fmt(rssLast / 1e6)} MB (${fmt(rssGrowthPct)}% after warmup) over ${SOAK_FRAMES} frames`,
+    `  sustained: ${fmt(soak.fps)} frames/s end-to-end · readback ${
+      fmt(soak.readbackMBps, 2)
+    } MB/s`,
+  );
+  console.log(
+    `  RSS ${fmt(rssFirst / 1e6)} MB -> ${fmt(rssLast / 1e6)} MB (${
+      fmt(rssGrowthPct)
+    }% after warmup) over ${SOAK_FRAMES} frames`,
   );
   // projections against the PRD workloads (devil's-advocate addition)
   const proj = (frames: number) => frames / soak.fps / 3600;
   report.projections = { frames64k_hours: proj(64_000), frames192k_hours: proj(192_000) };
   console.log(
-    `  projection at sustained rate: 64k frames = ${fmt(proj(64_000), 2)} h · 192k frames = ${fmt(proj(192_000), 2)} h`,
+    `  projection at sustained rate: 64k frames = ${fmt(proj(64_000), 2)} h · 192k frames = ${
+      fmt(proj(192_000), 2)
+    } h`,
   );
 
   // ---- 5. 512px batch (supersampling headroom probe) -----------------------
@@ -223,9 +258,13 @@ async function main() {
     },
   });
   report.batch512 = b512;
-  console.log(`  ${fmt(b512.fps)} frames/s end-to-end · readback ${fmt(b512.readbackMBps, 2)} MB/s`);
+  console.log(
+    `  ${fmt(b512.fps)} frames/s end-to-end · readback ${fmt(b512.readbackMBps, 2)} MB/s`,
+  );
 
-  console.log('\n[6/6] done — run `deno task spike:webgpu -- --mode=fault` separately for the panic probe');
+  console.log(
+    '\n[6/6] done — run `deno task spike:webgpu -- --mode=fault` separately for the panic probe',
+  );
   finish(report);
 }
 
@@ -254,17 +293,26 @@ async function faultInjection(device: GPUDevice) {
     device.pushErrorScope('validation');
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
-      colorAttachments: [{ view, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }],
+      colorAttachments: [{
+        view,
+        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        loadOp: 'clear',
+        storeOp: 'store',
+      }],
     });
     pass.end();
     device.queue.submit([encoder.finish()]);
     const err = await device.popErrorScope();
     await device.queue.onSubmittedWorkDone();
     console.log(`  survived. validation error captured: ${err ? err.message : '(none)'}`);
-    console.log('  verdict: catchable — a bake job can convert this to a retryable error in-process');
+    console.log(
+      '  verdict: catchable — a bake job can convert this to a retryable error in-process',
+    );
   } catch (e) {
     console.log(`  threw (catchable): ${(e as Error).message}`);
-    console.log('  verdict: catchable — a bake job can convert this to a retryable error in-process');
+    console.log(
+      '  verdict: catchable — a bake job can convert this to a retryable error in-process',
+    );
   }
   // if the process aborts before this line prints, the fault is NOT catchable:
   console.log('fault injection completed without process death');

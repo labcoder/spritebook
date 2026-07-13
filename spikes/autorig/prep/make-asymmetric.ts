@@ -19,7 +19,7 @@
 // Normals are left untouched: uniform scale about a point + translation is a similarity
 // transform with no rotation, so normal directions remain valid.
 
-import { WebIO, type Document } from 'npm:@gltf-transform/core@4.2.1';
+import { type Document, WebIO } from 'npm:@gltf-transform/core@4.2.1';
 import { basename } from 'node:path';
 
 const SCALE = 0.25;
@@ -27,7 +27,9 @@ const INWARD_FRAC = 0.15; // of forearm length, toward the body
 
 const [inPath, gtPath, outPath] = Deno.args;
 if (!inPath || !gtPath || !outPath) {
-  console.error('usage: deno run -A make-asymmetric.ts <in-static.glb> <in-groundtruth.json> <out.glb>');
+  console.error(
+    'usage: deno run -A make-asymmetric.ts <in-static.glb> <in-groundtruth.json> <out.glb>',
+  );
   Deno.exit(1);
 }
 
@@ -54,7 +56,9 @@ const wristJ = findJoint([/^hand_l$/, /^(hand|wrist).*(_l|\.l|left)$/]);
 const elbow = elbowJ.worldPosition;
 const wrist = wristJ.worldPosition;
 if (elbow[0] <= 0) {
-  throw new Error(`left elbow at x=${elbow[0]} — expected +X for a +Z-facing character; heuristic invalid`);
+  throw new Error(
+    `left elbow at x=${elbow[0]} — expected +X for a +Z-facing character; heuristic invalid`,
+  );
 }
 const dirRaw = [wrist[0] - elbow[0], wrist[1] - elbow[1], wrist[2] - elbow[2]];
 const forearmLen = Math.hypot(...dirRaw);
@@ -91,8 +95,7 @@ for (const mesh of root.listMeshes()) {
       total++;
       const [x, y, z] = [a[i], a[i + 1], a[i + 2]];
       grow(before, x, y, z);
-      const inBand =
-        x > elbow[0] &&
+      const inBand = x > elbow[0] &&
         Math.abs(y - elbow[1]) < forearmLen &&
         Math.abs(z - elbow[2]) < forearmLen;
       if (inBand) {
@@ -120,9 +123,15 @@ await Deno.writeFile(outPath, glb);
 
 const f = (v: number[]) => `[${v.map((x) => x.toFixed(3)).join(', ')}]`;
 console.log(
-  `${basename(inPath)} -> ${basename(outPath)} (${(glb.byteLength / 1024 / 1024).toFixed(2)} MB)\n` +
-    `  elbow(${elbowJ.name}) ${f(elbow)}  wrist(${wristJ.name}) ${f(wrist)}  forearmLen ${forearmLen.toFixed(3)}\n` +
-    `  selected ${selected}/${total} verts (x > ${elbow[0].toFixed(3)}), scale ${SCALE} about elbow, ` +
+  `${basename(inPath)} -> ${basename(outPath)} (${
+    (glb.byteLength / 1024 / 1024).toFixed(2)
+  } MB)\n` +
+    `  elbow(${elbowJ.name}) ${f(elbow)}  wrist(${wristJ.name}) ${f(wrist)}  forearmLen ${
+      forearmLen.toFixed(3)
+    }\n` +
+    `  selected ${selected}/${total} verts (x > ${
+      elbow[0].toFixed(3)
+    }), scale ${SCALE} about elbow, ` +
     `inward ${f(inward)}\n` +
     `  displacement: mean ${(sumDisp / selected).toFixed(3)} m, max ${maxDisp.toFixed(3)} m\n` +
     `  bounds before min ${f(before.min)} max ${f(before.max)}\n` +

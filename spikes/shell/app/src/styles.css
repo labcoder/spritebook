@@ -30,7 +30,9 @@
   --accent: #e8a33d;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -38,11 +40,31 @@ body {
   font: 14px/1.5 'IBM Plex Sans', system-ui, sans-serif;
 }
 
-.shell { max-width: 960px; margin: 0 auto; padding: 16px; }
-header { display: flex; align-items: baseline; gap: 12px; }
-h1, h2 { font-family: 'Chakra Petch', sans-serif; font-weight: 600; }
-h1 { font-size: 20px; }
-h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; }
+.shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+}
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+h1,
+h2 {
+  font-family: 'Chakra Petch', sans-serif;
+  font-weight: 600;
+}
+h1 {
+  font-size: 20px;
+}
+h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
 
 .badge {
   font-family: 'IBM Plex Mono', monospace;
@@ -53,7 +75,11 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   color: var(--accent);
 }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -61,9 +87,19 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   padding: 14px;
   margin-bottom: 12px;
 }
-.card.wide { width: 100%; }
-.row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
-.hint { color: var(--muted); font-size: 12px; }
+.card.wide {
+  width: 100%;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+}
 
 .btn {
   background: #262a33;
@@ -74,11 +110,22 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   font: inherit;
   cursor: pointer;
 }
-.btn:hover { border-color: var(--accent); }
-.btn.primary { background: var(--accent); color: #1a1204; border-color: var(--accent); font-weight: 500; }
-.btn.sq { width: 32px; }
+.btn:hover {
+  border-color: var(--accent);
+}
+.btn.primary {
+  background: var(--accent);
+  color: #1a1204;
+  border-color: var(--accent);
+  font-weight: 500;
+}
+.btn.sq {
+  width: 32px;
+}
 
-.positioner { outline: 0; }
+.positioner {
+  outline: 0;
+}
 .popup {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -87,13 +134,25 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   min-width: 180px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
 }
-.item { padding: 6px 10px; border-radius: 5px; cursor: default; }
-.item[data-highlighted] { background: var(--accent); color: #1a1204; }
+.item {
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: default;
+}
+.item[data-highlighted] {
+  background: var(--accent);
+  color: #1a1204;
+}
 
-.backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.55); }
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.55);
+}
 .dialog {
   position: fixed;
-  top: 50%; left: 50%;
+  top: 50%;
+  left: 50%;
   transform: translate(-50%, -50%);
   background: var(--panel);
   border: 1px solid var(--line);
@@ -112,10 +171,23 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   font: inherit;
 }
 
-.scrub { cursor: ew-resize; user-select: none; }
-.scrub label { color: var(--muted); font-size: 12px; cursor: ew-resize; }
-.scrub-cursor { filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.6)); }
-.nf-group { display: flex; gap: 4px; margin-top: 6px; }
+.scrub {
+  cursor: ew-resize;
+  user-select: none;
+}
+.scrub label {
+  color: var(--muted);
+  font-size: 12px;
+  cursor: ew-resize;
+}
+.scrub-cursor {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.6));
+}
+.nf-group {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
 .nf-input {
   width: 72px;
   text-align: center;
@@ -126,11 +198,18 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   font-family: 'IBM Plex Mono', monospace;
 }
 
-.drop { border-style: dashed; }
-.drop ul { margin: 8px 0 0; padding-left: 18px; font-size: 12px; }
+.drop {
+  border-style: dashed;
+}
+.drop ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
 
 /* the log drawer renders the NDJSON stream verbatim (copy & UX rules) */
-.logwell, #selftest {
+.logwell,
+#selftest {
   background: var(--well);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -141,4 +220,7 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   white-space: pre;
   margin: 10px 0 0;
 }
-#selftest { height: auto; max-height: 260px; }
+#selftest {
+  height: auto;
+  max-height: 260px;
+}

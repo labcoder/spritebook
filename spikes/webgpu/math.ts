@@ -6,7 +6,11 @@ export type Mat4 = Float32Array; // 16 elements, column-major (WebGPU/glTF conve
 export function mat4Identity(out?: Mat4): Mat4 {
   const m = out ?? new Float32Array(16);
   m.fill(0);
-  m[0] = m[5] = m[10] = m[15] = 1;
+  m[0] =
+    m[5] =
+    m[10] =
+    m[15] =
+      1;
   return m;
 }
 

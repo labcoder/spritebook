@@ -1,9 +1,9 @@
 # P0-T4 — auto-rig taste test (UniRig)
 
 **Throwaway by contract** (see `docs/internal/roadmap/p0.md`). Evidence lands in
-[REPORT.md](./REPORT.md); the rigged `.glb`s and contact sheets under `out/` feed the
-maintainer's ≥2-of-3 acceptance call. Feeds decisions: D-007 (Track B rigging), the
-sidecar VRAM budget, and D-009 registry platform gates.
+[REPORT.md](./REPORT.md); the rigged `.glb`s and contact sheets under `out/` feed the maintainer's
+≥2-of-3 acceptance call. Feeds decisions: D-007 (Track B rigging), the sidecar VRAM budget, and
+D-009 registry platform gates.
 
 ## Layout
 
@@ -26,8 +26,8 @@ uv pip install --python .venv torch_scatter torch_cluster -f https://data.pyg.or
 uv pip install --python .venv numpy==1.26.4   # re-pin LAST
 ```
 
-Checkpoints (~5.8 GB) auto-download from `huggingface.co/VAST-AI/UniRig` on first run
-into the HF cache. WSL2-Ubuntu fallback if native wheels fail (1-hour timebox rule).
+Checkpoints (~5.8 GB) auto-download from `huggingface.co/VAST-AI/UniRig` on first run into the HF
+cache. WSL2-Ubuntu fallback if native wheels fail (1-hour timebox rule).
 
 ## Pipeline per mesh (seeded)
 

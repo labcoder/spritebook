@@ -4,7 +4,9 @@
 Deno.serve((req) => {
   Deno.writeTextFileSync(
     `${Deno.cwd()}/out/serve-hits.log`,
-    `${new Date().toISOString()} ${req.method} ${req.url} UA=${req.headers.get('user-agent')?.slice(0, 60)}\n`,
+    `${new Date().toISOString()} ${req.method} ${req.url} UA=${
+      req.headers.get('user-agent')?.slice(0, 60)
+    }\n`,
     { append: true },
   );
   return new Response(

@@ -62,7 +62,11 @@ for (let r = 0; r < RINGS - 1; r++) {
 // inverse bind matrices: joint i sits at world (0, i*SEG_H, 0) in bind pose
 const ibm = new Float32Array(JOINT_COUNT * 16);
 for (let i = 0; i < JOINT_COUNT; i++) {
-  ibm[i * 16] = ibm[i * 16 + 5] = ibm[i * 16 + 10] = ibm[i * 16 + 15] = 1;
+  ibm[i * 16] =
+    ibm[i * 16 + 5] =
+    ibm[i * 16 + 10] =
+    ibm[i * 16 + 15] =
+      1;
   ibm[i * 16 + 13] = -i * SEG_H;
 }
 
@@ -70,8 +74,11 @@ const doc = new Document();
 const buffer = doc.createBuffer('bin');
 const scene = doc.createScene('scene');
 
-const acc = (name: string, type: 'VEC3' | 'VEC4' | 'SCALAR' | 'MAT4', array: Float32Array | Uint8Array | Uint16Array) =>
-  doc.createAccessor(name).setType(type).setArray(array).setBuffer(buffer);
+const acc = (
+  name: string,
+  type: 'VEC3' | 'VEC4' | 'SCALAR' | 'MAT4',
+  array: Float32Array | Uint8Array | Uint16Array,
+) => doc.createAccessor(name).setType(type).setArray(array).setBuffer(buffer);
 
 const joints = [];
 for (let i = 0; i < JOINT_COUNT; i++) {
@@ -100,4 +107,8 @@ const glb = await new WebIO().writeBinary(doc);
 const outPath = new URL('./assets/skinned-column.glb', import.meta.url);
 await Deno.mkdir(new URL('./assets/', import.meta.url), { recursive: true });
 await Deno.writeFile(outPath, glb);
-console.log(`wrote ${outPath.pathname} (${glb.byteLength} bytes, ${vertexCount} verts, ${indices.length / 3} tris, ${JOINT_COUNT} joints)`);
+console.log(
+  `wrote ${outPath.pathname} (${glb.byteLength} bytes, ${vertexCount} verts, ${
+    indices.length / 3
+  } tris, ${JOINT_COUNT} joints)`,
+);

@@ -5,7 +5,7 @@
 //
 // Pattern follows spikes/webgpu/asset.ts (WebIO from @gltf-transform/core, pinned 4.2.1).
 
-import { WebIO, type Node } from 'npm:@gltf-transform/core@4.2.1';
+import { type Node, WebIO } from 'npm:@gltf-transform/core@4.2.1';
 
 function fmt(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(3);
@@ -57,7 +57,9 @@ async function inspect(path: string): Promise<void> {
     const prefixed = names.filter((n) => n.includes(':'));
     console.log(
       prefixed.length > 0
-        ? `  prefix convention: ${prefixed.length}/${names.length} contain ':' e.g. "${prefixed[0]}"`
+        ? `  prefix convention: ${prefixed.length}/${names.length} contain ':' e.g. "${
+          prefixed[0]
+        }"`
         : '  prefix convention: none (bare bone names)',
     );
     const mixamo = names.filter((n) => n.toLowerCase().includes('mixamorig'));
@@ -74,7 +76,10 @@ async function inspect(path: string): Promise<void> {
     for (const scene of scenes) for (const n of scene.listChildren()) walk(n);
     const jointRoots = joints.filter((j) => !jointSet.has(parentOf.get(j)!));
     console.log(
-      `  hierarchy roots: ${jointRoots.map((r) => `"${r.getName()}" (parent: ${parentOf.get(r)?.getName() ?? 'scene'})`).join(', ')}`,
+      `  hierarchy roots: ${
+        jointRoots.map((r) => `"${r.getName()}" (parent: ${parentOf.get(r)?.getName() ?? 'scene'})`)
+          .join(', ')
+      }`,
     );
   }
 
@@ -87,7 +92,9 @@ async function inspect(path: string): Promise<void> {
         if (t) animated.add(t.getName());
       }
     }
-    console.log(`  (no skins) animated node names, first 12: ${[...animated].slice(0, 12).join(', ')}`);
+    console.log(
+      `  (no skins) animated node names, first 12: ${[...animated].slice(0, 12).join(', ')}`,
+    );
   }
 
   // --- animation clips ------------------------------------------------------
@@ -111,7 +118,9 @@ async function inspect(path: string): Promise<void> {
     if (!Number.isFinite(minT)) minT = 0;
     console.log(
       `  "${a.getName()}" — ${fmt(maxT - minT)}s (t=${fmt(minT)}..${fmt(maxT)}) ` +
-        `channels=${a.listChannels().length} targets=${targets.size} paths=[${[...paths].join(',')}]`,
+        `channels=${a.listChannels().length} targets=${targets.size} paths=[${
+          [...paths].join(',')
+        }]`,
     );
   }
 }

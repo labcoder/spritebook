@@ -1,0 +1,77 @@
+# P1-T1 CI: enforce the working agreements on every push/PR.
+# Kept free & simple: standard hosted runners only. Deno pinned per the
+# D-004 canary rider (upgrade deliberately; re-run spikes/webgpu first).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  DENO_VERSION: '2.9.2'
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+      - name: format
+        run: deno fmt --check
+      - name: lint
+        run: deno lint
+      - name: commit lint (PR range)
+        if: github.event_name == 'pull_request'
+        run: deno run --allow-run tools/ci/commit-lint.ts --range origin/${{ github.base_ref }}..HEAD
+      - name: tests required (PR)
+        if: github.event_name == 'pull_request'
+        run: deno run --allow-run tools/ci/tests-required.ts --base origin/${{ github.base_ref }}
+      - name: BOM guard (PR)
+        if: github.event_name == 'pull_request'
+        run: deno run --allow-run --allow-read tools/ci/bom-guard.ts --base origin/${{ github.base_ref }}
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+      - name: test
+        run: deno task test
+      - name: coverage (ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: deno task coverage
+      - name: upload coverage artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: .coverage
+
+  # Software-Vulkan lane: installed now, exercised by the render suites from P2 on
+  # (docs/internal/roadmap/p1.md; Mesa lavapipe row in docs/dependencies.md).
+  lavapipe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+      - name: install Mesa lavapipe
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools
+      - name: lavapipe adapter smoke
+        run: |
+          vulkaninfo --summary | grep -i llvmpipe
+          echo "lavapipe present; render suites attach here from P2"
