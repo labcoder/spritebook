@@ -1,0 +1,150 @@
+/**
+ * T2 acceptance: invalid documents fail with ACTIONABLE messages — the error
+ * must name the offending path and say what was expected, never a stack trace.
+ */
+import { assert, assertThrows } from 'jsr:@std/assert@1';
+import type { z } from 'zod';
+import { parseWith, SchemaError } from './canonical.ts';
+import { CharacterIdSchema } from './identity.ts';
+import { CacheKeyInputsSchema } from './cache.ts';
+import { JsonPatchOpSchema, ManifestPatchSchema } from './patch.ts';
+import { StylePresetSchema } from './project.ts';
+import { JobEventSchema } from './jobs.ts';
+import { migrateCharacterManifest } from './migrate.ts';
+
+function expectFailure(
+  schema: z.ZodType,
+  data: unknown,
+  what: string,
+  ...fragments: string[]
+) {
+  const err = assertThrows(() => parseWith(schema, data, what), SchemaError);
+  for (const f of fragments) {
+    assert(
+      err.message.includes(f),
+      `expected message to include "${f}", got:\n${err.message}`,
+    );
+  }
+}
+
+Deno.test('characterId rejects non-slug values with the rule spelled out', () => {
+  expectFailure(CharacterIdSchema, 'Brave Knight!', 'characterId', 'lowercase slug');
+  expectFailure(CharacterIdSchema, 'x', 'characterId', 'lowercase slug'); // too short
+});
+
+Deno.test('CacheKeyInputs rejects a smuggled displayName (strict object)', () => {
+  expectFailure(
+    CacheKeyInputsSchema,
+    {
+      characterId: 'brave-knight',
+      displayName: 'Brave Knight',
+      canonicalMeshSha256: 'b'.repeat(64),
+      rigStateHash: 'c'.repeat(64),
+      clipBindingHash: 'd'.repeat(64),
+      cameraPresetHash: 'e'.repeat(64),
+      stylePresetHash: 'f'.repeat(64),
+      rendererVersion: '0.1.0',
+      backend: { modelId: 'pixal3d', version: '1.2', paramsHash: '0'.repeat(64) },
+    },
+    'CacheKeyInputs',
+    'displayName',
+  );
+});
+
+Deno.test('patches cannot touch immutable identity paths', () => {
+  expectFailure(
+    JsonPatchOpSchema,
+    { op: 'replace', path: '/id', value: 'new-name' },
+    'JsonPatchOp',
+    'immutable',
+  );
+  expectFailure(
+    JsonPatchOpSchema,
+    { op: 'remove', path: '/createdAt' },
+    'JsonPatchOp',
+    'immutable',
+  );
+});
+
+Deno.test('patch ops: value required for add/replace, forbidden for remove', () => {
+  expectFailure(
+    JsonPatchOpSchema,
+    { op: 'replace', path: '/displayName' },
+    'JsonPatchOp',
+    "value is required for op 'replace'",
+  );
+  expectFailure(
+    JsonPatchOpSchema,
+    { op: 'remove', path: '/notes', value: 1 },
+    'JsonPatchOp',
+    "value is forbidden for op 'remove'",
+  );
+});
+
+Deno.test('ManifestPatch requires a 1:1 precomputed inverse', () => {
+  expectFailure(
+    ManifestPatchSchema,
+    {
+      seq: 1,
+      at: '2026-07-12T00:00:00Z',
+      target: { kind: 'character', id: 'brave-knight' },
+      op: [
+        { op: 'replace', path: '/displayName', value: 'A' },
+        { op: 'replace', path: '/look/stylePresetId', value: 'cel-2' },
+      ],
+      inverse: [{ op: 'replace', path: '/displayName', value: 'B' }],
+      label: 'two edits',
+    },
+    'ManifestPatch',
+    'inverse',
+    'one op per forward op',
+  );
+});
+
+Deno.test("StylePreset: alpha '1bit' without cutoff is actionable", () => {
+  expectFailure(
+    StylePresetSchema,
+    {
+      id: 'cel-2',
+      mode: 'cel',
+      temporal: { superSample: 1, clusterVote: false, paletteHysteresisEps: 0, texelSnap: false },
+      passes: ['lit'],
+      alpha: { mode: '1bit', bleedPx: 2 },
+    },
+    'StylePreset',
+    'cutoff',
+    "'1bit'",
+  );
+});
+
+Deno.test("StylePreset: passes must include 'lit' (parallel-layout law)", () => {
+  expectFailure(
+    StylePresetSchema,
+    {
+      id: 'cel-2',
+      mode: 'cel',
+      temporal: { superSample: 1, clusterVote: false, paletteHysteresisEps: 0, texelSnap: false },
+      passes: ['normal'],
+      alpha: { mode: 'soft', bleedPx: 2 },
+    },
+    'StylePreset',
+    "must include 'lit'",
+  );
+});
+
+Deno.test('JobEvent rejects unknown discriminants and bad timestamps', () => {
+  expectFailure(
+    JobEventSchema,
+    { t: 'finished', jobId: 'job-1', at: '2026-07-12T00:00:00Z' },
+    'JobEvent',
+    't',
+  );
+  expectFailure(JobEventSchema, { t: 'queued', jobId: 'job-1', at: 'yesterday' }, 'JobEvent', 'at');
+});
+
+Deno.test('migration refuses documents newer than this build', () => {
+  const err = assertThrows(() =>
+    migrateCharacterManifest({ schemaVersion: 99, id: 'brave-knight' })
+  );
+  assert((err as Error).message.includes('newer than this build'));
+});

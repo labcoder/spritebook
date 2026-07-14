@@ -2,9 +2,16 @@
  * SpriteBook data models — draft v0.2 (2026-07-11)
  *
  * Merged from: v0 draft + UX deltas + pre-regen audit.
- * P1-T2 turns this file into `packages/schema` with runtime validation
- * (Zod or similar), migrations, and exhaustive tests. Until then this
- * draft is the contract of record; keep it in lockstep with architecture.md.
+ *
+ * >>> IMPLEMENTED at P1-T2 (2026-07-12): `packages/schema` (zod 4) is now the
+ * >>> authoritative contract; this file remains the readable reference.
+ * >>> Implementation deltas: persisted documents (CharacterManifest, Project,
+ * >>> BakeManifest) carry `schemaVersion` (current: 2; v1->v2 migration adds
+ * >>> the D-008 opt-in `mirroring` default); `ExportTargetId` — referenced but
+ * >>> undefined here — is pinned to the four in-tree exporters
+ * >>> ('godot' | 'aseprite' | 'texturepacker' | 'strips'); patches reject the
+ * >>> immutable identity paths (/id, /characterId, /createdAt, /bakeId,
+ * >>> /schemaVersion) and require a 1:1 precomputed inverse.
  *
  * Conventions: all lengths in meters, all angles in degrees, all times in
  * seconds unless suffixed. Hashes are sha256 hex. IDs are lowercase slugs.

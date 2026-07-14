@@ -28,19 +28,14 @@ export interface RenderJobSpec {
   outDir: string;
 }
 
-/** Stub render job: yields the full event vocabulary in contract order. */
+/** Stub render job: yields the event contract (data-models v0.2 shape) in order. */
 export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent> {
-  const ts = () => new Date().toISOString();
-  const { jobId } = spec;
-  yield { event: 'queued', jobId, ts: ts() };
-  yield { event: 'started', jobId, ts: ts(), verb: 'render' };
-  yield { event: 'progress', jobId, ts: ts(), pct: 100, message: 'stub' };
-  yield {
-    event: 'artifact',
-    jobId,
-    ts: ts(),
-    path: `${spec.outDir}/stub.txt`,
-    kind: 'stub',
-  };
-  yield { event: 'done', jobId, ts: ts(), ok: true };
+  const at = () => new Date().toISOString();
+  const jobId = spec.jobId as JobEvent['jobId'];
+  const t0 = performance.now();
+  yield { t: 'queued', jobId, at: at() };
+  yield { t: 'started', jobId, at: at() };
+  yield { t: 'progress', jobId, at: at(), step: 'stub', done: 1, total: 1 };
+  yield { t: 'artifact', jobId, at: at(), kind: 'stub', path: `${spec.outDir}/stub.txt` };
+  yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
 }

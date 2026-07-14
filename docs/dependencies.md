@@ -13,11 +13,12 @@ are unchanged.
 
 ## Runtime & shell
 
-| Dependency               | Role                                                                                   | License             | Status |
-| ------------------------ | -------------------------------------------------------------------------------------- | ------------------- | ------ |
-| Deno 2.x                 | TS runtime, workspace, WebGPU, tests                                                   | MIT                 | std    |
-| Tauri 2.x (pin minor)    | app shell — **chosen by P0-T3 (D-005)**; `deno desktop` revisit trigger noted in D-005 | MIT+Apache-2.0      | std    |
-| wgpu (under Deno WebGPU) | GPU backend                                                                            | MIT/Apache-2.0 dual | std    |
+| Dependency               | Role                                                                                                                        | License             | Status           |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------- | ---------------- |
+| Deno 2.x                 | TS runtime, workspace, WebGPU, tests                                                                                        | MIT                 | std              |
+| zod 4.x                  | runtime validation for `@spritebook/schema`; v4 core rewrite + native JSON-Schema interop (pairs with D-009 `paramsSchema`) | MIT                 | std; lock-pinned |
+| Tauri 2.x (pin minor)    | app shell — **chosen by P0-T3 (D-005)**; `deno desktop` revisit trigger noted in D-005                                      | MIT+Apache-2.0      | std              |
+| wgpu (under Deno WebGPU) | GPU backend                                                                                                                 | MIT/Apache-2.0 dual | std              |
 
 ## Core render, style, pack
 

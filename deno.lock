@@ -6,7 +6,8 @@
     "npm:@gltf-transform/core@4.2.1": "4.2.1",
     "npm:@tauri-apps/cli@2.11.4": "2.11.4",
     "npm:fast-png@6.2.0": "6.2.0",
-    "npm:vite@*": "8.1.4"
+    "npm:vite@*": "8.1.4",
+    "npm:zod@^4.4.3": "4.4.3"
   },
   "jsr": {
     "@std/assert@1.0.19": {
@@ -396,6 +397,18 @@
         "fsevents"
       ],
       "bin": true
+    },
+    "zod@4.4.3": {
+      "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="
+    }
+  },
+  "workspace": {
+    "members": {
+      "packages/schema": {
+        "dependencies": [
+          "npm:zod@^4.4.3"
+        ]
+      }
     }
   }
 }

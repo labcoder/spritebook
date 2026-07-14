@@ -1,0 +1,7 @@
+{"at":"2026-07-12T00:00:00Z","jobId":"job-1","t":"queued"}
+{"at":"2026-07-12T00:00:00Z","jobId":"job-1","t":"started"}
+{"at":"2026-07-12T00:00:00Z","done":1,"jobId":"job-1","step":"render","t":"progress","total":16}
+{"at":"2026-07-12T00:00:00Z","jobId":"job-1","kind":"atlas","path":"atlas-0-lit.png","t":"artifact"}
+{"at":"2026-07-12T00:00:00Z","code":"palette-overflow","jobId":"job-1","message":"Palette clamped to 24","t":"warn"}
+{"at":"2026-07-12T00:00:00Z","code":"device-lost","jobId":"job-1","message":"GPU device lost","retryable":true,"t":"error"}
+{"at":"2026-07-12T00:00:00Z","jobId":"job-1","t":"done","wallTimeS":12.25}

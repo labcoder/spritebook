@@ -1,0 +1,1 @@
+{"bundled":true,"clips":[{"category":"locomotion","displayName":"Walk (relaxed)","durationS":1.667,"fpsSource":24,"id":"walk_relaxed","loop":true,"packId":"ual-free","rootMotion":true,"tags":["walk","loop"]}],"displayName":"Universal Animation Library (free tier)","id":"ual-free","license":{"name":"CC0","requiresAcceptance":false,"spdx":"CC0-1.0"},"rigProfile":"ual-humanoid"}

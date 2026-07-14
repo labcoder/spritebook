@@ -1,0 +1,1 @@
+{"at":"2026-07-12T00:00:00Z","inverse":[{"op":"replace","path":"/displayName","value":"Brave Knight"}],"label":"Rename to Sir Bravery","op":[{"op":"replace","path":"/displayName","value":"Sir Bravery"}],"seq":12,"target":{"id":"brave-knight","kind":"character"}}

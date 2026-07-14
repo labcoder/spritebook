@@ -1,0 +1,3 @@
+# Schema fixtures are byte-compared in tests (canonical JSON, LF) - never
+# let eol translation touch them, on any platform.
+packages/schema/fixtures/** text eol=lf
