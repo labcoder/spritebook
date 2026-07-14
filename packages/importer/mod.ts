@@ -1,11 +1,10 @@
 /**
- * @spritebook/importer - Border: readers (glTF-Transform, ufbx-wasm, obj2gltf), canonicalization, PreflightReport
- *
- * P1-T1 stub: the package exists so the workspace shape is load-bearing from
- * day one. Real implementation lands at P1-T4 (docs/internal/roadmap/).
+ * @spritebook/importer - the border: readers (glTF-Transform, three-FBX
+ * bridge, obj2gltf), canonicalization, PreflightReport (P1-T4, D-012, D-020).
  */
-export const PACKAGE = 'importer' as const;
-
-/** One-line contract from the architecture module map. */
-export const CONTRACT =
-  'Border: readers (glTF-Transform, ufbx-wasm, obj2gltf), canonicalization, PreflightReport' as const;
+export * from './errors.ts';
+export * from './detect.ts';
+export * from './io.ts';
+export * from './fbx.ts';
+export * from './canonicalize.ts';
+export * from './import.ts';

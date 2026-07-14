@@ -34,14 +34,15 @@ are unchanged.
 
 ## Importer border
 
-| Dependency                 | Role                                         | License          | Status                                                                                                                                    |
-| -------------------------- | -------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| glTF-Transform             | all glTF surgery                             | MIT              | std; pin (byte-determinism)                                                                                                               |
-| draco3d / meshopt decoders | decode compressed uploads                    | Apache-2.0 / MIT | std                                                                                                                                       |
-| **ufbx**                   | FBX ingestion                                | MIT              | **✓** — no Autodesk code; Godot 4.3+ default for the same reason. Integration form (wasm vs subprocess): P1-T4 decision, wasm recommended |
-| obj2gltf                   | OBJ ingestion                                | Apache-2.0       | std                                                                                                                                       |
-| mikktspace (wasm)          | tangents at render prep                      | MIT              | std                                                                                                                                       |
-| @pixiv/three-vrm           | VRM conventions reference (VRM 0.x faces −Z) | MIT              | std, reference only                                                                                                                       |
+| Dependency                  | Role                                         | License          | Status                                                                                                                                                      |
+| --------------------------- | -------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| glTF-Transform              | all glTF surgery                             | MIT              | std; pinned ^4.4.1 (byte-determinism)                                                                                                                       |
+| draco3dgltf / meshoptimizer | decode compressed uploads (exact npm names)  | Apache-2.0 / MIT | std; ^1.5.7 / ^1.2.0                                                                                                                                        |
+| three (FBXLoader only)      | FBX ingestion — **interim per D-020**        | MIT              | ^0.185.1; parser only, bridged into glTF-Transform Documents; no DOM/renderer touched                                                                       |
+| **ufbx**                    | FBX ingestion — target                       | MIT              | **blocked**: no npm package/wasm binding exists (verified 2026-07-13, D-020); no Autodesk code; Godot 4.3+ default. Revisit when a maintained binding lands |
+| obj2gltf                    | OBJ ingestion                                | Apache-2.0       | std; ^3.2.0                                                                                                                                                 |
+| mikktspace (wasm)           | tangents at render prep                      | MIT              | std                                                                                                                                                         |
+| @pixiv/three-vrm            | VRM conventions reference (VRM 0.x faces −Z) | MIT              | std, reference only                                                                                                                                         |
 
 **Rejected: FBX2glTF.** Code BSD-3, but binaries embed the proprietary Autodesk FBX SDK under the
 Autodesk License and Services Agreement (no redistribution). ✓ verified. Never bundle.

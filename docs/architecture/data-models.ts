@@ -12,6 +12,8 @@
  * >>> ('godot' | 'aseprite' | 'texturepacker' | 'strips'); patches reject the
  * >>> immutable identity paths (/id, /characterId, /createdAt, /bakeId,
  * >>> /schemaVersion) and require a 1:1 precomputed inverse.
+ * >>> P1-T4 delta (2026-07-13): `SourceRecord.importedVia.tool` gains
+ * >>> 'three-fbx' (D-020 interim FBX converter; 'ufbx' stays reserved).
  *
  * Conventions: all lengths in meters, all angles in degrees, all times in
  * seconds unless suffixed. Hashes are sha256 hex. IDs are lowercase slugs.
@@ -172,7 +174,8 @@ export interface SourceRecord {
   kind: 'image' | 'mesh';
   originalFilename: string;
   sha256: string;
-  importedVia?: { tool: 'gltf-transform' | 'ufbx' | 'obj2gltf'; version: string };
+  // 'three-fbx' added at P1-T4 (D-020 interim FBX path); 'ufbx' reserved for the wasm binding
+  importedVia?: { tool: 'gltf-transform' | 'ufbx' | 'obj2gltf' | 'three-fbx'; version: string };
 }
 
 export interface PreflightReport {

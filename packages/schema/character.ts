@@ -13,7 +13,9 @@ export const SourceRecordSchema = z.strictObject({
   originalFilename: z.string().min(1),
   sha256: Sha256Schema,
   importedVia: z.strictObject({
-    tool: z.enum(['gltf-transform', 'ufbx', 'obj2gltf']),
+    // 'three-fbx' is the D-020 interim FBX converter; 'ufbx' reserved for the
+    // wasm binding once one exists upstream
+    tool: z.enum(['gltf-transform', 'ufbx', 'obj2gltf', 'three-fbx']),
     version: z.string().min(1),
   }).optional(),
 });

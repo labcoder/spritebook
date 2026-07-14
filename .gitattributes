@@ -1,3 +1,20 @@
 # Schema fixtures are byte-compared in tests (canonical JSON, LF) - never
 # let eol translation touch them, on any platform.
 packages/schema/fixtures/** text eol=lf
+
+# deno fmt always writes LF; pin all source/text to LF so Windows autocrlf
+# never produces phantom modifications or CI fmt drift.
+*.ts text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.gltf text eol=lf
+*.obj text eol=lf
+.githooks/* text eol=lf
+
+# Binary fixtures - no translation, no diffs.
+*.glb binary
+*.fbx binary
