@@ -1,10 +1,13 @@
 /**
- * @spritebook/core - Queue, events, journal/undo, cache, orchestration
+ * @spritebook/core - queue, events, journal/undo, cache, orchestration.
  *
- * P1-T1 stub: the package exists so the workspace shape is load-bearing from
- * day one. Real implementation lands at P1-T3 (docs/internal/roadmap/).
+ * P1-T3: the core spine against stub executors — the NDJSON contract
+ * (validated at the EventBus choke point), a concurrency-limited queue with
+ * cancel + retry-on-retryable, the ManifestPatch journal with precomputed
+ * inverses (undo/redo), and the input-hash cache (D-011).
  */
-export const PACKAGE = 'core' as const;
-
-/** One-line contract from the architecture module map. */
-export const CONTRACT = 'Queue, events, journal/undo, cache, orchestration' as const;
+export * from './events.ts';
+export * from './queue.ts';
+export * from './journal.ts';
+export * from './cache.ts';
+export * from './stub-bake.ts';
