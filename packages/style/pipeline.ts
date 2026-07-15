@@ -91,7 +91,9 @@ function processFrame(
   );
 
   if (style.temporal.clusterVote) {
-    const labelsSx = labelSx(comp, aov.width, aov.height, palette, dither);
+    // blockSize = s: the Bayer dither is indexed by the 1x output block, so it
+    // survives the vote instead of being averaged away (M3).
+    const labelsSx = labelSx(comp, aov.width, aov.height, palette, dither, s);
     const cand = clusterVoteDownsample(labelsSx, aov.width, aov.height, s);
     const ref = areaAverageDownsample(comp, aov.width, aov.height, s);
     const final = resolveHysteresis(
@@ -133,23 +135,20 @@ function finishAlpha(rgba: Uint8Array, style: StylePreset, w: number, h: number)
   if (style.alpha.bleedPx > 0) dilateEdgeColors(rgba, w, h, style.alpha.bleedPx);
 }
 
-function qaFlags(style: StylePreset, camera: CameraPreset, src: AovSource): QAFlag[] {
+function qaFlags(style: StylePreset, camera: CameraPreset): QAFlag[] {
   const flags: QAFlag[] = [];
   if (style.outline && style.outline.widthPx > camera.paddingPx) {
-    const frameRefs = [];
-    for (let d = 0; d < src.directions; d++) {
-      for (let f = 0; f < src.frames; f++) {
-        frameRefs.push({ clipId: 'idle', direction: d, frame: f });
-      }
-    }
+    // preset-config check (a single representative frameRef; the flag is global,
+    // not per-frame). Strokes grow inward so they don't clip, but exceeding the
+    // padding budget means the outline eats into the cell's bleed margin.
     flags.push({
       code: 'outline-exceeds-padding',
       severity: 'warn',
       sourceStage: 'look',
-      frameRefs,
+      frameRefs: [{ clipId: 'idle', direction: 0, frame: 0 }],
       message:
-        `outline width ${style.outline.widthPx}px exceeds camera padding ${camera.paddingPx}px; ` +
-        `strokes may clip at cell edges`,
+        `outline width ${style.outline.widthPx}px exceeds the ${camera.paddingPx}px padding budget; ` +
+        `reduce widthPx or increase the camera padding`,
     });
   }
   return flags;
@@ -223,7 +222,7 @@ export async function styleFromAovs(
     superSample: s,
     paletteHex: paletteToHex(palette),
     flickerPct: flickerPct(idleFrames, w1, h1),
-    flags: qaFlags(style, camera, src),
+    flags: qaFlags(style, camera),
     styledDir,
   };
 }

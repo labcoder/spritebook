@@ -121,6 +121,10 @@ export function creaseEdges(aov: AovImage, p: OutlineParams): Uint8Array {
         const yy = y + N4_DY[k];
         if (xx < 0 || xx >= w || yy < 0 || yy >= h) continue;
         const j = yy * w + xx;
+        // mark the crease on ONE flank only (the lower-index texel of the pair,
+        // i.e. skip left/up neighbours) so a crease dilates to the same width as
+        // a silhouette rather than ~2x from being seeded on both sides (M2).
+        if (j < i) continue;
         if (mask[j] === 0) continue; // opaque/empty pair is a silhouette, not a crease
         const dot = xi * nx[j] + yi * ny[j] + zi * nz[j];
         if (dot < nt) {
@@ -138,37 +142,18 @@ export function creaseEdges(aov: AovImage, p: OutlineParams): Uint8Array {
   return out;
 }
 
-/**
- * Extract the outline stroke mask at render (Sx) resolution: 1 where a stroke sits,
- * 0 elsewhere. Silhouette OR crease edges are detected at 1px, then thickened to the
- * supersample-derived stroke width.
- *
- * Dilation approach: stroke = max(1, round(widthPx * superSample)). The 1px edge seeds
- * are grown by (stroke - 1) rounds of 8-connected dilation INTO OPAQUE TEXELS ONLY,
- * using two ping-pong buffers allocated once (every cell is rewritten each round, so no
- * stale carryover). This is equivalent to a Chebyshev distance <= stroke-1 dilation
- * clamped to mask != 0. Two consequences, both intended:
- *   - A straight silhouette grows only inward (the empty side is never written), so it
- *     ends up exactly `stroke` texels thick (seed + stroke-1 rounds), and no stroke ever
- *     expands past the silhouette into the padding.
- *   - A crease, opaque on both sides, is marked on both flanks and grows both ways.
- * stroke == 1 (rounds == 0) returns the detected edges verbatim, no dilation.
- */
-export function extractOutline(aov: AovImage, p: OutlineParams): Uint8Array {
-  const { width: w, height: h, mask } = aov;
+/** Grow `seeds` by `rounds` of 8-connected dilation INTO OPAQUE texels only. */
+function dilate(
+  seeds: Uint8Array,
+  mask: Uint16Array,
+  rounds: number,
+  w: number,
+  h: number,
+): Uint8Array {
+  if (rounds <= 0) return seeds;
   const n = w * h;
-
-  // 1px edge seeds: silhouette OR crease (reuse the silhouette buffer as accumulator).
-  const seeds = silhouetteEdges(aov);
-  const crease = creaseEdges(aov, p);
-  for (let i = 0; i < n; i++) seeds[i] |= crease[i];
-
-  const stroke = Math.max(1, Math.round(p.widthPx * p.superSample));
-  const rounds = stroke - 1;
-  if (rounds === 0) return seeds;
-
-  let cur: Uint8Array = seeds;
-  let next: Uint8Array = new Uint8Array(n);
+  let cur: Uint8Array<ArrayBufferLike> = seeds;
+  let next: Uint8Array<ArrayBufferLike> = new Uint8Array(n);
   for (let r = 0; r < rounds; r++) {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
@@ -199,4 +184,26 @@ export function extractOutline(aov: AovImage, p: OutlineParams): Uint8Array {
     next = tmp;
   }
   return cur;
+}
+
+/**
+ * Extract the outline stroke mask at render (Sx) resolution: 1 where a stroke sits.
+ * `stroke = max(1, round(widthPx * superSample))`. Silhouette and crease seeds are
+ * dilated SEPARATELY (8-connected, into opaque texels only) then unioned:
+ *   - Silhouette grows inward (the empty side is never written), clamped by the
+ *     boundary, so `stroke-1` rounds give a `stroke`-thick inward stroke that never
+ *     spills into the padding.
+ *   - A crease is interior (opaque both sides) so it grows BOTH ways; dilating it by
+ *     only floor((stroke-1)/2) rounds gives it the SAME ~stroke width as a silhouette
+ *     rather than ~2x (M2). stroke == 1 returns the 1px seeds verbatim.
+ */
+export function extractOutline(aov: AovImage, p: OutlineParams): Uint8Array {
+  const { width: w, height: h, mask } = aov;
+  const n = w * h;
+  const stroke = Math.max(1, Math.round(p.widthPx * p.superSample));
+  const sil = dilate(silhouetteEdges(aov), mask, stroke - 1, w, h);
+  const cre = dilate(creaseEdges(aov, p), mask, Math.floor((stroke - 1) / 2), w, h);
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) out[i] = sil[i] | cre[i];
+  return out;
 }

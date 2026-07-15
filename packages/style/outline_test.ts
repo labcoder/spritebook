@@ -63,7 +63,7 @@ Deno.test('crease: two flat normal regions -> crease exactly on the seam', () =>
   const out = extractOutline(aov, params({ superSample: 1, widthPx: 1 }));
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      const expected = x === SEAM - 1 || x === SEAM ? 1 : 0; // both flanks of the seam
+      const expected = x === SEAM - 1 ? 1 : 0; // single (lower-index) flank, M2
       assertEquals(out[y * W + x], expected, `crease at (${x},${y})`);
     }
   }
@@ -74,11 +74,11 @@ Deno.test('crease: a depth step is detected on the seam (normals flat)', () => {
   for (let y = 0; y < H; y++) {
     for (let x = SEAM; x < W; x++) aov.depth[y * W + x] = 40000;
   }
-  // |0.153 - 0.610| = 0.458 exceeds 0.5*0.153 AND 0.5*0.610 -> both flanks fire.
+  // |0.153 - 0.610| = 0.458 exceeds the scaled threshold -> crease on the left flank.
   const out = extractOutline(aov, params({ depthThresholdScaled: 0.5, normalThreshold: 0.5 }));
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      const expected = x === SEAM - 1 || x === SEAM ? 1 : 0;
+      const expected = x === SEAM - 1 ? 1 : 0;
       assertEquals(out[y * W + x], expected, `depth crease at (${x},${y})`);
     }
   }
@@ -108,10 +108,10 @@ Deno.test('crease: depth threshold scales with depth (same step, near creases, f
   const p = params({ depthThresholdScaled: 0.5, normalThreshold: 0.5 });
   const nearCrease = creaseEdges(near, p);
   const farCrease = creaseEdges(far, p);
-  // near: step 0.0305 > 0.5*(1000/65535)=0.0076 (and > the 3000 side) -> both flanks fire
+  // near: step 0.0305 > 0.5*(1000/65535)=0.0076 -> crease on the left (lower-index) flank
   for (let y = 0; y < H; y++) {
     assertEquals(nearCrease[y * W + (SEAM - 1)], 1, `near crease col ${SEAM - 1} @${y}`);
-    assertEquals(nearCrease[y * W + SEAM], 1, `near crease col ${SEAM} @${y}`);
+    assertEquals(nearCrease[y * W + SEAM], 0, `right flank not marked @${y}`);
   }
   // far: step 0.0305 < 0.5*(60000/65535)=0.4578 -> no crease anywhere
   assertEquals(farCrease.reduce((a, b) => a + b, 0), 0);

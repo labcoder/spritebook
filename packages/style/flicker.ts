@@ -15,11 +15,16 @@ export function flickerPct(frames: Uint8Array[], width: number, height: number):
     let changed = 0;
     for (let p = 0; p < px; p++) {
       const o = p * 4;
-      if (
-        a[o] !== b[o] || a[o + 1] !== b[o + 1] || a[o + 2] !== b[o + 2] || a[o + 3] !== b[o + 3]
+      const va = a[o + 3] > 0, vb = b[o + 3] > 0;
+      if (va !== vb) {
+        changed++; // appeared/disappeared — a visible change
+      } else if (
+        va &&
+        (a[o] !== b[o] || a[o + 1] !== b[o + 1] || a[o + 2] !== b[o + 2] || a[o + 3] !== b[o + 3])
       ) {
-        changed++;
+        changed++; // both visible and a channel differs
       }
+      // both transparent: ignore invisible RGB churn from edge bleed (L6)
     }
     sum += changed / px;
   }

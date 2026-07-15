@@ -13,6 +13,7 @@
     "npm:fast-png@^6.2.0": "6.2.0",
     "npm:meshoptimizer@^1.2.0": "1.2.0",
     "npm:obj2gltf@^3.2.0": "3.2.0",
+    "npm:pixelmatch@^5.3.0": "5.3.0",
     "npm:three@~0.185.1": "0.185.1",
     "npm:vite@*": "8.1.4",
     "npm:zod@^4.4.3": "4.4.3"
@@ -743,7 +744,7 @@
         "fs-extra",
         "jpeg-js",
         "mime",
-        "pngjs",
+        "pngjs@7.0.0",
         "yargs"
       ],
       "bin": true
@@ -759,6 +760,16 @@
     },
     "picomatch@4.0.5": {
       "integrity": "sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A=="
+    },
+    "pixelmatch@5.3.0": {
+      "integrity": "sha512-o8mkY4E/+LNUf6LzX96ht6k6CEDi65k9G2rjMtBe9Oo+VPKSvl+0GKHuH/AlG+GA5LPG/i5hrekkxUc3s2HU+Q==",
+      "dependencies": [
+        "pngjs@6.0.0"
+      ],
+      "bin": true
+    },
+    "pngjs@6.0.0": {
+      "integrity": "sha512-TRzzuFRRmEoSW/p1KVAmiOgPco2Irlah+bGFCeNfJXxxYGwSw7YwAOAcd7X28K/m5bjBWKsC29KyoMfHbypayg=="
     },
     "pngjs@7.0.0": {
       "integrity": "sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow=="
@@ -975,7 +986,8 @@
       },
       "packages/style": {
         "dependencies": [
-          "npm:fast-png@^6.2.0"
+          "npm:fast-png@^6.2.0",
+          "npm:pixelmatch@^5.3.0"
         ]
       }
     }

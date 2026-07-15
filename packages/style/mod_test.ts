@@ -71,7 +71,11 @@ Deno.test('style seam: renders + styles end-to-end, files + events only', async 
 
     const result = JSON.parse(await Deno.readTextFile(`${out}/style-result.json`));
     assertEquals(result.stylePresetId, 'pixel-8');
-    assertEquals(result.paletteHex.length, 8);
+    // median cut yields <= maxColors (fewer if the fixture has fewer clusters)
+    assert(
+      result.paletteHex.length > 0 && result.paletteHex.length <= 8,
+      `palette size ${result.paletteHex.length}`,
+    );
     assertEquals(result.cellPx, { w: 64, h: 64 });
   } finally {
     await Deno.remove(out, { recursive: true });

@@ -61,10 +61,10 @@ Deno.test('palette membership: every opaque pixel of a pixel style is a palette 
 });
 
 Deno.test('flicker is within each preset budget on the idle loop', async () => {
-  // measured on the fixture: pixel-8 ~0.06%, cel-2 ~0.10%, painterly ~1.44%.
-  // Budgets are ~3-4x measured as regression guards; the quantized styles clear
-  // the roadmap 1.2% target with large margin (cluster-vote + hysteresis working).
-  const budget: Record<string, number> = { 'pixel-8': 0.3, 'cel-2': 0.4, 'painterly': 2.0 };
+  // measured post-review: pixel-8 0.054%, cel-2 0.054%, painterly 0.689%. Tight
+  // regression guards (~2x measured); ALL now clear the roadmap 1.2% target —
+  // painterly included — after the hysteresis dimensional fix (H1).
+  const budget: Record<string, number> = { 'pixel-8': 0.15, 'cel-2': 0.15, 'painterly': 1.0 };
   for (const [id, preset] of Object.entries(PRESETS)) {
     const out = await Deno.makeTempDir();
     try {

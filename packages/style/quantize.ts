@@ -4,10 +4,13 @@
  * ONCE per character from every opaque pixel across all frames (skill: per-frame
  * palettes guarantee flicker).
  *
- * eps unit (Agent A flagged this): OKLab distances here are SQUARED, but
- * StylePreset.temporal.paletteHysteresisEps is a LINEAR OKLab delta (~1 JND at
- * 0.02), so it is squared at the call site before hysteresis compares squared
- * distances. Recorded as a local decision in docs/internal/decisions.md.
+ * eps unit (D-021, corrected after review): paletteHysteresisEps is a LINEAR
+ * OKLab delta (~1 JND at 0.02). hysteresis keeps prev unless `prevDist - candDist
+ * > eps`; since that difference is `(√-diff)` of two distances, both distances
+ * must be LINEAR and eps stays LINEAR. Squaring eps was wrong — with squared
+ * distances `prevDist-candDist = (p-c)(p+c)` and `eps²` gives an effective band
+ * of `eps²/(p+c)`, several-fold too narrow, so hysteresis barely engaged. We now
+ * pass sqrt(distance) and the linear eps.
  */
 import type { Lab, Palette } from './contracts.ts';
 import type { StylePreset } from '@spritebook/schema';
@@ -35,12 +38,33 @@ export function poolOklab(litFrames: Uint8Array[]): Float32Array {
   return out;
 }
 
+/**
+ * Sort a palette by OKLab lightness ascending, so index 0 is the darkest entry.
+ * The output colors are unchanged (only reindexed), but it makes the 'palette-
+ * dark' outline label index 0, which wins cluster-vote ties (lowest index) — so
+ * a half-phase boundary block resolves to the outline instead of an arbitrary
+ * surface color, and thin strokes stop wobbling with sub-texel phase (M4).
+ */
+function sortByLightness(p: Palette): Palette {
+  const order = Array.from({ length: p.size }, (_v, i) => i)
+    .sort((a, b) => p.lab[a * 3] - p.lab[b * 3] || a - b);
+  const srgb = new Uint8Array(p.size * 3);
+  const lab = new Float32Array(p.size * 3);
+  order.forEach((s, d) => {
+    srgb.set(p.srgb.subarray(s * 3, s * 3 + 3), d * 3);
+    lab.set(p.lab.subarray(s * 3, s * 3 + 3), d * 3);
+  });
+  return { srgb, lab, size: p.size };
+}
+
 /** Build the character palette once: adaptive from the pool, or fixed from hex. */
 export function buildPalette(preset: StylePreset, litFrames: Uint8Array[]): Palette {
   const q = preset.quantize;
   if (!q) return { srgb: new Uint8Array(0), lab: new Float32Array(0), size: 0 };
-  if (Array.isArray(q.palette)) return paletteFromHex(q.palette);
-  return buildAdaptivePalette(poolOklab(litFrames), q.maxColors);
+  const built = Array.isArray(q.palette)
+    ? paletteFromHex(q.palette)
+    : buildAdaptivePalette(poolOklab(litFrames), q.maxColors);
+  return sortByLightness(built);
 }
 
 /** Index of the darkest palette entry (lowest OKLab L) — the 'palette-dark' outline color. */
@@ -77,6 +101,13 @@ const DITHER_L_SCALE = 0.1;
 /**
  * Quantize an Sx rgba image to per-pixel palette labels (nearest OKLab entry),
  * with optional position-locked Bayer dither. Transparent texels (alpha 0) → -1.
+ *
+ * `blockSize` is the supersample factor: the Bayer threshold is indexed by the
+ * OUTPUT (1x) block `(floor(x/blockSize), floor(y/blockSize))`, not the Sx pixel,
+ * so all Sx subpixels of an output pixel share one threshold. Otherwise (matrix
+ * == blockSize) every block sees the identical sub-tile and cluster-vote erases
+ * the dither entirely; indexing by the 1x block makes adjacent output pixels
+ * stipple between palette entries and survive the vote (M3).
  */
 export function labelSx(
   rgba: Uint8Array,
@@ -84,6 +115,7 @@ export function labelSx(
   height: number,
   palette: Palette,
   dither: DitherConfig | null,
+  blockSize = 1,
 ): Int32Array {
   const out = new Int32Array(width * height);
   for (let y = 0; y < height; y++) {
@@ -97,7 +129,8 @@ export function labelSx(
       const lab = srgbToLab(rgba[o], rgba[o + 1], rgba[o + 2]);
       let match: Lab = lab;
       if (dither) {
-        const d = (bayerValue(dither.matrix, dither.size, x, y) - 0.5) * dither.strength *
+        const bx = Math.floor(x / blockSize), by = Math.floor(y / blockSize);
+        const d = (bayerValue(dither.matrix, dither.size, bx, by) - 0.5) * dither.strength *
           DITHER_L_SCALE;
         match = [lab[0] + d, lab[1], lab[2]];
       }
@@ -123,7 +156,6 @@ export function resolveHysteresis(
   width: number,
   height: number,
 ): Int32Array {
-  const eps2 = epsLinear * epsLinear;
   const out = new Int32Array(width * height);
   for (let p = 0; p < width * height; p++) {
     const c = cand[p];
@@ -138,9 +170,11 @@ export function resolveHysteresis(
     }
     const o = p * 4;
     const lab = srgbToLab(refRgba[o], refRgba[o + 1], refRgba[o + 2]);
-    const candDist = dist2ToIndex(lab, palette, c);
-    const prevDist = dist2ToIndex(lab, palette, prevLabel);
-    out[p] = hysteresis(prevLabel, c, prevDist, candDist, eps2);
+    // LINEAR OKLab distances so `prevDist - candDist > epsLinear` is a true
+    // linear-improvement test (D-021, corrected).
+    const candDist = Math.sqrt(dist2ToIndex(lab, palette, c));
+    const prevDist = Math.sqrt(dist2ToIndex(lab, palette, prevLabel));
+    out[p] = hysteresis(prevLabel, c, prevDist, candDist, epsLinear);
   }
   return out;
 }
