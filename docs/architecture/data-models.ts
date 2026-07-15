@@ -108,7 +108,7 @@ export interface Project {
 
 export interface CameraPreset {
   id: string; // "topdown30x8"
-  elevationDeg: number; // detents: 15 | 26.565 (2:1) | 30 | 35.264 (iso)
+  elevationDeg: number; // [0, 90) — detents 15 | 26.565 (2:1) | 30 | 35.264 (iso); 90 excluded (P2-T1: solver degenerates top-down)
   directions: 2 | 4 | 8 | 16;
   yawOffsetDeg: number; // direction 0 faces camera at yaw 0 (+Z front)
   pixelsPerMeter: number; // world-locked scale: roster shares one ruler

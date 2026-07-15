@@ -13,6 +13,8 @@ packages/schema/fixtures/** text eol=lf
 *.yaml text eol=lf
 *.gltf text eol=lf
 *.obj text eol=lf
+*.wgsl text eol=lf
+deno.lock text eol=lf
 .githooks/* text eol=lf
 
 # Binary fixtures - no translation, no diffs.

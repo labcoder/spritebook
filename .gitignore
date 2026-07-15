@@ -17,6 +17,9 @@ docs/internal/
 # Test failure artifacts (goldens themselves ARE committed)
 tests/failures/
 
+# Render throughput probe output (uploaded as a CI artifact; a trend signal, not a golden)
+.render-bench/
+
 # Spike outputs (measurements go in REPORT.md; pixels are throwaway)
 spikes/*/out/
 spikes/shell/tauri/src-tauri/target/

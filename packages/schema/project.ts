@@ -15,8 +15,12 @@ export type ExportTargetId = z.output<typeof ExportTargetIdSchema>;
 
 export const CameraPresetSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
-  /** detents in the GUI: 15 | 26.565 (2:1) | 30 | 35.264 (iso) — any value valid */
-  elevationDeg: z.number().min(0).max(90),
+  /**
+   * detents in the GUI: 15 | 26.565 (2:1) | 30 | 35.264 (iso) — any value valid.
+   * Excludes exactly 90° (pure top-down): the ortho framing solver degenerates
+   * there (world-up ∥ view); a bird's-eye path is future work.
+   */
+  elevationDeg: z.number().min(0).lt(90),
   directions: z.union([z.literal(2), z.literal(4), z.literal(8), z.literal(16)]),
   yawOffsetDeg: z.number(),
   /** world-locked scale: the roster shares one ruler */

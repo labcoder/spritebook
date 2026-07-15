@@ -58,10 +58,17 @@ jobs:
           name: coverage
           path: .coverage
 
-  # Software-Vulkan lane: installed now, exercised by the render suites from P2 on
-  # (docs/internal/roadmap/p1.md; Mesa lavapipe row in docs/dependencies.md).
+  # Software-Vulkan lane: the render suites run here (hosted runners have no GPU).
+  # Mesa lavapipe gives a real-if-slow WebGPU adapter — good for the structural
+  # golden suite, the double-render byte canary, and the width-100 strip. Pixels
+  # are NOT compared against hardware goldens here (a separate set; would poison
+  # both). DENO_WEBGPU_BACKEND is pinned so comparisons are like-for-like, and
+  # SPRITEBOOK_REQUIRE_GPU turns a missing adapter into a hard failure so a broken
+  # lane can't masquerade as "all render tests skipped, green".
   lavapipe:
     runs-on: ubuntu-latest
+    env:
+      DENO_WEBGPU_BACKEND: vulkan
     steps:
       - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v2
@@ -72,6 +79,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mesa-vulkan-drivers vulkan-tools
       - name: lavapipe adapter smoke
-        run: |
-          vulkaninfo --summary | grep -i llvmpipe
-          echo "lavapipe present; render suites attach here from P2"
+        run: vulkaninfo --summary | grep -i llvmpipe
+      - name: render suite (structural + canary + strip, software Vulkan)
+        env:
+          SPRITEBOOK_REQUIRE_GPU: '1'
+        run: deno test --allow-read --allow-write --allow-env --allow-ffi packages/render/
+      - name: render throughput probe
+        run: deno run --allow-read --allow-write --allow-env --allow-ffi packages/render/bench.ts .render-bench
+      - name: upload throughput report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-throughput
+          path: .render-bench/throughput.json
+          if-no-files-found: warn
