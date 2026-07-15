@@ -24,7 +24,7 @@
   "unstable": ["webgpu"],
   "exclude": ["spikes/shell/app/dist", "spikes/shell/app/node_modules", "spikes/autorig/UniRig"],
   "tasks": {
-    "dev": "deno test --watch --allow-read --allow-write --allow-env --allow-ffi",
+    "dev": "deno test --watch --watch-exclude=node_modules --allow-read --allow-write --allow-env --allow-ffi",
     "test": "deno test --allow-read --allow-write --allow-env --allow-ffi",
     "test:gpu": "SPRITEBOOK_REQUIRE_GPU=1 deno test --allow-read --allow-write --allow-env --allow-ffi packages/render/",
     "lint": "deno lint",
