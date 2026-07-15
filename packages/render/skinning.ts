@@ -199,6 +199,19 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
   };
 }
 
+/**
+ * Deterministic test poses (placeholder until ClipBinding sampling lands):
+ *  - 'turntable': whole-body rotation about +Y (directions/goldens).
+ *  - 'idle': a gentle low-amplitude sway about +Y — the near-static loop the
+ *    flicker metric needs (a turntable moves too much to isolate spurious
+ *    frame-to-frame flicker from real motion). Frame 0 is the bind pose in both.
+ */
+export type PoseMode = 'turntable' | 'idle';
+
+function rootAngle(pose: PoseMode, frame: number): number {
+  return pose === 'idle' ? 0.03 * Math.sin(frame * 0.4) : frame * 0.06;
+}
+
 export function jointScratch(asset: SkinnedAsset): { mats: Float32Array; worlds: Float32Array } {
   return {
     mats: new Float32Array(asset.jointCount * 16),
@@ -224,11 +237,13 @@ export function evalJointMatrices(
   frame: number,
   out: Float32Array,
   worlds: Float32Array,
+  pose: PoseMode = 'turntable',
 ): void {
+  const angle = rootAngle(pose, frame);
   for (let i = 0; i < asset.jointCount; i++) {
     const bind = asset.bindLocals.subarray(i * 16, i * 16 + 16);
-    // root turntables about Y (through the grounded feet); children ride at bind
-    if (i === 0) mat4RotationY(frame * 0.06, scratchDelta);
+    // root rotates about Y (through the grounded feet); children ride at bind
+    if (i === 0) mat4RotationY(angle, scratchDelta);
     else mat4Identity(scratchDelta);
     mat4Multiply(bind, scratchDelta, scratchLocal);
 
@@ -252,7 +267,11 @@ export function evalJointMatrices(
  * moving silhouette sweeps outside the bind AABB). CPU mirror of the vertex
  * shader's skin blend; deterministic.
  */
-export function posedBounds(asset: SkinnedAsset, frames: number): ModelBounds {
+export function posedBounds(
+  asset: SkinnedAsset,
+  frames: number,
+  pose: PoseMode = 'turntable',
+): ModelBounds {
   const mats = new Float32Array(asset.jointCount * 16);
   const worlds = new Float32Array(asset.jointCount * 16);
   const min: [number, number, number] = [Infinity, Infinity, Infinity];
@@ -262,7 +281,7 @@ export function posedBounds(asset: SkinnedAsset, frames: number): ModelBounds {
   const nf = Math.max(1, frames);
 
   for (let f = 0; f < nf; f++) {
-    evalJointMatrices(asset, f, mats, worlds);
+    evalJointMatrices(asset, f, mats, worlds, pose);
     for (let v = 0; v < vcount; v++) {
       const px = p[v * 3], py = p[v * 3 + 1], pz = p[v * 3 + 2];
       let x = 0, y = 0, z = 0;

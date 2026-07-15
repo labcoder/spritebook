@@ -28,6 +28,7 @@ import {
   jointScratch,
   loadSkinnedAsset,
   posedBounds,
+  type PoseMode,
   type SkinnedAsset,
 } from './skinning.ts';
 import { ReadbackPool } from './readback.ts';
@@ -70,6 +71,7 @@ export class Renderer {
     private ib: GPUBuffer,
     private camData: Float32Array[],
     private scratch: { mats: Float32Array; worlds: Float32Array },
+    private pose: PoseMode,
   ) {}
 
   static async create(
@@ -79,6 +81,7 @@ export class Renderer {
     shaderSrc: string,
     width: number,
     height: number,
+    pose: PoseMode = 'turntable',
   ): Promise<Renderer> {
     const { device } = gpu;
     device.pushErrorScope('validation');
@@ -140,6 +143,7 @@ export class Renderer {
       ib,
       camData,
       jointScratch(asset),
+      pose,
     );
   }
 
@@ -165,7 +169,7 @@ export class Renderer {
   /** Encode one frame's draw into `encoder` after updating the camera+joint buffers. */
   private encodeFrame(encoder: GPUCommandEncoder, direction: number, frame: number): void {
     this.gpu.device.queue.writeBuffer(this.camBuf, 0, this.camData[direction] as BufferSource);
-    evalJointMatrices(this.asset, frame, this.scratch.mats, this.scratch.worlds);
+    evalJointMatrices(this.asset, frame, this.scratch.mats, this.scratch.worlds, this.pose);
     this.gpu.device.queue.writeBuffer(this.jointBuf, 0, this.scratch.mats as BufferSource);
 
     const pass = encoder.beginRenderPass(createAovPassDescriptor(this.targets));
@@ -314,13 +318,14 @@ export class Renderer {
 /** Load + set up a renderer for a spec (shared by the seam and tests). */
 export async function makeRenderer(
   gpu: GpuContext,
-  spec: Pick<RenderJobSpec, 'modelPath' | 'camera' | 'frames'>,
+  spec: Pick<RenderJobSpec, 'modelPath' | 'camera' | 'frames' | 'pose'>,
   shaderSrc: string,
 ): Promise<Renderer> {
+  const pose = spec.pose ?? 'turntable';
   const asset = await loadSkinnedAsset(spec.modelPath);
   // frame the STABLE per-clip bounds (union over the posed frames), not the bind
   // pose — a rotating/moving silhouette sweeps outside the bind AABB (m6).
-  const framing = solveFraming(spec.camera, posedBounds(asset, spec.frames));
+  const framing = solveFraming(spec.camera, posedBounds(asset, spec.frames, pose));
   return Renderer.create(
     gpu,
     asset,
@@ -328,5 +333,6 @@ export async function makeRenderer(
     shaderSrc,
     spec.camera.cellPx.w,
     spec.camera.cellPx.h,
+    pose,
   );
 }

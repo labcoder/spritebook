@@ -25,6 +25,8 @@ export interface RenderJobSpec {
   camera: CameraPreset;
   /** deterministic pose count for T1; ClipBinding sampling arrives w/ the anim package */
   frames: number;
+  /** deterministic test pose (default 'turntable'; 'idle' is the low-motion loop the flicker metric needs) */
+  pose?: 'turntable' | 'idle';
   /** carried through; the NPR style stack is P2-T2 */
   stylePreset: string;
   /** every render product is written under here */
