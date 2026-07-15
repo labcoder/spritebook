@@ -972,6 +972,11 @@
         "dependencies": [
           "npm:zod@^4.4.3"
         ]
+      },
+      "packages/style": {
+        "dependencies": [
+          "npm:fast-png@^6.2.0"
+        ]
       }
     }
   }
