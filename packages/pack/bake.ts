@@ -114,6 +114,16 @@ function supersample(camera: CameraPreset, s: number): CameraPreset {
   };
 }
 
+/**
+ * The persisted form of a StyleResult: `styledDir` is the live run's TEMP path —
+ * an in-memory handle, meaningless once the cells are folded into atlas pages —
+ * and a volatile absolute path has no place in a deterministic bake artifact
+ * (caught by the byte-stability acceptance test).
+ */
+function persistedStyleResult(r: StyleResult): StyleResult {
+  return { ...r, styledDir: '' };
+}
+
 interface BakedCells {
   /** frameIdKey -> encoded PNG bytes, per pass ('lit' = styled) */
   cells: Map<string, Map<string, Uint8Array>>;
@@ -253,7 +263,7 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       }
       await cache.put(
         await artifactKey(bake, 'style-result'),
-        new TextEncoder().encode(JSON.stringify(baked.styleResult)),
+        new TextEncoder().encode(JSON.stringify(persistedStyleResult(baked.styleResult))),
       );
     }
 
@@ -291,7 +301,7 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     yield { t: 'progress', jobId, at: at(), step: 'write', done: 3, total: 4 };
     await Deno.writeTextFile(
       `${bakeDir}/style-result.json`,
-      JSON.stringify(baked.styleResult, null, 2) + '\n',
+      JSON.stringify(persistedStyleResult(baked.styleResult), null, 2) + '\n',
     );
     const gif = buildContactSheet(
       new Map([...litCells].map(([k, c]) => [k, c.rgba!])),

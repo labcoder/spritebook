@@ -84,10 +84,10 @@ jobs:
       # The style CPU pipeline + perceptual goldens are deterministic over
       # committed AOV fixtures, so they also run GPU-free on the hosted `test`
       # matrix; here they additionally exercise the live render->style seam.
-      - name: render + style suites (software Vulkan)
+      - name: render + style + pack/export suites (software Vulkan)
         env:
           SPRITEBOOK_REQUIRE_GPU: '1'
-        run: deno test --allow-read --allow-write --allow-env --allow-ffi packages/render/ packages/style/
+        run: deno test --allow-read --allow-write --allow-env --allow-ffi packages/render/ packages/style/ packages/pack/ packages/export/
       - name: render throughput probe
         run: deno run --allow-read --allow-write --allow-env --allow-ffi packages/render/bench.ts .render-bench
       - name: upload throughput report
