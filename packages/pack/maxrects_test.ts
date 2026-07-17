@@ -1,0 +1,202 @@
+import { assert, assertEquals, assertThrows } from 'jsr:@std/assert@1';
+import { frameIdKey, type PackLayout } from './contracts.ts';
+import { type PackCell, packLayout, PINNED_PACKER_OPTIONS } from './maxrects.ts';
+
+function cell(clipId: string, direction: number, frame: number, w: number, h: number): PackCell {
+  return { id: { clipId, direction, frame }, w, h };
+}
+
+/** 16 uniform 96x96 cells (idle, 4 directions x 4 frames) — the T3 shape. */
+function uniform16(): PackCell[] {
+  const cells: PackCell[] = [];
+  for (let d = 0; d < 4; d++) {
+    for (let f = 0; f < 4; f++) cells.push(cell('idle', d, f, 96, 96));
+  }
+  return cells;
+}
+
+/** Mixed sizes — packLayout must not assume uniform cells. */
+function mixed(): PackCell[] {
+  return [
+    cell('a', 0, 0, 96, 96),
+    cell('a', 0, 1, 64, 32),
+    cell('a', 1, 0, 32, 64),
+    cell('b', 0, 0, 128, 128),
+    cell('b', 0, 1, 200, 40),
+    cell('b', 1, 0, 40, 200),
+    cell('c', 0, 0, 96, 96),
+  ];
+}
+
+/** Any two same-page rects must be >= gapPx apart on at least one axis (so: no overlap). */
+function assertSeparated(layout: PackLayout, gapPx: number): void {
+  for (let i = 0; i < layout.rects.length; i++) {
+    for (let j = i + 1; j < layout.rects.length; j++) {
+      const a = layout.rects[i];
+      const b = layout.rects[j];
+      if (a.pageIndex !== b.pageIndex) continue;
+      const separated = a.x + a.w + gapPx <= b.x || b.x + b.w + gapPx <= a.x ||
+        a.y + a.h + gapPx <= b.y || b.y + b.h + gapPx <= a.y;
+      assert(
+        separated,
+        `rects ${frameIdKey(a.id)} and ${
+          frameIdKey(b.id)
+        } are closer than ${gapPx}px on page ${a.pageIndex}`,
+      );
+    }
+  }
+}
+
+// --- determinism -------------------------------------------------------------
+
+Deno.test('packLayout: packing twice yields deep-equal layouts (the determinism canary)', () => {
+  assertEquals(packLayout(uniform16()), packLayout(uniform16()));
+  assertEquals(packLayout(mixed()), packLayout(mixed()));
+  // overflow config exercises the multi-page path too
+  const opts = { maxPageSizePx: 256, gapPx: 2 };
+  assertEquals(packLayout(uniform16(), opts), packLayout(uniform16(), opts));
+  assertEquals(packLayout(mixed(), opts), packLayout(mixed(), opts));
+});
+
+Deno.test('packLayout: input order does not matter (canonical sort first)', () => {
+  const sorted = mixed();
+  const scrambled = [3, 0, 6, 2, 5, 1, 4].map((i) => sorted[i]);
+  assertEquals(packLayout(scrambled), packLayout(sorted));
+});
+
+Deno.test('packLayout: the pinned packer options stay pinned', () => {
+  // A change here changes every layout ever baked — treat as a format bump, not a tweak.
+  assertEquals(PINNED_PACKER_OPTIONS, {
+    smart: false,
+    pot: false,
+    square: false,
+    allowRotation: false,
+    tag: false,
+    border: 0,
+  });
+});
+
+Deno.test('packLayout: pinned placement golden (fires if a packer update moves rects)', () => {
+  const layout = packLayout([cell('g', 0, 0, 96, 96), cell('g', 0, 1, 96, 96)]);
+  assertEquals(layout, {
+    pageCount: 1,
+    pageSizePx: 256, // two 98px consumed cells do not fit a 128px page -> 256
+    rects: [
+      { id: { clipId: 'g', direction: 0, frame: 0 }, pageIndex: 0, x: 0, y: 0, w: 96, h: 96 },
+      { id: { clipId: 'g', direction: 0, frame: 1 }, pageIndex: 0, x: 0, y: 98, w: 96, h: 96 },
+    ],
+  });
+});
+
+// --- geometry laws -----------------------------------------------------------
+
+Deno.test('packLayout: rects stay inside the page bounds', () => {
+  for (const layout of [packLayout(mixed()), packLayout(uniform16(), { maxPageSizePx: 256 })]) {
+    for (const rect of layout.rects) {
+      assert(rect.x >= 0 && rect.y >= 0, `${frameIdKey(rect.id)} at negative position`);
+      assert(
+        rect.x + rect.w <= layout.pageSizePx && rect.y + rect.h <= layout.pageSizePx,
+        `${frameIdKey(rect.id)} overflows the ${layout.pageSizePx}px page`,
+      );
+      assert(rect.pageIndex >= 0 && rect.pageIndex < layout.pageCount, 'pageIndex out of range');
+    }
+  }
+});
+
+Deno.test('packLayout: no overlaps and the gap is respected (uniform + mixed, overflow too)', () => {
+  assertSeparated(packLayout(uniform16()), 2);
+  assertSeparated(packLayout(mixed()), 2);
+  assertSeparated(packLayout(uniform16(), { maxPageSizePx: 256, gapPx: 2 }), 2);
+  assertSeparated(packLayout(mixed(), { maxPageSizePx: 256, gapPx: 7 }), 7);
+});
+
+Deno.test('packLayout: gapPx 0 packs flush without overlap', () => {
+  const layout = packLayout([cell('g', 0, 0, 96, 96), cell('g', 0, 1, 96, 96)], { gapPx: 0 });
+  assertEquals(layout.pageCount, 1);
+  assertSeparated(layout, 0);
+});
+
+// --- page sizing -------------------------------------------------------------
+
+Deno.test('packLayout: page size is the smallest fitting power of two', () => {
+  // 16x 96px + 2px gap: a 256 page holds 4, so 512 is the smallest single page
+  const layout = packLayout(uniform16());
+  assertEquals(layout.pageCount, 1);
+  assertEquals(layout.pageSizePx, 512);
+  // one small cell -> the smallest pot square that holds its edge
+  assertEquals(packLayout([cell('a', 0, 0, 96, 96)]).pageSizePx, 128);
+  assertEquals(packLayout([cell('a', 0, 0, 100, 40)]).pageSizePx, 128);
+  for (const l of [layout, packLayout(mixed())]) {
+    assert((l.pageSizePx & (l.pageSizePx - 1)) === 0, `${l.pageSizePx} is not a power of two`);
+  }
+});
+
+Deno.test('packLayout: an exact-fit cell shares its page size (gap pads between rects only)', () => {
+  const layout = packLayout([cell('a', 0, 0, 256, 256)], { maxPageSizePx: 256 });
+  assertEquals(layout, {
+    pageCount: 1,
+    pageSizePx: 256,
+    rects: [{
+      id: { clipId: 'a', direction: 0, frame: 0 },
+      pageIndex: 0,
+      x: 0,
+      y: 0,
+      w: 256,
+      h: 256,
+    }],
+  });
+});
+
+Deno.test('packLayout: overflow spills to more pages, all at the capped size', () => {
+  const layout = packLayout(uniform16(), { maxPageSizePx: 256 });
+  assertEquals(layout.pageSizePx, 256);
+  assertEquals(layout.pageCount, 4); // 4 cells per 256 page
+  const pages = new Set(layout.rects.map((r) => r.pageIndex));
+  assertEquals([...pages].sort((a, b) => a - b), [0, 1, 2, 3]);
+});
+
+Deno.test('packLayout: a non-pot maxPageSizePx caps at the largest pot below it', () => {
+  const layout = packLayout(uniform16(), { maxPageSizePx: 300 });
+  assertEquals(layout.pageSizePx, 256);
+  assertEquals(layout.pageCount, 4);
+});
+
+// --- canonical order ---------------------------------------------------------
+
+Deno.test('packLayout: rects come back sorted by frameIdKey', () => {
+  const scrambled = [6, 2, 4, 0, 5, 3, 1].map((i) => mixed()[i]);
+  const keys = packLayout(scrambled).rects.map((r) => frameIdKey(r.id));
+  assertEquals(keys, [...keys].sort());
+  assertEquals(keys, mixed().map((c) => frameIdKey(c.id)).sort());
+});
+
+// --- errors and edges --------------------------------------------------------
+
+Deno.test('packLayout: a single cell exceeding maxPageSizePx throws', () => {
+  assertThrows(
+    () => packLayout([cell('big', 0, 0, 300, 10)], { maxPageSizePx: 256 }),
+    RangeError,
+    'exceeds the largest page',
+  );
+  assertThrows(() => packLayout([cell('big', 0, 0, 10, 4096)]), RangeError, 'exceeds');
+});
+
+Deno.test('packLayout: duplicate frame ids throw', () => {
+  assertThrows(
+    () => packLayout([cell('a', 0, 0, 8, 8), cell('a', 0, 0, 8, 8)]),
+    Error,
+    'duplicate frame id a/d00/f000',
+  );
+});
+
+Deno.test('packLayout: invalid cell sizes and options throw', () => {
+  assertThrows(() => packLayout([cell('a', 0, 0, 0, 8)]), RangeError, 'invalid size');
+  assertThrows(() => packLayout([cell('a', 0, 0, 8.5, 8)]), RangeError, 'invalid size');
+  assertThrows(() => packLayout([cell('a', 0, 0, 8, 8)], { gapPx: -1 }), RangeError, 'gapPx');
+  assertThrows(() => packLayout([cell('a', 0, 0, 8, 8)], { gapPx: 1.5 }), RangeError, 'gapPx');
+  assertThrows(() => packLayout([cell('a', 0, 0, 8, 8)], { maxPageSizePx: 0 }), RangeError);
+});
+
+Deno.test('packLayout: empty input packs to zero pages', () => {
+  assertEquals(packLayout([]), { pageCount: 0, pageSizePx: 0, rects: [] });
+});
