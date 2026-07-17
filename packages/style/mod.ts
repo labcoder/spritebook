@@ -11,7 +11,10 @@ import type { StyleJobSpec } from './contracts.ts';
 import { styleFromAovs } from './pipeline.ts';
 
 export { styleFromAovs } from './pipeline.ts';
-export type { StyleJobSpec, StyleResult } from './contracts.ts';
+// pure AOV utilities, re-exported for the pack stage (bake composes render ->
+// style -> pack via files; pack reads the same Sx AOVs to build 1x AOV pages)
+export { readAov } from './aovio.ts';
+export type { AovImage, AovSource, StyleJobSpec, StyleResult } from './contracts.ts';
 
 /** Scale a 1x output CameraPreset up to the supersample render resolution. */
 function supersampleCamera(camera: CameraPreset, s: number): CameraPreset {

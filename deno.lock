@@ -11,6 +11,8 @@
     "npm:draco3dgltf@^1.5.7": "1.5.7",
     "npm:fast-png@6.2.0": "6.2.0",
     "npm:fast-png@^6.2.0": "6.2.0",
+    "npm:gifenc@^1.0.3": "1.0.3",
+    "npm:maxrects-packer@^2.7.3": "2.7.3",
     "npm:meshoptimizer@^1.2.0": "1.2.0",
     "npm:obj2gltf@^3.2.0": "3.2.0",
     "npm:pixelmatch@^5.3.0": "5.3.0",
@@ -571,6 +573,9 @@
     "get-caller-file@2.0.5": {
       "integrity": "sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg=="
     },
+    "gifenc@1.0.3": {
+      "integrity": "sha512-xdr6AdrfGBcfzncONUOlXMBuc5wJDtOueE3c5rdG0oNgtINLD+f2iFZltrBRZYzACRbKr+mSVU/x98zv2u3jmw=="
+    },
     "graceful-fs@4.2.11": {
       "integrity": "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="
     },
@@ -689,6 +694,9 @@
     },
     "long@5.3.2": {
       "integrity": "sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA=="
+    },
+    "maxrects-packer@2.7.3": {
+      "integrity": "sha512-bG6qXujJ1QgttZVIH4WDanhoJtvbud/xP/XPyf6A69C9RdA61BM4TomFALCq2nrTa+tARRIBB4LuIFsnUQU2wA=="
     },
     "mersenne-twister@1.1.0": {
       "integrity": "sha512-mUYWsMKNrm4lfygPkL3OfGzOPTR2DBlTkBNHM//F6hGp8cLThY897crAlk3/Jo17LEOOjQUrNAx6DvgO77QJkA=="
@@ -962,6 +970,12 @@
   },
   "workspace": {
     "members": {
+      "packages/export": {
+        "dependencies": [
+          "npm:fast-png@^6.2.0",
+          "npm:gifenc@^1.0.3"
+        ]
+      },
       "packages/importer": {
         "dependencies": [
           "npm:@gltf-transform/core@^4.4.1",
@@ -971,6 +985,12 @@
           "npm:meshoptimizer@^1.2.0",
           "npm:obj2gltf@^3.2.0",
           "npm:three@~0.185.1"
+        ]
+      },
+      "packages/pack": {
+        "dependencies": [
+          "npm:fast-png@^6.2.0",
+          "npm:maxrects-packer@^2.7.3"
         ]
       },
       "packages/render": {
