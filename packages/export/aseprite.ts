@@ -1,0 +1,139 @@
+/**
+ * Aseprite "JSON (array)" exporter — a pure projection of BakeManifest (D-010).
+ *
+ * Emits, per lit atlas page, `<characterId>.ase.json` plus the lit page PNG
+ * copied VERBATIM into outDir (meta.image references the copied file name).
+ * The `.ase.json` extension is deliberate: the TexturePacker exporter writes
+ * `<characterId>.tp.json` into the same outDir, so a bare `<characterId>.json`
+ * would collide across exporters.
+ *
+ * Multi-page bakes emit one JSON per lit page with a `_p<pageIndex>` name
+ * suffix (`<characterId>_p1.ase.json`); the suffix is omitted when there is
+ * exactly one page. Each JSON contains ONLY its page's frames, and frameTags
+ * index into that page-local frames array — tags therefore never span pages
+ * by construction.
+ *
+ * BYTE-STABILITY DOCTRINE (packages/pack/contracts.ts): the output is a pure
+ * function of the manifest's stable fields and opts.fps. Never read the clock;
+ * never project `createdAt` / `metrics.wallTimeS` / `metrics.cacheHitPct`.
+ * Every object is literal-constructed in a FIXED key order and serialized as
+ * `JSON.stringify(doc, null, 2) + '\n'` (LF), so exporting an unchanged bake
+ * is byte-identical.
+ *
+ * Cells are packed as full rects (no trim, no rotation), hence
+ * spriteSourceSize = {0, 0, w, h}, sourceSize = {w, h}, and rotated = trimmed
+ * = false. duration is a uniform Math.round(1000 / opts.fps) ms per frame
+ * until ClipBinding lands (see contracts.ts ExportOptions).
+ */
+import type { FrameRecord } from '@spritebook/schema';
+import type { Exporter } from '../pack/contracts.ts';
+
+const META_APP = 'spritebook';
+/** Projected as meta.version — a frozen format constant, never read at runtime. */
+const META_VERSION = '0.1.0';
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface Size {
+  w: number;
+  h: number;
+}
+
+/** One entry of the "JSON (array)" frames list — key order here is the wire order. */
+interface AsepriteFrame {
+  filename: string;
+  frame: Rect;
+  rotated: false;
+  trimmed: false;
+  spriteSourceSize: Rect;
+  sourceSize: Size;
+  duration: number;
+}
+
+/** One tag per (clipId, direction); from/to index the page-local frames array. */
+interface AsepriteFrameTag {
+  name: string;
+  from: number;
+  to: number;
+  direction: 'forward';
+}
+
+const pad = (n: number, width: number): string => String(n).padStart(width, '0');
+
+/** Canonical frame name: `<clipId>_d<DD>_f<FFF>` (zero-padded 2/3). */
+const frameName = (f: FrameRecord): string =>
+  `${f.clipId}_d${pad(f.direction, 2)}_f${pad(f.frame, 3)}`;
+
+/** Deterministic frame order: (clipId, direction, frame); code-unit string compare. */
+function byClipDirFrame(a: FrameRecord, b: FrameRecord): number {
+  if (a.clipId !== b.clipId) return a.clipId < b.clipId ? -1 : 1;
+  if (a.direction !== b.direction) return a.direction - b.direction;
+  return a.frame - b.frame;
+}
+
+/** Contiguous (clipId, direction) runs of an already-sorted page-local frame list. */
+function frameTags(frames: FrameRecord[]): AsepriteFrameTag[] {
+  const tags: AsepriteFrameTag[] = [];
+  frames.forEach((f, i) => {
+    const name = `${f.clipId}_d${pad(f.direction, 2)}`;
+    const last = tags.at(-1);
+    if (last && last.name === name) last.to = i;
+    else tags.push({ name, from: i, to: i, direction: 'forward' });
+  });
+  return tags;
+}
+
+/** AtlasPage.png is bake-dir-relative; the copy in outDir is flat (its base name). */
+const baseName = (relPath: string): string => relPath.split('/').at(-1) ?? relPath;
+
+export const exportAseprite: Exporter = async (manifest, bakeDir, outDir, opts) => {
+  if (!Number.isFinite(opts.fps) || opts.fps <= 0) {
+    throw new RangeError(`exportAseprite: fps must be positive and finite, got ${opts.fps}`);
+  }
+  const duration = Math.round(1000 / opts.fps);
+  const litPages = manifest.atlases
+    .filter((a) => a.pass === 'lit')
+    .toSorted((a, b) => a.pageIndex - b.pageIndex);
+  const sortedFrames = manifest.frames.toSorted(byClipDirFrame);
+  await Deno.mkdir(outDir, { recursive: true });
+
+  const written: string[] = [];
+  for (const page of litPages) {
+    const frames = sortedFrames.filter((f) => f.atlas.pageIndex === page.pageIndex);
+    const image = baseName(page.png);
+    const suffix = litPages.length === 1 ? '' : `_p${page.pageIndex}`;
+    const jsonPath = `${outDir}/${manifest.characterId}${suffix}.ase.json`;
+    const pngPath = `${outDir}/${image}`;
+
+    const doc = {
+      frames: frames.map((f): AsepriteFrame => ({
+        filename: frameName(f),
+        frame: { x: f.atlas.x, y: f.atlas.y, w: f.atlas.w, h: f.atlas.h },
+        rotated: false,
+        trimmed: false,
+        spriteSourceSize: { x: 0, y: 0, w: f.atlas.w, h: f.atlas.h },
+        sourceSize: { w: f.atlas.w, h: f.atlas.h },
+        duration,
+      })),
+      meta: {
+        app: META_APP,
+        version: META_VERSION,
+        image,
+        format: 'RGBA8888',
+        size: { w: page.sizePx, h: page.sizePx },
+        scale: '1',
+        frameTags: frameTags(frames),
+      },
+    };
+
+    await Deno.copyFile(`${bakeDir}/${page.png}`, pngPath);
+    await Deno.writeTextFile(jsonPath, JSON.stringify(doc, null, 2) + '\n');
+    written.push(jsonPath, pngPath);
+  }
+  return written.toSorted();
+};
