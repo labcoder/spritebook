@@ -200,3 +200,28 @@ Deno.test('packLayout: invalid cell sizes and options throw', () => {
 Deno.test('packLayout: empty input packs to zero pages', () => {
   assertEquals(packLayout([]), { pageCount: 0, pageSizePx: 0, rects: [] });
 });
+
+Deno.test('packLayout: the mixed-layout golden pins exact coordinates (D-022 tripwire)', () => {
+  // Captured from maxrects-packer@2.7.3 under PINNED_PACKER_OPTIONS. Atlas rects
+  // feed cache-stable bakes whose keys do NOT include the packer version, so a
+  // silent algorithm change would break "same inputs -> identical bytes" without
+  // any other test firing. If this golden fails after a deliberate packer
+  // update, treat it as a bake-format bump (D-022), re-capture, and say why.
+  const l = packLayout(mixed());
+  assertEquals({ pageCount: l.pageCount, pageSizePx: l.pageSizePx }, {
+    pageCount: 1,
+    pageSizePx: 512,
+  });
+  const got = l.rects.map((
+    r,
+  ) => [r.id.clipId, r.id.direction, r.id.frame, r.pageIndex, r.x, r.y, r.w, r.h]);
+  assertEquals(got, [
+    ['a', 0, 0, 0, 0, 0, 96, 96],
+    ['a', 0, 1, 0, 98, 0, 64, 32],
+    ['a', 1, 0, 0, 164, 0, 32, 64],
+    ['b', 0, 0, 0, 198, 0, 128, 128],
+    ['b', 0, 1, 0, 0, 130, 200, 40],
+    ['b', 1, 0, 0, 0, 172, 40, 200],
+    ['c', 0, 0, 0, 0, 374, 96, 96],
+  ]);
+});

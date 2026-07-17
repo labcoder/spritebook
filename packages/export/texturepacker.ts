@@ -37,6 +37,7 @@
  */
 import type { FrameRecord } from '@spritebook/schema';
 import type { Exporter } from '../pack/contracts.ts';
+import { assertNoSplitAnimations } from './split-guard.ts';
 
 const META_APP = 'spritebook';
 /** Projected as meta.version — a frozen format constant, never read at runtime. */
@@ -84,6 +85,7 @@ const round6 = (v: number): number => Number(v.toFixed(6));
 const baseName = (relPath: string): string => relPath.split('/').at(-1) ?? relPath;
 
 export const exportTexturePacker: Exporter = async (manifest, bakeDir, outDir, _opts) => {
+  assertNoSplitAnimations(manifest, 'exportTexturePacker');
   const litPages = manifest.atlases
     .filter((a) => a.pass === 'lit')
     .toSorted((a, b) => a.pageIndex - b.pageIndex);

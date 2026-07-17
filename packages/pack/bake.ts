@@ -30,7 +30,7 @@ import {
 } from './contracts.ts';
 import { artifactKey, bakeKey, BlobCache, frameKey } from './cache.ts';
 import { assembleManifest, frameGrid } from './manifest.ts';
-import { assertRectIdentity, composePage, encodePagePng } from './atlas.ts';
+import { composePage, encodePagePng } from './atlas.ts';
 import { packLayout } from './maxrects.ts';
 import { aov1x } from './aov1x.ts';
 import { buildContactSheet } from './contactsheet.ts';
@@ -154,8 +154,16 @@ async function tryCached(
       cells.get(pass)!.set(fik, bytes);
     }
   }
-  const styleResult = JSON.parse(new TextDecoder().decode(styleBytes)) as StyleResult;
-  return { cells, styleResult, hits: new Set(grid.map(frameIdKey)) };
+  // a corrupt cache VALUE is a miss, mirroring the module's "invalid keys
+  // throw, never miss" philosophy from the other side (adversarial review M2);
+  // atomic puts should make this unreachable, but a miss self-heals and a
+  // throw would poison every warm bake of the recipe
+  try {
+    const styleResult = JSON.parse(new TextDecoder().decode(styleBytes)) as StyleResult;
+    return { cells, styleResult, hits: new Set(grid.map(frameIdKey)) };
+  } catch {
+    return null;
+  }
 }
 
 /** Full recompute: render Sx AOVs -> style -> 1x AOV cells. */
@@ -193,26 +201,33 @@ async function recompute(
     width: spec.camera.cellPx.w * s,
     height: spec.camera.cellPx.h * s,
   };
+  // from here on, any throw must not leak the temp dirs (adversarial review m6)
   const styleOut = await Deno.makeTempDir();
-  const styleResult = await styleFromAovs(src, spec.camera, spec.style, styleOut);
+  try {
+    const styleResult = await styleFromAovs(src, spec.camera, spec.style, styleOut);
 
-  const cells = new Map<string, Map<string, Uint8Array>>(
-    ['lit', ...AOV_PASSES].map((p) => [p, new Map<string, Uint8Array>()]),
-  );
-  for (const id of grid) {
-    const fik = frameIdKey(id);
-    const d = String(id.direction).padStart(2, '0');
-    const f = String(id.frame).padStart(3, '0');
-    cells.get('lit')!.set(fik, await Deno.readFile(`${styleResult.styledDir}/d${d}_f${f}.png`));
-    const aov = await readAov(src.framesDir, id.direction, id.frame);
-    const one = aov1x(aov, s);
-    cells.get('albedo')!.set(fik, encodePagePng(one.albedo, 'rgba8'));
-    cells.get('normal')!.set(fik, encodePagePng(one.normal, 'rgba8'));
-    cells.get('depth')!.set(fik, encodePagePng(one.depth, 'gray16'));
-    cells.get('mask')!.set(fik, encodePagePng(one.mask, 'gray16'));
+    const cells = new Map<string, Map<string, Uint8Array>>(
+      ['lit', ...AOV_PASSES].map((p) => [p, new Map<string, Uint8Array>()]),
+    );
+    for (const id of grid) {
+      const fik = frameIdKey(id);
+      const d = String(id.direction).padStart(2, '0');
+      const f = String(id.frame).padStart(3, '0');
+      cells.get('lit')!.set(fik, await Deno.readFile(`${styleResult.styledDir}/d${d}_f${f}.png`));
+      const aov = await readAov(src.framesDir, id.direction, id.frame);
+      const one = aov1x(aov, s);
+      cells.get('albedo')!.set(fik, encodePagePng(one.albedo, 'rgba8'));
+      cells.get('normal')!.set(fik, encodePagePng(one.normal, 'rgba8'));
+      cells.get('depth')!.set(fik, encodePagePng(one.depth, 'gray16'));
+      cells.get('mask')!.set(fik, encodePagePng(one.mask, 'gray16'));
+    }
+    return { cells, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
+  } catch (err) {
+    await cleanup();
+    throw err;
+  } finally {
+    await Deno.remove(styleOut, { recursive: true }).catch(() => {});
   }
-  await Deno.remove(styleOut, { recursive: true }).catch(() => {});
-  return { cells, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
 }
 
 function decodeCell(bytes: Uint8Array, kind: 'rgba8' | 'gray16'): CellPlane {
@@ -230,6 +245,8 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
   yield { t: 'queued', jobId, at: at() };
   yield { t: 'started', jobId, at: at() };
 
+  // hoisted so the catch can release the recompute temp dir on ANY failure (m6)
+  let cleanup: (() => Promise<void>) | undefined;
   try {
     const inputs = await buildCacheInputs(spec);
     const bake = await bakeKey(inputs);
@@ -242,7 +259,6 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     yield { t: 'progress', jobId, at: at(), step: 'cells', done: 1, total: 4 };
     let baked: BakedCells | null = null;
     if (cache && spec.onlyInvalidated) baked = await tryCached(cache, bake, grid);
-    let cleanup: (() => Promise<void>) | undefined;
     if (!baked) {
       const r = await recompute(spec, grid);
       baked = r;
@@ -280,13 +296,18 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       );
     }
     const litCells = decoded.get('lit')!;
+    // THE LAW, by construction: one layout, computed once from the lit cells,
+    // replayed verbatim on all five passes below. The runtime guard against a
+    // pass diverging is composePage's cell-size-mismatch throw (an AOV cell
+    // that disagrees with its lit rect refuses to composite); asserting rect
+    // identity on five references to this one object would be theater (m5) —
+    // assertRectIdentity remains for callers holding genuinely separate layouts.
     const layout = packLayout(
       grid.map((id) => {
         const c = litCells.get(frameIdKey(id))!;
         return { id, w: c.w, h: c.h };
       }),
     );
-    assertRectIdentity(RENDER_PASSES.map(() => layout)); // the law's runtime witness
 
     for (const pass of RENDER_PASSES) {
       const kind = PAGE_KIND[pass];
@@ -342,6 +363,7 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     }
     yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
   } catch (err) {
+    await cleanup?.().catch(() => {});
     yield {
       t: 'error',
       jobId,

@@ -90,7 +90,16 @@ export class BlobCache {
     }
   }
 
+  /**
+   * ATOMIC put: write to a temp sibling then rename into place. A crash mid-put
+   * can therefore never leave a torn value under a valid key — without this, a
+   * torn frame blob next to an intact style-result commit marker would poison
+   * every later warm bake of the recipe (adversarial review M2).
+   */
   async put(key: string, bytes: Uint8Array): Promise<void> {
-    await Deno.writeFile(this.#path(key), bytes);
+    const path = this.#path(key);
+    const tmp = `${path}.tmp-${crypto.randomUUID()}`;
+    await Deno.writeFile(tmp, bytes);
+    await Deno.rename(tmp, path);
   }
 }

@@ -66,7 +66,18 @@ function numFlag(args: string[], name: string, fallback: number): number {
   const raw = flag(args, name);
   if (raw === undefined) return fallback;
   const n = Number(raw);
-  if (!Number.isFinite(n)) throw new Error(`--${name} must be a number (got "${raw}")`);
+  if (!Number.isFinite(n) || raw.startsWith('--')) {
+    throw new Error(`--${name} must be a number (got "${raw}")`);
+  }
+  return n;
+}
+
+/** Like numFlag but requires a positive integer (frame counts, pixel sizes). */
+function intFlag(args: string[], name: string, fallback: number): number {
+  const n = numFlag(args, name, fallback);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`--${name} must be a positive integer (got ${n})`);
+  }
   return n;
 }
 
@@ -98,17 +109,18 @@ const DIR_CHOICES = new Set([2, 4, 8, 16]);
 
 /** Build the CameraPreset for `spritebook bake` from CLI flags + defaults. */
 function cameraFromFlags(args: string[]): CameraPreset {
-  const directions = numFlag(args, 'directions', 8);
+  const directions = intFlag(args, 'directions', 8);
   if (!DIR_CHOICES.has(directions)) throw new Error('--directions must be 2, 4, 8, or 16');
-  const cell = numFlag(args, 'cell', 64);
+  const cell = intFlag(args, 'cell', 64);
+  const elevation = numFlag(args, 'elevation', 30);
   return {
-    id: `cli-e30x${directions}`,
-    elevationDeg: numFlag(args, 'elevation', 30),
+    id: `cli-e${elevation}x${directions}`,
+    elevationDeg: elevation,
     directions: directions as CameraPreset['directions'],
     yawOffsetDeg: 0,
-    pixelsPerMeter: numFlag(args, 'ppm', 32),
+    pixelsPerMeter: intFlag(args, 'ppm', 32),
     cellPx: { w: cell, h: cell },
-    paddingPx: numFlag(args, 'padding', 6),
+    paddingPx: intFlag(args, 'padding', 6),
     pivot: 'feet-baseline',
     orthographic: true,
   };
@@ -143,7 +155,9 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       );
     }
     const styleId = flag(args, 'style') ?? 'pixel-8';
-    const style = PRESETS[styleId];
+    // Object.hasOwn: `--style __proto__` must be unknown-style, not a
+    // prototype-chain hit that dies later as a confusing TypeError (m7)
+    const style = Object.hasOwn(PRESETS, styleId) ? PRESETS[styleId] : undefined;
     if (!style) {
       return fail(
         'bake' as JobEvent['jobId'],
@@ -159,7 +173,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           modelPath: model,
           camera: cameraFromFlags(args),
           style,
-          frames: numFlag(args, 'frames', 6),
+          frames: intFlag(args, 'frames', 6),
           outRoot: out,
           cacheDir: flag(args, 'cache'),
           onlyInvalidated: args.includes('--only-invalidated'),
@@ -198,16 +212,26 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         err instanceof Error ? err.message : String(err),
       );
     }
-    return await pump(
-      runExportJob({
-        jobId: 'export',
-        bakeDir,
-        outDir: out,
-        targets,
-        fps: numFlag(args, 'fps', 8),
-      }),
-      emit,
-    );
+    // the same arg-error-to-event discipline as the bake branch (M4): a bad
+    // --fps must become an NDJSON error event, never a raw throw out of runCli
+    try {
+      return await pump(
+        runExportJob({
+          jobId: 'export',
+          bakeDir,
+          outDir: out,
+          targets,
+          fps: numFlag(args, 'fps', 8),
+        }),
+        emit,
+      );
+    } catch (err) {
+      return fail(
+        'export' as JobEvent['jobId'],
+        'bad-args',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
   }
 
   if (verb !== 'undo' && verb !== 'redo') {

@@ -12,7 +12,7 @@
     "npm:fast-png@6.2.0": "6.2.0",
     "npm:fast-png@^6.2.0": "6.2.0",
     "npm:gifenc@^1.0.3": "1.0.3",
-    "npm:maxrects-packer@^2.7.3": "2.7.3",
+    "npm:maxrects-packer@2.7.3": "2.7.3",
     "npm:meshoptimizer@^1.2.0": "1.2.0",
     "npm:obj2gltf@^3.2.0": "3.2.0",
     "npm:pixelmatch@^5.3.0": "5.3.0",
@@ -990,7 +990,7 @@
         "dependencies": [
           "npm:fast-png@^6.2.0",
           "npm:gifenc@^1.0.3",
-          "npm:maxrects-packer@^2.7.3"
+          "npm:maxrects-packer@2.7.3"
         ]
       },
       "packages/render": {

@@ -148,3 +148,35 @@ Deno.test('exportAseprite emits one JSON per lit page with page-local tags', asy
   assertEquals(p0.meta.frameTags, [{ name: 'idle_d00', from: 0, to: 1, direction: 'forward' }]);
   assertEquals(p1.meta.frameTags, [{ name: 'idle_d01', from: 0, to: 1, direction: 'forward' }]);
 });
+
+Deno.test('exportAseprite refuses an animation split across pages (M1 guard)', async () => {
+  // move ONLY idle/d01/f001 to page 1: group idle_d01 now spans pages 0 and 1,
+  // so any per-page JSON would truncate the animation - must throw, not lie
+  const base = await fixtureManifest();
+  const plain = structuredClone(base);
+  for (const f of plain.frames) {
+    if (f.direction === 1 && f.frame === 1) f.atlas.pageIndex = 1;
+  }
+  plain.atlases.push({
+    pageIndex: 1,
+    pass: 'lit',
+    sizePx: 64,
+    png: 'atlas_lit_1.png',
+    layoutSharedWith: 'lit',
+  });
+  const manifest = parseWith(BakeManifestSchema, plain, 'split-group manifest');
+  const out = await Deno.makeTempDir({ prefix: 'sb-ase-split-' });
+  try {
+    let threw = false;
+    try {
+      await exportAseprite(manifest, BAKE, out, { fps: 8 });
+    } catch (err) {
+      threw = true;
+      assert(err instanceof Error && err.message.includes('idle_d01'), `names the group: ${err}`);
+      assert(err.message.includes('spans atlas pages'), 'explains the failure');
+    }
+    assert(threw, 'split animation must throw');
+  } finally {
+    await Deno.remove(out, { recursive: true });
+  }
+});

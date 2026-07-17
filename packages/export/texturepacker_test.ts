@@ -154,3 +154,32 @@ Deno.test('exportTexturePacker emits one hash JSON per lit page', async () => {
   assertEquals(p0.meta.image, 'atlas_lit_0.png');
   assertEquals(p1.meta.image, 'atlas_lit_1.png');
 });
+
+Deno.test('exportTexturePacker refuses an animation split across pages (M1 guard)', async () => {
+  const base = await fixtureManifest();
+  const plain = structuredClone(base);
+  for (const f of plain.frames) {
+    if (f.direction === 1 && f.frame === 1) f.atlas.pageIndex = 1;
+  }
+  plain.atlases.push({
+    pageIndex: 1,
+    pass: 'lit',
+    sizePx: 64,
+    png: 'atlas_lit_1.png',
+    layoutSharedWith: 'lit',
+  });
+  const manifest = parseWith(BakeManifestSchema, plain, 'split-group manifest');
+  const out = await Deno.makeTempDir({ prefix: 'sb-tp-split-' });
+  try {
+    let threw = false;
+    try {
+      await exportTexturePacker(manifest, BAKE, out, { fps: 8 });
+    } catch (err) {
+      threw = true;
+      assert(err instanceof Error && err.message.includes('idle_d01'), `names the group: ${err}`);
+    }
+    assert(threw, 'split animation must throw');
+  } finally {
+    await Deno.remove(out, { recursive: true });
+  }
+});

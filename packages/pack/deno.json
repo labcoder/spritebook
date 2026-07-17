@@ -5,6 +5,6 @@
   "imports": {
     "fast-png": "npm:fast-png@^6.2.0",
     "gifenc": "npm:gifenc@^1.0.3",
-    "maxrects-packer": "npm:maxrects-packer@^2.7.3"
+    "maxrects-packer": "npm:maxrects-packer@2.7.3"
   }
 }

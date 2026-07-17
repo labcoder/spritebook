@@ -27,6 +27,7 @@
  */
 import type { FrameRecord } from '@spritebook/schema';
 import type { Exporter } from '../pack/contracts.ts';
+import { assertNoSplitAnimations } from './split-guard.ts';
 
 const META_APP = 'spritebook';
 /** Projected as meta.version — a frozen format constant, never read at runtime. */
@@ -95,6 +96,7 @@ export const exportAseprite: Exporter = async (manifest, bakeDir, outDir, opts) 
   if (!Number.isFinite(opts.fps) || opts.fps <= 0) {
     throw new RangeError(`exportAseprite: fps must be positive and finite, got ${opts.fps}`);
   }
+  assertNoSplitAnimations(manifest, 'exportAseprite');
   const duration = Math.round(1000 / opts.fps);
   const litPages = manifest.atlases
     .filter((a) => a.pass === 'lit')

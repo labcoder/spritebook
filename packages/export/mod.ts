@@ -45,6 +45,11 @@ export async function* runExportJob(spec: ExportJobSpec): AsyncIterable<JobEvent
 
   try {
     if (spec.targets.length === 0) throw new Error('no export targets given');
+    if (spec.fps !== undefined && (!Number.isFinite(spec.fps) || spec.fps <= 0)) {
+      // validated ONCE at the seam so every target behaves identically —
+      // texturepacker ignores fps by design and would otherwise accept -5
+      throw new Error(`fps must be positive and finite, got ${spec.fps}`);
+    }
     const manifest: BakeManifest = parseWith(
       BakeManifestSchema,
       JSON.parse(await Deno.readTextFile(`${spec.bakeDir}/manifest.json`)),
