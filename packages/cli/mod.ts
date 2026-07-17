@@ -1,15 +1,26 @@
 /**
- * @spritebook/cli - verb surface. P1-T3 lands the first real verbs: `undo`
- * and `redo` over a manifest + its journal, with `--json` always-NDJSON
- * output (the full verb surface arrives through P2+).
+ * @spritebook/cli - verb surface. P1-T3 landed `undo`/`redo`; P2-T3 lands
+ * `bake` (canonical glb -> bake dir via render->style->pack) and `export`
+ * (bake dir -> engine-ready files). `--json` gives always-NDJSON output.
  *
  * On-disk journal layout, next to the manifest:
  *   <manifest>                    canonical JSON document
  *   <manifest>.journal.ndjson     append-only ManifestPatch lines
  *   <manifest>.journal.cursor     how many patches are currently applied
  */
-import { canonicalJson, type JobEvent, ManifestPatchSchema, parseWith } from '@spritebook/schema';
+import {
+  canonicalJson,
+  type ExportTargetId,
+  ExportTargetIdSchema,
+  type JobEvent,
+  ManifestPatchSchema,
+  parseWith,
+} from '@spritebook/schema';
+import type { CameraPreset } from '@spritebook/schema';
 import { applyPatchOps, encodeEvent } from '@spritebook/core';
+import { PRESETS } from '@spritebook/style';
+import { runBakeJob } from '@spritebook/pack';
+import { runExportJob } from '@spritebook/export';
 
 export interface CliIo {
   stdout(line: string): void;
@@ -51,6 +62,58 @@ function flag(args: string[], name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
+function numFlag(args: string[], name: string, fallback: number): number {
+  const raw = flag(args, name);
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) throw new Error(`--${name} must be a number (got "${raw}")`);
+  return n;
+}
+
+/** Human-readable rendering of an event stream; returns 1 if an error passed. */
+async function pump(
+  events: AsyncIterable<JobEvent>,
+  emit: (e: JobEvent, human: string) => void,
+): Promise<number> {
+  let failed = 0;
+  for await (const e of events) {
+    const human = e.t === 'progress'
+      ? `[${e.done}/${e.total}] ${e.step}`
+      : e.t === 'artifact'
+      ? `${e.kind}: ${e.path}`
+      : e.t === 'warn'
+      ? `warn [${e.code}]: ${e.message}`
+      : e.t === 'error'
+      ? `error [${e.code}]: ${e.message}`
+      : e.t === 'done'
+      ? `done in ${e.wallTimeS.toFixed(2)}s`
+      : e.t;
+    emit(e, human);
+    if (e.t === 'error') failed = 1;
+  }
+  return failed;
+}
+
+const DIR_CHOICES = new Set([2, 4, 8, 16]);
+
+/** Build the CameraPreset for `spritebook bake` from CLI flags + defaults. */
+function cameraFromFlags(args: string[]): CameraPreset {
+  const directions = numFlag(args, 'directions', 8);
+  if (!DIR_CHOICES.has(directions)) throw new Error('--directions must be 2, 4, 8, or 16');
+  const cell = numFlag(args, 'cell', 64);
+  return {
+    id: `cli-e30x${directions}`,
+    elevationDeg: numFlag(args, 'elevation', 30),
+    directions: directions as CameraPreset['directions'],
+    yawOffsetDeg: 0,
+    pixelsPerMeter: numFlag(args, 'ppm', 32),
+    cellPx: { w: cell, h: cell },
+    paddingPx: numFlag(args, 'padding', 6),
+    pivot: 'feet-baseline',
+    orthographic: true,
+  };
+}
+
 /** Run the CLI. Returns the process exit code. */
 export async function runCli(args: string[], io: CliIo): Promise<number> {
   const now = io.now ?? (() => new Date().toISOString());
@@ -68,11 +131,90 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     return 1;
   };
 
+  if (verb === 'bake') {
+    const model = flag(args, 'model');
+    const character = flag(args, 'character');
+    const out = flag(args, 'out');
+    if (!model || !character || !out) {
+      return fail(
+        'bake' as JobEvent['jobId'],
+        'missing-arg',
+        '--model <glb>, --character <id>, and --out <dir> are required',
+      );
+    }
+    const styleId = flag(args, 'style') ?? 'pixel-8';
+    const style = PRESETS[styleId];
+    if (!style) {
+      return fail(
+        'bake' as JobEvent['jobId'],
+        'unknown-style',
+        `Unknown style "${styleId}" - available: ${Object.keys(PRESETS).sort().join(', ')}`,
+      );
+    }
+    try {
+      return await pump(
+        runBakeJob({
+          jobId: 'bake',
+          characterId: character,
+          modelPath: model,
+          camera: cameraFromFlags(args),
+          style,
+          frames: numFlag(args, 'frames', 6),
+          outRoot: out,
+          cacheDir: flag(args, 'cache'),
+          onlyInvalidated: args.includes('--only-invalidated'),
+        }),
+        emit,
+      );
+    } catch (err) {
+      return fail(
+        'bake' as JobEvent['jobId'],
+        'bad-args',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  if (verb === 'export') {
+    const bakeDir = flag(args, 'bake');
+    const out = flag(args, 'out');
+    const targetsRaw = flag(args, 'targets');
+    if (!bakeDir || !out || !targetsRaw) {
+      return fail(
+        'export' as JobEvent['jobId'],
+        'missing-arg',
+        '--bake <bakeDir>, --out <dir>, and --targets <a,b,...> are required',
+      );
+    }
+    let targets: ExportTargetId[];
+    try {
+      targets = targetsRaw.split(',').map((t) =>
+        parseWith(ExportTargetIdSchema, t.trim(), `target "${t.trim()}"`)
+      );
+    } catch (err) {
+      return fail(
+        'export' as JobEvent['jobId'],
+        'unknown-target',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+    return await pump(
+      runExportJob({
+        jobId: 'export',
+        bakeDir,
+        outDir: out,
+        targets,
+        fps: numFlag(args, 'fps', 8),
+      }),
+      emit,
+    );
+  }
+
   if (verb !== 'undo' && verb !== 'redo') {
     return fail(
       'cli' as JobEvent['jobId'],
       'unknown-verb',
-      `Unknown verb "${verb ?? ''}" - available now: undo, redo (see roadmap for the full surface)`,
+      `Unknown verb "${verb ?? ''}" - available now: bake, export, undo, redo`,
     );
   }
 

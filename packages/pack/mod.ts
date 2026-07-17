@@ -1,10 +1,16 @@
 /**
- * @spritebook/pack - MaxRects atlasing, parallel-layout guarantee, contact sheets
- *
- * P1-T1 stub: the package exists so the workspace shape is load-bearing from
- * day one. Real implementation lands at P2 (docs/internal/roadmap/).
+ * @spritebook/pack - MaxRects atlasing behind the parallel-layout law, the
+ * per-frame input-hash cache, the BakeManifest writer, contact sheets, and the
+ * bake orchestrator. The seam: a BakeJobSpec (plain data) in; a bake dir
+ * (manifest + atlas pages + artifacts) + a JobEvent stream out. No GPU object
+ * or pixel buffer crosses this API (D-004 discipline throughout).
  */
-export const PACKAGE = 'pack' as const;
-
-/** One-line contract from the architecture module map. */
-export const CONTRACT = 'MaxRects atlasing, parallel-layout guarantee, contact sheets' as const;
+export * from './contracts.ts';
+export { artifactKey, bakeKey, BlobCache, frameKey, predictInvalidation } from './cache.ts';
+export { assembleManifest, frameGrid } from './manifest.ts';
+export { DEFAULT_GAP_PX, DEFAULT_MAX_PAGE_SIZE_PX, packLayout } from './maxrects.ts';
+export { assertRectIdentity, composePage, encodePagePng } from './atlas.ts';
+export { aov1x } from './aov1x.ts';
+export { buildContactSheet } from './contactsheet.ts';
+export { buildCacheInputs, pivotFor, runBakeJob } from './bake.ts';
+export type { BakeJobSpec } from './bake.ts';

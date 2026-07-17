@@ -11,6 +11,7 @@ import type { StyleJobSpec } from './contracts.ts';
 import { styleFromAovs } from './pipeline.ts';
 
 export { styleFromAovs } from './pipeline.ts';
+export { CEL_2, PAINTERLY, PIXEL_8, PRESETS } from './presets.ts';
 // pure AOV utilities, re-exported for the pack stage (bake composes render ->
 // style -> pack via files; pack reads the same Sx AOVs to build 1x AOV pages)
 export { readAov } from './aovio.ts';
