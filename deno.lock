@@ -972,8 +972,7 @@
     "members": {
       "packages/export": {
         "dependencies": [
-          "npm:fast-png@^6.2.0",
-          "npm:gifenc@^1.0.3"
+          "npm:fast-png@^6.2.0"
         ]
       },
       "packages/importer": {
@@ -990,6 +989,7 @@
       "packages/pack": {
         "dependencies": [
           "npm:fast-png@^6.2.0",
+          "npm:gifenc@^1.0.3",
           "npm:maxrects-packer@^2.7.3"
         ]
       },
