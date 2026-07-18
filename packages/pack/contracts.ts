@@ -137,5 +137,6 @@ export type Exporter = (
 /** Manifest fields exporters must never project (byte-stability doctrine). */
 export const VOLATILE_FIELDS = ['createdAt', 'metrics.wallTimeS', 'metrics.cacheHitPct'] as const;
 
-/** rendererVersion recorded in CacheKeyInputs (bump policy lands in P2-T4). */
-export const RENDERER_VERSION = 'spritebook-render@0.1.0';
+// RENDERER_VERSION moved home to @spritebook/render (P2-T4): the render package
+// owns its version, and cache keys carry renderSignature() — version + adapter
+// hash (D-023) — so a driver change is an honest full cache miss.

@@ -17,7 +17,7 @@ import { decode as decodePng } from 'fast-png';
 import type { CacheKeyInputs, CameraPreset, JobEvent, StylePreset } from '@spritebook/schema';
 import { canonicalJson, RENDER_PASSES } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
-import { runRenderJob } from '@spritebook/render';
+import { renderSignature, runRenderJob } from '@spritebook/render';
 import { type AovSource, readAov, styleFromAovs, type StyleResult } from '@spritebook/style';
 import {
   atlasPageName,
@@ -26,7 +26,6 @@ import {
   type FrameId,
   frameIdKey,
   PAGE_KIND,
-  RENDERER_VERSION,
 } from './contracts.ts';
 import { artifactKey, bakeKey, BlobCache, frameKey } from './cache.ts';
 import { assembleManifest, frameGrid } from './manifest.ts';
@@ -61,9 +60,15 @@ async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** The full T3 recipe: model bytes + presets + the idle clip stub + sentinels. */
+/**
+ * The full bake recipe: model bytes + presets + the idle clip stub + sentinels.
+ * `renderSig` is renderSignature() from @spritebook/render — pipeline version
+ * composed with the adapter-identity hash (D-023), so the same recipe on a
+ * different GPU/driver is a different recipe.
+ */
 export async function buildCacheInputs(
   spec: Pick<BakeJobSpec, 'characterId' | 'modelPath' | 'camera' | 'style' | 'frames'>,
+  renderSig: string,
 ): Promise<CacheKeyInputs> {
   const modelBytes = await Deno.readFile(spec.modelPath);
   return {
@@ -77,7 +82,7 @@ export async function buildCacheInputs(
     ),
     cameraPresetHash: await sha256Hex(canonicalJson(spec.camera)),
     stylePresetHash: await sha256Hex(canonicalJson(spec.style)),
-    rendererVersion: RENDERER_VERSION,
+    rendererVersion: renderSig,
     // no generation backend in the T3 path: the mesh comes in from the border
     backend: {
       modelId: 'source-mesh',
@@ -248,7 +253,14 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
   // hoisted so the catch can release the recompute temp dir on ANY failure (m6)
   let cleanup: (() => Promise<void>) | undefined;
   try {
-    const inputs = await buildCacheInputs(spec);
+    // model existence first (the friendlier error on every machine), THEN the
+    // adapter-bound render signature — baking is a GPU operation either way
+    try {
+      await Deno.stat(spec.modelPath);
+    } catch {
+      throw new Error(`Cannot read "${spec.modelPath}" - does the file exist?`);
+    }
+    const inputs = await buildCacheInputs(spec, await renderSignature());
     const bake = await bakeKey(inputs);
     const bakeDir = `${spec.outRoot}/bake-${bake.slice(0, 8)}`;
     await Deno.mkdir(bakeDir, { recursive: true });

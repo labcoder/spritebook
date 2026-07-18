@@ -15,7 +15,7 @@ import { decode as decodePng } from 'fast-png';
 import type { BakeManifest, CameraPreset, JobEvent, StylePreset } from '@spritebook/schema';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
 import { PIXEL_8 } from '@spritebook/style';
-import { runRenderJob } from '@spritebook/render';
+import { renderSignature, runRenderJob } from '@spritebook/render';
 import { tryGetGpu } from '../render/gpu.ts';
 import { exportGodot, parseTres, runExportJob, validateTres } from '@spritebook/export';
 import { buildCacheInputs, frameGrid, pivotFor, predictInvalidation, runBakeJob } from './mod.ts';
@@ -152,13 +152,14 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
         const cold = await bake(`${root}/c1`, { cacheDir, onlyInvalidated: true });
         assertEquals(cold.manifest.metrics.cacheHitPct, 0, 'cold cache misses everything');
 
+        const sig = await renderSignature();
         const inputs = await buildCacheInputs({
           characterId: 'asym',
           modelPath: GLB,
           camera: CAM,
           style: PIXEL_8,
           frames: FRAMES,
-        });
+        }, sig);
         assertEquals(
           predictInvalidation(inputs, inputs, grid),
           [],
@@ -183,7 +184,7 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
           camera: CAM,
           style: wider,
           frames: FRAMES,
-        });
+        }, sig);
         const predicted = predictInvalidation(inputs, newInputs, grid);
         assertEquals(predicted, grid, 'prediction: look change -> every frame');
         const changed = await bake(`${root}/c3`, {

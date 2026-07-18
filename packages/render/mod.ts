@@ -23,6 +23,10 @@ import { getGpu } from './gpu.ts';
 import { makeRenderer } from './renderer.ts';
 
 export type { RenderJobSpec } from './contracts.ts';
+export { RENDERER_VERSION } from './contracts.ts';
+// render identity + health as plain data (D-004-safe; no GPU object crosses)
+export { renderDiagnostics, renderSignature } from './diagnostics.ts';
+export type { RenderDiagnostics } from './diagnostics.ts';
 
 /** Render one canonical model to per-direction AOV pages + a throughput report. */
 export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent> {

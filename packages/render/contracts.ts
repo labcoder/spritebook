@@ -88,6 +88,18 @@ export const REQUIRED_LIMITS: Record<string, number> = {
   maxColorAttachments: 5,
 };
 
+/**
+ * The render pipeline's version, OWNED HERE (P2-T4; previously mis-homed in
+ * pack). Bump policy (docs/versioning.md): bump on ANY pixel-affecting change
+ * anywhere in the bake pipeline — shaders, framing, pose driver, AOV encoding,
+ * style algorithms, packing — because this string anchors every cache key and
+ * golden set. A bump ships with a golden refresh explaining why pixels changed.
+ * Cache keys never carry this string raw: they carry renderSignature()
+ * (diagnostics.ts), which composes it with the adapter-identity hash (D-023) so
+ * a GPU/driver change is an honest cache miss.
+ */
+export const RENDERER_VERSION = 'spritebook-render@0.1.0';
+
 // ---------------------------------------------------------------------------
 // AOV contract (aov.ts + shaders.wgsl). One MRT pass, five color attachments,
 // in this exact order — the FS output struct @location(0..4) must match.

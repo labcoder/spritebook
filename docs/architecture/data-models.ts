@@ -14,6 +14,9 @@
  * >>> /schemaVersion) and require a 1:1 precomputed inverse.
  * >>> P1-T4 delta (2026-07-13): `SourceRecord.importedVia.tool` gains
  * >>> 'three-fbx' (D-020 interim FBX converter; 'ufbx' stays reserved).
+ * >>> P2-T4 delta (2026-07-15): `CacheKeyInputs.rendererVersion` carries the
+ * >>> COMPOSED render signature `<version>#<adapter-hash>` (D-023) — a GPU or
+ * >>> driver change is an honest full cache miss. Field type unchanged.
  *
  * Conventions: all lengths in meters, all angles in degrees, all times in
  * seconds unless suffixed. Hashes are sha256 hex. IDs are lowercase slugs.
