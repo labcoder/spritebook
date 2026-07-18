@@ -1,8 +1,8 @@
 # Quickstart
 
-<!-- SKELETON (P2-T4): every TRANSCRIPT/METRIC comment below is a placeholder the release
-integrator replaces with real output captured from the release binary. Do not hand-write
-transcripts. -->
+<!-- Transcripts below were captured from the real compiled win-x64 binary (lean release build,
+2026-07-18) running in a fresh directory laid out like the release zip. Regenerate them the same
+way when behavior changes; never hand-write them. -->
 
 Bake a rigged 3D character into engine-ready 2D spritesheets, locally, in five minutes.
 
@@ -42,7 +42,17 @@ Healthy output shows the product and render-pipeline versions, your adapter, the
 (the renderer + adapter identity that cache keys carry), and a passing render probe
 (`render probe: OK`):
 
-<!-- TRANSCRIPT:doctor -->
+```
+SpriteBook 0.1.0-alpha.1
+deno 2.9.2 - v8 14.9.207.2-rusty - windows-x86_64
+render pipeline spritebook-render@0.1.0
+backend env: DENO_WEBGPU_BACKEND=(unset - wgpu default)
+adapter: NVIDIA GeForce RTX 3090 (vendor 4318, device 8708)
+render signature: spritebook-render@0.1.0#b490bb6b
+features: (none)
+limits: maxColorAttachments=8 maxColorAttachmentBytesPerSample=32 maxTextureDimension2D=8192 maxBufferSize=268435456
+render probe: OK (checksum 5f70bf18a0860070)
+```
 
 `doctor` exits 0 only when an adapter exists **and** the probe passes. If it prints `adapter: NONE`,
 see Troubleshooting below.
@@ -53,7 +63,17 @@ see Troubleshooting below.
 spritebook bake --model sample/asymmetric.glb --character hero --out bakes --style pixel-8 --directions 8 --frames 6
 ```
 
-<!-- TRANSCRIPT:bake -->
+```
+queued
+started
+[1/4] cells
+[2/4] pack
+[3/4] write
+[4/4] manifest
+bake-manifest: bakes/bake-7f23852b/manifest.json
+bake-dir: bakes/bake-7f23852b
+done in 4.17s
+```
 
 The bake lands in a content-addressed directory, `bakes/bake-<id>/`:
 
@@ -73,7 +93,19 @@ spritebook export --bake bakes/bake-<id> --out exports --targets godot,aseprite,
 
 (`bakes/bake-<id>` is the bake directory printed by step 4.)
 
-<!-- TRANSCRIPT:export -->
+```
+queued
+started
+[1/4] godot
+export-godot: exports/godot
+[2/4] aseprite
+export-aseprite: exports/aseprite
+[3/4] texturepacker
+export-texturepacker: exports/texturepacker
+[4/4] strips
+export-strips: exports/strips
+done in 0.07s
+```
 
 One subdirectory per target:
 
@@ -151,7 +183,11 @@ hysteresis), so frames do not shimmer in motion.
 
 ## Performance
 
-Reference numbers for the step-4 bake (8 directions x 6 frames, 64 px cells, `pixel-8`):
+Reference numbers for the step-4 workload (bake 8 directions x 6 frames at 64 px `pixel-8`, then
+export all four targets) — the roadmap bar is <=10 minutes cold:
 
-- Dev GPU: <!-- METRIC:dev -->
-- CI software rasterizer (Mesa lavapipe): <!-- METRIC:ci -->
+- Dev GPU (RTX 3090, Vulkan, Windows, compiled binary): **~4.4 s** (bake 4.17 s + export 0.07 s).
+- CI software rasterizer (ubuntu-latest, Mesa lavapipe): measured by the release workflow's Linux
+  smoke on every tag push — the number is printed in that run's summary and uploaded as the
+  `metric-linux` artifact. (Software rasterization is minutes-scale by design; it exists to prove
+  the pipeline, not to race it.)
