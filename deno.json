@@ -31,7 +31,7 @@
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
     "coverage": "deno test --allow-read --allow-write --allow-env --allow-ffi --coverage=.coverage && deno coverage .coverage",
-    "goldens:update": "echo 'goldens arrive with the render suites (P2) - see renderer-golden-testing skill'",
+    "goldens:update": "deno run --allow-read --allow-write --allow-env --allow-ffi packages/style/fixtures/_gen-goldens.ts",
     "hooks:install": "git config core.hooksPath .githooks",
     "spike:webgpu": "deno run --unstable-webgpu --allow-read=spikes/webgpu --allow-write=spikes/webgpu --allow-env spikes/webgpu/main.ts",
     "spike:webgpu:gen": "deno run --allow-read=spikes/webgpu --allow-write=spikes/webgpu spikes/webgpu/gen-asset.ts"
