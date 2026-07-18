@@ -2,9 +2,9 @@
 
 Notable changes to SpriteBook. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version, tag, and golden policy is in
-[docs/versioning.md](docs/versioning.md).
+`docs/versioning.md` in the repository.
 
-## [0.1.0-alpha.1] - 2026-07-18
+## 0.1.0-alpha.1 - 2026-07-18
 
 First alpha: the headless bake pipeline, end to end. A rigged 3D character goes in; deterministic,
 engine-ready 2D spritesheets come out. One CLI binary, no GUI yet.
@@ -36,7 +36,8 @@ engine-ready 2D spritesheets come out. One CLI binary, no GUI yet.
   unchanged bake is byte-identical; volatile manifest fields are never projected.
 - **Input-hash frame cache** (`--cache`, `--only-invalidated`): keys hash the full recipe — model
   bytes, camera, style, clip, and the D-023 render signature (`<renderer version>#<adapter hash>`) —
-  so a GPU or driver change is an honest full cache miss, never stale pixels.
+  so an adapter change is an honest full cache miss (driver-version-only updates are a documented
+  gap — see docs/versioning.md).
 - **Journaled undo/redo** (`spritebook undo` / `spritebook redo`): manifest edits are append-only,
   reversible patches with a cursor. Undo/redo is core behavior, not a GUI trick.
 - **`spritebook doctor`**: product and render-pipeline versions, backend env, adapter identity, the
@@ -83,4 +84,4 @@ engine-ready 2D spritesheets come out. One CLI binary, no GUI yet.
   sample ships in the release zip); importing FBX/OBJ/VRM means running from source.
 - Real-engine export validation (Godot/Phaser/Aseprite imports) is deferred to the end of the
   project by design; exports are validated structurally and for byte-stability on every CI run
-  ([docs/export-validation.md](docs/export-validation.md)).
+  (`docs/export-validation.md` in the repository).

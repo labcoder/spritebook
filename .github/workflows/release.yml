@@ -27,14 +27,19 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: ${{ env.DENO_VERSION }}
+      - name: tag matches SPRITEBOOK_VERSION
+        run: |
+          v=$(deno eval "const { SPRITEBOOK_VERSION } = await import('./packages/cli/version.ts'); console.log(SPRITEBOOK_VERSION)")
+          test "v$v" = "$GITHUB_REF_NAME" || {
+            echo "tag $GITHUB_REF_NAME does not match packages/cli/version.ts (v$v)"; exit 1; }
       - name: lean release tree (no spikes, no importer - D-025)
         run: deno run --allow-read --allow-write tools/release/lean.ts
-      # lean.ts deleted the lock (install MATERIALIZES the whole lock, spike
-      # deps included). Fresh resolution is deterministic because every runtime
-      # dep is exact-pinned; the tripwire asserts exactly that.
-      - name: fresh install + pin tripwire
+      # lean.ts swapped in the COMMITTED lean.lock (full lean resolution,
+      # transitives included) so --frozen works and the shipped binary is
+      # exactly the tested tree. The tripwire is a belt on the swap itself.
+      - name: frozen install + pin tripwire
         run: |
-          deno install
+          deno install --frozen
           for pin in 'fast-png@6.2.0' 'gifenc@1.0.3' 'maxrects-packer@2.7.3' \
                      'zod@4.4.3' 'pixelmatch@5.3.0' '@gltf-transform/core@4.4.1'; do
             grep -q "\"$pin\"" deno.lock || { echo "PIN DRIFT: $pin missing"; exit 1; }
@@ -66,6 +71,7 @@ jobs:
         with:
           name: release-zips
           path: dist/*.zip
+          overwrite: true # re-runs of a flaky release must not collide
 
   smoke-linux:
     needs: build
@@ -85,7 +91,9 @@ jobs:
           set -e
           unzip -q spritebook-${GITHUB_REF_NAME}-linux-x64.zip -d sb
           chmod +x sb/spritebook
-          sb/spritebook --version
+          v=$(sb/spritebook --version)
+          test "$v" = "spritebook ${GITHUB_REF_NAME#v}" ||
+            { echo "--version '$v' does not match tag"; exit 1; }
           sb/spritebook doctor
           start=$(date +%s)
           sb/spritebook bake --model sb/sample/asymmetric.glb --character hero \
@@ -102,6 +110,7 @@ jobs:
         with:
           name: metric-linux
           path: metric-linux.txt
+          overwrite: true
 
   smoke-windows:
     needs: build
@@ -117,13 +126,18 @@ jobs:
         run: |
           Expand-Archive "spritebook-$env:GITHUB_REF_NAME-win-x64.zip" -DestinationPath sb
           $v = & sb/spritebook.exe --version
-          if ($v -notmatch 'spritebook 0\.') { throw "bad --version output: $v" }
+          if ($v -ne "spritebook $($env:GITHUB_REF_NAME.TrimStart('v'))") {
+            throw "--version '$v' does not match tag $env:GITHUB_REF_NAME"
+          }
           $out = & sb/spritebook.exe doctor
           $text = $out -join "`n"
           Write-Host $text
           if ($text -notmatch 'render probe: OK' -and $text -notmatch 'adapter: NONE') {
             throw 'doctor neither healthy nor honestly unavailable'
           }
+          # doctor exits 1 when no adapter exists (honest) - that outcome is
+          # ACCEPTED above, so defuse the runner's appended `exit $LASTEXITCODE`
+          $global:LASTEXITCODE = 0
 
   # NOTE: macos minutes bill x10 on private repos; this job runs only on tag
   # pushes, which the maintainer controls. It is the only mac validation we have.
@@ -134,16 +148,25 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: release-zips
-      - name: smoke (version + honest doctor, arm64)
+      - name: smoke (version + honest doctor; arm64 native + x64 via Rosetta)
         run: |
           set -e
-          unzip -q spritebook-${GITHUB_REF_NAME}-mac-arm64.zip -d sb
-          chmod +x sb/spritebook
-          sb/spritebook --version
-          out=$(sb/spritebook doctor || true)
-          echo "$out"
-          echo "$out" | grep -Eq 'render probe: OK|adapter: NONE' ||
-            { echo 'doctor neither healthy nor honestly unavailable'; exit 1; }
+          smoke () {
+            unzip -q "spritebook-${GITHUB_REF_NAME}-$1.zip" -d "sb-$1"
+            chmod +x "sb-$1/spritebook"
+            v=$("sb-$1/spritebook" --version)
+            test "$v" = "spritebook ${GITHUB_REF_NAME#v}" ||
+              { echo "$1: --version '$v' does not match tag"; exit 1; }
+            out=$("sb-$1/spritebook" doctor || true)
+            echo "--- $1 doctor ---"; echo "$out"
+            echo "$out" | grep -Eq 'render probe: OK|adapter: NONE' ||
+              { echo "$1: doctor neither healthy nor honestly unavailable"; exit 1; }
+          }
+          smoke mac-arm64
+          # every published target gets executed before publish - the x64 build
+          # runs under Rosetta 2 on the arm64 runner (D-025: a compile can
+          # succeed and still die at startup)
+          smoke mac-x64
 
   publish:
     needs: [smoke-linux, smoke-windows, smoke-macos]

@@ -1,0 +1,91 @@
+{
+  "version": "5",
+  "specifiers": {
+    "npm:@gltf-transform/core@4.4.1": "4.4.1",
+    "npm:fast-png@6.2.0": "6.2.0",
+    "npm:gifenc@1.0.3": "1.0.3",
+    "npm:maxrects-packer@2.7.3": "2.7.3",
+    "npm:pixelmatch@5.3.0": "5.3.0",
+    "npm:zod@4.4.3": "4.4.3"
+  },
+  "npm": {
+    "@gltf-transform/core@4.4.1": {
+      "integrity": "sha512-ygWWFOrj1HnfvBimHF1yHTY4abbeBjn3CvljijaWKoRLMRV/a8pWYQu9rfMFQhfpT5kYZTD5Mp+dizAXPbiTDQ==",
+      "dependencies": [
+        "property-graph"
+      ]
+    },
+    "@types/pako@2.0.4": {
+      "integrity": "sha512-VWDCbrLeVXJM9fihYodcLiIv0ku+AlOa/TQ1SvYOaBuyrSKgEcro95LJyIsJ4vSo6BXIxOKxiJAat04CmST9Fw=="
+    },
+    "fast-png@6.2.0": {
+      "integrity": "sha512-fO4DewoEd9WwuP8DQcfj8Tlc88Jno6lJAjlDYzvJSqMIZwxUpRT4zuzPXgqygjJqngBdCbeQRaL/FVz3InExhA==",
+      "dependencies": [
+        "@types/pako",
+        "iobuffer",
+        "pako"
+      ]
+    },
+    "gifenc@1.0.3": {
+      "integrity": "sha512-xdr6AdrfGBcfzncONUOlXMBuc5wJDtOueE3c5rdG0oNgtINLD+f2iFZltrBRZYzACRbKr+mSVU/x98zv2u3jmw=="
+    },
+    "iobuffer@5.4.0": {
+      "integrity": "sha512-DRebOWuqDvxunfkNJAlc3IzWIPD5xVxwUNbHr7xKB8E6aLJxIPfNX3CoMJghcFjpv6RWQsrcJbghtEwSPoJqMA=="
+    },
+    "maxrects-packer@2.7.3": {
+      "integrity": "sha512-bG6qXujJ1QgttZVIH4WDanhoJtvbud/xP/XPyf6A69C9RdA61BM4TomFALCq2nrTa+tARRIBB4LuIFsnUQU2wA=="
+    },
+    "pako@2.2.0": {
+      "integrity": "sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w=="
+    },
+    "pixelmatch@5.3.0": {
+      "integrity": "sha512-o8mkY4E/+LNUf6LzX96ht6k6CEDi65k9G2rjMtBe9Oo+VPKSvl+0GKHuH/AlG+GA5LPG/i5hrekkxUc3s2HU+Q==",
+      "dependencies": [
+        "pngjs"
+      ],
+      "bin": true
+    },
+    "pngjs@6.0.0": {
+      "integrity": "sha512-TRzzuFRRmEoSW/p1KVAmiOgPco2Irlah+bGFCeNfJXxxYGwSw7YwAOAcd7X28K/m5bjBWKsC29KyoMfHbypayg=="
+    },
+    "property-graph@4.1.0": {
+      "integrity": "sha512-AvPcP7XECNWy4LGmFQ77k7un4lSKM4eS29PTvW4ck95uYeLxXPWJM7hLuBqK91FaHqCcgJvIUCuNJjjxKE7VKQ=="
+    },
+    "zod@4.4.3": {
+      "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="
+    }
+  },
+  "workspace": {
+    "members": {
+      "packages/export": {
+        "dependencies": [
+          "npm:fast-png@6.2.0"
+        ]
+      },
+      "packages/pack": {
+        "dependencies": [
+          "npm:fast-png@6.2.0",
+          "npm:gifenc@1.0.3",
+          "npm:maxrects-packer@2.7.3"
+        ]
+      },
+      "packages/render": {
+        "dependencies": [
+          "npm:@gltf-transform/core@4.4.1",
+          "npm:fast-png@6.2.0"
+        ]
+      },
+      "packages/schema": {
+        "dependencies": [
+          "npm:zod@4.4.3"
+        ]
+      },
+      "packages/style": {
+        "dependencies": [
+          "npm:fast-png@6.2.0",
+          "npm:pixelmatch@5.3.0"
+        ]
+      }
+    }
+  }
+}

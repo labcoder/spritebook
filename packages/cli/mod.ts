@@ -59,7 +59,12 @@ async function readJournal(f: JournalFiles) {
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : undefined;
+  if (i < 0) return undefined;
+  const value = args[i + 1];
+  // a flag at end-of-line or followed by another flag has NO value — treating
+  // the next token as one silently misparses (`--model --character hero`) or
+  // silently disables features (`--cache` last = no caching)
+  return value === undefined || value.startsWith('--') ? undefined : value;
 }
 
 function numFlag(args: string[], name: string, fallback: number): number {

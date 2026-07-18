@@ -17,6 +17,14 @@ function io() {
   };
 }
 
+Deno.test('--version prints the single-source version and exits 0', async () => {
+  const { runCli } = await import('./mod.ts');
+  const { out, io: cliIo } = io();
+  const code = await runCli(['--version'], cliIo);
+  assertEquals(code, 0);
+  assertEquals(out, [`spritebook ${SPRITEBOOK_VERSION}`]);
+});
+
 Deno.test('doctor: human output matches the machine it runs on', async () => {
   const { out, io: cliIo } = io();
   const code = await runDoctor([], cliIo);

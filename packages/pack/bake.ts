@@ -64,7 +64,8 @@ async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
  * The full bake recipe: model bytes + presets + the idle clip stub + sentinels.
  * `renderSig` is renderSignature() from @spritebook/render — pipeline version
  * composed with the adapter-identity hash (D-023), so the same recipe on a
- * different GPU/driver is a different recipe.
+ * different adapter is a different recipe (driver-version-only updates are a
+ * known gap; see render/diagnostics.ts).
  */
 export async function buildCacheInputs(
   spec: Pick<BakeJobSpec, 'characterId' | 'modelPath' | 'camera' | 'style' | 'frames'>,

@@ -84,10 +84,12 @@ jobs:
       # The style CPU pipeline + perceptual goldens are deterministic over
       # committed AOV fixtures, so they also run GPU-free on the hosted `test`
       # matrix; here they additionally exercise the live render->style seam.
-      - name: render + style + pack/export suites (software Vulkan)
+      # cli included so doctor's HEALTHY branch (signature + probe) runs on a
+      # lane that actually has an adapter, not only on the dev box
+      - name: render + style + pack/export + cli suites (software Vulkan)
         env:
           SPRITEBOOK_REQUIRE_GPU: '1'
-        run: deno test --allow-read --allow-write --allow-env --allow-ffi packages/render/ packages/style/ packages/pack/ packages/export/
+        run: deno test --allow-read --allow-write --allow-env --allow-ffi packages/render/ packages/style/ packages/pack/ packages/export/ packages/cli/
       - name: render throughput probe
         run: deno run --allow-read --allow-write --allow-env --allow-ffi packages/render/bench.ts .render-bench
       - name: upload throughput report

@@ -139,4 +139,4 @@ export const VOLATILE_FIELDS = ['createdAt', 'metrics.wallTimeS', 'metrics.cache
 
 // RENDERER_VERSION moved home to @spritebook/render (P2-T4): the render package
 // owns its version, and cache keys carry renderSignature() — version + adapter
-// hash (D-023) — so a driver change is an honest full cache miss.
+// hash (D-023) — so an adapter change is an honest full cache miss.

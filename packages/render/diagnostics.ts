@@ -2,17 +2,25 @@
  * Render identity + health as PLAIN DATA (D-004: nothing GPU-shaped crosses the
  * seam — strings, numbers, and JSON-safe records only).
  *
- * renderSignature (D-023): `<RENDERER_VERSION>#<8-hex sha256 of adapterInfo>`.
- * The composed string is what cache keys carry as `rendererVersion`, so a GPU
- * or driver change flips every key — an honest full miss, because pixels are
- * only deterministic per (pipeline version, adapter, driver). It lands verbatim
- * in BakeManifest.inputs for provenance, and `spritebook doctor` prints it.
+ * renderSignature (D-023, scope corrected after review): `<RENDERER_VERSION>#
+ * <8-hex sha256 of adapterInfo>`. The composed string is what cache keys carry
+ * as `rendererVersion`, so an ADAPTER change (different GPU, vendor, device, or
+ * anything Deno's GPUAdapterInfo exposes — including fields future Deno
+ * versions add, so a Deno upgrade may flip keys too) is an honest full cache
+ * miss. KNOWN GAP: GPUAdapterInfo carries NO driver version (verified: vendor/
+ * device ids, description, subgroup sizes only), so a driver-version-only
+ * update does NOT flip keys and a warm `--only-invalidated` bake can serve
+ * pre-update pixels — open rider on D-023 to fold driver identity in when the
+ * runtime exposes it. The signature lands verbatim in BakeManifest.inputs for
+ * provenance, and `spritebook doctor` prints it.
  *
  * renderDiagnostics: the doctor payload — versions, backend env, adapter info,
  * features, the limits we depend on, and an optional clear-pass probe that
- * exercises device init -> render pass -> readback and checksums the bytes
- * (a 16x16 transparent-black clear is byte-identical on every conforming
- * backend, so the checksum doubles as a tiny cross-machine sanity anchor).
+ * exercises device init -> render pass (all five AOV attachments) -> readback
+ * of the LIT target and checksums those bytes (a 16x16 transparent-black clear
+ * of an rgba8 target is byte-identical on every conforming backend, so the
+ * checksum is a small cross-machine sanity anchor for the lit path; the other
+ * four targets are exercised as attachments but not read back here).
  */
 import { canonicalJson } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
@@ -49,14 +57,16 @@ const NO_ADAPTER_HINTS = [
 async function clearProbe(
   device: GPUDevice,
 ): Promise<{ ok: boolean; checksum?: string; error?: string }> {
+  let buf: GPUBuffer | undefined;
+  let targets: ReturnType<typeof createAovTargets> | undefined;
   try {
     const size = 16;
-    const targets = createAovTargets(device, size, size);
+    targets = createAovTargets(device, size, size);
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginRenderPass(createAovPassDescriptor(targets));
     pass.end(); // clear only — no geometry; deterministic bytes by spec
     const bytesPerRow = 256; // 16 px * 4 B = 64, padded to the 256 floor
-    const buf = device.createBuffer({
+    buf = device.createBuffer({
       size: bytesPerRow * size,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     });
@@ -73,14 +83,18 @@ async function clearProbe(
       pixels.set(src.subarray(y * bytesPerRow, y * bytesPerRow + size * 4), y * size * 4);
     }
     buf.unmap();
-    buf.destroy();
-    for (const t of targets.color) t.destroy();
-    targets.depthStencil.destroy();
     let bin = '';
     for (const b of pixels) bin += String.fromCharCode(b);
     return { ok: true, checksum: (await sha256Hex(bin)).slice(0, 16) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    // release on every path; by here all queued work referencing them is done
+    buf?.destroy();
+    if (targets) {
+      for (const t of targets.color) t.destroy();
+      targets.depthStencil.destroy();
+    }
   }
 }
 

@@ -96,7 +96,8 @@ export const REQUIRED_LIMITS: Record<string, number> = {
  * golden set. A bump ships with a golden refresh explaining why pixels changed.
  * Cache keys never carry this string raw: they carry renderSignature()
  * (diagnostics.ts), which composes it with the adapter-identity hash (D-023) so
- * a GPU/driver change is an honest cache miss.
+ * an ADAPTER change is an honest cache miss (driver-version-only updates are a
+ * known gap — see diagnostics.ts).
  */
 export const RENDERER_VERSION = 'spritebook-render@0.1.0';
 

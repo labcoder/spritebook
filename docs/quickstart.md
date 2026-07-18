@@ -18,6 +18,7 @@ Unzip it anywhere. Contents:
 spritebook (.exe on Windows)   the CLI binary
 sample/asymmetric.glb          a small rigged test character (deliberately one-armed)
 quickstart.md                  this file
+CHANGELOG.md                   what is in this release
 ```
 
 ## 2. First run on each OS
@@ -30,12 +31,15 @@ each OS objects exactly once:
   "Open Anyway"**, or clear the quarantine attribute: `xattr -d com.apple.quarantine ./spritebook`
 - **Linux**: mark it executable: `chmod +x ./spritebook`
 
+Commands below are written as `./spritebook` — that form works in bash, zsh, and Windows PowerShell
+alike (in classic `cmd.exe`, type `.\spritebook` instead).
+
 ## 3. Check your GPU
 
 Baking renders on your GPU through WebGPU. Verify the machine first:
 
 ```
-spritebook doctor
+./spritebook doctor
 ```
 
 Healthy output shows the product and render-pipeline versions, your adapter, the render signature
@@ -60,7 +64,7 @@ see Troubleshooting below.
 ## 4. Bake
 
 ```
-spritebook bake --model sample/asymmetric.glb --character hero --out bakes --style pixel-8 --directions 8 --frames 6
+./spritebook bake --model sample/asymmetric.glb --character hero --out bakes --style pixel-8 --directions 8 --frames 6
 ```
 
 ```
@@ -88,7 +92,7 @@ The bake lands in a content-addressed directory, `bakes/bake-<id>/`:
 ## 5. Export
 
 ```
-spritebook export --bake bakes/bake-<id> --out exports --targets godot,aseprite,texturepacker,strips
+./spritebook export --bake bakes/bake-<id> --out exports --targets godot,aseprite,texturepacker,strips
 ```
 
 (`bakes/bake-<id>` is the bake directory printed by step 4.)
@@ -175,11 +179,15 @@ hysteresis), so frames do not shimmer in motion.
   - headless Linux / CI: install Mesa lavapipe (`mesa-vulkan-drivers`) for a software adapter.
 - **`render probe: FAILED`** — an adapter exists but a minimal render pass failed; the error text is
   in the output. Update drivers or try the other backend for your OS.
-- **`SPRITEBOOK_REQUIRE_GPU=1`** turns a missing adapter into a hard error instead of a skip (useful
-  in CI so a broken lane cannot pass as "skipped, green").
+- **`SPRITEBOOK_REQUIRE_GPU=1`** (repo/CI concern, not needed day-to-day): in the source repo's test
+  suites it turns a missing adapter into a hard error so a broken CI lane cannot pass as "skipped,
+  green". In the binary it only sharpens `doctor`'s failure message; `bake` always errors without an
+  adapter regardless.
 - **Same model, different machine, different pixels** — expected. Pixels are deterministic per
-  (pipeline version, adapter, driver); a GPU or driver change deliberately misses the whole cache.
-  `doctor` prints the render signature that identifies your combination.
+  (pipeline version, adapter, driver); an adapter change deliberately misses the whole cache.
+  `doctor` prints the render signature that identifies your combination. One caveat: a
+  driver-version-only update does not change the signature — if you use `--cache` and just updated
+  GPU drivers, delete the cache directory (or bake once without `--only-invalidated`).
 
 ## Performance
 

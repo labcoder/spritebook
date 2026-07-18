@@ -33,10 +33,15 @@ Cache keys never carry the raw string. At bake time they carry `renderSignature(
 e.g. spritebook-render@0.1.0#a1b2c3d4
 ```
 
-Composing the adapter-identity hash in means a GPU or driver change flips every cache key — a
-deliberate, honest full miss, because pixels are only deterministic per (pipeline version, adapter,
-driver). The signature is recorded verbatim in every `BakeManifest` (`inputs.rendererVersion`) for
-provenance, and `spritebook doctor` prints it.
+Composing the adapter-identity hash in means an **adapter change** (different GPU/vendor/device —
+anything Deno's `GPUAdapterInfo` exposes, which can grow across Deno versions) flips every cache key
+— a deliberate, honest full miss, because pixels are only deterministic per (pipeline version,
+adapter, driver). **Known gap:** `GPUAdapterInfo` exposes no driver version, so a
+driver-version-only update does _not_ flip keys — a warm `--only-invalidated` bake after a driver
+update can serve pre-update pixels. Open rider on D-023: fold driver identity in once the runtime
+exposes it; until then, clear or skip the cache after driver updates. The signature is recorded
+verbatim in every `BakeManifest` (`inputs.rendererVersion`) for provenance, and `spritebook doctor`
+prints it.
 
 ## Golden-refresh workflow
 
@@ -72,8 +77,8 @@ would pay that cost twice.
 
 - **GitHub Releases** host the alpha artifacts (the repo is private; releases serve the maintainer
   and invited testers): one zip per target — `win-x64`, `mac-arm64`, `mac-x64`, `linux-x64` — each
-  containing the binary, a sample model, and the quickstart. Eventual public distribution stays
-  itch.io / the maintainer's website per D-017.
+  containing the binary, a sample model, the quickstart, and the changelog. Eventual public
+  distribution stays itch.io / the maintainer's website per D-017.
 - **win-arm64** has no native `deno compile` target; use the win-x64 zip — Windows-on-ARM runs it
   under x64 emulation ([platform-support.md](platform-support.md)).
 - **npm** (a binary-launcher shim around the same binaries) is planned immediately after the alpha
