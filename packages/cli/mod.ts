@@ -132,6 +132,16 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
   const json = args.includes('--json');
   const verb = args[0];
 
+  if (verb === '--version' || verb === '-v') {
+    const { SPRITEBOOK_VERSION } = await import('./version.ts');
+    io.stdout(`spritebook ${SPRITEBOOK_VERSION}`);
+    return 0;
+  }
+  if (verb === 'doctor') {
+    const { runDoctor } = await import('./doctor.ts');
+    return await runDoctor(args, io);
+  }
+
   const emit = (e: JobEvent, human: string) => {
     if (json) io.stdout(encodeEvent(e).trimEnd());
     else io.stdout(human);
@@ -238,7 +248,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     return fail(
       'cli' as JobEvent['jobId'],
       'unknown-verb',
-      `Unknown verb "${verb ?? ''}" - available now: bake, export, undo, redo`,
+      `Unknown verb "${verb ?? ''}" - available: bake, export, doctor, undo, redo (--version)`,
     );
   }
 
