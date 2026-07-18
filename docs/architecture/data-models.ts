@@ -17,6 +17,9 @@
  * >>> P2-T4 delta (2026-07-15): `CacheKeyInputs.rendererVersion` carries the
  * >>> COMPOSED render signature `<version>#<adapter-hash>` (D-023) — a GPU or
  * >>> driver change is an honest full cache miss. Field type unchanged.
+ * >>> P3-T1 delta (2026-07-18): new `AnimPack`/`AnimClipMeta` (schema/animpack)
+ * >>> — pack manifests per D-009/D-013 (license, redistributable flag, tags);
+ * >>> skeleton pinned 'ual-humanoid' (the UE-style 65-joint UAL convention).
  *
  * Conventions: all lengths in meters, all angles in degrees, all times in
  * seconds unless suffixed. Hashes are sha256 hex. IDs are lowercase slugs.

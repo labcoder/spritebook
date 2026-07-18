@@ -23,10 +23,18 @@ export interface RenderJobSpec {
   modelPath: string;
   /** resolved plain data (schema-validated by core before it crosses) */
   camera: CameraPreset;
-  /** deterministic pose count for T1; ClipBinding sampling arrives w/ the anim package */
+  /** frames to render (with `posesPath`: must equal the poses file's frame count) */
   frames: number;
-  /** deterministic test pose (default 'turntable'; 'idle' is the low-motion loop the flicker metric needs) */
-  pose?: 'turntable' | 'idle';
+  /**
+   * pose source: the deterministic test poses ('turntable' default; 'idle' is
+   * the low-motion flicker loop), or 'clip' — play the poses artifact at
+   * `posesPath` (P3-T1: anim samples ClipBindings into per-frame joint local
+   * matrices, keyed by joint NAME; the renderer maps names -> its skin's joints
+   * at load). A file path across the seam, per D-004.
+   */
+  pose?: 'turntable' | 'idle' | 'clip';
+  /** required when pose === 'clip': the poses-<clipId>.bin artifact */
+  posesPath?: string;
   /** carried through; the NPR style stack is P2-T2 */
   stylePreset: string;
   /** every render product is written under here */
