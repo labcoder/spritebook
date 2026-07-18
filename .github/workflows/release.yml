@@ -1,0 +1,154 @@
+# P2-T4 release: build once (lean tree), smoke every target on its native
+# runner, then attach zips to the GitHub Release. Triggered ONLY by a version
+# tag push — the maintainer controls when this runs (and when the macos job
+# spends its x10 private-repo minutes) by controlling the push.
+#
+# Compile findings baked in (compile-spike, P2-T4): deno compile embeds the
+# PHYSICAL node_modules, so every target builds from a lean tree (tools/release/
+# lean.ts: no spikes/, no importer) with a frozen install; binaries must be
+# smoke-tested because a compile can succeed and still die at startup.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  DENO_VERSION: '2.9.2'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+      - name: lean release tree (no spikes, no importer - D-025)
+        run: deno run --allow-read --allow-write tools/release/lean.ts
+      - name: frozen install
+        run: deno install --frozen
+      - name: compile all targets
+        run: |
+          set -e
+          compile () {
+            deno compile --frozen \
+              --allow-read --allow-write --allow-env --allow-ffi \
+              --include packages/render/shaders.wgsl \
+              --target "$1" -o "dist/$2/$3" packages/cli/mod.ts
+          }
+          compile x86_64-pc-windows-msvc  win-x64    spritebook.exe
+          compile x86_64-unknown-linux-gnu linux-x64 spritebook
+          compile aarch64-apple-darwin    mac-arm64  spritebook
+          compile x86_64-apple-darwin     mac-x64    spritebook
+      - name: assemble zips (binary + sample + quickstart + changelog)
+        run: |
+          set -e
+          for t in win-x64 linux-x64 mac-arm64 mac-x64; do
+            mkdir -p "dist/$t/sample"
+            cp packages/style/fixtures/asymmetric.glb "dist/$t/sample/asymmetric.glb"
+            cp docs/quickstart.md CHANGELOG.md "dist/$t/"
+            (cd "dist/$t" && zip -qr "../spritebook-${GITHUB_REF_NAME}-$t.zip" .)
+          done
+          ls -la dist/*.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-zips
+          path: dist/*.zip
+
+  smoke-linux:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-zips
+      - name: install Mesa lavapipe (software Vulkan adapter)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools unzip
+      - name: smoke + timed quickstart metric (the non-dev-OS number)
+        env:
+          DENO_WEBGPU_BACKEND: vulkan
+        run: |
+          set -e
+          unzip -q spritebook-${GITHUB_REF_NAME}-linux-x64.zip -d sb
+          chmod +x sb/spritebook
+          sb/spritebook --version
+          sb/spritebook doctor
+          start=$(date +%s)
+          sb/spritebook bake --model sb/sample/asymmetric.glb --character hero \
+            --out sb/bakes --style pixel-8 --directions 8 --frames 6
+          bakedir=$(ls -d sb/bakes/bake-*)
+          sb/spritebook export --bake "$bakedir" --out sb/exports \
+            --targets godot,aseprite,texturepacker,strips
+          end=$(date +%s)
+          echo "quickstart workload (bake 8x6 + export x4): $((end-start))s on ubuntu/lavapipe" \
+            | tee metric-linux.txt >> "$GITHUB_STEP_SUMMARY"
+          test -f "$bakedir/manifest.json"
+          test -f sb/exports/godot/hero.tres
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metric-linux
+          path: metric-linux.txt
+
+  smoke-windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-zips
+      # hosted Windows runners have no GPU adapter: a healthy binary either
+      # reports the adapter (exit 0) or says so honestly (adapter: NONE, exit 1).
+      - name: smoke (version + honest doctor)
+        shell: pwsh
+        run: |
+          Expand-Archive "spritebook-$env:GITHUB_REF_NAME-win-x64.zip" -DestinationPath sb
+          $v = & sb/spritebook.exe --version
+          if ($v -notmatch 'spritebook 0\.') { throw "bad --version output: $v" }
+          $out = & sb/spritebook.exe doctor
+          $text = $out -join "`n"
+          Write-Host $text
+          if ($text -notmatch 'render probe: OK' -and $text -notmatch 'adapter: NONE') {
+            throw 'doctor neither healthy nor honestly unavailable'
+          }
+
+  # NOTE: macos minutes bill x10 on private repos; this job runs only on tag
+  # pushes, which the maintainer controls. It is the only mac validation we have.
+  smoke-macos:
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-zips
+      - name: smoke (version + honest doctor, arm64)
+        run: |
+          set -e
+          unzip -q spritebook-${GITHUB_REF_NAME}-mac-arm64.zip -d sb
+          chmod +x sb/spritebook
+          sb/spritebook --version
+          out=$(sb/spritebook doctor || true)
+          echo "$out"
+          echo "$out" | grep -Eq 'render probe: OK|adapter: NONE' ||
+            { echo 'doctor neither healthy nor honestly unavailable'; exit 1; }
+
+  publish:
+    needs: [smoke-linux, smoke-windows, smoke-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-zips
+      - name: create the GitHub Release with the zips
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" spritebook-*.zip \
+            --title "SpriteBook $GITHUB_REF_NAME" \
+            --notes-file CHANGELOG.md
