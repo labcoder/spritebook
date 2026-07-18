@@ -25,12 +25,22 @@ import {
 } from './aov.ts';
 import {
   evalJointMatrices,
+  evalPosesMatrices,
   jointScratch,
   loadSkinnedAsset,
   posedBounds,
+  posedBoundsFromPoses,
   type PoseMode,
   type SkinnedAsset,
 } from './skinning.ts';
+import { mapPosesJoints, readPoses } from './poses.ts';
+
+/** A loaded poses artifact, mapped onto the asset's joints (pose === 'clip'). */
+export interface ClipPoses {
+  data: Float32Array;
+  map: Int32Array;
+  jointsPerFrame: number;
+}
 import { ReadbackPool } from './readback.ts';
 import { encodeAov } from './png.ts';
 import { buildThroughput, writeThroughput } from './throughput.ts';
@@ -72,6 +82,7 @@ export class Renderer {
     private camData: Float32Array[],
     private scratch: { mats: Float32Array; worlds: Float32Array },
     private pose: PoseMode,
+    private clipPoses?: ClipPoses,
   ) {}
 
   static async create(
@@ -82,6 +93,7 @@ export class Renderer {
     width: number,
     height: number,
     pose: PoseMode = 'turntable',
+    clipPoses?: ClipPoses,
   ): Promise<Renderer> {
     const { device } = gpu;
     device.pushErrorScope('validation');
@@ -144,6 +156,7 @@ export class Renderer {
       camData,
       jointScratch(asset),
       pose,
+      clipPoses,
     );
   }
 
@@ -169,7 +182,20 @@ export class Renderer {
   /** Encode one frame's draw into `encoder` after updating the camera+joint buffers. */
   private encodeFrame(encoder: GPUCommandEncoder, direction: number, frame: number): void {
     this.gpu.device.queue.writeBuffer(this.camBuf, 0, this.camData[direction] as BufferSource);
-    evalJointMatrices(this.asset, frame, this.scratch.mats, this.scratch.worlds, this.pose);
+    if (this.pose === 'clip' && this.clipPoses) {
+      const cp = this.clipPoses;
+      evalPosesMatrices(
+        this.asset,
+        cp.data,
+        cp.map,
+        cp.jointsPerFrame,
+        frame,
+        this.scratch.mats,
+        this.scratch.worlds,
+      );
+    } else {
+      evalJointMatrices(this.asset, frame, this.scratch.mats, this.scratch.worlds, this.pose);
+    }
     this.gpu.device.queue.writeBuffer(this.jointBuf, 0, this.scratch.mats as BufferSource);
 
     const pass = encoder.beginRenderPass(createAovPassDescriptor(this.targets));
@@ -318,14 +344,38 @@ export class Renderer {
 /** Load + set up a renderer for a spec (shared by the seam and tests). */
 export async function makeRenderer(
   gpu: GpuContext,
-  spec: Pick<RenderJobSpec, 'modelPath' | 'camera' | 'frames' | 'pose'>,
+  spec: Pick<RenderJobSpec, 'modelPath' | 'camera' | 'frames' | 'pose' | 'posesPath'>,
   shaderSrc: string,
 ): Promise<Renderer> {
   const pose = spec.pose ?? 'turntable';
   const asset = await loadSkinnedAsset(spec.modelPath);
+
+  let clipPoses: ClipPoses | undefined;
+  if (pose === 'clip') {
+    if (!spec.posesPath) throw new Error("pose 'clip' requires posesPath");
+    const { header, data } = await readPoses(spec.posesPath);
+    if (header.frames !== spec.frames) {
+      throw new Error(
+        `poses file has ${header.frames} frames, spec asks for ${spec.frames} - ` +
+          `they must match exactly (the sampling contract owns frame count)`,
+      );
+    }
+    const map = mapPosesJoints(asset.jointNames, header);
+    clipPoses = { data, map, jointsPerFrame: header.jointNames.length };
+  }
+
   // frame the STABLE per-clip bounds (union over the posed frames), not the bind
   // pose — a rotating/moving silhouette sweeps outside the bind AABB (m6).
-  const framing = solveFraming(spec.camera, posedBounds(asset, spec.frames, pose));
+  const bounds = clipPoses
+    ? posedBoundsFromPoses(
+      asset,
+      clipPoses.data,
+      clipPoses.map,
+      clipPoses.jointsPerFrame,
+      spec.frames,
+    )
+    : posedBounds(asset, spec.frames, pose);
+  const framing = solveFraming(spec.camera, bounds);
   return Renderer.create(
     gpu,
     asset,
@@ -334,5 +384,6 @@ export async function makeRenderer(
     spec.camera.cellPx.w,
     spec.camera.cellPx.h,
     pose,
+    clipPoses,
   );
 }

@@ -24,6 +24,8 @@ export interface SkinnedAsset {
   weights: Float32Array; // 4 weights per vertex
   indices: Uint32Array; // triangle list
   jointCount: number;
+  /** joint node names, in skin joint order (poses files map onto these BY NAME) */
+  jointNames: string[];
   /** bind-pose LOCAL matrix per joint (column-major, 16 floats each) */
   bindLocals: Float32Array;
   /** parent joint index, -1 for roots; parents always precede children */
@@ -161,6 +163,7 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
     return {
       ...common,
       jointCount: 1,
+      jointNames: ['<static>'],
       bindLocals: mat4Identity(),
       jointParents: Int32Array.of(-1),
       inverseBind: mat4Identity(),
@@ -193,6 +196,7 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
   return {
     ...common,
     jointCount,
+    jointNames: jointNodes.map((j) => j.getName()),
     bindLocals,
     jointParents,
     inverseBind: skin.getInverseBindMatrices()!.getArray() as Float32Array,
@@ -200,16 +204,19 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
 }
 
 /**
- * Deterministic test poses (placeholder until ClipBinding sampling lands):
- *  - 'turntable': whole-body rotation about +Y (directions/goldens).
+ * Pose sources:
+ *  - 'turntable': whole-body rotation about +Y (directions/goldens fixture pose).
  *  - 'idle': a gentle low-amplitude sway about +Y — the near-static loop the
- *    flicker metric needs (a turntable moves too much to isolate spurious
- *    frame-to-frame flicker from real motion). Frame 0 is the bind pose in both.
+ *    flicker metric needs. Frame 0 is the bind pose in both.
+ *  - 'clip': play a poses artifact (P3-T1) — handled by evalPosesMatrices; it
+ *    never reaches the test-pose driver below.
  */
-export type PoseMode = 'turntable' | 'idle';
+export type PoseMode = 'turntable' | 'idle' | 'clip';
 
 function rootAngle(pose: PoseMode, frame: number): number {
-  return pose === 'idle' ? 0.03 * Math.sin(frame * 0.4) : frame * 0.06;
+  if (pose === 'idle') return 0.03 * Math.sin(frame * 0.4);
+  if (pose === 'clip') return 0; // unreachable via the renderer's clip branch
+  return frame * 0.06;
 }
 
 export function jointScratch(asset: SkinnedAsset): { mats: Float32Array; worlds: Float32Array } {
@@ -258,6 +265,80 @@ export function evalJointMatrices(
       out.subarray(i * 16, i * 16 + 16),
     );
   }
+}
+
+/**
+ * Skinning matrices for one poses-file frame: local matrices come from the
+ * poses blob (mapped by name; unmapped joints play their bind locals), then the
+ * same world/IBM composition as evalJointMatrices. `map` is
+ * poses.mapPosesJoints's asset-index -> poses-index table.
+ */
+export function evalPosesMatrices(
+  asset: SkinnedAsset,
+  posesData: Float32Array,
+  map: Int32Array,
+  jointsPerFrame: number,
+  frame: number,
+  out: Float32Array,
+  worlds: Float32Array,
+): void {
+  const base = frame * jointsPerFrame * 16;
+  for (let i = 0; i < asset.jointCount; i++) {
+    const pi = map[i];
+    const local = pi >= 0
+      ? posesData.subarray(base + pi * 16, base + pi * 16 + 16)
+      : asset.bindLocals.subarray(i * 16, i * 16 + 16);
+
+    const world = worlds.subarray(i * 16, i * 16 + 16);
+    const p = asset.jointParents[i];
+    if (p < 0) world.set(local);
+    else mat4Multiply(worlds.subarray(p * 16, p * 16 + 16), local, world);
+
+    mat4Multiply(
+      world,
+      asset.inverseBind.subarray(i * 16, i * 16 + 16),
+      out.subarray(i * 16, i * 16 + 16),
+    );
+  }
+}
+
+/** posedBounds, but driven by a poses blob instead of the test-pose driver. */
+export function posedBoundsFromPoses(
+  asset: SkinnedAsset,
+  posesData: Float32Array,
+  map: Int32Array,
+  jointsPerFrame: number,
+  frames: number,
+): ModelBounds {
+  const mats = new Float32Array(asset.jointCount * 16);
+  const worlds = new Float32Array(asset.jointCount * 16);
+  const min: [number, number, number] = [Infinity, Infinity, Infinity];
+  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  const { positions: p, joints: J, weights: W } = asset;
+  const vcount = p.length / 3;
+
+  for (let f = 0; f < Math.max(1, frames); f++) {
+    evalPosesMatrices(asset, posesData, map, jointsPerFrame, f, mats, worlds);
+    for (let v = 0; v < vcount; v++) {
+      const px = p[v * 3], py = p[v * 3 + 1], pz = p[v * 3 + 2];
+      let x = 0, y = 0, z = 0;
+      for (let k = 0; k < 4; k++) {
+        const wgt = W[v * 4 + k];
+        if (wgt === 0) continue;
+        const j = J[v * 4 + k] * 16;
+        x += wgt * (mats[j] * px + mats[j + 4] * py + mats[j + 8] * pz + mats[j + 12]);
+        y += wgt * (mats[j + 1] * px + mats[j + 5] * py + mats[j + 9] * pz + mats[j + 13]);
+        z += wgt * (mats[j + 2] * px + mats[j + 6] * py + mats[j + 10] * pz + mats[j + 14]);
+      }
+      if (x < min[0]) min[0] = x;
+      if (x > max[0]) max[0] = x;
+      if (y < min[1]) min[1] = y;
+      if (y > max[1]) max[1] = y;
+      if (z < min[2]) min[2] = z;
+      if (z > max[2]) max[2] = z;
+    }
+  }
+  return { min, max };
 }
 
 /**
