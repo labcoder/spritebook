@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "exports": "./mod.ts",
   "imports": {
-    "fast-png": "npm:fast-png@^6.2.0"
+    "fast-png": "npm:fast-png@6.2.0"
   }
 }

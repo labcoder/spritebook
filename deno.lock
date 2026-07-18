@@ -4,21 +4,21 @@
     "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "npm:@gltf-transform/core@4.2.1": "4.2.1",
+    "npm:@gltf-transform/core@4.4.1": "4.4.1",
     "npm:@gltf-transform/core@^4.4.1": "4.4.1",
     "npm:@gltf-transform/extensions@^4.4.1": "4.4.1",
     "npm:@gltf-transform/functions@^4.4.1": "4.4.1",
     "npm:@tauri-apps/cli@2.11.4": "2.11.4",
     "npm:draco3dgltf@^1.5.7": "1.5.7",
     "npm:fast-png@6.2.0": "6.2.0",
-    "npm:fast-png@^6.2.0": "6.2.0",
-    "npm:gifenc@^1.0.3": "1.0.3",
+    "npm:gifenc@1.0.3": "1.0.3",
     "npm:maxrects-packer@2.7.3": "2.7.3",
     "npm:meshoptimizer@^1.2.0": "1.2.0",
     "npm:obj2gltf@^3.2.0": "3.2.0",
-    "npm:pixelmatch@^5.3.0": "5.3.0",
+    "npm:pixelmatch@5.3.0": "5.3.0",
     "npm:three@~0.185.1": "0.185.1",
     "npm:vite@*": "8.1.4",
-    "npm:zod@^4.4.3": "4.4.3"
+    "npm:zod@4.4.3": "4.4.3"
   },
   "jsr": {
     "@std/assert@1.0.19": {
@@ -972,7 +972,7 @@
     "members": {
       "packages/export": {
         "dependencies": [
-          "npm:fast-png@^6.2.0"
+          "npm:fast-png@6.2.0"
         ]
       },
       "packages/importer": {
@@ -988,26 +988,26 @@
       },
       "packages/pack": {
         "dependencies": [
-          "npm:fast-png@^6.2.0",
-          "npm:gifenc@^1.0.3",
+          "npm:fast-png@6.2.0",
+          "npm:gifenc@1.0.3",
           "npm:maxrects-packer@2.7.3"
         ]
       },
       "packages/render": {
         "dependencies": [
-          "npm:@gltf-transform/core@^4.4.1",
-          "npm:fast-png@^6.2.0"
+          "npm:@gltf-transform/core@4.4.1",
+          "npm:fast-png@6.2.0"
         ]
       },
       "packages/schema": {
         "dependencies": [
-          "npm:zod@^4.4.3"
+          "npm:zod@4.4.3"
         ]
       },
       "packages/style": {
         "dependencies": [
-          "npm:fast-png@^6.2.0",
-          "npm:pixelmatch@^5.3.0"
+          "npm:fast-png@6.2.0",
+          "npm:pixelmatch@5.3.0"
         ]
       }
     }

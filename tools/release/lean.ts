@@ -11,7 +11,12 @@
  *      resolution with every platform's vite/tauri/rolldown variants)
  *   2. delete packages/importer/ and drop it from the workspace array
  *      (`spritebook import` is run-from-source until D-025 is revisited)
- * After this script: `deno install --frozen` then `deno compile` per target.
+ *   3. delete deno.lock — `deno install` MATERIALIZES the whole lock (verified:
+ *      a lean tree with the full lock still installed the GUI spike's rolldown/
+ *      tauri platform binaries, 152 MB). Fresh resolution is deterministic by
+ *      construction because every runtime dep is EXACT-pinned in its package
+ *      deno.json; the workflow's pin tripwire is the belt to that suspender.
+ * After this script: `deno install` then `deno compile --frozen` per target.
  *
  *   deno run --allow-read --allow-write tools/release/lean.ts
  */
@@ -19,6 +24,7 @@ const root = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)
 
 await Deno.remove(`${root}/spikes`, { recursive: true }).catch(() => {});
 await Deno.remove(`${root}/packages/importer`, { recursive: true }).catch(() => {});
+await Deno.remove(`${root}/deno.lock`).catch(() => {});
 
 const denoJsonPath = `${root}/deno.json`;
 const config = JSON.parse(await Deno.readTextFile(denoJsonPath));

@@ -29,8 +29,16 @@ jobs:
           deno-version: ${{ env.DENO_VERSION }}
       - name: lean release tree (no spikes, no importer - D-025)
         run: deno run --allow-read --allow-write tools/release/lean.ts
-      - name: frozen install
-        run: deno install --frozen
+      # lean.ts deleted the lock (install MATERIALIZES the whole lock, spike
+      # deps included). Fresh resolution is deterministic because every runtime
+      # dep is exact-pinned; the tripwire asserts exactly that.
+      - name: fresh install + pin tripwire
+        run: |
+          deno install
+          for pin in 'fast-png@6.2.0' 'gifenc@1.0.3' 'maxrects-packer@2.7.3' \
+                     'zod@4.4.3' 'pixelmatch@5.3.0' '@gltf-transform/core@4.4.1'; do
+            grep -q "\"$pin\"" deno.lock || { echo "PIN DRIFT: $pin missing"; exit 1; }
+          done
       - name: compile all targets
         run: |
           set -e
