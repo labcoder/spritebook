@@ -162,6 +162,85 @@ function paletteToHex(palette: Palette): string[] {
   return out;
 }
 
+/** One clip's Sx AOV source in a multi-clip bake. */
+export interface ClipAovSource extends AovSource {
+  clipId: string;
+}
+
+/**
+ * Multi-clip styling (P3-T1): ONE palette pooled across every frame of EVERY
+ * clip (the npr skill's per-character palette law — a per-clip palette would
+ * flicker at clip boundaries), then the law-order pipeline per clip/direction,
+ * writing `${outDir}/styled/<clipId>/dDD_fFFF.png`. The flicker metric is
+ * measured on the FIRST source's direction 0 (bake passes the idle-most clip
+ * first). Single-clip styleFromAovs below keeps its flat layout untouched.
+ */
+export async function styleClipsFromAovs(
+  srcs: ClipAovSource[],
+  camera: CameraPreset,
+  style: StylePreset,
+  outDir: string,
+): Promise<StyleResult> {
+  if (srcs.length === 0) throw new Error('styleClipsFromAovs: no sources');
+  const s = style.temporal.superSample;
+  const w1 = srcs[0].width / s, h1 = srcs[0].height / s;
+
+  const perClip = new Map<string, AovImage[][]>();
+  const allLit: Uint8Array[] = [];
+  for (const src of srcs) {
+    const aovs: AovImage[][] = [];
+    for (let d = 0; d < src.directions; d++) {
+      aovs[d] = [];
+      for (let f = 0; f < src.frames; f++) {
+        const aov = await readAov(src.framesDir, d, f);
+        aovs[d][f] = aov;
+        allLit.push(aov.lit);
+      }
+    }
+    perClip.set(src.clipId, aovs);
+  }
+
+  const palette = buildPalette(style, allLit);
+  const color = style.outline
+    ? outlineColor(style, palette)
+    : [0, 0, 0] as [number, number, number];
+  const dither = ditherConfig(style);
+  const styledDir = `${outDir}/styled`;
+  const flickerFrames: Uint8Array[] = [];
+
+  for (const src of srcs) {
+    const aovs = perClip.get(src.clipId)!;
+    const clipDir = `${styledDir}/${src.clipId}`;
+    await Deno.mkdir(clipDir, { recursive: true });
+    for (let d = 0; d < src.directions; d++) {
+      let prev: Int32Array | null = null;
+      for (let f = 0; f < src.frames; f++) {
+        const { rgba, labels } = processFrame(aovs[d][f], style, palette, color, dither, prev);
+        prev = labels;
+        finishAlpha(rgba, style, w1, h1);
+        if (src === srcs[0] && d === 0) flickerFrames.push(rgba.slice());
+        await Deno.writeFile(
+          `${clipDir}/${tag(d, f)}.png`,
+          encodePng({ width: w1, height: h1, data: rgba }),
+        );
+      }
+    }
+  }
+
+  return {
+    stylePresetId: style.id,
+    cameraPresetId: camera.id,
+    directions: srcs[0].directions,
+    frames: srcs[0].frames,
+    cellPx: { w: w1, h: h1 },
+    superSample: s,
+    paletteHex: paletteToHex(palette),
+    flickerPct: flickerPct(flickerFrames, w1, h1),
+    flags: qaFlags(style, camera),
+    styledDir,
+  };
+}
+
 /**
  * Style a directory of Sx AOVs into 1x sprite PNGs + a StyleResult. Pure CPU:
  * reads the committed AOVs, builds the palette once, runs the law-order pipeline
