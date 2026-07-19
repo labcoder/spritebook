@@ -18,7 +18,27 @@ import type { CacheKeyInputs, CameraPreset, JobEvent, StylePreset } from '@sprit
 import { canonicalJson, RENDER_PASSES } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
 import { renderSignature, runRenderJob } from '@spritebook/render';
-import { type AovSource, readAov, styleFromAovs, type StyleResult } from '@spritebook/style';
+import {
+  type AovSource,
+  type ClipAovSource,
+  readAov,
+  styleClipsFromAovs,
+  styleFromAovs,
+  type StyleResult,
+} from '@spritebook/style';
+import {
+  type Clip,
+  loadPackClip,
+  loadSkeletonRestFromFile,
+  retargetClip,
+  sampleClip,
+  type SampledPoses,
+  type SampleSpec,
+  UAL_HUMANOID,
+  writePoses,
+  writePreviewGlb,
+} from '@spritebook/anim';
+import { posesFileName } from '@spritebook/anim';
 import {
   atlasPageName,
   type CellPlane,
@@ -50,7 +70,24 @@ export interface BakeJobSpec {
   cacheDir?: string;
   /** serve unchanged frames from the cache instead of recomputing */
   onlyInvalidated?: boolean;
+  /**
+   * P3-T1: real clips. Each binding retargets a pack clip onto the model
+   * (once — D-006), samples it per the binding, renders pose 'clip'. Absent ->
+   * the P2 idle-stub bake, byte-unchanged.
+   */
+  clips?: ClipBindingSpec[];
+  /** pack directory holding clips/ (default: the bundled UAL pack) */
+  packDir?: string;
 }
+
+export interface ClipBindingSpec extends SampleSpec {
+  clipId: string;
+}
+
+const BUNDLED_PACK = new URL('../anim/packs/ual', import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 
 const CLIP_ID = 'idle';
 const AOV_PASSES = ['albedo', 'normal', 'depth', 'mask'] as const;
@@ -68,7 +105,7 @@ async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
  * known gap; see render/diagnostics.ts).
  */
 export async function buildCacheInputs(
-  spec: Pick<BakeJobSpec, 'characterId' | 'modelPath' | 'camera' | 'style' | 'frames'>,
+  spec: Pick<BakeJobSpec, 'characterId' | 'modelPath' | 'camera' | 'style' | 'frames' | 'clips'>,
   renderSig: string,
 ): Promise<CacheKeyInputs> {
   const modelBytes = await Deno.readFile(spec.modelPath);
@@ -78,8 +115,12 @@ export async function buildCacheInputs(
     // pre-rig sentinel: the rig stage lands with Track B (P3); until then the
     // skin is whatever the canonical glb carries, keyed as such
     rigStateHash: await sha256Hex(canonicalJson({ track: 'source-skin' })),
+    // clips present -> the real binding set; absent -> the legacy idle stub
+    // (hash input unchanged so P2-era caches stay valid)
     clipBindingHash: await sha256Hex(
-      canonicalJson({ clipId: CLIP_ID, frames: spec.frames, pose: 'idle' }),
+      spec.clips?.length
+        ? canonicalJson({ clips: spec.clips })
+        : canonicalJson({ clipId: CLIP_ID, frames: spec.frames, pose: 'idle' }),
     ),
     cameraPresetHash: await sha256Hex(canonicalJson(spec.camera)),
     stylePresetHash: await sha256Hex(canonicalJson(spec.style)),
@@ -169,6 +210,109 @@ async function tryCached(
     return { cells, styleResult, hits: new Set(grid.map(frameIdKey)) };
   } catch {
     return null;
+  }
+}
+
+interface PreparedClip {
+  binding: ClipBindingSpec;
+  sampled: SampledPoses;
+}
+
+/**
+ * The anim stage — retarget ONCE per bake (D-006): load each pack clip, retarget
+ * onto the model skeleton, sample per its binding, and emit the preview GLB
+ * into the bake dir. Runs on BOTH the cached and recompute paths (CPU-cheap,
+ * and previews must exist even when pixels come from cache).
+ */
+async function prepareClips(spec: BakeJobSpec, bakeDir: string): Promise<PreparedClip[]> {
+  const packDir = spec.packDir ?? BUNDLED_PACK;
+  const targetRest = await loadSkeletonRestFromFile(spec.modelPath);
+  const out: PreparedClip[] = [];
+  for (const binding of spec.clips!) {
+    const source: Clip = await loadPackClip(packDir, binding.clipId);
+    // the pack clip glb carries its own skeleton rest — load it per clip file
+    const sourceRest = await loadSkeletonRestFromFile(
+      `${packDir}/clips/${binding.clipId}.glb`,
+    );
+    const { clip } = retargetClip(source, sourceRest, targetRest, UAL_HUMANOID);
+    await writePreviewGlb(spec.modelPath, clip, `${bakeDir}/preview-${binding.clipId}.glb`);
+    out.push({ binding, sampled: sampleClip(clip, targetRest, binding) });
+  }
+  return out;
+}
+
+/** Full multi-clip recompute: per clip render pose 'clip' -> pooled style -> cells. */
+async function recomputeClips(
+  spec: BakeJobSpec,
+  prepared: PreparedClip[],
+  grid: FrameId[],
+): Promise<BakedCells & { aovDirCleanup: () => Promise<void> }> {
+  const s = spec.style.temporal.superSample;
+  const aovRoot = await Deno.makeTempDir();
+  const cleanup = async () => {
+    await Deno.remove(aovRoot, { recursive: true }).catch(() => {});
+  };
+
+  try {
+    const srcs: ClipAovSource[] = [];
+    for (const { binding, sampled } of prepared) {
+      const clipDir = `${aovRoot}/${binding.clipId}`;
+      await Deno.mkdir(clipDir, { recursive: true });
+      const posesPath = `${clipDir}/${posesFileName(binding.clipId)}`;
+      await writePoses(posesPath, binding.clipId, sampled);
+      for await (
+        const e of runRenderJob({
+          jobId: `${spec.jobId}-render-${binding.clipId}`,
+          modelPath: spec.modelPath,
+          camera: supersample(spec.camera, s),
+          frames: binding.frames,
+          pose: 'clip',
+          posesPath,
+          stylePreset: spec.style.id,
+          outDir: clipDir,
+        })
+      ) {
+        if (e.t === 'error') throw new Error(`render ${binding.clipId} failed: ${e.message}`);
+      }
+      srcs.push({
+        clipId: binding.clipId,
+        framesDir: `${clipDir}/frames`,
+        directions: spec.camera.directions,
+        frames: binding.frames,
+        width: spec.camera.cellPx.w * s,
+        height: spec.camera.cellPx.h * s,
+      });
+    }
+
+    const styleOut = await Deno.makeTempDir();
+    try {
+      const styleResult = await styleClipsFromAovs(srcs, spec.camera, spec.style, styleOut);
+      const cells = new Map<string, Map<string, Uint8Array>>(
+        ['lit', ...AOV_PASSES].map((p) => [p, new Map<string, Uint8Array>()]),
+      );
+      for (const id of grid) {
+        const fik = frameIdKey(id);
+        const d = String(id.direction).padStart(2, '0');
+        const f = String(id.frame).padStart(3, '0');
+        cells.get('lit')!.set(
+          fik,
+          await Deno.readFile(`${styleResult.styledDir}/${id.clipId}/d${d}_f${f}.png`),
+        );
+        const src = srcs.find((x) => x.clipId === id.clipId)!;
+        const aov = await readAov(src.framesDir, id.direction, id.frame);
+        const one = aov1x(aov, s);
+        cells.get('albedo')!.set(fik, encodePagePng(one.albedo, 'rgba8'));
+        cells.get('normal')!.set(fik, encodePagePng(one.normal, 'rgba8'));
+        cells.get('depth')!.set(fik, encodePagePng(one.depth, 'gray16'));
+        cells.get('mask')!.set(fik, encodePagePng(one.mask, 'gray16'));
+      }
+      return { cells, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
+    } finally {
+      await Deno.remove(styleOut, { recursive: true }).catch(() => {});
+    }
+  } catch (err) {
+    await cleanup();
+    throw err;
   }
 }
 
@@ -265,15 +409,21 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     const bake = await bakeKey(inputs);
     const bakeDir = `${spec.outRoot}/bake-${bake.slice(0, 8)}`;
     await Deno.mkdir(bakeDir, { recursive: true });
-    const grid = frameGrid(spec.camera.directions, spec.frames, CLIP_ID);
+    const grid = spec.clips?.length
+      ? spec.clips.flatMap((c) => frameGrid(spec.camera.directions, c.frames, c.clipId))
+      : frameGrid(spec.camera.directions, spec.frames, CLIP_ID);
     const cache = spec.cacheDir ? new BlobCache(spec.cacheDir) : null;
+
+    // 0. the anim stage (clips only): retarget ONCE, emit previews — runs on
+    // the cached path too (previews are bake artifacts, pixels or not)
+    const prepared = spec.clips?.length ? await prepareClips(spec, bakeDir) : null;
 
     // 1. cells: cached (all-or-none) or full recompute
     yield { t: 'progress', jobId, at: at(), step: 'cells', done: 1, total: 4 };
     let baked: BakedCells | null = null;
     if (cache && spec.onlyInvalidated) baked = await tryCached(cache, bake, grid);
     if (!baked) {
-      const r = await recompute(spec, grid);
+      const r = prepared ? await recomputeClips(spec, prepared, grid) : await recompute(spec, grid);
       baked = r;
       cleanup = r.aovDirCleanup;
     }
@@ -337,18 +487,21 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       `${bakeDir}/style-result.json`,
       JSON.stringify(persistedStyleResult(baked.styleResult), null, 2) + '\n',
     );
-    const gif = buildContactSheet(
-      new Map([...litCells].map(([k, c]) => [k, c.rgba!])),
-      {
-        clipId: CLIP_ID,
+    const rgbaCells = new Map([...litCells].map(([k, c]) => [k, c.rgba!]));
+    const clipList = spec.clips?.length
+      ? spec.clips.map((c) => ({ clipId: c.clipId, frames: c.frames }))
+      : [{ clipId: CLIP_ID, frames: spec.frames }];
+    for (const c of clipList) {
+      const gif = buildContactSheet(rgbaCells, {
+        clipId: c.clipId,
         directions: spec.camera.directions,
-        frames: spec.frames,
+        frames: c.frames,
         cellW: spec.camera.cellPx.w,
         cellH: spec.camera.cellPx.h,
         fps: DEFAULT_FPS,
-      },
-    );
-    await Deno.writeFile(`${bakeDir}/contact-${CLIP_ID}.gif`, gif);
+      });
+      await Deno.writeFile(`${bakeDir}/contact-${c.clipId}.gif`, gif);
+    }
 
     const manifest = await assembleManifest({
       inputs,
