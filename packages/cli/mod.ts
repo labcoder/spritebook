@@ -158,6 +158,62 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     return 1;
   };
 
+  if (verb === 'anim') {
+    // query/install verbs over animation packs (P3-T1). Like doctor, --json
+    // emits ONE JSON document (a query snapshot, not a job stream).
+    const { importPack, listClips, loadPack } = await import('@spritebook/anim');
+    const jsonOut = (doc: unknown) => io.stdout(JSON.stringify(doc));
+    try {
+      if (args.includes('--list')) {
+        const packsRoot = flag(args, 'packs') ??
+          new URL('../anim/packs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+        const pack = await loadPack(`${packsRoot}/ual`);
+        const clips = listClips(pack, {
+          tag: flag(args, 'tag'),
+          category: flag(args, 'category'),
+        });
+        if (json) jsonOut({ pack: pack.id, clips });
+        else {
+          io.stdout(`${pack.name} (${pack.id}) - ${clips.length}/${pack.clips.length} clips`);
+          for (const c of clips) {
+            io.stdout(
+              `  ${c.id.padEnd(26)} ${c.category.padEnd(11)} ${
+                c.durationS.toFixed(2).padStart(5)
+              }s${c.loop ? ' loop' : ''}  [${c.tags.join(', ')}]`,
+            );
+          }
+        }
+        return 0;
+      }
+      const importSrc = flag(args, 'import-pack');
+      if (importSrc) {
+        const into = flag(args, 'into');
+        if (!into) {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'missing-arg',
+            '--into <packsRoot> is required with --import-pack',
+          );
+        }
+        const pack = await importPack(importSrc, into);
+        if (json) jsonOut({ imported: pack.id, clips: pack.clips.length });
+        else io.stdout(`imported pack "${pack.id}" (${pack.clips.length} clips) into ${into}`);
+        return 0;
+      }
+      return fail(
+        'anim' as JobEvent['jobId'],
+        'missing-arg',
+        'anim needs --list [--tag t] [--category c] or --import-pack <dir> --into <packsRoot>',
+      );
+    } catch (err) {
+      return fail(
+        'anim' as JobEvent['jobId'],
+        'anim-failed',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   if (verb === 'bake') {
     const model = flag(args, 'model');
     const character = flag(args, 'character');

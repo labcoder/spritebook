@@ -1,11 +1,20 @@
 /**
- * @spritebook/anim - Pack ingestion, humanoid retarget profile, clip sampling, preview clip emission
+ * @spritebook/anim - animation packs, the humanoid retarget profile, clip
+ * sampling, and the poses artifact the render seam plays (P3-T1). Everything
+ * crosses package boundaries as plain data and file paths; the retarget runs
+ * ONCE in core (D-006) and both previews and bakes consume its output.
  *
- * P1-T1 stub: the package exists so the workspace shape is load-bearing from
- * day one. Real implementation lands at P3 (docs/internal/roadmap/).
+ * NOTE: retarget/profile/sample exports join this surface as their modules
+ * land in-phase; contracts + pack tooling are stable now.
  */
-export const PACKAGE = 'anim' as const;
-
-/** One-line contract from the architecture module map. */
-export const CONTRACT =
-  'Pack ingestion, humanoid retarget profile, clip sampling, preview clip emission' as const;
+export * from './contracts.ts';
+export {
+  buildPack,
+  clipCategory,
+  clipTags,
+  importPack,
+  listClips,
+  loadPack,
+  toClipId,
+} from './pack.ts';
+export type { AnimPackMeta, BuildPackOptions } from './pack.ts';
