@@ -7,6 +7,7 @@
     "npm:@gltf-transform/core@4.4.1": "4.4.1",
     "npm:@gltf-transform/core@^4.4.1": "4.4.1",
     "npm:@gltf-transform/extensions@^4.4.1": "4.4.1",
+    "npm:@gltf-transform/functions@4.4.1": "4.4.1",
     "npm:@gltf-transform/functions@^4.4.1": "4.4.1",
     "npm:@tauri-apps/cli@2.11.4": "2.11.4",
     "npm:draco3dgltf@^1.5.7": "1.5.7",
@@ -970,6 +971,11 @@
   },
   "workspace": {
     "members": {
+      "packages/anim": {
+        "dependencies": [
+          "npm:@gltf-transform/core@4.4.1"
+        ]
+      },
       "packages/export": {
         "dependencies": [
           "npm:fast-png@6.2.0"
