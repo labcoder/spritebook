@@ -27,7 +27,7 @@
  *   would silently smear holds). Morph-target `weights` channels are not joint
  *   animation and are skipped.
  */
-import type { Document } from '@gltf-transform/core';
+import { type Document, NodeIO } from '@gltf-transform/core';
 import type { Clip, HumanoidProfile, JointTrack, LoadClip, SkeletonRest } from './contracts.ts';
 import { qDot, qNormalize, qSlerp, type Quat } from './quat.ts';
 
@@ -304,3 +304,9 @@ export const loadClip: LoadClip = (doc, animationName, clipId): Clip => {
 
   return { id: clipId, duration, tracks };
 };
+
+/** loadSkeletonRest over a glb on disk (bake-side convenience; same semantics). */
+export async function loadSkeletonRestFromFile(path: string): Promise<SkeletonRest> {
+  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  return loadSkeletonRest(doc);
+}

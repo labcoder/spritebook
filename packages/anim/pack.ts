@@ -33,7 +33,8 @@ import {
   parseWith,
   SCHEMA_VERSION,
 } from '@spritebook/schema';
-import { PACK_CLIP_DIR, PACK_MANIFEST } from './contracts.ts';
+import { type Clip, PACK_CLIP_DIR, PACK_MANIFEST } from './contracts.ts';
+import { loadClip } from './profile.ts';
 
 /** Pinned generator string: clip-glb bytes must not vary run to run. */
 const GENERATOR = 'spritebook-anim-pack@0.1.0';
@@ -390,4 +391,18 @@ async function readManifest(dir: string): Promise<unknown> {
   } catch (err) {
     throw new Error(`invalid JSON in ${path}: ${message(err)}`);
   }
+}
+
+/**
+ * Load one pack clip by id: opens `clips/<clipId>.glb` (guaranteed single
+ * animation, skeleton-only) and returns it as a Clip.
+ */
+export async function loadPackClip(packDir: string, clipId: string): Promise<Clip> {
+  const path = `${packDir}/${PACK_CLIP_DIR}/${clipId}.glb`;
+  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const anims = doc.getRoot().listAnimations();
+  if (anims.length !== 1) {
+    throw new Error(`${path}: expected exactly one animation, found ${anims.length}`);
+  }
+  return loadClip(doc, anims[0].getName(), clipId);
 }
