@@ -112,6 +112,21 @@ async function pump(
 
 const DIR_CHOICES = new Set([2, 4, 8, 16]);
 
+/** `--clips walk-loop:6@1.5!hold,idle-loop:4` -> ClipBindingSpec[]. */
+function parseClips(raw: string) {
+  return raw.split(',').map((part) => {
+    const m = part.trim().match(/^([a-z0-9][a-z0-9-]*):(\d+)(?:@([\d.]+))?(!hold)?$/);
+    if (!m) {
+      throw new Error(`bad --clips entry "${part.trim()}" - want clip:frames[@speed][!hold]`);
+    }
+    const frames = Number(m[2]);
+    const speed = m[3] ? Number(m[3]) : 1;
+    if (frames < 1) throw new Error(`--clips "${m[1]}": frames must be >= 1`);
+    if (!(speed > 0)) throw new Error(`--clips "${m[1]}": speed must be > 0`);
+    return { clipId: m[1], frames, speed, holdLast: m[4] !== undefined };
+  });
+}
+
 /** Build the CameraPreset for `spritebook bake` from CLI flags + defaults. */
 function cameraFromFlags(args: string[]): CameraPreset {
   const directions = intFlag(args, 'directions', 8);
@@ -248,6 +263,8 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           outRoot: out,
           cacheDir: flag(args, 'cache'),
           onlyInvalidated: args.includes('--only-invalidated'),
+          clips: flag(args, 'clips') ? parseClips(flag(args, 'clips')!) : undefined,
+          packDir: flag(args, 'pack'),
         }),
         emit,
       );
