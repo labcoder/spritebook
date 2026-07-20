@@ -84,9 +84,10 @@ export interface ClipBindingSpec extends SampleSpec {
   clipId: string;
 }
 
-const BUNDLED_PACK = new URL('../anim/packs/ual', import.meta.url).pathname.replace(
-  /^\/([A-Za-z]:)/,
-  '$1',
+// decodeURIComponent: URL.pathname percent-encodes (spaces, non-ASCII) — an
+// install under "C:\Users\First Last\..." must still resolve (review F3)
+const BUNDLED_PACK = decodeURIComponent(
+  new URL('../anim/packs/ual', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
 );
 
 const CLIP_ID = 'idle';
@@ -105,23 +106,43 @@ async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
  * known gap; see render/diagnostics.ts).
  */
 export async function buildCacheInputs(
-  spec: Pick<BakeJobSpec, 'characterId' | 'modelPath' | 'camera' | 'style' | 'frames' | 'clips'>,
+  spec: Pick<
+    BakeJobSpec,
+    'characterId' | 'modelPath' | 'camera' | 'style' | 'frames' | 'clips' | 'packDir'
+  >,
   renderSig: string,
 ): Promise<CacheKeyInputs> {
   const modelBytes = await Deno.readFile(spec.modelPath);
+  // clip CONTENT is a cache input (invariant 3): the binding spec alone would
+  // serve stale pixels after an in-place pack upgrade while the preview GLB
+  // regenerates from the new bytes — a silent D-006 parity break (review F1).
+  // Content-addressed, so the same clip bytes under a different packDir hit.
+  let clipBindings: string;
+  if (spec.clips?.length) {
+    const packDir = spec.packDir ?? BUNDLED_PACK;
+    const withContent = [];
+    for (const c of spec.clips) {
+      const clipPath = `${packDir}/clips/${c.clipId}.glb`;
+      let bytes: Uint8Array;
+      try {
+        bytes = await Deno.readFile(clipPath);
+      } catch {
+        throw new Error(`Cannot read clip "${c.clipId}" at "${clipPath}" - is the pack complete?`);
+      }
+      withContent.push({ ...c, clipSha256: await sha256OfBytes(bytes) });
+    }
+    clipBindings = canonicalJson({ clips: withContent });
+  } else {
+    // legacy idle stub — hash input unchanged so P2-era caches stay valid
+    clipBindings = canonicalJson({ clipId: CLIP_ID, frames: spec.frames, pose: 'idle' });
+  }
   return {
     characterId: spec.characterId,
     canonicalMeshSha256: await sha256OfBytes(modelBytes),
     // pre-rig sentinel: the rig stage lands with Track B (P3); until then the
     // skin is whatever the canonical glb carries, keyed as such
     rigStateHash: await sha256Hex(canonicalJson({ track: 'source-skin' })),
-    // clips present -> the real binding set; absent -> the legacy idle stub
-    // (hash input unchanged so P2-era caches stay valid)
-    clipBindingHash: await sha256Hex(
-      spec.clips?.length
-        ? canonicalJson({ clips: spec.clips })
-        : canonicalJson({ clipId: CLIP_ID, frames: spec.frames, pose: 'idle' }),
-    ),
+    clipBindingHash: await sha256Hex(clipBindings),
     cameraPresetHash: await sha256Hex(canonicalJson(spec.camera)),
     stylePresetHash: await sha256Hex(canonicalJson(spec.style)),
     rendererVersion: renderSig,
@@ -218,27 +239,55 @@ interface PreparedClip {
   sampled: SampledPoses;
 }
 
+/** Post-correction foot residual above this is worth a warn event (meters). */
+const FOOT_WARN_M = 0.02;
+
 /**
  * The anim stage — retarget ONCE per bake (D-006): load each pack clip, retarget
  * onto the model skeleton, sample per its binding, and emit the preview GLB
  * into the bake dir. Runs on BOTH the cached and recompute paths (CPU-cheap,
  * and previews must exist even when pixels come from cache).
+ *
+ * `warnings` carries the retarget evidence to the event stream (skill law:
+ * unmapped joints are REPORTED, never guessed — a report nobody sees is a
+ * guess with extra steps; review F2): core joints left at rest and foot
+ * residuals above tolerance become `warn` JobEvents in runBakeJob.
  */
-async function prepareClips(spec: BakeJobSpec, bakeDir: string): Promise<PreparedClip[]> {
+async function prepareClips(
+  spec: BakeJobSpec,
+  bakeDir: string,
+): Promise<{ prepared: PreparedClip[]; warnings: { code: string; message: string }[] }> {
   const packDir = spec.packDir ?? BUNDLED_PACK;
   const targetRest = await loadSkeletonRestFromFile(spec.modelPath);
-  const out: PreparedClip[] = [];
+  const prepared: PreparedClip[] = [];
+  const warnings: { code: string; message: string }[] = [];
   for (const binding of spec.clips!) {
     const source: Clip = await loadPackClip(packDir, binding.clipId);
     // the pack clip glb carries its own skeleton rest — load it per clip file
     const sourceRest = await loadSkeletonRestFromFile(
       `${packDir}/clips/${binding.clipId}.glb`,
     );
-    const { clip } = retargetClip(source, sourceRest, targetRest, UAL_HUMANOID);
+    const { clip, report, stats } = retargetClip(source, sourceRest, targetRest, UAL_HUMANOID);
+    const coreMissing = UAL_HUMANOID.core.filter((j) => !report.mapped.includes(j));
+    if (coreMissing.length) {
+      warnings.push({
+        code: 'anim-unmapped-core',
+        message: `clip "${binding.clipId}": ${coreMissing.length} core joints not driven ` +
+          `(${coreMissing.join(', ')}) - they hold the rest pose`,
+      });
+    }
+    if (stats.footContactMaxErrM > FOOT_WARN_M) {
+      warnings.push({
+        code: 'anim-foot-contact',
+        message: `clip "${binding.clipId}": feet off ground by up to ` +
+          `${(stats.footContactMaxErrM * 100).toFixed(1)}cm on contact frames ` +
+          `(tolerance ${FOOT_WARN_M * 100}cm)`,
+      });
+    }
     await writePreviewGlb(spec.modelPath, clip, `${bakeDir}/preview-${binding.clipId}.glb`);
-    out.push({ binding, sampled: sampleClip(clip, targetRest, binding) });
+    prepared.push({ binding, sampled: sampleClip(clip, targetRest, binding) });
   }
-  return out;
+  return { prepared, warnings };
 }
 
 /** Full multi-clip recompute: per clip render pose 'clip' -> pooled style -> cells. */
@@ -405,6 +454,18 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     } catch {
       throw new Error(`Cannot read "${spec.modelPath}" - does the file exist?`);
     }
+    // one binding per clip: three downstream paths key on clipId alone (poses
+    // dir, styled dir, preview glb) — a duplicate would fail late after full
+    // GPU work with an unactionable message (review F4)
+    if (spec.clips) {
+      const seen = new Set<string>();
+      for (const c of spec.clips) {
+        if (seen.has(c.clipId)) {
+          throw new Error(`duplicate clip binding "${c.clipId}" - one binding per clip`);
+        }
+        seen.add(c.clipId);
+      }
+    }
     const inputs = await buildCacheInputs(spec, await renderSignature());
     const bake = await bakeKey(inputs);
     const bakeDir = `${spec.outRoot}/bake-${bake.slice(0, 8)}`;
@@ -416,7 +477,11 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
 
     // 0. the anim stage (clips only): retarget ONCE, emit previews — runs on
     // the cached path too (previews are bake artifacts, pixels or not)
-    const prepared = spec.clips?.length ? await prepareClips(spec, bakeDir) : null;
+    const anim = spec.clips?.length ? await prepareClips(spec, bakeDir) : null;
+    const prepared = anim?.prepared ?? null;
+    for (const w of anim?.warnings ?? []) {
+      yield { t: 'warn', jobId, at: at(), code: w.code, message: w.message };
+    }
 
     // 1. cells: cached (all-or-none) or full recompute
     yield { t: 'progress', jobId, at: at(), step: 'cells', done: 1, total: 4 };

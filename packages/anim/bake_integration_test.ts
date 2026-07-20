@@ -50,6 +50,10 @@ Deno.test('acceptance: multi-clip bake — exact counts, clip ids, previews', as
     ) events.push(e);
     const err = events.find((e) => e.t === 'error');
     assert(!err, `bake failed: ${JSON.stringify(err)}`);
+    // the fixture implements the full 21-joint core and its feet plant within
+    // tolerance — a warn here means the retarget evidence path regressed
+    const warns = events.filter((e) => e.t === 'warn');
+    assertEquals(warns, [], 'clean fixture bakes without retarget warnings');
 
     const manifestPath = (events.find((e) => e.t === 'artifact' && e.kind === 'bake-manifest') as {
       path: string;
