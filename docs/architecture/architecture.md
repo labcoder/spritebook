@@ -113,6 +113,7 @@ upstream UniRig scripts) stays inside the sidecar process boundary; adapters ret
 | `style`            | NPR stack: quantize (OKLab), dither, outlines, temporal toolkit, flicker metric          |
 | `anim`             | Pack ingestion, humanoid retarget profile, clip sampling, preview clip emission          |
 | `pack`             | MaxRects atlasing, parallel-layout guarantee, contact sheets                             |
+| `gen`              | Generation pipeline: registry → sidecar → **the border** → GenerationResult; reprojection |
 | `export`           | Godot / Aseprite / TexturePacker / strips — projections of BakeManifest                  |
 | `registry`         | Catalog/installed/pins, gates, verify                                                    |
 | `cli`              | Verb surface (`gen, pick, rig, anim, look, bake, export, models, clone, rename, undo…`)  |

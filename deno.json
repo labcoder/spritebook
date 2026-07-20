@@ -6,6 +6,7 @@
     "./packages/render",
     "./packages/style",
     "./packages/anim",
+    "./packages/gen",
     "./packages/pack",
     "./packages/export",
     "./packages/registry",

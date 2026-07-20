@@ -1,0 +1,9 @@
+{
+  "name": "@spritebook/gen",
+  "version": "0.1.0",
+  "exports": "./mod.ts",
+  "imports": {
+    "@gltf-transform/core": "npm:@gltf-transform/core@4.4.1",
+    "fast-png": "npm:fast-png@6.2.0"
+  }
+}
