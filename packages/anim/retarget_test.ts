@@ -428,3 +428,45 @@ Deno.test('A_TPose null transfer: every target stays at rest (identity-ish delta
     assert(res.stats.footContactMaxErrM < 1e-6, `${name}: nothing to correct`);
   }
 });
+
+Deno.test('degenerate target hips rest height fails loud (review F6)', async () => {
+  const f = await fx();
+  // a target whose pelvis rests at Y=0: hipScale would silently zero root motion
+  const flat: SkeletonRest = {
+    parents: new Map([['pelvis', '']]),
+    locals: new Map([[
+      'pelvis',
+      Float32Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1),
+    ]]),
+  };
+  let threw = false;
+  try {
+    retargetClip(f.walk, f.ualRest, flat, UAL_HUMANOID);
+  } catch (err) {
+    threw = true;
+    assert(String(err).includes('target hips rest height'), `actionable: ${err}`);
+  }
+  assert(threw, 'flat target must be rejected, not silently mirrored/zeroed');
+});
+
+Deno.test('non-unit rest scale fails loud, naming the joint (review F7)', async () => {
+  const f = await fx();
+  const [, normal] = f.targets[0];
+  // clone the normal body and bake a 2x scale into one joint's rest local —
+  // the rest FK would silently mis-measure hip height on such a rig
+  const scaled: SkeletonRest = {
+    parents: new Map(normal.parents),
+    locals: new Map([...normal.locals].map(([k, v]) => [k, Float32Array.from(v)])),
+  };
+  const m = scaled.locals.get('spine_01')!;
+  for (const c of [0, 1, 2, 4, 5, 6, 8, 9, 10]) m[c] *= 2;
+  let threw = false;
+  try {
+    retargetClip(f.walk, f.ualRest, scaled, UAL_HUMANOID);
+  } catch (err) {
+    threw = true;
+    assert(String(err).includes('spine_01'), `names the joint: ${err}`);
+    assert(String(err).includes('rest scale'), `names the cause: ${err}`);
+  }
+  assert(threw, 'non-unit rest scale must be rejected, not silently mis-measured');
+});

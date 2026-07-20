@@ -127,6 +127,19 @@ function buildRestSkeleton(rest: SkeletonRest, label: string): RestSkeleton {
         `retarget: ${label} joint "${name}" references missing parent "${parent}"`,
       );
     }
+    // this FK composes world = parent + R*localPos, which is only correct for
+    // unit rest scale; a cm-authored rig (Armature scale 0.01) would get hip
+    // heights and hipScale silently wrong in every downstream number — fail
+    // loud instead of guessing (review F7)
+    for (let c = 0; c < 3; c++) {
+      const len = Math.hypot(m[c * 4], m[c * 4 + 1], m[c * 4 + 2]);
+      if (Math.abs(len - 1) > 1e-3) {
+        throw new Error(
+          `retarget: ${label} joint "${name}" has rest scale ${len.toFixed(4)} — ` +
+            'non-unit rest scale is not supported; re-export the rig with scale applied',
+        );
+      }
+    }
     local.set(name, { parent, rot: qFromMat4(m), pos: [m[12], m[13], m[14]] });
   }
   const order: string[] = [];
@@ -302,6 +315,14 @@ export function retargetClip(
     throw new Error(
       `retarget: source hips rest height is ${srcHipY} m — cannot derive hipScale ` +
         '(is the source skeleton grounded with +Y up?)',
+    );
+  }
+  // same guard for the target: hipScale 0 would zero root motion and a
+  // negative one would mirror the trajectory, both silently (review F6)
+  if (!(tgtHipY > 1e-6)) {
+    throw new Error(
+      `retarget: target hips rest height is ${tgtHipY} m — cannot derive hipScale ` +
+        '(is the target skeleton grounded with +Y up?)',
     );
   }
   const hipScale = tgtHipY / srcHipY;

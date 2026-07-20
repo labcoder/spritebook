@@ -27,8 +27,15 @@ export interface SampledPoses {
   frames: number;
 }
 
-/** The contract's frame times for a binding. */
+/** The contract's frame times for a binding. Fails loud on a degenerate spec —
+ * speed 0 would compose NaN into pose matrices and flow silently to the GPU. */
 export function frameTimes(duration: number, spec: SampleSpec): number[] {
+  if (!Number.isInteger(spec.frames) || spec.frames < 1) {
+    throw new Error(`frameTimes: frames must be a positive integer, got ${spec.frames}`);
+  }
+  if (!Number.isFinite(spec.speed) || !(spec.speed > 0)) {
+    throw new Error(`frameTimes: speed must be a positive finite number, got ${spec.speed}`);
+  }
   const d = duration / spec.speed;
   const out: number[] = [];
   for (let i = 0; i < spec.frames; i++) {
@@ -200,6 +207,12 @@ export async function readPoses(
   const header = JSON.parse(new TextDecoder().decode(bytes.subarray(0, nl))) as PosesHeader;
   if (header.version !== POSES_VERSION) {
     throw new Error(`${path}: poses version ${header.version}, expected ${POSES_VERSION}`);
+  }
+  if (
+    typeof header.clipId !== 'string' || !Array.isArray(header.jointNames) ||
+    !Number.isInteger(header.frames) || header.frames < 1
+  ) {
+    throw new Error(`${path}: poses header is missing clipId/frames/jointNames`);
   }
   const blob = bytes.slice(nl + 1); // fresh, 4-aligned buffer
   const expected = header.frames * header.jointNames.length * 16 * 4;
