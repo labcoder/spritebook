@@ -1,0 +1,4 @@
+# uv-managed environment and Python bytecode (machine-local)
+.venv/
+__pycache__/
+*.pyc
