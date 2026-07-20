@@ -52,7 +52,7 @@ Autodesk License and Services Agreement (no redistribution). ✓ verified. Never
 | Dependency             | Role                        | License                                                     | Status                                                                                            |
 | ---------------------- | --------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Python 3.11+ / PyTorch | runtime                     | PSF / BSD-3                                                 | std                                                                                               |
-| rembg                  | background removal          | MIT                                                         | std; **⚠ per-weight**: U²-Net Apache-2.0 OK; verify each model file as it becomes a catalog entry |
+| rembg                  | background removal          | MIT                                                         | std; **per-weight**: u2net.onnx **✓ verified Apache-2.0** (2026-07-19, catalog entry `rembg-u2net`, hash-pinned); verify every future weight as it becomes an entry |
 | onnxruntime (CPU)      | rembg inference             | MIT                                                         | std; sidecar env only (uv-managed), CPU build — no CUDA requirement for imageprep                 |
 | ajv (npm, core-side)   | paramsSchema validation     | MIT                                                         | std; exact-pinned; validates adapter JSON Schemas in core BEFORE jobs reach the sidecar (D-009)   |
 | Pose check v1          | A-pose advisory             | ours (silhouette heuristic on rembg alpha — **no new dep**) | audit item 14                                                                                     |
@@ -104,8 +104,8 @@ the bundled starter.
 
 ## Open gates
 
-1. Make-It-Animatable license — before p3-T4.
-2. rembg per-weight licenses — as catalog entries land.
+1. ~~Make-It-Animatable license~~ — resolved 2026-07-18 (D-026): NOT cleanly verified; Track A ships on fit + UniRig-humanoid.
+2. rembg per-weight licenses — u2net **✓ closed 2026-07-19** (Apache-2.0, catalog-pinned); re-opens per additional weight.
 
 Resolved 2026-07-11: ~~deno desktop vs Tauri~~ → **Tauri v2** by P0-T3 (D-005; `deno desktop`
 revisit trigger recorded there).

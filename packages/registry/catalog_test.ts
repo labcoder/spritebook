@@ -15,9 +15,18 @@ const BUNDLED = decodeURIComponent(
 
 Deno.test('bundled catalog: default path resolves, validates, and is canonicalJson bytes', async () => {
   const cat = await loadCatalog();
-  assertEquals(cat, { schemaVersion: 2, models: [] });
   const bytes = await Deno.readTextFile(BUNDLED);
   assertEquals(bytes, canonicalJson(cat), 'committed catalog must be canonical bytes + newline');
+  // the first real entries (P3-T2): pinned from P0-T4 evidence + a verified
+  // local download — ids are load-bearing for the CLI and the prep verb
+  const ids = cat.models.map((m) => m.id);
+  assert(ids.includes('rembg-u2net'), `rembg-u2net entry present (got: ${ids.join(', ')})`);
+  assert(ids.includes('unirig'), `unirig entry present (got: ${ids.join(', ')})`);
+  const unirig = cat.models.find((m) => m.id === 'unirig')!;
+  assert(
+    unirig.versions[0].platforms.every((p) => p.endsWith('-cuda')),
+    'unirig is honestly CUDA-only (D-009 platform verdict)',
+  );
 });
 
 Deno.test('catalog: duplicate model ids are rejected', async () => {
