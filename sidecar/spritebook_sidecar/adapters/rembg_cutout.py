@@ -108,9 +108,18 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     session = _offline_session(model_path)
     emit.progress("load", 1, 3)
 
-    with Image.open(image_path) as img:
-        img.load()
-        cutout = remove(img, session=session)
+    try:
+        with Image.open(image_path) as img:
+            img.load()
+            cutout = remove(img, session=session)
+    except OSError as exc:
+        # UnidentifiedImageError subclasses OSError — a non-image input is a
+        # permanent, honest input error, never a crash or a retry
+        raise AdapterError(
+            "input-invalid",
+            f"Cannot read '{image_path}' as an image: {exc}",
+            False,
+        ) from exc
     if cutout.mode != "RGBA":
         cutout = cutout.convert("RGBA")
     emit.progress("infer", 2, 3)

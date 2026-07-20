@@ -199,11 +199,20 @@ class _Handler(BaseHTTPRequestHandler):
         self.close_connection = True
 
     def _write_event(self, event: dict[str, Any]) -> None:
-        data = to_line(event).encode("utf-8")
-        self.wfile.write(f"{len(data):X}\r\n".encode("ascii"))
-        self.wfile.write(data)
-        self.wfile.write(b"\r\n")
-        self.wfile.flush()
+        # _socket_broken distinguishes OUR socket dying from an adapter's own
+        # OSError (Pillow's UnidentifiedImageError subclasses OSError!) — the
+        # two must not share a fate: socket death propagates silently, an
+        # adapter OSError must still end the stream with a terminal event
+        # (P3-T2 review P1: a bad input was masquerading as retryable death).
+        try:
+            data = to_line(event).encode("utf-8")
+            self.wfile.write(f"{len(data):X}\r\n".encode("ascii"))
+            self.wfile.write(data)
+            self.wfile.write(b"\r\n")
+            self.wfile.flush()
+        except OSError:
+            self._socket_broken = True
+            raise
 
     def _end_ndjson(self) -> None:
         self.wfile.write(b"0\r\n\r\n")
@@ -261,8 +270,14 @@ class _Handler(BaseHTTPRequestHandler):
             adapter.run(params, emitter)
         except AdapterError as exc:
             self._write_event(ev_error(job_id, exc.code, exc.message, exc.retryable))
-        except OSError:
-            raise  # socket death; handled by caller
+        except OSError as exc:
+            if getattr(self, "_socket_broken", False):
+                raise  # genuine socket death; handled by caller
+            # adapter-domain OSError (UnidentifiedImageError, PermissionError,
+            # FileExistsError, ...) — the socket is fine, end terminally
+            self._write_event(
+                ev_error(job_id, "internal", f"{type(exc).__name__}: {exc}", False)
+            )
         except Exception as exc:  # noqa: BLE001 — stream MUST end terminally
             sys.stderr.write(
                 f"[sidecar] adapter '{kind}' crashed on job {job_id}:\n"

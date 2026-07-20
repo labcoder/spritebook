@@ -183,8 +183,16 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
             "input-missing", f"Input image not found: {image_path}", False
         )
 
-    with Image.open(image_path) as img:
-        rgba = img.convert("RGBA")
+    try:
+        with Image.open(image_path) as img:
+            rgba = img.convert("RGBA")
+    except OSError as exc:
+        # UnidentifiedImageError subclasses OSError — permanent input error
+        raise AdapterError(
+            "input-invalid",
+            f"Cannot read '{image_path}' as an image: {exc}",
+            False,
+        ) from exc
     alpha = np.asarray(rgba.getchannel("A"), dtype=np.uint8)
     emit.progress("analyze", 1, 1)
 

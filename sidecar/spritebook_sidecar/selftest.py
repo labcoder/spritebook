@@ -223,6 +223,33 @@ def test_echo_failure(port: int, tmp: Path) -> None:
     ok(not (out_dir / "echo.txt").exists(), "no artifact written on failure")
 
 
+def test_non_image_input_ends_terminally(port: int, tmp: Path) -> None:
+    """Review P1: an adapter-domain OSError (UnidentifiedImageError subclasses
+    OSError) must end the stream with a TERMINAL error event — never masquerade
+    as a dropped socket that core would misreport as retryable death."""
+    not_image = tmp / "not an image.txt"
+    not_image.write_text("plain text, definitely not a png", encoding="utf-8")
+    out_dir = tmp / "non-image-out"
+    job_id = "selftest-non-image"
+    status, _, events = stream_job(
+        port,
+        {
+            "jobId": job_id,
+            "kind": "pose-check",
+            "params": {"imagePath": str(not_image), "outDir": str(out_dir)},
+        },
+    )
+    ok(status == 200, "non-image job still streams NDJSON")
+    for ev in events:
+        assert_event_shape(ev, job_id)
+    ok(len(events) >= 3, f"stream not cut short: {[e['t'] for e in events]}")
+    err = events[-1]
+    ok(err["t"] == "error", f"terminal event is an error, not a drop: {err['t']}")
+    ok(err["code"] == "input-invalid", f"honest code input-invalid: {err['code']}")
+    ok(err["retryable"] is False, "a non-image input is never retryable")
+    ok("not an image.txt" in err["message"], "message names the offending file")
+
+
 def test_unknown_adapter(port: int) -> None:
     job_id = "selftest-unknown"
     status, _, events = stream_job(
@@ -422,6 +449,7 @@ def main() -> int:
             test_handshake(port)
             test_echo_job(port, tmp)
             test_echo_failure(port, tmp)
+            test_non_image_input_ends_terminally(port, tmp)
             test_unknown_adapter(port)
             test_bad_requests(port)
             test_single_flight(port, tmp)
