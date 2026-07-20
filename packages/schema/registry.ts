@@ -51,8 +51,12 @@ export type WeightFile = z.output<typeof WeightFileSchema>;
 
 export const ModelVersionSchema = z.strictObject({
   version: z.string().min(1),
-  /** staged multi-file releases are the norm (UniRig: skeleton + skin ckpts) */
-  files: z.array(WeightFileSchema).min(1),
+  /** Staged multi-file releases are the norm (UniRig: skeleton + skin ckpts).
+   * EMPTY is legal and meaningful: a backend that ships no weights at all —
+   * procedural or bundled — still belongs in the catalog so it carries a
+   * paramsSchema, gates, and an install receipt like every other backend.
+   * Installing one is just the receipt. */
+  files: z.array(WeightFileSchema),
   platforms: z.array(PlatformSchema).min(1),
   /** MEASURED peak for the configured path, never README claims (sidecar-vram) */
   minVramGb: z.number().positive().optional(),
@@ -134,12 +138,13 @@ export const InstallReceiptSchema = z.strictObject({
   installedAt: z.string().min(1),
   /** platform detected at install time (os + accelerator probe) */
   platform: PlatformSchema,
-  /** every file as verified on disk (re-checked by `models verify`) */
+  /** every file as verified on disk (re-checked by `models verify`); empty
+   * for a weightless backend, whose receipt records only that the gates ran */
   files: z.array(z.strictObject({
     path: z.string().min(1),
     sha256: z.string().regex(/^[0-9a-f]{64}$/),
     bytes: z.int().positive(),
-  })).min(1),
+  })),
   /** null when the license needs no acceptance; else the recorded consent */
   licenseAccepted: z.strictObject({
     name: z.string().min(1),
