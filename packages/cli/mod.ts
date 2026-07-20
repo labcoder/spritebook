@@ -259,6 +259,73 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     }
   }
 
+  if (verb === 'prep') {
+    // image prep (P3-T2): rembg cutout + pose preflight through the sidecar.
+    // The weight comes from the registry (never auto-downloaded by the
+    // adapter); the sidecar dir defaults to the repo checkout and is
+    // overridable for installed layouts.
+    const image = flag(args, 'image');
+    const out = flag(args, 'out');
+    if (!image || !out) {
+      return fail(
+        'prep' as JobEvent['jobId'],
+        'missing-arg',
+        '--image <file> and --out <dir> are required',
+      );
+    }
+    const registry = await import('@spritebook/registry');
+    const { SidecarSession } = await import('@spritebook/core');
+    try {
+      const root = flag(args, 'models-dir') ?? registry.defaultModelsRoot();
+      const installed = await registry.resolveInstalled(root, 'rembg-u2net');
+      if (!installed) {
+        return fail(
+          'prep' as JobEvent['jobId'],
+          'model-missing',
+          'rembg-u2net is not installed - run `spritebook models install rembg-u2net` first ' +
+            `(models root: ${root})`,
+        );
+      }
+      const modelDir = registry.versionDir(root, 'rembg-u2net', installed.version);
+      let sidecarDir = flag(args, 'sidecar') ?? Deno.env.get('SPRITEBOOK_SIDECAR_DIR');
+      if (!sidecarDir) {
+        const repoSidecar = decodeURIComponent(
+          new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+        );
+        try {
+          await Deno.stat(`${repoSidecar}/pyproject.toml`);
+          sidecarDir = repoSidecar;
+        } catch {
+          return fail(
+            'prep' as JobEvent['jobId'],
+            'sidecar-missing',
+            'cannot find the sidecar project - pass --sidecar <dir> or set SPRITEBOOK_SIDECAR_DIR',
+          );
+        }
+      }
+      await Deno.mkdir(out, { recursive: true });
+      const session = new SidecarSession({ sidecarDir });
+      try {
+        return await pump(
+          session.run({
+            jobId: 'prep' as JobEvent['jobId'],
+            kind: 'rembg',
+            params: { imagePath: image, outDir: out, modelDir },
+          }),
+          emit,
+        );
+      } finally {
+        await session.dispose();
+      }
+    } catch (err) {
+      return fail(
+        'prep' as JobEvent['jobId'],
+        'prep-failed',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   if (verb === 'models') {
     // registry verbs (P3-T2, D-009): list is a query snapshot; install/verify/
     // rm are job streams with the same event discipline as bake/export.
@@ -283,9 +350,11 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
             const terr = m.license.excludedTerritories?.length
               ? ` [license excludes ${m.license.excludedTerritories.join(', ')}]`
               : '';
-            io.stdout(`${m.id.padEnd(14)} ${m.kind.padEnd(10)} ${m.displayName} - ${
-              m.license.spdx ?? m.license.name
-            }${terr}`);
+            io.stdout(
+              `${m.id.padEnd(14)} ${m.kind.padEnd(10)} ${m.displayName} - ${
+                m.license.spdx ?? m.license.name
+              }${terr}`,
+            );
             for (const v of m.versions) {
               const size = `${(v.diskBytes / 1e9).toFixed(2).padStart(6)} GB`;
               const vram = v.minVramGb ? `  >=${v.minVramGb} GiB VRAM` : '';
@@ -469,8 +538,8 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       'cli' as JobEvent['jobId'],
       'unknown-verb',
       `Unknown verb "${
-      verb ?? ''
-    }" - available: models, anim, bake, export, doctor, undo, redo (--version)`,
+        verb ?? ''
+      }" - available: prep, models, anim, bake, export, doctor, undo, redo (--version)`,
     );
   }
 

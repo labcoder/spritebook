@@ -1002,6 +1002,11 @@
           "npm:@gltf-transform/core@4.4.1"
         ]
       },
+      "packages/cli": {
+        "dependencies": [
+          "npm:fast-png@6.2.0"
+        ]
+      },
       "packages/core": {
         "dependencies": [
           "npm:ajv@8.17.1"
