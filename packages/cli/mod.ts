@@ -259,6 +259,99 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     }
   }
 
+  if (verb === 'models') {
+    // registry verbs (P3-T2, D-009): list is a query snapshot; install/verify/
+    // rm are job streams with the same event discipline as bake/export.
+    const registry = await import('@spritebook/registry');
+    const jsonOut = (doc: unknown) => io.stdout(JSON.stringify(doc));
+    const sub = args[1];
+    try {
+      const root = flag(args, 'models-dir') ?? registry.defaultModelsRoot();
+      if (sub === 'list') {
+        const catalog = await registry.loadCatalog(flag(args, 'catalog'));
+        const all = await registry.runListQuery({ catalog, root });
+        const rows = args.includes('--installed')
+          ? all
+            .map((m) => ({ ...m, versions: m.versions.filter((v) => v.installed) }))
+            .filter((m) => m.versions.length > 0)
+          : all;
+        if (json) jsonOut({ models: rows });
+        else if (rows.length === 0) {
+          io.stdout(args.includes('--installed') ? 'no models installed' : 'catalog is empty');
+        } else {
+          for (const m of rows) {
+            const terr = m.license.excludedTerritories?.length
+              ? ` [license excludes ${m.license.excludedTerritories.join(', ')}]`
+              : '';
+            io.stdout(`${m.id.padEnd(14)} ${m.kind.padEnd(10)} ${m.displayName} - ${
+              m.license.spdx ?? m.license.name
+            }${terr}`);
+            for (const v of m.versions) {
+              const size = `${(v.diskBytes / 1e9).toFixed(2).padStart(6)} GB`;
+              const vram = v.minVramGb ? `  >=${v.minVramGb} GiB VRAM` : '';
+              io.stdout(
+                `  ${v.version.padEnd(12)} ${size}  ${v.platforms.join(',')}${vram}${
+                  v.installed ? '  [installed]' : ''
+                }`,
+              );
+            }
+          }
+        }
+        return 0;
+      }
+      if (sub === 'install' || sub === 'verify' || sub === 'rm') {
+        const ref = args[2];
+        if (!ref || ref.startsWith('--')) {
+          return fail(
+            'models' as JobEvent['jobId'],
+            'missing-arg',
+            `models ${sub} <id[@version]> is required - see \`spritebook models list\``,
+          );
+        }
+        const [modelId, version] = ref.split('@', 2);
+        if (sub === 'install') {
+          return await pump(
+            registry.runInstallJob({
+              jobId: 'models',
+              catalog: await registry.loadCatalog(flag(args, 'catalog')),
+              root,
+              modelId,
+              version,
+              acceptLicense: args.includes('--accept-license'),
+              territory: flag(args, 'territory'),
+            }),
+            emit,
+          );
+        }
+        if (sub === 'verify') {
+          return await pump(
+            registry.runVerifyJob({
+              jobId: 'models',
+              catalog: await registry.loadCatalog(flag(args, 'catalog')),
+              root,
+              modelId,
+              version,
+            }),
+            emit,
+          );
+        }
+        return await pump(registry.runRmJob({ jobId: 'models', root, modelId, version }), emit);
+      }
+      return fail(
+        'models' as JobEvent['jobId'],
+        'missing-arg',
+        'models needs a subcommand: list [--installed] | install <id[@version]> ' +
+          '[--accept-license] [--territory CC] | verify <id[@version]> | rm <id[@version]>',
+      );
+    } catch (err) {
+      return fail(
+        'models' as JobEvent['jobId'],
+        'models-failed',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   if (verb === 'bake') {
     const model = flag(args, 'model');
     const character = flag(args, 'character');
@@ -375,7 +468,9 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     return fail(
       'cli' as JobEvent['jobId'],
       'unknown-verb',
-      `Unknown verb "${verb ?? ''}" - available: bake, export, doctor, undo, redo (--version)`,
+      `Unknown verb "${
+      verb ?? ''
+    }" - available: models, anim, bake, export, doctor, undo, redo (--version)`,
     );
   }
 
