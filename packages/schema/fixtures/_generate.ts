@@ -26,9 +26,13 @@ const modelEntry = parseWith(ModelEntrySchema, {
   license: { spdx: 'MIT', name: 'MIT', requiresAcceptance: false },
   versions: [{
     version: '1.2',
-    weightsUrl: 'https://example.com/pixal3d-1.2.safetensors',
-    weightsSha256: sha('a'),
-    diskBytes: 4200000000,
+    files: [{
+      path: 'pixal3d-1.2.safetensors',
+      url: 'https://example.com/pixal3d-1.2.safetensors',
+      sha256: sha('a'),
+      bytes: 4200000000,
+    }],
+    platforms: ['windows-cuda', 'linux-cuda'],
     minVramGb: 8,
     paramsSchema: { type: 'object', properties: { quality: { type: 'string' } } },
     defaults: { quality: 'high' },

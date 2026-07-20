@@ -8,6 +8,7 @@
 export * from './canonical.ts';
 export * from './identity.ts';
 export * from './registry.ts';
+export * from './sidecar.ts';
 export * from './project.ts';
 export * from './character.ts';
 export * from './animpack.ts';

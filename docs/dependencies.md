@@ -53,6 +53,8 @@ Autodesk License and Services Agreement (no redistribution). ✓ verified. Never
 | ---------------------- | --------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Python 3.11+ / PyTorch | runtime                     | PSF / BSD-3                                                 | std                                                                                               |
 | rembg                  | background removal          | MIT                                                         | std; **⚠ per-weight**: U²-Net Apache-2.0 OK; verify each model file as it becomes a catalog entry |
+| onnxruntime (CPU)      | rembg inference             | MIT                                                         | std; sidecar env only (uv-managed), CPU build — no CUDA requirement for imageprep                 |
+| ajv (npm, core-side)   | paramsSchema validation     | MIT                                                         | std; exact-pinned; validates adapter JSON Schemas in core BEFORE jobs reach the sidecar (D-009)   |
 | Pose check v1          | A-pose advisory             | ours (silhouette heuristic on rembg alpha — **no new dep**) | audit item 14                                                                                     |
 | MediaPipe Pose         | optional pose-check upgrade | Apache-2.0                                                  | later, catalog-installed extra                                                                    |
 

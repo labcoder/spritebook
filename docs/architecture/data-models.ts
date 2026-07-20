@@ -49,18 +49,37 @@ export interface LicenseInfo {
   excludedTerritories?: string[]; // ISO codes; e.g. Hunyuan3D: ["EU","GB","KR"]
 }
 
+/** One weight file (P3-T2: staged multi-file releases are the norm — UniRig
+ *  ships skeleton + skin checkpoints). The hash is the trust anchor. */
+export interface WeightFile {
+  path: string; // relative inside the install dir; traversal-free grammar
+  url: string;
+  sha256: string; // exact pin; staged releases are why (UniRig)
+  bytes: number;
+}
+
+/** os-accel pairs; '-cpu' satisfiable anywhere with that OS. CUDA-only stacks
+ *  list only cuda platforms — macOS excluded with a message, not a crash. */
+export type Platform =
+  | 'windows-cuda'
+  | 'linux-cuda'
+  | 'macos-metal'
+  | 'windows-cpu'
+  | 'linux-cpu'
+  | 'macos-cpu';
+
 export interface ModelVersion {
   version: string; // "1.2"
-  weightsUrl: string;
-  weightsSha256: string; // exact pin; staged releases are why (UniRig)
-  diskBytes: number;
-  minVramGb?: number;
+  files: WeightFile[]; // disk size = sum(bytes), derived
+  platforms: Platform[];
+  minVramGb?: number; // MEASURED peak for the configured path (sidecar-vram)
   /** JSON Schema for adapter params — validates GenerationParams AND drives
    *  the GUI options form. Pixal3D: quality/textureSize; TripoSplat: gaussians. */
   paramsSchema: JSONSchema;
   defaults: Record<string, unknown>;
-  /** What the backend emits; geometry-only backends trigger the texture substage. */
-  outputs: { geometry: true; texture: boolean; kind: 'mesh' | 'gaussians' };
+  /** What the backend emits; geometry-only backends trigger the texture
+   *  substage. Required for gen3d entries; absent for rig/imageprep. */
+  outputs?: { geometry: true; texture: boolean; kind: 'mesh' | 'gaussians' };
 }
 
 export interface ModelEntry {
