@@ -35,6 +35,81 @@ class AdapterError(Exception):
         self.retryable = bool(retryable)
 
 
+def validate_params(
+    schema: dict[str, Any],
+    params: dict[str, Any],
+    defaults: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Apply ``defaults`` then check ``params`` against the adapter's OWN schema.
+
+    Core validates params against the announced ``paramsSchema`` before a job
+    request exists, so this is the second lock on the same door: a sidecar
+    driven directly (selftest, a future CLI, a core bug) must still refuse
+    nonsense with ``bad-params`` rather than crash halfway through a run.
+
+    Supports exactly the JSON Schema subset the adapters here use — ``required``,
+    ``additionalProperties: false``, and per-property ``type`` (string / integer
+    / number / boolean), ``enum``, ``minimum``, ``maximum``, ``minLength``.
+    Anything richer belongs in core, which has a real validator.
+    """
+    merged: dict[str, Any] = dict(defaults or {})
+    merged.update(params)
+    props: dict[str, Any] = schema.get("properties", {})
+
+    if schema.get("additionalProperties") is False:
+        unknown = sorted(set(merged) - set(props))
+        if unknown:
+            raise AdapterError(
+                "bad-params",
+                f"unknown param(s) {', '.join(unknown)}; allowed: {', '.join(sorted(props))}",
+                False,
+            )
+    for key in schema.get("required", []):
+        if key not in merged:
+            raise AdapterError("bad-params", f"missing required param '{key}'", False)
+
+    for key, spec in props.items():
+        if key not in merged:
+            continue
+        value = merged[key]
+        want = spec.get("type")
+        # bool is a subclass of int in Python; an integer param must not accept True.
+        if want == "integer":
+            good = isinstance(value, int) and not isinstance(value, bool)
+        elif want == "number":
+            good = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif want == "string":
+            good = isinstance(value, str)
+        elif want == "boolean":
+            good = isinstance(value, bool)
+        else:
+            good = True
+        if not good:
+            raise AdapterError(
+                "bad-params",
+                f"param '{key}' must be a {want}, got {type(value).__name__}",
+                False,
+            )
+        if "enum" in spec and value not in spec["enum"]:
+            allowed = ", ".join(str(v) for v in spec["enum"])
+            raise AdapterError(
+                "bad-params", f"param '{key}' must be one of [{allowed}], got {value!r}", False
+            )
+        if "minimum" in spec and value < spec["minimum"]:
+            raise AdapterError(
+                "bad-params", f"param '{key}' must be >= {spec['minimum']}, got {value}", False
+            )
+        if "maximum" in spec and value > spec["maximum"]:
+            raise AdapterError(
+                "bad-params", f"param '{key}' must be <= {spec['maximum']}, got {value}", False
+            )
+        if "minLength" in spec and len(value) < spec["minLength"]:
+            raise AdapterError(
+                "bad-params", f"param '{key}' must be at least {spec['minLength']} char(s)", False
+            )
+    return merged
+
+
 @dataclass(frozen=True)
 class Adapter:
     id: str
@@ -61,9 +136,15 @@ class Adapter:
 
 def build_registry() -> dict[str, Adapter]:
     """id -> Adapter, in announcement order."""
-    from . import echo, pose_check, rembg_cutout
+    from . import echo, fixture_gen, pose_check, rembg_cutout, texture_substage
 
-    adapters = [echo.ADAPTER, rembg_cutout.ADAPTER, pose_check.ADAPTER]
+    adapters = [
+        echo.ADAPTER,
+        rembg_cutout.ADAPTER,
+        pose_check.ADAPTER,
+        fixture_gen.ADAPTER,
+        texture_substage.ADAPTER,
+    ]
     registry: dict[str, Adapter] = {}
     for adapter in adapters:
         if adapter.id in registry:

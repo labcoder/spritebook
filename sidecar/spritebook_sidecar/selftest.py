@@ -143,7 +143,10 @@ def test_handshake(port: int) -> None:
         f"python is major.minor.micro: {hs['python']}",
     )
     ids = [a["id"] for a in hs["adapters"]]
-    ok(ids == ["echo", "rembg", "pose-check"], f"the three adapters announced: {ids}")
+    ok(
+        ids == ["echo", "rembg", "pose-check", "fixture-gen", "texture-substage"],
+        f"the five adapters announced: {ids}",
+    )
     for a in hs["adapters"]:
         ok(
             {"id", "kind", "version", "paramsSchema", "defaults"} <= set(a.keys())
@@ -248,6 +251,177 @@ def test_non_image_input_ends_terminally(port: int, tmp: Path) -> None:
     ok(err["code"] == "input-invalid", f"honest code input-invalid: {err['code']}")
     ok(err["retryable"] is False, "a non-image input is never retryable")
     ok("not an image.txt" in err["message"], "message names the offending file")
+
+
+def _cutout_png(path: Path, w: int = 96, h: int = 144, narrow: bool = False) -> None:
+    """A deterministic figure-ish cut-out with a patterned interior."""
+    import math
+
+    from PIL import Image
+
+    a = np.zeros((h, w, 4), dtype=np.uint8)
+    half = w * (0.10 if narrow else 0.26)
+    for y in range(h):
+        for x in range(w):
+            cx = w / 2
+            if y < h * 0.22:
+                inside = math.hypot(x - cx, y - h * 0.13) < w * 0.16
+            elif y < h * 0.68:
+                inside = abs(x - cx) < half
+            else:
+                inside = abs(x - cx) < half * 0.7
+            if inside:
+                a[y, x] = [(x * 2) % 256, (y * 3) % 256, 180, 255]
+    Image.fromarray(a, "RGBA").save(path)
+
+
+def test_fixture_gen_determinism(tmp: Path) -> None:
+    from spritebook_sidecar.adapters import build_registry
+    from spritebook_sidecar.glb import read_glb
+
+    reg = build_registry()
+    img = tmp / "fg source.png"
+    _cutout_png(img)
+
+    class _E:
+        def __init__(self) -> None:
+            self.art: list[tuple[str, str]] = []
+
+        def progress(self, *a: Any) -> None:
+            pass
+
+        def artifact(self, kind: str, path: str) -> None:
+            self.art.append((kind, path))
+
+        def warn(self, *a: Any) -> None:
+            pass
+
+    def gen(out: str, seed: int, image: Path = img) -> bytes:
+        e = _E()
+        reg["fixture-gen"].run(
+            {"imagePath": str(image), "outDir": str(tmp / out), "seed": seed}, e
+        )
+        ok(e.art and e.art[-1][0] == "mesh-raw", f"fixture-gen emits mesh-raw: {e.art}")
+        return Path(e.art[-1][1]).read_bytes()
+
+    a1 = gen("fg1", 7)
+    a2 = gen("fg2", 7)
+    b1 = gen("fg3", 8)
+    ok(a1 == a2, "fixture-gen is byte-deterministic for a fixed seed")
+    ok(a1 != b1, "a different seed produces different bytes")
+
+    mesh = read_glb(tmp / "fg1" / "raw.glb")
+    ok(mesh.vertex_count > 3, f"mesh has vertices ({mesh.vertex_count})")
+    ok(mesh.triangle_count > 1, f"mesh has triangles ({mesh.triangle_count})")
+    ok(mesh.uvs is not None, "mesh is UV-mapped")
+    ok(mesh.has_base_color_texture, "mesh carries a base color texture")
+
+    # the output must depend on the INPUT, not just the seed
+    narrow = tmp / "narrow.png"
+    _cutout_png(narrow, narrow=True)
+    ok(gen("fg4", 7, narrow) != a1, "a different silhouette produces a different mesh")
+
+
+def test_fixture_gen_validation(tmp: Path) -> None:
+    """An empty silhouette must fail loudly, not emit a degenerate mesh."""
+    from PIL import Image
+
+    from spritebook_sidecar.adapters import AdapterError, build_registry
+
+    blank = tmp / "blank.png"
+    Image.fromarray(np.zeros((32, 32, 4), dtype=np.uint8), "RGBA").save(blank)
+
+    class _E:
+        def progress(self, *a: Any) -> None:
+            pass
+
+        def artifact(self, *a: Any) -> None:
+            raise AssertionError("FAIL: an empty cut-out must not produce an artifact")
+
+        def warn(self, *a: Any) -> None:
+            pass
+
+    try:
+        build_registry()["fixture-gen"].run(
+            {"imagePath": str(blank), "outDir": str(tmp / "blank-out"), "seed": 1}, _E()
+        )
+    except AdapterError as exc:
+        ok(exc.retryable is False, "an empty cut-out is not retryable")
+        ok(bool(exc.code), f"empty cut-out fails with a code: {exc.code}")
+    else:
+        raise AssertionError("FAIL: an empty cut-out should have raised")
+
+
+def test_texture_substage(tmp: Path) -> None:
+    from spritebook_sidecar.adapters import AdapterError, build_registry
+    from spritebook_sidecar.glb import build_glb, read_glb
+
+    reg = build_registry()
+    img = tmp / "ts source.png"
+    _cutout_png(img)
+
+    class _E:
+        def __init__(self) -> None:
+            self.art: list[tuple[str, str]] = []
+
+        def progress(self, *a: Any) -> None:
+            pass
+
+        def artifact(self, kind: str, path: str) -> None:
+            self.art.append((kind, path))
+
+        def warn(self, *a: Any) -> None:
+            pass
+
+    e = _E()
+    reg["fixture-gen"].run({"imagePath": str(img), "outDir": str(tmp / "ts-in"), "seed": 3}, e)
+    raw = Path(e.art[-1][1])
+    before = read_glb(raw)
+
+    e2 = _E()
+    reg["texture-substage"].run(
+        {"meshPath": str(raw), "imagePath": str(img), "outDir": str(tmp / "ts-out")}, e2
+    )
+    ok(e2.art and e2.art[-1][0] == "texture", f"substage emits texture: {e2.art}")
+    after = read_glb(Path(e2.art[-1][1]))
+    ok(after.vertex_count == before.vertex_count, "vertex count unchanged by texturing")
+    ok(int(after.indices.size) == int(before.indices.size), "index count unchanged")
+    ok(np.array_equal(after.positions, before.positions), "positions bit-identical")
+    ok(after.has_base_color_texture, "the substage output is textured")
+
+    # a missing mesh is an actionable refusal, not a crash
+    try:
+        reg["texture-substage"].run(
+            {"meshPath": str(tmp / "nope.glb"), "imagePath": str(img), "outDir": str(tmp / "x")},
+            _E(),
+        )
+    except AdapterError as exc:
+        ok(exc.code in ("input-missing", "glb-invalid"), f"missing mesh is actionable: {exc.code}")
+        ok(exc.retryable is False, "a missing input mesh is not retryable")
+    else:
+        raise AssertionError("FAIL: a missing mesh should have raised")
+
+
+def test_fixture_gen_over_http(port: int, tmp: Path) -> None:
+    img = tmp / "http source.png"
+    _cutout_png(img)
+    job_id = "selftest-fixture-gen"
+    status, _, events = stream_job(
+        port,
+        {
+            "jobId": job_id,
+            "kind": "fixture-gen",
+            "params": {"imagePath": str(img), "outDir": str(tmp / "http out"), "seed": 5},
+        },
+    )
+    ok(status == 200, "fixture-gen job -> 200")
+    for ev in events:
+        assert_event_shape(ev, job_id)
+    kinds = [e["t"] for e in events]
+    ok(kinds[0] == "queued" and kinds[-1] == "done", f"terminal done: {kinds}")
+    art = [e for e in events if e["t"] == "artifact"]
+    ok(len(art) == 1 and art[0]["kind"] == "mesh-raw", f"one mesh-raw artifact: {art}")
+    ok(Path(art[0]["path"]).is_file(), "raw.glb exists on disk")
 
 
 def test_unknown_adapter(port: int) -> None:
@@ -454,6 +628,10 @@ def main() -> int:
             test_bad_requests(port)
             test_single_flight(port, tmp)
             test_pose_checks()
+            test_fixture_gen_determinism(tmp)
+            test_fixture_gen_validation(tmp)
+            test_texture_substage(tmp)
+            test_fixture_gen_over_http(port, tmp)
             test_rembg_model_missing(tmp)
             test_events_module()
             test_shutdown(port, server_thread)
