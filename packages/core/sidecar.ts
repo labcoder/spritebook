@@ -215,26 +215,29 @@ async function readListeningLine(
 ): Promise<{ line: string; rest: ReadableStream<Uint8Array> }> {
   const reader = stdout.getReader();
   let buf = '';
-  const deadline = setTimeout(() => reader.cancel(new Error('startup timeout')), timeoutMs);
+  // cancel() resolves the pending read() as {done:true} — it does NOT reject
+  // with the cancel reason — so a flag is the only way the done-branch can
+  // tell "timed out" from "process exited" (P3-T2 review P2-1)
+  let timedOut = false;
+  const deadline = setTimeout(() => {
+    timedOut = true;
+    reader.cancel().catch(() => {});
+  }, timeoutMs);
   try {
     const decoder = new TextDecoder();
     while (!buf.includes('\n')) {
       const chunk = await reader.read();
       if (chunk.done) {
         throw new Error(
-          `sidecar exited before announcing its port. stderr tail:\n${stderrTail()}`,
+          timedOut
+            ? `sidecar did not announce its port within ${timeoutMs}ms ` +
+              `(first run does a uv sync - retry or run 'uv sync' in the sidecar dir). ` +
+              `stderr tail:\n${stderrTail()}`
+            : `sidecar exited before announcing its port. stderr tail:\n${stderrTail()}`,
         );
       }
       buf += decoder.decode(chunk.value, { stream: true });
     }
-  } catch (e) {
-    throw e instanceof Error && e.message === 'startup timeout'
-      ? new Error(
-        `sidecar did not announce its port within ${timeoutMs}ms ` +
-          `(first run does a uv sync - retry or run 'uv sync' in the sidecar dir). ` +
-          `stderr tail:\n${stderrTail()}`,
-      )
-      : e;
   } finally {
     clearTimeout(deadline);
     reader.releaseLock();
@@ -330,23 +333,34 @@ export class SidecarSession {
   // microtask, which read every dead process as alive (caught by the real
   // kill-mid-job acceptance test; the mock suite could never see it)
   #dead = false;
+  // in-flight spawn, memoized: two concurrent run()s must share ONE process,
+  // not orphan a second python behind the last-write-wins handle (review P2-4)
+  #starting: Promise<SidecarHandle> | null = null;
 
   constructor(cfg: SidecarConfig) {
     this.#cfg = cfg;
   }
 
   /** The live handle, spawning or respawning as needed. */
-  async ensure(): Promise<SidecarHandle> {
-    if (this.#handle && !this.#dead) return this.#handle;
-    this.#handle = null;
-    this.#dead = false;
-    const handle = await startSidecar(this.#cfg);
-    this.#handle = handle;
-    const markDead = () => {
-      if (this.#handle === handle) this.#dead = true;
-    };
-    handle.exited.then(markDead, markDead);
-    return handle;
+  ensure(): Promise<SidecarHandle> {
+    if (this.#handle && !this.#dead) return Promise.resolve(this.#handle);
+    if (!this.#starting) {
+      this.#handle = null;
+      this.#dead = false;
+      this.#starting = startSidecar(this.#cfg)
+        .then((handle) => {
+          this.#handle = handle;
+          const markDead = () => {
+            if (this.#handle === handle) this.#dead = true;
+          };
+          handle.exited.then(markDead, markDead);
+          return handle;
+        })
+        .finally(() => {
+          this.#starting = null;
+        });
+    }
+    return this.#starting;
   }
 
   async *run(req: SidecarJobRequest): AsyncIterable<JobEvent> {
@@ -354,12 +368,13 @@ export class SidecarSession {
     try {
       handle = await this.ensure();
     } catch (e) {
-      yield errEvent(
-        req.jobId,
-        'sidecar-start-failed',
-        e instanceof Error ? e.message : String(e),
-        true,
-      );
+      const message = e instanceof Error ? e.message : String(e);
+      // honest retryability (review P2-3): a missing uv binary or a sidecar
+      // that exits at boot is a CONFIG error a retry loop can never heal; a
+      // startup timeout may just be the first-run uv sync being slow
+      const permanent = e instanceof Deno.errors.NotFound ||
+        message.includes('exited before announcing its port');
+      yield errEvent(req.jobId, 'sidecar-start-failed', message, !permanent);
       return;
     }
     for await (const e of runSidecarJob(handle, req)) {

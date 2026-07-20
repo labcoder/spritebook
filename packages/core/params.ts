@@ -14,13 +14,26 @@ const compiled = new WeakMap<JSONSchema, ReturnType<typeof ajv.compile>>();
 
 export type ParamsCheck = { ok: true } | { ok: false; errors: string[] };
 
-/** Validate `params` against an adapter's declared schema. Never throws on
- * bad PARAMS (that is the caller's error event); throws on a bad SCHEMA —
- * a malformed roster is a programming error, not user input. */
+/** Validate `params` against an adapter's declared schema. NEVER throws: bad
+ * params are the caller's error event, and a bad SCHEMA is one too — the
+ * schema arrives from the sidecar HANDSHAKE (validated only as a JSON
+ * record), so an ajv-strict rejection here must not detonate the choke point
+ * mid-generator (P3-T2 review P2-2). */
 export function validateParams(schema: JSONSchema, params: Record<string, unknown>): ParamsCheck {
   let validate = compiled.get(schema);
   if (!validate) {
-    validate = ajv.compile(schema);
+    try {
+      validate = ajv.compile(schema);
+    } catch (e) {
+      return {
+        ok: false,
+        errors: [
+          `the adapter declared an invalid paramsSchema: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        ],
+      };
+    }
     compiled.set(schema, validate);
   }
   if (validate(params)) return { ok: true };

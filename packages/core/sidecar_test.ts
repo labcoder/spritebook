@@ -244,3 +244,19 @@ Deno.test('validateParams: strict, allErrors, actionable messages', () => {
   }
   assert(validateParams(ECHO.paramsSchema, withDefaults(ECHO.defaults, { steps: 3 })).ok);
 });
+
+Deno.test('validateParams: a malformed SCHEMA is an error result, never a throw', () => {
+  // the schema arrives from the sidecar handshake (arbitrary JSON record) —
+  // an ajv-strict rejection must not detonate the choke point (review P2-2)
+  for (
+    const garbage of [
+      { type: 'objekt' },
+      { type: 'object', properties: { a: { type: 'object', notAKeyword: 1 } } },
+      { required: 'steps' },
+    ]
+  ) {
+    const r = validateParams(garbage as never, {});
+    assert(!r.ok, `schema ${JSON.stringify(garbage)} must fail closed`);
+    if (!r.ok) assert(r.errors[0].includes('invalid paramsSchema'), r.errors[0]);
+  }
+});
