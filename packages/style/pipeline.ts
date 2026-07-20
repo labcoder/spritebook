@@ -171,9 +171,13 @@ export interface ClipAovSource extends AovSource {
  * Multi-clip styling (P3-T1): ONE palette pooled across every frame of EVERY
  * clip (the npr skill's per-character palette law — a per-clip palette would
  * flicker at clip boundaries), then the law-order pipeline per clip/direction,
- * writing `${outDir}/styled/<clipId>/dDD_fFFF.png`. The flicker metric is
- * measured on the FIRST source's direction 0 (bake passes the idle-most clip
- * first). Single-clip styleFromAovs below keeps its flat layout untouched.
+ * writing `${outDir}/styled/<clipId>/dDD_fFFF.png`. Palette hysteresis resets
+ * per clip x direction — chaining it across unrelated clips would couple clip
+ * N's first frame to clip N-1's last. The flicker metric is measured on the
+ * FIRST source's direction 0: the CALLER picks which clip that is (binding
+ * order), and the reported number means that clip only. `frames` in the result
+ * is the per-direction total across all clips. Single-clip styleFromAovs below
+ * keeps its flat layout untouched.
  */
 export async function styleClipsFromAovs(
   srcs: ClipAovSource[],
@@ -231,7 +235,8 @@ export async function styleClipsFromAovs(
     stylePresetId: style.id,
     cameraPresetId: camera.id,
     directions: srcs[0].directions,
-    frames: srcs[0].frames,
+    // honest multi-clip accounting: total frames per direction, not clip 0's
+    frames: srcs.reduce((n, src) => n + src.frames, 0),
     cellPx: { w: w1, h: h1 },
     superSample: s,
     paletteHex: paletteToHex(palette),
