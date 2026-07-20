@@ -1,10 +1,14 @@
 /**
- * @spritebook/registry - Catalog/installed/pins, gates, verify
- *
- * P1-T1 stub: the package exists so the workspace shape is load-bearing from
- * day one. Real implementation lands at P3 (docs/internal/roadmap/).
+ * @spritebook/registry - the D-009 model registry: a committed catalog
+ * (licenses, territories, platforms, VRAM floors, per-file sha256 pins), the
+ * installed tree under the models root, project pins, the install gates, and
+ * the install/verify/rm jobs speaking the JobEvent vocabulary. Backends are
+ * catalog DATA, never hardcoded integrations, and nothing lands on disk
+ * unverified - the trust anchor is the hash, never the download source.
  */
-export const PACKAGE = 'registry' as const;
-
-/** One-line contract from the architecture module map. */
-export const CONTRACT = 'Catalog/installed/pins, gates, verify' as const;
+export * from './catalog.ts';
+export * from './installed.ts';
+export * from './pins.ts';
+export * from './gates.ts';
+export * from './hash.ts';
+export * from './install.ts';

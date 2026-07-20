@@ -1,5 +1,8 @@
 {
   "name": "@spritebook/registry",
   "version": "0.1.0",
-  "exports": "./mod.ts"
+  "exports": "./mod.ts",
+  "imports": {
+    "@std/crypto": "jsr:@std/crypto@1"
+  }
 }

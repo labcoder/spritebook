@@ -1,0 +1,497 @@
+/**
+ * Install / verify / rm jobs (D-009), speaking the runBakeJob event
+ * discipline: queued -> started -> per-file progress -> artifact -> done,
+ * and every failure is a schema-valid error EVENT with an actionable code —
+ * never a throw across the seam.
+ *
+ * Install discipline: resolve from the catalog, gates first (platform,
+ * license, territory — VRAM only warns; the job-time preflight is the hard
+ * gate), then every file downloads into a staging dir and must match its
+ * catalog sha256 AND byte count before anything lands in the final dir.
+ * NOTHING lands unverified: the trust anchor is the hash, never the download
+ * source (sidecar-vram skill). Verification hashes the staged file through
+ * the same streaming hashFile that verify uses — one code path, and an
+ * injected fetcher is never trusted to report its own hashes.
+ */
+import type {
+  InstallReceipt,
+  JobEvent,
+  ModelCatalog,
+  ModelEntry,
+  ModelVersion,
+  Platform,
+} from '@spritebook/schema';
+import {
+  canonicalJson,
+  InstallReceiptSchema,
+  parseWith,
+  SCHEMA_VERSION,
+  versionDiskBytes,
+} from '@spritebook/schema';
+import {
+  detectPlatform,
+  detectVramGb,
+  gateLicense,
+  gatePlatform,
+  gateTerritory,
+  gateVram,
+} from './gates.ts';
+import {
+  compareVersions,
+  getReceipt,
+  listInstalled,
+  RECEIPT_FILE,
+  resolveInstalled,
+  versionDir,
+} from './installed.ts';
+import { hashFile } from './hash.ts';
+
+/** Injectable downloader: fetch `url` into `destPath`, optionally reporting bytes so far. */
+export type Fetcher = (
+  url: string,
+  destPath: string,
+  onBytes?: (bytesSoFar: number) => void,
+) => Promise<void>;
+
+/** Default fetcher: fetch() streamed straight to disk — never buffered whole. */
+export const fetchToFile: Fetcher = async (url, destPath, onBytes) => {
+  const resp = await fetch(url);
+  if (!resp.ok || resp.body === null) {
+    throw new Error(`GET ${url} -> HTTP ${resp.status}`);
+  }
+  const file = await Deno.open(destPath, { write: true, create: true, truncate: true });
+  let seen = 0;
+  const counter = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      seen += chunk.byteLength;
+      onBytes?.(seen);
+      controller.enqueue(chunk);
+    },
+  });
+  await resp.body.pipeThrough(counter).pipeTo(file.writable);
+};
+
+/** Expected failure with its event code; anything else surfaces as the job's generic code. */
+class JobFail extends Error {
+  constructor(readonly code: string, message: string, readonly retryable = false) {
+    super(message);
+  }
+}
+
+export interface InstallJobOpts {
+  jobId: string;
+  catalog: ModelCatalog;
+  /** models root (the CLI seam passes defaultModelsRoot(); explicit here) */
+  root: string;
+  modelId: string;
+  /** omitted -> the highest catalog version (compareVersions) */
+  version?: string;
+  /** the user's explicit --accept-license, recorded in the receipt when required */
+  acceptLicense?: boolean;
+  /** the user's --territory self-declaration (D-027; never geolocated) */
+  territory?: string;
+  /** injectable for tests — the default downloads over the network */
+  fetcher?: Fetcher;
+  /** injectable detection results (tests); omitted fields run the real probes */
+  detected?: { platform?: Platform; vramGb?: number | null };
+}
+
+/**
+ * Install one catalog version under `<root>/<modelId>/<version>/` with a
+ * receipt. Event codes: unknown-model, unknown-version, platform-unsupported,
+ * license-acceptance-required, territory-declaration-required,
+ * territory-excluded, territory-invalid, already-installed, download-failed
+ * (retryable), hash-mismatch, install-failed; warns vram-unknown /
+ * vram-below-min.
+ */
+export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEvent> {
+  const at = () => new Date().toISOString();
+  const jobId = opts.jobId as JobEvent['jobId'];
+  const t0 = performance.now();
+  yield { t: 'queued', jobId, at: at() };
+  yield { t: 'started', jobId, at: at() };
+
+  let staging: string | undefined;
+  try {
+    const entry = findEntry(opts.catalog, opts.modelId);
+    const version = findVersion(entry, opts.version);
+
+    const platform = opts.detected?.platform ?? await detectPlatform();
+    const gates = [
+      gatePlatform(version, platform),
+      gateLicense(entry, { acceptLicense: opts.acceptLicense ?? false }),
+      gateTerritory(entry, { territory: opts.territory }),
+    ];
+    for (const gate of gates) {
+      if (!gate.ok) throw new JobFail(gate.code, gate.message);
+    }
+    const vramGb = opts.detected?.vramGb !== undefined
+      ? opts.detected.vramGb
+      : await detectVramGb();
+    const vram = gateVram(version, vramGb);
+    if (vram.status === 'unknown' || vram.status === 'below-min') {
+      yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
+    }
+
+    const finalDir = versionDir(opts.root, entry.id, version.version);
+    if (await getReceipt(opts.root, entry.id, version.version)) {
+      throw new JobFail(
+        'already-installed',
+        `Model "${entry.id}" ${version.version} is already installed at ${finalDir}. ` +
+          `Installs never overwrite - run \`spritebook models rm ${entry.id}\` first ` +
+          `to reinstall.`,
+      );
+    }
+
+    // download ALL files to staging; each must verify before finalize
+    staging = `${opts.root}/.staging-${entry.id}-${version.version}-${randomHex(4)}`;
+    await Deno.mkdir(staging, { recursive: true });
+    const fetcher = opts.fetcher ?? fetchToFile;
+    const total = version.files.length;
+    const verified: InstallReceipt['files'] = [];
+    for (const [i, f] of version.files.entries()) {
+      const dest = `${staging}/${f.path}`;
+      const parent = dest.slice(0, dest.lastIndexOf('/'));
+      await Deno.mkdir(parent, { recursive: true });
+      try {
+        await fetcher(f.url, dest);
+      } catch (err) {
+        throw new JobFail(
+          'download-failed',
+          `Downloading ${f.url} failed: ${message(err)}. This is usually transient - ` +
+            `retry the install.`,
+          true,
+        );
+      }
+      const size = (await Deno.stat(dest)).size;
+      if (size !== f.bytes) {
+        throw new JobFail(
+          'hash-mismatch',
+          `File "${f.path}" is ${size} bytes but the catalog pins ${f.bytes} - refusing ` +
+            `to install; nothing was written to the models dir.`,
+        );
+      }
+      const sha = await hashFile(dest);
+      if (sha !== f.sha256) {
+        throw new JobFail(
+          'hash-mismatch',
+          `File "${f.path}" hashed ${sha} but the catalog pins ${f.sha256} - refusing ` +
+            `to install; nothing was written to the models dir.`,
+        );
+      }
+      verified.push({ path: f.path, sha256: sha, bytes: size });
+      yield { t: 'progress', jobId, at: at(), step: 'download', done: i + 1, total };
+    }
+
+    // atomic finalize: rename staging into place, then write the receipt.
+    // Crash window (accepted, documented): a crash between the rename and the
+    // receipt write leaves weights WITHOUT a receipt — verify reports
+    // no-receipt, listInstalled/resolveInstalled treat it as not-installed,
+    // and `models rm` (or the remnant sweep below) cleans it up.
+    await Deno.mkdir(`${opts.root}/${entry.id}`, { recursive: true });
+    if (await dirExists(finalDir)) {
+      // receiptless remnant from exactly that crash window (the receipt check
+      // above passed) — unverified bytes, safe and honest to sweep
+      await Deno.remove(finalDir, { recursive: true });
+    }
+    await Deno.rename(staging, finalDir);
+    staging = undefined;
+
+    const receipt = parseWith(
+      InstallReceiptSchema,
+      {
+        schemaVersion: SCHEMA_VERSION,
+        modelId: entry.id,
+        version: version.version,
+        installedAt: at(),
+        platform,
+        files: verified,
+        licenseAccepted: entry.license.requiresAcceptance
+          ? {
+            name: entry.license.name,
+            ...(entry.license.spdx !== undefined ? { spdx: entry.license.spdx } : {}),
+            at: at(),
+          }
+          : null,
+        ...(opts.territory !== undefined ? { territoryDeclared: opts.territory } : {}),
+        vram: {
+          ...(version.minVramGb !== undefined ? { minGb: version.minVramGb } : {}),
+          ...(vramGb !== null ? { detectedGb: vramGb } : {}),
+          status: vram.status,
+        },
+      },
+      `InstallReceipt (${entry.id}@${version.version})`,
+    );
+    const receiptPath = `${finalDir}/${RECEIPT_FILE}`;
+    await Deno.writeTextFile(receiptPath, canonicalJson(receipt));
+
+    yield { t: 'artifact', jobId, at: at(), kind: 'install-receipt', path: receiptPath };
+    yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
+  } catch (err) {
+    if (staging) await Deno.remove(staging, { recursive: true }).catch(() => {});
+    const fail = err instanceof JobFail ? err : new JobFail('install-failed', message(err));
+    yield {
+      t: 'error',
+      jobId,
+      at: at(),
+      code: fail.code,
+      message: fail.message,
+      retryable: fail.retryable,
+    };
+  }
+}
+
+export interface VerifyJobOpts {
+  jobId: string;
+  catalog: ModelCatalog;
+  root: string;
+  modelId: string;
+  /** omitted -> the highest installed version */
+  version?: string;
+}
+
+/**
+ * Rehash every installed file against the RECEIPT and, when the version is
+ * still in the catalog, against the CATALOG pins too. Event codes:
+ * no-receipt, verify-failed.
+ */
+export async function* runVerifyJob(opts: VerifyJobOpts): AsyncIterable<JobEvent> {
+  const at = () => new Date().toISOString();
+  const jobId = opts.jobId as JobEvent['jobId'];
+  const t0 = performance.now();
+  yield { t: 'queued', jobId, at: at() };
+  yield { t: 'started', jobId, at: at() };
+
+  try {
+    let version = opts.version;
+    let receipt: InstallReceipt | null = null;
+    if (version === undefined) {
+      const hit = await resolveInstalled(opts.root, opts.modelId);
+      if (hit) ({ version, receipt } = hit);
+    } else {
+      receipt = await getReceipt(opts.root, opts.modelId, version);
+    }
+    if (version === undefined || receipt === null) {
+      const dir = version === undefined
+        ? `${opts.root}/${opts.modelId}`
+        : versionDir(opts.root, opts.modelId, version);
+      const remnant = await dirExists(dir);
+      throw new JobFail(
+        'no-receipt',
+        remnant
+          ? `${dir} has files but no receipt - the install did not complete (crash ` +
+            `window). Run \`spritebook models rm ${opts.modelId}\` and reinstall.`
+          : `Model "${opts.modelId}"${version ? ` ${version}` : ''} is not installed ` +
+            `under ${opts.root}.`,
+      );
+    }
+
+    const dir = versionDir(opts.root, opts.modelId, version);
+    const catVersion = opts.catalog.models.find((m) => m.id === opts.modelId)
+      ?.versions.find((v) => v.version === version);
+    const total = receipt.files.length;
+    for (const [i, f] of receipt.files.entries()) {
+      const path = `${dir}/${f.path}`;
+      const stat = await Deno.stat(path).catch(() => null);
+      if (!stat?.isFile) {
+        throw new JobFail('verify-failed', `File "${f.path}" is missing from ${dir}.`);
+      }
+      if (stat.size !== f.bytes) {
+        throw new JobFail(
+          'verify-failed',
+          `File "${f.path}" is ${stat.size} bytes on disk but the receipt recorded ` +
+            `${f.bytes}.`,
+        );
+      }
+      const sha = await hashFile(path);
+      if (sha !== f.sha256) {
+        throw new JobFail(
+          'verify-failed',
+          `File "${f.path}" hashes ${sha} on disk but the receipt recorded ${f.sha256} - ` +
+            `the install is corrupt. Run \`spritebook models rm ${opts.modelId}\` and ` +
+            `reinstall.`,
+        );
+      }
+      const pin = catVersion?.files.find((cf) => cf.path === f.path);
+      if (pin && pin.sha256 !== sha) {
+        throw new JobFail(
+          'verify-failed',
+          `File "${f.path}" hashes ${sha} (matching its receipt) but the catalog now ` +
+            `pins ${pin.sha256} - reinstall to pick up the catalog's pinned build.`,
+        );
+      }
+      yield { t: 'progress', jobId, at: at(), step: 'verify', done: i + 1, total };
+    }
+    // the catalog comparison cuts both ways: a pin the receipt never saw
+    // means this install no longer matches what the catalog ships
+    for (const pin of catVersion?.files ?? []) {
+      if (!receipt.files.some((f) => f.path === pin.path)) {
+        throw new JobFail(
+          'verify-failed',
+          `The catalog now pins an additional file "${pin.path}" that this install does ` +
+            `not have - reinstall to match the catalog.`,
+        );
+      }
+    }
+    yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
+  } catch (err) {
+    const fail = err instanceof JobFail ? err : new JobFail('verify-failed', message(err));
+    yield {
+      t: 'error',
+      jobId,
+      at: at(),
+      code: fail.code,
+      message: fail.message,
+      retryable: fail.retryable,
+    };
+  }
+}
+
+export interface RmJobOpts {
+  jobId: string;
+  root: string;
+  modelId: string;
+  /** omitted -> remove EVERY version of the model */
+  version?: string;
+}
+
+/**
+ * Remove one installed version (or the whole model dir when version is
+ * omitted). Also the documented cleanup for crash-window remnants — it
+ * removes the dir whether or not a receipt made it. Artifact-free. Event
+ * codes: not-installed, rm-failed.
+ */
+export async function* runRmJob(opts: RmJobOpts): AsyncIterable<JobEvent> {
+  const at = () => new Date().toISOString();
+  const jobId = opts.jobId as JobEvent['jobId'];
+  const t0 = performance.now();
+  yield { t: 'queued', jobId, at: at() };
+  yield { t: 'started', jobId, at: at() };
+
+  try {
+    const target = opts.version === undefined
+      ? `${opts.root}/${opts.modelId}`
+      : versionDir(opts.root, opts.modelId, opts.version);
+    if (!(await dirExists(target))) {
+      throw new JobFail(
+        'not-installed',
+        `Nothing to remove: ${target} does not exist. \`spritebook models list\` shows ` +
+          `what is installed.`,
+      );
+    }
+    await Deno.remove(target, { recursive: true });
+    if (opts.version !== undefined) {
+      // sweep the model dir when the last version is gone — an empty dir is
+      // not "installed" and must not linger in listings or on disk
+      const parent = `${opts.root}/${opts.modelId}`;
+      const left = await Array.fromAsync(Deno.readDir(parent)).catch(() => null);
+      if (left !== null && left.length === 0) await Deno.remove(parent);
+    }
+    yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
+  } catch (err) {
+    const fail = err instanceof JobFail ? err : new JobFail('rm-failed', message(err));
+    yield {
+      t: 'error',
+      jobId,
+      at: at(),
+      code: fail.code,
+      message: fail.message,
+      retryable: fail.retryable,
+    };
+  }
+}
+
+export interface ListedVersion {
+  version: string;
+  diskBytes: number;
+  platforms: Platform[];
+  minVramGb?: number;
+  installed: boolean;
+}
+
+export interface ListedModel {
+  id: string;
+  kind: ModelEntry['kind'];
+  displayName: string;
+  license: {
+    name: string;
+    spdx?: string;
+    requiresAcceptance: boolean;
+    excludedTerritories?: string[];
+  };
+  versions: ListedVersion[];
+}
+
+/**
+ * The `models list` projection: plain data, NOT events — the CLI renders it.
+ * Catalog order is preserved; `installed` means a valid receipt exists.
+ */
+export async function runListQuery(
+  opts: { catalog: ModelCatalog; root: string },
+): Promise<ListedModel[]> {
+  const installed = new Set(
+    (await listInstalled(opts.root)).map((x) => `${x.id}@${x.version}`),
+  );
+  return opts.catalog.models.map((m) => ({
+    id: m.id,
+    kind: m.kind,
+    displayName: m.displayName,
+    license: {
+      name: m.license.name,
+      ...(m.license.spdx !== undefined ? { spdx: m.license.spdx } : {}),
+      requiresAcceptance: m.license.requiresAcceptance,
+      ...(m.license.excludedTerritories !== undefined
+        ? { excludedTerritories: m.license.excludedTerritories }
+        : {}),
+    },
+    versions: m.versions.map((v) => ({
+      version: v.version,
+      diskBytes: versionDiskBytes(v),
+      platforms: v.platforms,
+      ...(v.minVramGb !== undefined ? { minVramGb: v.minVramGb } : {}),
+      installed: installed.has(`${m.id}@${v.version}`),
+    })),
+  }));
+}
+
+function findEntry(catalog: ModelCatalog, id: string): ModelEntry {
+  const entry = catalog.models.find((m) => m.id === id);
+  if (entry) return entry;
+  const ids = catalog.models.map((m) => m.id);
+  throw new JobFail(
+    'unknown-model',
+    ids.length
+      ? `No model "${id}" in the catalog. Available: ${ids.join(', ')}.`
+      : `No model "${id}" in the catalog - it lists no models yet.`,
+  );
+}
+
+function findVersion(entry: ModelEntry, version?: string): ModelVersion {
+  if (version === undefined) {
+    // highest by compareVersions — mirrors resolveInstalled's "highest installed"
+    return [...entry.versions]
+      .sort((a, b) => compareVersions(a.version, b.version))
+      .at(-1)!;
+  }
+  const hit = entry.versions.find((v) => v.version === version);
+  if (hit) return hit;
+  throw new JobFail(
+    'unknown-version',
+    `Model "${entry.id}" has no version "${version}". Available: ` +
+      `${entry.versions.map((v) => v.version).join(', ')}.`,
+  );
+}
+
+async function dirExists(path: string): Promise<boolean> {
+  const stat = await Deno.stat(path).catch(() => null);
+  return stat?.isDirectory ?? false;
+}
+
+function randomHex(bytes: number): string {
+  const buf = crypto.getRandomValues(new Uint8Array(bytes));
+  return [...buf].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
