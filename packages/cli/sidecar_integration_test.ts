@@ -52,7 +52,7 @@ Deno.test('real sidecar: spawn via uv, handshake roster, echo end-to-end', async
     const handle = await session.ensure();
     assertEquals(
       handle.handshake.adapters.map((a) => a.id).sort(),
-      ['echo', 'pose-check', 'rembg'],
+      ['echo', 'fixture-gen', 'pose-check', 'rembg', 'texture-substage'],
       'the announced roster',
     );
     const events = await collect(session.run({

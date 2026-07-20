@@ -132,6 +132,36 @@ function parseClips(raw: string) {
   });
 }
 
+/** `--adjust quality=high,steps=20` -> params. Values are JSON-parsed so
+ * numbers and booleans arrive typed (the backend's paramsSchema is what
+ * finally judges them, core-side, before any process is spawned). */
+function parseAdjust(raw: string | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  const out: Record<string, unknown> = {};
+  for (const part of raw.split(',')) {
+    const eq = part.indexOf('=');
+    if (eq <= 0) {
+      throw new Error(`bad --adjust entry "${part.trim()}" - want key=value[,key=value]`);
+    }
+    const key = part.slice(0, eq).trim();
+    const value = part.slice(eq + 1).trim();
+    if (key === '__proto__' || key === 'constructor') {
+      throw new Error(`--adjust key "${key}" is not allowed`);
+    }
+    try {
+      out[key] = JSON.parse(value);
+    } catch {
+      out[key] = value; // a bare string stays a string
+    }
+  }
+  return out;
+}
+
+/** The workspace's source dir (mirrors packages/schema/gen.ts SOURCE_DIR). */
+function workspacePathsFor(workspace: string): string {
+  return `${workspace}/source`;
+}
+
 /** Build the CameraPreset for `spritebook bake` from CLI flags + defaults. */
 function cameraFromFlags(args: string[]): CameraPreset {
   const directions = intFlag(args, 'directions', 8);
@@ -254,6 +284,118 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       return fail(
         'anim' as JobEvent['jobId'],
         'anim-failed',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  if (verb === 'gen' || verb === 'pick') {
+    const { runGenJob, runPickJob } = await import('@spritebook/gen');
+    const { readWorkspace } = await import('@spritebook/core');
+    const workspace = flag(args, 'workspace') ?? flag(args, 'out');
+    if (!workspace) {
+      return fail(
+        verb as JobEvent['jobId'],
+        'missing-arg',
+        '--workspace <dir> is required (the character directory)',
+      );
+    }
+    const sidecarDir = () => {
+      const explicit = flag(args, 'sidecar') ?? Deno.env.get('SPRITEBOOK_SIDECAR_DIR');
+      if (explicit) return explicit;
+      return decodeURIComponent(
+        new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+      );
+    };
+
+    try {
+      if (verb === 'pick') {
+        const resultId = flag(args, 'result');
+        if (!resultId) {
+          return fail(
+            'pick' as JobEvent['jobId'],
+            'missing-arg',
+            '--result <rN> is required - `spritebook gen` prints the id it created',
+          );
+        }
+        return await pump(
+          runPickJob({
+            jobId: 'pick',
+            workspace,
+            resultId,
+            reproject: args.includes('--reproject'),
+            imagePath: flag(args, 'image'),
+          }),
+          emit,
+        );
+      }
+
+      // gen
+      const character = flag(args, 'character');
+      if (!character) {
+        return fail('gen' as JobEvent['jobId'], 'missing-arg', '--character <id> is required');
+      }
+      let image = flag(args, 'image');
+      let params = parseAdjust(flag(args, 'adjust'));
+      let modelId = flag(args, 'model') ?? 'fixture-gen';
+      let seed = flag(args, 'seed') !== undefined ? intFlag(args, 'seed', 0) : undefined;
+
+      // --more-like rN: reuse that receipt's backend and params, vary the seed.
+      // The new seed is max(existing)+1 - deterministic given the manifest, and
+      // always different, so "more like this" explores instead of repeating.
+      const moreLike = flag(args, 'more-like');
+      if (moreLike) {
+        const manifest = await readWorkspace(workspace);
+        const parent = manifest.generation.results.find((r) => r.id === moreLike);
+        if (!parent) {
+          const ids = manifest.generation.results.map((r) => r.id).join(', ') || '(none)';
+          return fail(
+            'gen' as JobEvent['jobId'],
+            'unknown-result',
+            `No result "${moreLike}" to vary - results: ${ids}`,
+          );
+        }
+        modelId = flag(args, 'model') ?? parent.backend.modelId;
+        params = { ...parent.params, ...params };
+        delete params.seed;
+        seed ??= Math.max(...manifest.generation.results.map((r) => r.seed)) + 1;
+        image ??= `${workspacePathsFor(workspace)}/${manifest.source.sha256}${
+          manifest.source.originalFilename.slice(
+            manifest.source.originalFilename.lastIndexOf('.'),
+          )
+        }`;
+      }
+      if (!image) {
+        return fail(
+          'gen' as JobEvent['jobId'],
+          'missing-arg',
+          '--image <cutout.png> is required (run `spritebook prep` to make one)',
+        );
+      }
+
+      return await pump(
+        runGenJob({
+          jobId: 'gen',
+          characterId: character as never,
+          workspace,
+          imagePath: image,
+          modelId,
+          version: flag(args, 'model-version'),
+          seed: seed ?? 0,
+          params,
+          declaredHeightM: flag(args, 'height') !== undefined
+            ? numFlag(args, 'height', 1.7)
+            : undefined,
+          sidecarDir: sidecarDir(),
+          modelsRoot: flag(args, 'models-dir'),
+          catalogPath: flag(args, 'catalog'),
+        }),
+        emit,
+      );
+    } catch (err) {
+      return fail(
+        verb as JobEvent['jobId'],
+        'bad-args',
         err instanceof Error ? err.message : String(err),
       );
     }
@@ -539,7 +681,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       'unknown-verb',
       `Unknown verb "${
         verb ?? ''
-      }" - available: prep, models, anim, bake, export, doctor, undo, redo (--version)`,
+      }" - available: prep, gen, pick, models, anim, bake, export, doctor, undo, redo (--version)`,
     );
   }
 
