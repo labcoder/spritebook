@@ -114,6 +114,7 @@ const DIR_CHOICES = new Set([2, 4, 8, 16]);
 
 /** `--clips walk-loop:6@1.5!hold,idle-loop:4` -> ClipBindingSpec[]. */
 function parseClips(raw: string) {
+  const seen = new Set<string>();
   return raw.split(',').map((part) => {
     const m = part.trim().match(/^([a-z0-9][a-z0-9-]*):(\d+)(?:@([\d.]+))?(!hold)?$/);
     if (!m) {
@@ -123,6 +124,10 @@ function parseClips(raw: string) {
     const speed = m[3] ? Number(m[3]) : 1;
     if (frames < 1) throw new Error(`--clips "${m[1]}": frames must be >= 1`);
     if (!(speed > 0)) throw new Error(`--clips "${m[1]}": speed must be > 0`);
+    if (seen.has(m[1])) {
+      throw new Error(`--clips lists "${m[1]}" twice - one binding per clip`);
+    }
+    seen.add(m[1]);
     return { clipId: m[1], frames, speed, holdLast: m[4] !== undefined };
   });
 }
@@ -180,24 +185,49 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     const jsonOut = (doc: unknown) => io.stdout(JSON.stringify(doc));
     try {
       if (args.includes('--list')) {
+        // decodeURIComponent: URL.pathname percent-encodes spaces/non-ASCII in
+        // the install path (review F3)
         const packsRoot = flag(args, 'packs') ??
-          new URL('../anim/packs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-        const pack = await loadPack(`${packsRoot}/ual`);
-        const clips = listClips(pack, {
-          tag: flag(args, 'tag'),
-          category: flag(args, 'category'),
-        });
-        if (json) jsonOut({ pack: pack.id, clips });
-        else {
-          io.stdout(`${pack.name} (${pack.id}) - ${clips.length}/${pack.clips.length} clips`);
-          for (const c of clips) {
-            io.stdout(
-              `  ${c.id.padEnd(26)} ${c.category.padEnd(11)} ${
-                c.durationS.toFixed(2).padStart(5)
-              }s${c.loop ? ' loop' : ''}  [${c.tags.join(', ')}]`,
-            );
+          decodeURIComponent(
+            new URL('../anim/packs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+          );
+        // every subdir with a pack.json is a pack — imported packs list too
+        const packDirs: string[] = [];
+        for await (const entry of Deno.readDir(packsRoot)) {
+          if (!entry.isDirectory) continue;
+          try {
+            await Deno.stat(`${packsRoot}/${entry.name}/pack.json`);
+            packDirs.push(`${packsRoot}/${entry.name}`);
+          } catch {
+            // not a pack dir
           }
         }
+        if (!packDirs.length) {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'no-packs',
+            `no packs under "${packsRoot}" - import one with --import-pack <dir> --into <root>`,
+          );
+        }
+        packDirs.sort();
+        const query = { tag: flag(args, 'tag'), category: flag(args, 'category') };
+        const out: { pack: string; clips: unknown[] }[] = [];
+        for (const dir of packDirs) {
+          const pack = await loadPack(dir);
+          const clips = listClips(pack, query);
+          out.push({ pack: pack.id, clips });
+          if (!json) {
+            io.stdout(`${pack.name} (${pack.id}) - ${clips.length}/${pack.clips.length} clips`);
+            for (const c of clips) {
+              io.stdout(
+                `  ${c.id.padEnd(26)} ${c.category.padEnd(11)} ${
+                  c.durationS.toFixed(2).padStart(5)
+                }s${c.loop ? ' loop' : ''}  [${c.tags.join(', ')}]`,
+              );
+            }
+          }
+        }
+        if (json) jsonOut(out.length === 1 ? out[0] : { packs: out });
         return 0;
       }
       const importSrc = flag(args, 'import-pack');
@@ -249,6 +279,25 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         'bake' as JobEvent['jobId'],
         'unknown-style',
         `Unknown style "${styleId}" - available: ${Object.keys(PRESETS).sort().join(', ')}`,
+      );
+    }
+    // a valueless --clips must not silently bake the legacy idle stub, and a
+    // --pack without --clips changes nothing - both are user error, say so
+    if (args.includes('--clips') && !flag(args, 'clips')) {
+      return fail(
+        'bake' as JobEvent['jobId'],
+        'bad-args',
+        '--clips needs a value: clip:frames[@speed][!hold][,...] - see `spritebook anim --list`',
+      );
+    }
+    if (args.includes('--pack') && !flag(args, 'pack')) {
+      return fail('bake' as JobEvent['jobId'], 'bad-args', '--pack needs a directory path');
+    }
+    if (flag(args, 'pack') && !flag(args, 'clips')) {
+      return fail(
+        'bake' as JobEvent['jobId'],
+        'bad-args',
+        '--pack only applies with --clips (it picks where clip ids resolve)',
       );
     }
     try {

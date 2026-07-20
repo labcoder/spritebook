@@ -91,3 +91,48 @@ Deno.test('cli without --json stays human-readable; unknown verbs fail actionabl
   assertEquals(await runCli(['undo'], missing.io), 1);
   assert(missing.err[0].includes('--manifest'));
 });
+
+Deno.test('bake --clips arg validation fails fast, before any GPU work', async () => {
+  const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o', '--json'];
+  const cases: Array<[string[], string]> = [
+    // valueless --clips must NOT silently bake the legacy idle stub (review F9)
+    [[...base, '--clips'], '--clips needs a value'],
+    [[...base, '--pack'], '--pack needs a directory'],
+    [[...base, '--pack', 'somewhere'], '--pack only applies with --clips'],
+    // duplicates fail here, not after a full render (review F4)
+    [[...base, '--clips', 'walk-loop:2,walk-loop:4'], 'twice'],
+    [[...base, '--clips', 'walk-loop:2@0'], 'speed must be > 0'],
+    [[...base, '--clips', 'walk-loop:0'], 'frames must be >= 1'],
+    [[...base, '--clips', 'Walk_Loop:2'], 'clip:frames[@speed][!hold]'],
+  ];
+  for (const [args, needle] of cases) {
+    const c = collector();
+    assertEquals(await runCli(args, c.io), 1, args.join(' '));
+    const e = JSON.parse(c.out[c.out.length - 1]);
+    assertEquals(e.t, 'error', args.join(' '));
+    assertEquals(e.code, 'bad-args', args.join(' '));
+    assert(e.message.includes(needle), `${args.join(' ')}: ${e.message}`);
+  }
+});
+
+Deno.test('anim --list finds the bundled pack; --tag filters; --json is one document', async () => {
+  const c = collector();
+  assertEquals(await runCli(['anim', '--list', '--tag', 'walk', '--json'], c.io), 0);
+  assertEquals(c.out.length, 1, 'one JSON document');
+  const doc = JSON.parse(c.out[0]);
+  assertEquals(doc.pack, 'ual');
+  assert(doc.clips.length > 0, 'walk-tagged clips exist');
+  assert(
+    doc.clips.every((x: { tags: string[] }) => x.tags.includes('walk')),
+    'tag filter applies',
+  );
+
+  const missing = collector();
+  assertEquals(
+    await runCli(['anim', '--list', '--packs', 'Z:/no-such-root', '--json'], missing.io),
+    1,
+  );
+  const err = JSON.parse(missing.out[0]);
+  assertEquals(err.t, 'error');
+  assert(err.message.includes('no-such-root'), 'names the offending root');
+});
