@@ -325,6 +325,11 @@ export async function startSidecar(cfg: SidecarConfig): Promise<SidecarHandle> {
 export class SidecarSession {
   #cfg: SidecarConfig;
   #handle: SidecarHandle | null = null;
+  // set by the exit watcher, NOT probed via Promise.race — racing an
+  // `exited.then(...)` against an already-resolved sentinel always loses by a
+  // microtask, which read every dead process as alive (caught by the real
+  // kill-mid-job acceptance test; the mock suite could never see it)
+  #dead = false;
 
   constructor(cfg: SidecarConfig) {
     this.#cfg = cfg;
@@ -332,16 +337,16 @@ export class SidecarSession {
 
   /** The live handle, spawning or respawning as needed. */
   async ensure(): Promise<SidecarHandle> {
-    if (this.#handle) {
-      const alive = await Promise.race([
-        this.#handle.exited.then(() => false),
-        Promise.resolve(true),
-      ]);
-      if (alive) return this.#handle;
-      this.#handle = null;
-    }
-    this.#handle = await startSidecar(this.#cfg);
-    return this.#handle;
+    if (this.#handle && !this.#dead) return this.#handle;
+    this.#handle = null;
+    this.#dead = false;
+    const handle = await startSidecar(this.#cfg);
+    this.#handle = handle;
+    const markDead = () => {
+      if (this.#handle === handle) this.#dead = true;
+    };
+    handle.exited.then(markDead, markDead);
+    return handle;
   }
 
   async *run(req: SidecarJobRequest): AsyncIterable<JobEvent> {
@@ -357,7 +362,14 @@ export class SidecarSession {
       );
       return;
     }
-    yield* runSidecarJob(handle, req);
+    for await (const e of runSidecarJob(handle, req)) {
+      // protocol-level death also marks the session dead: `uv run` wraps the
+      // python process, so killing python does not promptly resolve the
+      // WRAPPER's exit promise — without this, an immediate retry would reuse
+      // the corpse (caught by the kill-mid-job acceptance test)
+      if (e.t === 'error' && e.code === 'sidecar-died') this.#dead = true;
+      yield e;
+    }
   }
 
   async dispose(): Promise<void> {
@@ -377,6 +389,13 @@ export class SidecarSession {
       new Promise<false>((resolve) => setTimeout(() => resolve(false), 3_000)),
     ]);
     if (!graceful) {
+      // the announced pid is the PYTHON process; proc is the uv wrapper —
+      // kill both, or a stubborn python could orphan behind a dead wrapper
+      try {
+        Deno.kill(handle.pid);
+      } catch {
+        // already gone
+      }
       try {
         handle.proc.kill();
       } catch {
