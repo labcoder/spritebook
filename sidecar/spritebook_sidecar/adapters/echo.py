@@ -1,12 +1,17 @@
 """Echo adapter — the built-in ``test`` kind.
 
 Sleeps through ``steps`` progress ticks, optionally fails at ``failAt``, and
-writes ``<outDir>/echo.txt``. With a large ``delayMs`` the job runs long
-enough for core's death test to kill the sidecar mid-stream.
+writes ``<outDir>/echo.txt``. Two death levers for core's acceptance tests:
+a large ``delayMs`` keeps the job alive long enough to be killed externally,
+and ``dieAt`` hard-exits the PROCESS (``os._exit``) right after that step's
+progress event — a real mid-stream crash (no terminal event, no shutdown
+handshake, connection drops), usable where the test harness has no
+kill-arbitrary-pid permission.
 """
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -21,6 +26,7 @@ PARAMS_SCHEMA: dict[str, Any] = {
         "delayMs": {"type": "integer", "minimum": 0, "maximum": 60000},
         "outDir": {"type": "string"},
         "failAt": {"type": "integer", "minimum": 1},
+        "dieAt": {"type": "integer", "minimum": 1},
     },
     "additionalProperties": False,
 }
@@ -35,6 +41,8 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
         out_dir = Path(str(params["outDir"]))
         fail_at = params.get("failAt")
         fail_at = int(fail_at) if fail_at is not None else None
+        die_at = params.get("dieAt")
+        die_at = int(die_at) if die_at is not None else None
     except (KeyError, TypeError, ValueError) as exc:
         raise AdapterError("bad-params", f"echo params invalid: {exc}", False) from exc
     if steps < 1:
@@ -45,6 +53,11 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
         emit.progress("echo", i, steps)
         if fail_at == i:
             raise AdapterError("echo-fail", "requested failure at step %d" % i, False)
+        if die_at == i:
+            # simulate a hard crash: no cleanup, no terminal event, the socket
+            # just drops — exactly what a CUDA-faulted or OOM-killed sidecar
+            # looks like from core's side
+            os._exit(86)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     log_path = (out_dir / "echo.txt").resolve()
