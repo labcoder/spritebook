@@ -208,6 +208,16 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
       })
     ) {
       if (e.t === 'error') {
+        // a catalog entry whose weights are installed but whose ADAPTER this
+        // build does not ship is a known state, not a crash — say so plainly
+        if (e.code === 'unknown-adapter') {
+          throw new GenFail(
+            'backend-unavailable',
+            `Backend "${entry.id}" is installed, but this build of SpriteBook has no adapter ` +
+              `for it yet, so it cannot be run. Use a backend the sidecar implements ` +
+              `(\`spritebook models list\` shows what is installed; \`fixture-gen\` always works).`,
+          );
+        }
         throw new GenFail(
           'backend-failed',
           `Backend "${entry.id}" failed: ${e.message}`,
