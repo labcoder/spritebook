@@ -25,7 +25,7 @@
  */
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { RigSkeletonSchema } from '@spritebook/schema';
-import { applyJointEdits, hintsFromEdits, sidePartner } from './edits.ts';
+import { applyJointEdits, sidePartner } from './edits.ts';
 import { packWeightRows } from './apply.ts';
 import { detectFacing } from './orient.ts';
 
