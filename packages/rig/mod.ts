@@ -63,3 +63,6 @@ export {
 
 export { applyEditsToRiggedGlb, applyJointEdits, hintsFromEdits, sidePartner } from './edits.ts';
 export type { ApplyEditsResult } from './edits.ts';
+
+export { runRigJob } from './job.ts';
+export type { RigJobOptions, RigJobSummary } from './job.ts';

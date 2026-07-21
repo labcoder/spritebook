@@ -16,7 +16,7 @@ import {
   ManifestPatchSchema,
   parseWith,
 } from '@spritebook/schema';
-import type { CameraPreset } from '@spritebook/schema';
+import type { CameraPreset, JointEdit, OrientationFix } from '@spritebook/schema';
 import { applyPatchOps, encodeEvent } from '@spritebook/core';
 import { PRESETS } from '@spritebook/style';
 import { runBakeJob } from '@spritebook/pack';
@@ -398,6 +398,96 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     }
   }
 
+  if (verb === 'rig') {
+    // Track B auto-rig + the repair verbs (P3-T3). Tier 2 rewrites the mesh
+    // and so runs BEFORE prediction; tier 1 moves joints on the rigged file.
+    const model = flag(args, 'model');
+    const out = flag(args, 'out');
+    if (!model || !out) {
+      return fail(
+        'rig' as JobEvent['jobId'],
+        'missing-arg',
+        '--model <glb> and --out <dir> are required',
+      );
+    }
+    const registry = await import('@spritebook/registry');
+    const { runRigJob } = await import('@spritebook/rig');
+    try {
+      const fixes: OrientationFix[] = [];
+      for (const f of ['face-front', 'feet-ground', 'center'] as const) {
+        if (args.includes(`--${f}`)) fixes.push(f);
+      }
+      const rotate = flag(args, 'rotate');
+      if (rotate !== undefined) {
+        if (!['90', '180', '270'].includes(rotate)) {
+          return fail('rig' as JobEvent['jobId'], 'bad-args', '--rotate must be 90, 180 or 270');
+        }
+        fixes.push(`rotate-${rotate}` as OrientationFix);
+      }
+
+      let edits: JointEdit[] = [];
+      const editsPath = flag(args, 'edits');
+      if (args.includes('--edits') && !editsPath) {
+        return fail('rig' as JobEvent['jobId'], 'bad-args', '--edits needs a patch.json path');
+      }
+      if (editsPath) {
+        const { JointEditsFileSchema } = await import('@spritebook/schema');
+        edits = parseWith(
+          JointEditsFileSchema,
+          JSON.parse(await Deno.readTextFile(editsPath)),
+          `joint edits file "${editsPath}"`,
+        ).edits;
+      }
+      const rerunWithHints = args.includes('--rerun-with-hints');
+      if (rerunWithHints && edits.length === 0) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'bad-args',
+          '--rerun-with-hints needs --edits <patch.json>: the hints ARE your previous nudges',
+        );
+      }
+
+      const backend = flag(args, 'backend') ?? 'unirig';
+      const root = flag(args, 'models-dir') ?? registry.defaultModelsRoot();
+      const installed = await registry.resolveInstalled(root, backend);
+      if (!installed) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'model-missing',
+          `Rig backend "${backend}" is not installed - run \`spritebook models install ${backend}\` ` +
+            `first (models root: ${root})`,
+        );
+      }
+      const sidecarDir = flag(args, 'sidecar') ?? Deno.env.get('SPRITEBOOK_SIDECAR_DIR') ??
+        decodeURIComponent(
+          new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+        );
+
+      return await pump(
+        runRigJob({
+          jobId: 'rig',
+          modelPath: model,
+          outDir: out,
+          sidecarDir,
+          modelDir: registry.versionDir(root, backend, installed.version),
+          backend,
+          seed: flag(args, 'seed') !== undefined ? intFlag(args, 'seed', 0) : 0,
+          orientationFixes: fixes,
+          edits,
+          rerunWithHints,
+          skipDeformCheck: args.includes('--no-deform-check'),
+        }),
+        emit,
+      );
+    } catch (err) {
+      return fail(
+        'rig' as JobEvent['jobId'],
+        'bad-args',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   if (verb === 'prep') {
     // image prep (P3-T2): rembg cutout + pose preflight through the sidecar.
     // The weight comes from the registry (never auto-downloaded by the
@@ -701,7 +791,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       'unknown-verb',
       `Unknown verb "${
         verb ?? ''
-      }" - available: prep, gen, pick, models, anim, bake, export, doctor, undo, redo (--version)`,
+      }" - available: prep, gen, pick, rig, models, anim, bake, export, doctor, undo, redo (--version)`,
     );
   }
 
