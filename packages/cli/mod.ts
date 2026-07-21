@@ -148,6 +148,12 @@ function parseAdjust(raw: string | undefined): Record<string, unknown> {
     if (key === '__proto__' || key === 'constructor') {
       throw new Error(`--adjust key "${key}" is not allowed`);
     }
+    // the seed is hoisted out of params because provenance depends on it, so
+    // gen always overrides params.seed - accepting it here would silently
+    // ignore what the user typed and then record a different seed
+    if (key === 'seed') {
+      throw new Error('set the seed with --seed <n>, not --adjust seed=<n>');
+    }
     try {
       out[key] = JSON.parse(value);
     } catch {
@@ -155,11 +161,6 @@ function parseAdjust(raw: string | undefined): Record<string, unknown> {
     }
   }
   return out;
-}
-
-/** The workspace's source dir (mirrors packages/schema/gen.ts SOURCE_DIR). */
-function workspacePathsFor(workspace: string): string {
-  return `${workspace}/source`;
 }
 
 /** Build the CameraPreset for `spritebook bake` from CLI flags + defaults. */
@@ -291,7 +292,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
 
   if (verb === 'gen' || verb === 'pick') {
     const { runGenJob, runPickJob } = await import('@spritebook/gen');
-    const { readWorkspace } = await import('@spritebook/core');
+    const { readWorkspace, sourceImagePath } = await import('@spritebook/core');
     const workspace = flag(args, 'workspace') ?? flag(args, 'out');
     if (!workspace) {
       return fail(
@@ -359,11 +360,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         params = { ...parent.params, ...params };
         delete params.seed;
         seed ??= Math.max(...manifest.generation.results.map((r) => r.seed)) + 1;
-        image ??= `${workspacePathsFor(workspace)}/${manifest.source.sha256}${
-          manifest.source.originalFilename.slice(
-            manifest.source.originalFilename.lastIndexOf('.'),
-          )
-        }`;
+        image ??= sourceImagePath(workspace, manifest);
       }
       if (!image) {
         return fail(

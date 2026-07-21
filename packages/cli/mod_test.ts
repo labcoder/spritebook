@@ -136,3 +136,22 @@ Deno.test('anim --list finds the bundled pack; --tag filters; --json is one docu
   assertEquals(err.t, 'error');
   assert(err.message.includes('no-such-root'), 'names the offending root');
 });
+
+Deno.test('gen --adjust refuses seed and prototype keys', async () => {
+  const base = ['gen', '--character', 'hero', '--workspace', 'ws', '--image', 'i.png', '--json'];
+  for (
+    const [args, needle] of [
+      // --adjust seed=N would be silently overridden by the hoisted seed, and
+      // the receipt would then record a DIFFERENT seed than the user typed
+      [[...base, '--adjust', 'seed=99'], 'not --adjust seed'],
+      [[...base, '--adjust', '__proto__={}'], 'not allowed'],
+      [[...base, '--adjust', 'nokey'], 'want key=value'],
+    ] as Array<[string[], string]>
+  ) {
+    const c = collector();
+    assertEquals(await runCli(args, c.io), 1, args.join(' '));
+    const e = JSON.parse(c.out[c.out.length - 1]);
+    assertEquals(e.code, 'bad-args', args.join(' '));
+    assert(e.message.includes(needle), `${args.join(' ')}: ${e.message}`);
+  }
+});

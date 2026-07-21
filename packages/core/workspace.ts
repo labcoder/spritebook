@@ -250,6 +250,20 @@ function extName(name: string): string {
   return dot > 0 ? name.slice(dot) : '';
 }
 
+/**
+ * Where `storeSourceImage` put this manifest's source image.
+ *
+ * Exported because callers kept re-deriving it: `pick --reproject` and the
+ * CLI's `--more-like` both need the stored source back, and both got it
+ * subtly wrong for a filename with no extension (`slice(lastIndexOf('.'))`
+ * returns the last CHARACTER when there is no dot, so `cutout` resolved to
+ * `<sha>t`). One derivation, one place, no drift.
+ */
+export function sourceImagePath(workspace: string, manifest: CharacterManifest): string {
+  const { sourceDir } = workspacePaths(workspace);
+  return `${sourceDir}/${manifest.source.sha256}${extName(manifest.source.originalFilename)}`;
+}
+
 async function pathExists(path: string): Promise<boolean> {
   try {
     await Deno.stat(path);

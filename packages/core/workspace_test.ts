@@ -15,6 +15,7 @@ import {
   nextResultId,
   readWorkspace,
   resultPaths,
+  sourceImagePath,
   storeSourceImage,
   workspacePaths,
 } from './workspace.ts';
@@ -212,4 +213,35 @@ Deno.test('nextResultId counts up and never reuses a discarded id', () => {
     { id: 'r2', discarded: true },
   ]);
   assertEquals(nextResultId(allGone), 'r3');
+});
+
+Deno.test('sourceImagePath: one derivation, correct for extension-less names', async () => {
+  const dir = await Deno.makeTempDir();
+  try {
+    // storeSourceImage is the writer; sourceImagePath must agree with it for
+    // EVERY filename shape, including ones with no extension and dotfiles —
+    // two callers hand-rolled this and both mis-handled the no-dot case
+    for (const [i, name] of ['cutout.png', 'cutout', '.hidden', 'a.b.c.png'].entries()) {
+      const ws = `${dir}/ws-${i}`;
+      const srcDir = `${dir}/src-${i}`;
+      await Deno.mkdir(srcDir, { recursive: true });
+      const src = `${srcDir}/${name}`;
+      await Deno.writeFile(src, new Uint8Array([1, 2, 3, 4]));
+      const stored = await storeSourceImage(ws, src);
+      const manifest = await createWorkspace({
+        workspace: ws,
+        characterId: 'hero' as never,
+        displayName: 'hero',
+        source: { kind: 'image', originalFilename: stored.originalFilename, sha256: stored.sha256 },
+      });
+      assertEquals(
+        sourceImagePath(ws, manifest),
+        stored.storedPath,
+        `derivation matches the writer for "${name}"`,
+      );
+      await Deno.stat(sourceImagePath(ws, manifest)); // the file is really there
+    }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 });

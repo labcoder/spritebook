@@ -18,6 +18,7 @@ import {
   readWorkspace,
   resultPaths,
   setCanonicalMesh,
+  sourceImagePath,
   workspacePaths,
 } from '@spritebook/core';
 import { loadCatalog } from '@spritebook/registry';
@@ -137,10 +138,7 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
 
     let reprojected = false;
     if (opts.reproject) {
-      const image = opts.imagePath ??
-        `${paths.sourceDir}/${manifest.source.sha256}${
-          manifest.source.originalFilename.slice(manifest.source.originalFilename.lastIndexOf('.'))
-        }`;
+      const image = opts.imagePath ?? sourceImagePath(opts.workspace, manifest);
       try {
         await Deno.stat(image);
       } catch {
