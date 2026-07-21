@@ -104,21 +104,21 @@ upstream UniRig scripts) stays inside the sidecar process boundary; adapters ret
 
 ## Module map (materialized as the `packages/*` Deno workspace at P1-T1; `gui` arrives p4, `sidecar` p3)
 
-| Package            | Owns                                                                                     |
-| ------------------ | ---------------------------------------------------------------------------------------- |
-| `schema`           | All types in `data-models.ts`, validation, `ManifestPatch`, migrations                   |
-| `core`             | Queue, events, journal/undo, cache, orchestration                                        |
-| `importer`         | Border: readers (glTF-Transform, ufbx-wasm, obj2gltf), canonicalization, PreflightReport |
-| `render`           | Headless WebGPU: MRT AOVs, skinning, readback                                            |
-| `style`            | NPR stack: quantize (OKLab), dither, outlines, temporal toolkit, flicker metric          |
-| `anim`             | Pack ingestion, humanoid retarget profile, clip sampling, preview clip emission          |
-| `pack`             | MaxRects atlasing, parallel-layout guarantee, contact sheets                             |
+| Package            | Owns                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| `schema`           | All types in `data-models.ts`, validation, `ManifestPatch`, migrations                    |
+| `core`             | Queue, events, journal/undo, cache, orchestration                                         |
+| `importer`         | Border: readers (glTF-Transform, ufbx-wasm, obj2gltf), canonicalization, PreflightReport  |
+| `render`           | Headless WebGPU: MRT AOVs, skinning, readback                                             |
+| `style`            | NPR stack: quantize (OKLab), dither, outlines, temporal toolkit, flicker metric           |
+| `anim`             | Pack ingestion, humanoid retarget profile, clip sampling, preview clip emission           |
+| `pack`             | MaxRects atlasing, parallel-layout guarantee, contact sheets                              |
 | `gen`              | Generation pipeline: registry → sidecar → **the border** → GenerationResult; reprojection |
-| `export`           | Godot / Aseprite / TexturePacker / strips — projections of BakeManifest                  |
-| `registry`         | Catalog/installed/pins, gates, verify                                                    |
-| `cli`              | Verb surface (`gen, pick, rig, anim, look, bake, export, models, clone, rename, undo…`)  |
-| `gui`              | Shell app; framework-agnostic viewport classes                                           |
-| `sidecar` (Python) | Adapters: rembg, gen backends, rig backends                                              |
+| `export`           | Godot / Aseprite / TexturePacker / strips — projections of BakeManifest                   |
+| `registry`         | Catalog/installed/pins, gates, verify                                                     |
+| `cli`              | Verb surface (`gen, pick, rig, anim, look, bake, export, models, clone, rename, undo…`)   |
+| `gui`              | Shell app; framework-agnostic viewport classes                                            |
+| `sidecar` (Python) | Adapters: rembg, gen backends, rig backends                                               |
 
 ## Non-goals of the architecture
 

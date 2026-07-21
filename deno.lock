@@ -7,6 +7,7 @@
     "npm:@gltf-transform/core@4.2.1": "4.2.1",
     "npm:@gltf-transform/core@4.4.1": "4.4.1",
     "npm:@gltf-transform/core@^4.4.1": "4.4.1",
+    "npm:@gltf-transform/extensions@4.4.1": "4.4.1",
     "npm:@gltf-transform/extensions@^4.4.1": "4.4.1",
     "npm:@gltf-transform/functions@4.4.1": "4.4.1",
     "npm:@gltf-transform/functions@^4.4.1": "4.4.1",
@@ -1014,6 +1015,12 @@
       },
       "packages/export": {
         "dependencies": [
+          "npm:fast-png@6.2.0"
+        ]
+      },
+      "packages/gen": {
+        "dependencies": [
+          "npm:@gltf-transform/core@4.4.1",
           "npm:fast-png@6.2.0"
         ]
       },
