@@ -518,15 +518,38 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         }
         const [modelId, version] = ref.split('@', 2);
         if (sub === 'install') {
+          const catalog = await registry.loadCatalog(flag(args, 'catalog'));
+          // --from <dir>: take the bytes from disk instead of the network.
+          // Hashes are still verified against the catalog pin, so this is a
+          // delivery route, not a weaker guarantee (offline installs; reusing
+          // bytes another tool already downloaded).
+          const from = flag(args, 'from');
+          if (args.includes('--from') && !from) {
+            return fail('models' as JobEvent['jobId'], 'bad-args', '--from needs a directory path');
+          }
+          let fetcher;
+          if (from) {
+            const entry = catalog.models.find((m) => m.id === modelId);
+            const v = entry?.versions.find((x) => x.version === (version ?? x.version));
+            if (!v) {
+              return fail(
+                'models' as JobEvent['jobId'],
+                'unknown-model',
+                `cannot resolve "${ref}" in the catalog to lay out --from files`,
+              );
+            }
+            fetcher = registry.fetchFromDir(from, v.files);
+          }
           return await pump(
             registry.runInstallJob({
               jobId: 'models',
-              catalog: await registry.loadCatalog(flag(args, 'catalog')),
+              catalog,
               root,
               modelId,
               version,
               acceptLicense: args.includes('--accept-license'),
               territory: flag(args, 'territory'),
+              ...(fetcher ? { fetcher } : {}),
             }),
             emit,
           );

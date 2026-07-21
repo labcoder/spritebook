@@ -71,6 +71,29 @@ export const fetchToFile: Fetcher = async (url, destPath, onBytes) => {
   await resp.body.pipeThrough(counter).pipeTo(file.writable);
 };
 
+/**
+ * Offline fetcher: take each file from `<sourceDir>/<declared path>` instead
+ * of the network. Hash verification is UNCHANGED — the bytes still have to
+ * match the catalog pin — so this is a different delivery route, never a
+ * weaker guarantee. Exists for air-gapped installs and for reusing bytes an
+ * upstream tool already downloaded (an HF cache, a colleague's copy).
+ */
+export function fetchFromDir(sourceDir: string, files: { path: string; url: string }[]): Fetcher {
+  const byUrl = new Map(files.map((f) => [f.url, f.path]));
+  return async (url, destPath) => {
+    const rel = byUrl.get(url);
+    if (rel === undefined) throw new Error(`no local file mapped for ${url}`);
+    const src = `${sourceDir}/${rel}`;
+    try {
+      await Deno.copyFile(src, destPath);
+    } catch {
+      throw new Error(
+        `cannot read "${src}" - --from expects the files laid out at their declared paths`,
+      );
+    }
+  };
+}
+
 /** Expected failure with its event code; anything else surfaces as the job's generic code. */
 class JobFail extends Error {
   constructor(readonly code: string, message: string, readonly retryable = false) {
