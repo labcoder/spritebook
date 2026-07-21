@@ -15,18 +15,18 @@
  * From the geometry alone, using two signals that agree for humanoids and
  * degrade honestly for everything else:
  *
- * 1. **Depth asymmetry.** A person is not front/back symmetric: the mass in
- *    front of the hip plane (chest, nose, toes) differs from the mass behind
- *    it (back, heels). Feet are the strongest single cue — toes point the way
- *    the body faces — so the bottom slice of the mesh votes hardest.
- * 2. **Silhouette width.** Humanoids are wider across the shoulders than they
+ * 1. **Silhouette width.** Humanoids are wider across the shoulders than they
  *    are deep through the chest. Whichever horizontal axis is WIDER is the
  *    left-right axis, which leaves the other as the facing axis and halves
- *    the answer space before the depth test picks a sign.
+ *    the answer space before anything has to pick a sign.
+ * 2. **Reach from the mass centroid.** A person is not front/back symmetric:
+ *    toes protrude forward much further than heels protrude back. So the sign
+ *    comes from which side reaches FURTHER from the centre of mass, measured
+ *    hardest over the bottom slice of the mesh where the feet are.
  *
- * Confidence is the margin between the two candidate axes, so a barrel (no
- * meaningful facing) reports low confidence and the caller can decline to act
- * rather than rotating something arbitrarily.
+ * Confidence multiplies the two: it needs both a clearly non-square body AND a
+ * clear asymmetry, so a barrel (no meaningful facing) reports ~0 and the
+ * caller can decline to act rather than rotating something arbitrarily.
  */
 import { Document, NodeIO } from '@gltf-transform/core';
 import type { FacingReport, OrientationFix } from '@spritebook/schema';
