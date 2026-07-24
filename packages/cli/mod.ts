@@ -476,6 +476,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           edits,
           rerunWithHints,
           skipDeformCheck: args.includes('--no-deform-check'),
+          workspace: flag(args, 'workspace'),
         }),
         emit,
       );

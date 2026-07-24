@@ -21,14 +21,22 @@
  * the rigged file and does not, and `--rerun-with-hints` feeds the user's
  * existing nudges back into step 2 so a correction is never made twice.
  */
-import type { JobEvent, JointEdit, OrientationFix, RigHint, RigSkeleton } from '@spritebook/schema';
+import type {
+  JobEvent,
+  JointEdit,
+  OrientationFix,
+  RigHint,
+  RigSkeleton,
+  RigState,
+} from '@spritebook/schema';
 import {
+  MANIFEST_FILE,
   parseWith,
   RIG_SKELETON_FILE,
   RIG_WEIGHTS_FILE,
   RigSkeletonSchema,
 } from '@spritebook/schema';
-import { SidecarSession } from '@spritebook/core';
+import { setRigState, SidecarSession } from '@spritebook/core';
 import { applyRig } from './apply.ts';
 import { deformCheck } from './deform.ts';
 import { applyOrientationFixes, detectFacingFile } from './orient.ts';
@@ -55,6 +63,9 @@ export interface RigJobOptions {
   rerunWithHints?: boolean;
   /** skip the deform check (it costs a CPU pass over every joint) */
   skipDeformCheck?: boolean;
+  /** character workspace; when given, the rig is recorded as a journaled
+   * patch so `spritebook undo` can take a repair back */
+  workspace?: string;
 }
 
 export interface RigJobSummary {
@@ -321,6 +332,45 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
       }
     }
     yield { t: 'progress', jobId, at: at(), step: 'deform', done: 4, total: 4 };
+
+    // 6. record the rig in the character, as a journaled patch — which is what
+    // makes `spritebook undo` work on a repair (P3-T3 acceptance). Optional:
+    // `rig` is usable on a bare glb with no character at all, and that is
+    // deliberate (a user trying the tool out has no workspace yet).
+    if (opts.workspace) {
+      const rigState: RigState = {
+        track: 'B',
+        backend: { modelId: backend, version: skeleton.backend.version },
+        skeletonProfile: 'generic',
+        jointCount: skeleton.joints.length,
+        jointEdits: edits,
+        orientationFixes: fixes,
+        // the user has not looked at it yet; `accepted` is theirs to set
+        accepted: false,
+      };
+      try {
+        await setRigState(opts.workspace, rigState);
+        yield {
+          t: 'artifact',
+          jobId,
+          at: at(),
+          kind: 'character-manifest',
+          path: `${opts.workspace}/${MANIFEST_FILE}`,
+        };
+      } catch (err) {
+        // the rig itself succeeded and its files are on disk; failing the job
+        // now would throw away real work over bookkeeping
+        yield {
+          t: 'warn',
+          jobId,
+          at: at(),
+          code: 'rig-not-recorded',
+          message: `The rig is on disk but could not be recorded in the character: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        };
+      }
+    }
 
     yield {
       t: 'done',
