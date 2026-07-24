@@ -11,6 +11,7 @@ export * from './registry.ts';
 export * from './sidecar.ts';
 export * from './gen.ts';
 export * from './rig.ts';
+export * from './roster.ts';
 export * from './project.ts';
 export * from './character.ts';
 export * from './animpack.ts';
