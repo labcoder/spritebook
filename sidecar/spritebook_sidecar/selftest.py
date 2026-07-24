@@ -21,7 +21,7 @@ from typing import Any
 
 import numpy as np
 
-from .adapters import AdapterError, build_registry
+from .adapters import AdapterError, build_registry, validate_params
 from .adapters.pose_check import build_preflight_report, run_checks
 from .events import JobEmitter, iso_now
 from .server import build_server
@@ -144,8 +144,8 @@ def test_handshake(port: int) -> None:
     )
     ids = [a["id"] for a in hs["adapters"]]
     ok(
-        ids == ["echo", "rembg", "pose-check", "fixture-gen", "texture-substage"],
-        f"the five adapters announced: {ids}",
+        ids == ["echo", "rembg", "pose-check", "fixture-gen", "texture-substage", "unirig"],
+        f"the six adapters announced: {ids}",
     )
     for a in hs["adapters"]:
         ok(
@@ -582,6 +582,344 @@ def test_rembg_model_missing(tmp: Path) -> None:
         ok(emitted == [], "no events emitted before the model check")
 
 
+def _multi_mesh_glb(path: Path) -> None:
+    """Two triangles, two meshes, two nodes — the second translated +10 in X.
+
+    Hand-built rather than produced by :func:`build_glb` because the thing under
+    test is exactly what ``build_glb`` never writes: several meshes under posed
+    nodes, which is what the importer's border hands the rigger.
+    """
+    import struct
+
+    positions = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0]], dtype="<f4")
+    indices = np.array([0, 1, 2], dtype="<u2")
+    blob = positions.tobytes() + indices.tobytes() + b"\x00\x00"
+    doc = {
+        "asset": {"version": "2.0", "generator": "selftest"},
+        "scene": 0,
+        "scenes": [{"nodes": [0, 1]}],
+        "nodes": [{"mesh": 0}, {"mesh": 1, "translation": [10.0, 0.0, 0.0]}],
+        "meshes": [
+            {"primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "mode": 4}]},
+            {"primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "mode": 4}]},
+        ],
+        "accessors": [
+            {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+             "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 0.0]},
+            {"bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR"},
+        ],
+        "bufferViews": [
+            {"buffer": 0, "byteOffset": 0, "byteLength": 36},
+            {"buffer": 0, "byteOffset": 36, "byteLength": 6},
+        ],
+        "buffers": [{"byteLength": len(blob)}],
+    }
+    json_bytes = json.dumps(doc, separators=(",", ":")).encode("utf-8")
+    json_bytes += b" " * ((4 - len(json_bytes) % 4) % 4)
+    total = 12 + 8 + len(json_bytes) + 8 + len(blob)
+    out = bytearray()
+    out.extend(struct.pack("<III", 0x46546C67, 2, total))
+    out.extend(struct.pack("<II", len(json_bytes), 0x4E4F534A))
+    out.extend(json_bytes)
+    out.extend(struct.pack("<II", len(blob), 0x004E4942))
+    out.extend(blob)
+    path.write_bytes(bytes(out))
+
+
+def test_scene_geometry(tmp: Path) -> None:
+    """The rig path's reader: every primitive, posed, in a documented order."""
+    from .glb import read_scene_geometry
+
+    path = tmp / "two meshes.glb"
+    _multi_mesh_glb(path)
+    scene = read_scene_geometry(path)
+    ok(scene.vertex_count == 6, f"both primitives contribute vertices: {scene.vertex_count}")
+    ok(scene.triangles.shape == (2, 3), f"both triangles present: {scene.triangles.shape}")
+    ok(
+        int(scene.triangles.max()) == 5,
+        "the second primitive's indices are offset into the flattened array",
+    )
+    ok(
+        float(scene.positions[3][0]) == 10.0 and float(scene.positions[0][0]) == 0.0,
+        "the node's translation is applied to its own primitive only",
+    )
+    spans = scene.primitives
+    ok(len(spans) == 2, "one span per primitive")
+    ok(
+        (spans[0].first_vertex, spans[0].vertex_count) == (0, 3)
+        and (spans[1].first_vertex, spans[1].vertex_count) == (3, 3),
+        "spans describe the flattening core has to reproduce",
+    )
+    ok(scene.has_skins is False, "a static mesh reports no skins")
+
+
+def test_unirig_params() -> None:
+    """paramsSchema is RigAdapterParams, and it refuses everything else."""
+    from .adapters import unirig
+
+    schema = unirig.ADAPTER.params_schema
+    ok(unirig.ADAPTER.kind == "rig", "unirig announces kind 'rig'")
+    ok(
+        set(schema["properties"]) == {"meshPath", "outDir", "seed", "modelDir", "hints"},
+        f"paramsSchema is exactly RigAdapterParams: {sorted(schema['properties'])}",
+    )
+    ok(schema["additionalProperties"] is False, "paramsSchema is closed")
+    ok(
+        set(schema["required"]) == {"meshPath", "outDir", "seed", "modelDir"},
+        "hints is the only optional param",
+    )
+
+    good = {"meshPath": "a.glb", "outDir": "out", "seed": 1, "modelDir": "m"}
+    for label, params, needle in [
+        ("unknown param", {**good, "nope": 1}, "unknown param"),
+        ("missing meshPath", {k: v for k, v in good.items() if k != "meshPath"}, "meshPath"),
+        ("missing modelDir", {k: v for k, v in good.items() if k != "modelDir"}, "modelDir"),
+        ("negative seed", {**good, "seed": -1}, ">= 0"),
+        ("seed not an int", {**good, "seed": "42"}, "must be a integer"),
+        ("empty meshPath", {**good, "meshPath": ""}, "at least 1 char"),
+    ]:
+        try:
+            validate_params(schema, params, unirig.DEFAULTS)
+            raise AssertionError(f"FAIL: {label} should be rejected")
+        except AdapterError as exc:
+            ok(exc.code == "bad-params", f"{label} -> bad-params")
+            ok(needle in exc.message, f"{label} message names the problem: {exc.message}")
+
+    merged = validate_params(schema, good, unirig.DEFAULTS)
+    ok(merged["seed"] == 1, "an explicit seed beats the default")
+    ok(validate_params(schema, {k: v for k, v in good.items() if k != "seed"},
+                       unirig.DEFAULTS)["seed"] == 42, "seed defaults to the catalog's 42")
+
+    for label, hints in [
+        ("not an array", "upperarm_l"),
+        ("not objects", [1, 2]),
+        ("extra key", [{"joint": "a", "position": [0, 0, 0], "why": 1}]),
+        ("missing position", [{"joint": "a"}]),
+        ("empty joint name", [{"joint": "", "position": [0, 0, 0]}]),
+        ("two components", [{"joint": "a", "position": [0, 0]}]),
+        ("non-finite", [{"joint": "a", "position": [0, float("nan"), 0]}]),
+    ]:
+        try:
+            unirig.parse_hints(hints)
+            raise AssertionError(f"FAIL: hints {label} should be rejected")
+        except AdapterError as exc:
+            ok(exc.code == "bad-params", f"hints {label} -> bad-params")
+    parsed = unirig.parse_hints([{"joint": "upperarm_l", "position": [0.1, 1.2, 0]}])
+    ok(parsed == [{"joint": "upperarm_l", "position": [0.1, 1.2, 0.0]}], "a good hint survives")
+    ok(unirig.parse_hints(None) == [], "absent hints are an empty list")
+
+
+def test_unirig_validation() -> None:
+    """The output validators, fed exactly the garbage P0-T4 catalogued."""
+    from .adapters import unirig
+
+    # --- topological order ----------------------------------------------------
+    ok(
+        list(unirig.topological_order(np.array([-1, 0, 1]))) == [0, 1, 2],
+        "an already-ordered skeleton is left alone",
+    )
+    order = unirig.topological_order(np.array([-1, 2, 0]))
+    ok(list(order) == [0, 2, 1], f"a child before its parent is reordered: {list(order)}")
+    for label, parents, needle in [
+        ("a parent cycle", np.array([1, 0]), "cycle"),
+        ("an out-of-range parent", np.array([-1, 7]), "out-of-range"),
+        ("a parent below -1", np.array([-2, 0]), "out-of-range"),
+    ]:
+        try:
+            unirig.topological_order(parents)
+            raise AssertionError(f"FAIL: {label} should be refused")
+        except AdapterError as exc:
+            ok(exc.code == "invalid-output", f"{label} -> invalid-output")
+            ok(needle in exc.message, f"{label} message says what it saw: {exc.message}")
+
+    joints = np.array([[0.0, 0, 0], [0.0, 1, 0], [0.0, 2, 0]])
+    _j, _t, parents, names, indices, moved = unirig.reorder_skeleton(
+        joints, joints, np.array([-1, 2, 0]), ["a", "b", "c"], np.array([[1, 0], [2, 1]])
+    )
+    ok(moved is True, "reorder_skeleton reports that it moved joints")
+    ok(list(parents) == [-1, 0, 1], f"parents are remapped to the new order: {list(parents)}")
+    ok(names == ["a", "c", "b"], f"names travel with their joints: {names}")
+    ok(indices.tolist() == [[2, 0], [1, 2]], f"weight indices are remapped too: {indices.tolist()}")
+
+    # --- weights --------------------------------------------------------------
+    indices = np.array([[0, 1], [0, 1], [0, 1], [0, 1]])
+    weights = np.array(
+        [
+            [0.5, 0.5],  # already normalized
+            [0.2, 0.2],  # sums to 0.4 -> renormalized
+            [0.0, 0.0],  # zero-weight vertex: guarded, never divided
+            [np.nan, np.inf],  # the silent-GPU-failure signature
+        ]
+    )
+    row_sums = np.array([1.0, 0.4, 0.0, np.nan])
+    out_indices, out_weights, counts = unirig.finalize_weights(indices, weights, row_sums, 2)
+    ok(counts["unnormalizedVertices"] == 3, f"unnormalized rows counted: {counts}")
+    ok(counts["zeroWeightVertices"] == 2, f"zero-weight rows counted: {counts}")
+    ok(np.isfinite(out_weights).all(), "no NaN or Inf survives into rig.npz")
+    ok(
+        abs(float(out_weights[1].sum()) - 1.0) < 1e-6,
+        f"a short row is renormalized to 1: {out_weights[1]}",
+    )
+    ok(
+        float(out_weights[2].sum()) == 0.0 and float(out_weights[3].sum()) == 0.0,
+        "zero-weight rows stay zero rather than becoming NaN (P0-T4 catalog item 5)",
+    )
+    ok(out_indices.dtype == np.int32 and out_weights.dtype == np.float32,
+       "rig.npz gets int32 indices and float32 weights")
+
+    try:
+        unirig.finalize_weights(np.array([[0, 9]]), np.array([[1.0, 0.0]]), np.array([1.0]), 2)
+        raise AssertionError("FAIL: an out-of-range joint index should be refused")
+    except AdapterError as exc:
+        ok(exc.code == "invalid-output", "out-of-range joint index -> invalid-output")
+        ok("out of bounds" in exc.message, f"message explains the consequence: {exc.message}")
+
+    # --- the document shape rig.ts freezes ------------------------------------
+    document = unirig.build_skeleton_document(
+        joints=np.zeros((1, 3)),
+        tails=np.ones((1, 3)),
+        parents=np.array([-1]),
+        names=["bone_0"],
+        seed=7,
+        version="36842e2b",
+        vertex_count=4,
+        semantic=False,
+        validation={
+            "nonFiniteWeights": 0,
+            "unnormalizedVertices": 3,
+            "zeroWeightVertices": 2,
+            "retries": 1,
+        },
+    )
+    ok(
+        set(document) == {
+            "schemaVersion", "backend", "seed", "joints", "semanticNames",
+            "vertexCount", "influencesPerVertex", "validation",
+        },
+        f"rig.json has EXACTLY RigSkeleton's keys: {sorted(document)}",
+    )
+    ok(
+        set(document["validation"]) == {
+            "nonFiniteWeights", "unnormalizedVertices", "zeroWeightVertices", "retries",
+        },
+        "the validation block has exactly its four counts",
+    )
+    ok(set(document["joints"][0]) == {"name", "parent", "head", "tail"}, "RigJoint keys are exact")
+    ok(document["influencesPerVertex"] == 4, "four influences per vertex, as glTF holds")
+    ok(json.loads(json.dumps(document)) == document, "the document is plain JSON")
+
+
+def test_unirig_naming() -> None:
+    """The semantic-naming pass names what it can and admits what it cannot."""
+    from .adapters import unirig
+    from .adapters.unirig_humanoid_ref import HUMANOID_REFERENCE
+
+    reference = np.array([p for _, p in HUMANOID_REFERENCE])
+    ref_names = [n for n, _ in HUMANOID_REFERENCE]
+    # the reference itself, scaled to a 1.7 m character sitting at the origin
+    joints = reference * 1.7
+    fallback = [f"bone_{i}" for i in range(joints.shape[0])]
+    names, stats = unirig.semantic_names(joints, fallback)
+    ok(stats["matched"] == len(ref_names), f"a perfect humanoid matches every joint: {stats}")
+    ok(names[ref_names.index("upperarm_l")] == "upperarm_l", "left stays left")
+    ok(names[ref_names.index("foot_r")] == "foot_r", "right stays right")
+    ok(stats["mirrored"] is False, "an unmirrored skeleton is not flipped")
+
+    # D-008 / catalog item 6: on a symmetric character the mirrored hypothesis
+    # ties the direct one on float noise, and a tie must NOT swap sides.
+    mirrored_input = joints * np.array([-1.0, 1.0, 1.0])
+    _names, mirrored_stats = unirig.semantic_names(mirrored_input, fallback)
+    ok(
+        mirrored_stats["mirrored"] is False,
+        "a tie between direct and mirrored keeps the direct reading",
+    )
+    pairs, _score = unirig._greedy_assign(mirrored_input / 1.7, reference, mirror=True)
+    ok(
+        ref_names[pairs[ref_names.index("upperarm_l")][0]] == "upperarm_l",
+        "the mirrored hypothesis itself does map a flipped skeleton back",
+    )
+
+    # a non-humanoid (the P0-T4 giraffe case): a long body running front to back
+    # is nowhere near a two-legged reference, so almost nothing may take a name
+    quadruped = np.stack(
+        [np.zeros(20), np.linspace(0.0, 2.0, 20), np.linspace(-3.0, 3.0, 20)], axis=1
+    )
+    other_names, other_stats = unirig.semantic_names(
+        quadruped, [f"bone_{i}" for i in range(20)]
+    )
+    ok(
+        other_stats["matched"] < unirig.SEMANTIC_MIN_FRACTION * 20,
+        f"a non-humanoid does not get dressed up in arm names: {other_stats}",
+    )
+    ok(
+        sum(n.startswith("bone_") for n in other_names) > 10,
+        "unmatched joints keep UniRig's positional names",
+    )
+
+    flat = np.zeros((3, 3))
+    flat_names, flat_stats = unirig.semantic_names(flat, ["bone_0", "bone_1", "bone_2"])
+    ok(flat_stats["matched"] == 0, "a zero-height skeleton cannot be normalized, so nothing matches")
+    ok(flat_names == ["bone_0", "bone_1", "bone_2"], "and the fallback names survive intact")
+
+
+def test_unirig_environment(tmp: Path) -> None:
+    """Missing backend and missing weights both fail EARLY and actionably."""
+    from .adapters import unirig
+
+    mesh = tmp / "rig input.glb"
+    _multi_mesh_glb(mesh)
+    params = {
+        "meshPath": str(mesh),
+        "outDir": str(tmp / "rig out"),
+        "seed": 42,
+        "modelDir": str(tmp / "no models"),
+    }
+    saved = {k: os.environ.get(k) for k in (unirig.ENV_HOME, unirig.ENV_PYTHON)}
+    try:
+        os.environ[unirig.ENV_HOME] = str(tmp / "no unirig here")
+        os.environ[unirig.ENV_PYTHON] = str(tmp / "no python here")
+        emitted: list[dict[str, Any]] = []
+        t0 = time.monotonic()
+        try:
+            unirig.run(dict(params), JobEmitter("selftest-unirig", emitted.append))
+            raise AssertionError("FAIL: a missing UniRig clone should have raised")
+        except AdapterError as exc:
+            elapsed = time.monotonic() - t0
+            ok(exc.code == "backend-missing", f"missing clone -> backend-missing: {exc.code}")
+            ok(str(tmp / "no unirig here") in exc.message, "message names the path it looked at")
+            ok(unirig.ENV_HOME in exc.message, "message names the override variable")
+            ok(elapsed < 5.0, f"fails fast, without importing torch ({elapsed:.3f}s)")
+            ok(emitted == [], "no events before the environment check")
+
+        # a clone that exists but no weights: the NEXT gate must fire
+        fake_home = tmp / "fake unirig"
+        (fake_home / "configs" / "task").mkdir(parents=True, exist_ok=True)
+        (fake_home / "run.py").write_text("# not the real thing\n", encoding="utf-8")
+        (fake_home / unirig.SKIN_TASK).write_text("mode: predict\n", encoding="utf-8")
+        os.environ[unirig.ENV_HOME] = str(fake_home)
+        os.environ[unirig.ENV_PYTHON] = sys.executable
+        emitted = []
+        try:
+            unirig.run(dict(params), JobEmitter("selftest-unirig", emitted.append))
+            raise AssertionError("FAIL: a missing modelDir should have raised")
+        except AdapterError as exc:
+            ok(exc.code == "model-missing", f"missing weights -> model-missing: {exc.code}")
+            ok(exc.retryable is False, "model-missing is not retryable")
+            for expected in (unirig.SKELETON_CKPT, unirig.SKIN_CKPT):
+                ok(
+                    str((Path(params["modelDir"]) / expected).resolve()) in exc.message,
+                    f"message names the exact expected path for {expected}",
+                )
+            ok("spritebook models install unirig" in exc.message, "message names the install fix")
+            ok(emitted == [], "no events before the weight check")
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
 def test_events_module() -> None:
     ok(bool(AT_RE.match(iso_now())), "iso_now matches ISO UTC ms Z")
     emitted: list[dict[str, Any]] = []
@@ -633,6 +971,11 @@ def main() -> int:
             test_texture_substage(tmp)
             test_fixture_gen_over_http(port, tmp)
             test_rembg_model_missing(tmp)
+            test_scene_geometry(tmp)
+            test_unirig_params()
+            test_unirig_validation()
+            test_unirig_naming()
+            test_unirig_environment(tmp)
             test_events_module()
             test_shutdown(port, server_thread)
     finally:

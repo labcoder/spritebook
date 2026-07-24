@@ -20,7 +20,10 @@ D-009 registry platform gates.
 uv venv --python 3.11 .venv
 uv pip install --python .venv torch==2.7.0 torchvision --index-url https://download.pytorch.org/whl/cu128
 uv pip install --python .venv -r requirements-win.txt
-uv pip install --python .venv "<flash_attn 2.8.3+cu128torch2.7.0 cp311 win_amd64 wheel URL>"  # prebuilt; never build from source
+# prebuilt; NEVER build from source. The exact URL, recovered and re-verified 2026-07-19 (P3-T3)
+# after the P0-T4 notes left it as a placeholder and the env was deleted at phase exit:
+uv pip install --python .venv "https://github.com/kingbri1/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl"
+uv pip install --python .venv triton-windows   # flash-attn imports triton at module load
 uv pip install --python .venv spconv-cu124
 uv pip install --python .venv torch_scatter torch_cluster -f https://data.pyg.org/whl/torch-2.7.0+cu128.html
 uv pip install --python .venv numpy==1.26.4   # re-pin LAST

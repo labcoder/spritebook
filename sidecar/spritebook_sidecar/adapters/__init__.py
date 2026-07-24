@@ -136,7 +136,7 @@ class Adapter:
 
 def build_registry() -> dict[str, Adapter]:
     """id -> Adapter, in announcement order."""
-    from . import echo, fixture_gen, pose_check, rembg_cutout, texture_substage
+    from . import echo, fixture_gen, pose_check, rembg_cutout, texture_substage, unirig
 
     adapters = [
         echo.ADAPTER,
@@ -144,6 +144,7 @@ def build_registry() -> dict[str, Adapter]:
         pose_check.ADAPTER,
         fixture_gen.ADAPTER,
         texture_substage.ADAPTER,
+        unirig.ADAPTER,
     ]
     registry: dict[str, Adapter] = {}
     for adapter in adapters:

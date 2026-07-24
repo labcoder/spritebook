@@ -376,6 +376,212 @@ def read_glb(path: Path) -> GlbMesh:
     )
 
 
+# --- whole-scene geometry (the rig path) --------------------------------------
+
+
+@dataclass(frozen=True)
+class ScenePrimitive:
+    """Where one primitive's vertices landed in the flattened scene arrays."""
+
+    node: int
+    mesh: int
+    primitive: int
+    first_vertex: int
+    vertex_count: int
+
+
+@dataclass(frozen=True)
+class SceneGeometry:
+    """Every triangle primitive of a glb's default scene, flattened and posed.
+
+    :func:`read_glb` deliberately handles exactly one mesh with one primitive —
+    that is all the generation path ever writes, and refusing anything else
+    there keeps the texture substage honest. Rigging has no such luxury: the
+    border does not join meshes, so a canonical character routinely arrives as
+    several meshes under several nodes (the P0-T4 humanoid is body + eyes +
+    eyebrows). A rig has to cover all of it.
+
+    ``positions`` is therefore the concatenation of every triangle primitive
+    reachable from the default scene, each transformed by its NODE'S WORLD
+    MATRIX, in this order:
+
+        scene.nodes in order -> depth-first, children in order
+          -> for a node with a mesh, primitives in order
+
+    That order IS the contract between this adapter's ``rig.npz`` rows and the
+    mesh core applies them to; ``primitives`` records the span each one
+    occupies so a consumer can prove its own traversal agrees rather than
+    assume it.
+    """
+
+    positions: np.ndarray  # (N, 3) float32, world space
+    triangles: np.ndarray  # (M, 3) int64, indices into positions
+    primitives: list[ScenePrimitive]
+    has_skins: bool
+
+    @property
+    def vertex_count(self) -> int:
+        return int(self.positions.shape[0])
+
+
+def _node_matrix(node: dict[str, Any]) -> np.ndarray:
+    """One node's local transform as a 4x4, from ``matrix`` or from TRS."""
+    if "matrix" in node:
+        m = np.asarray(node["matrix"], dtype=np.float64)
+        if m.size != 16:
+            raise AdapterError(
+                "glb-invalid", f"node.matrix has {m.size} elements; expected 16.", False
+            )
+        # glTF matrices are COLUMN-major; numpy reads row-major, so transpose.
+        return m.reshape(4, 4).T
+    out = np.eye(4, dtype=np.float64)
+    t = np.asarray(node.get("translation", (0.0, 0.0, 0.0)), dtype=np.float64)
+    s = np.asarray(node.get("scale", (1.0, 1.0, 1.0)), dtype=np.float64)
+    x, y, z, w = (float(v) for v in node.get("rotation", (0.0, 0.0, 0.0, 1.0)))
+    rot = np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ],
+        dtype=np.float64,
+    )
+    out[:3, :3] = rot @ np.diag(s)
+    out[:3, 3] = t
+    return out
+
+
+def read_scene_geometry(path: Path) -> SceneGeometry:
+    """Flatten a glb's default scene into one posed vertex + triangle array.
+
+    Raises AdapterError naming the offending primitive for anything that cannot
+    be rigged as a triangle mesh — a silently skipped primitive is a region of
+    the character that would come back unweighted with no explanation.
+    """
+    try:
+        raw = Path(path).read_bytes()
+    except OSError as exc:
+        raise AdapterError("input-missing", f"Cannot read '{path}': {exc}", False) from exc
+
+    doc, blob = parse_glb_chunks(raw)
+    buffers = _resolve_buffers(doc, blob)
+    nodes: list[dict[str, Any]] = doc.get("nodes") or []
+    meshes: list[dict[str, Any]] = doc.get("meshes") or []
+    scenes: list[dict[str, Any]] = doc.get("scenes") or []
+    scene_index = int(doc.get("scene", 0))
+    if not scenes:
+        raise AdapterError("glb-invalid", "glb declares no scenes; there is nothing to rig.", False)
+    if scene_index >= len(scenes):
+        raise AdapterError(
+            "glb-invalid", f"asset.scene is {scene_index} but only {len(scenes)} scenes exist.", False
+        )
+
+    pos_chunks: list[np.ndarray] = []
+    tri_chunks: list[np.ndarray] = []
+    spans: list[ScenePrimitive] = []
+    total = 0
+
+    def visit(node_index: int, parent: np.ndarray, seen: frozenset[int]) -> None:
+        nonlocal total
+        if node_index in seen:
+            raise AdapterError(
+                "glb-invalid", f"node {node_index} is its own ancestor; the scene graph is cyclic.", False
+            )
+        if node_index >= len(nodes):
+            raise AdapterError(
+                "glb-invalid", f"scene references node {node_index}; only {len(nodes)} exist.", False
+            )
+        node = nodes[node_index]
+        world = parent @ _node_matrix(node)
+        mesh_index = node.get("mesh")
+        if mesh_index is not None:
+            mi = int(mesh_index)
+            if mi >= len(meshes):
+                raise AdapterError(
+                    "glb-invalid", f"node {node_index} references mesh {mi}; only {len(meshes)} exist.", False
+                )
+            for pi, prim in enumerate(meshes[mi].get("primitives") or []):
+                mode = int(prim.get("mode", MODE_TRIANGLES))
+                if mode != MODE_TRIANGLES:
+                    raise AdapterError(
+                        "unsupported-glb",
+                        f"meshes[{mi}].primitives[{pi}] has mode {mode}; only TRIANGLES (4) can "
+                        "be rigged. Re-export the character as triangle meshes.",
+                        False,
+                    )
+                attrs = prim.get("attributes") or {}
+                if "POSITION" not in attrs:
+                    raise AdapterError(
+                        "glb-invalid",
+                        f"meshes[{mi}].primitives[{pi}] has no POSITION attribute.",
+                        False,
+                    )
+                local = _read_accessor(doc, buffers, int(attrs["POSITION"])).astype(np.float64)
+                if local.ndim != 2 or local.shape[1] != 3:
+                    raise AdapterError(
+                        "glb-invalid",
+                        f"meshes[{mi}].primitives[{pi}] POSITION is not VEC3.",
+                        False,
+                    )
+                posed = local @ world[:3, :3].T + world[:3, 3]
+                if "indices" in prim:
+                    idx = _read_accessor(doc, buffers, int(prim["indices"])).reshape(-1)
+                else:
+                    idx = np.arange(local.shape[0], dtype=np.int64)
+                idx = np.asarray(idx, dtype=np.int64)
+                if idx.size % 3 != 0:
+                    raise AdapterError(
+                        "glb-invalid",
+                        f"meshes[{mi}].primitives[{pi}] has {idx.size} indices, not a multiple of 3.",
+                        False,
+                    )
+                if idx.size and (int(idx.min()) < 0 or int(idx.max()) >= local.shape[0]):
+                    raise AdapterError(
+                        "index-out-of-range",
+                        f"meshes[{mi}].primitives[{pi}] indices span "
+                        f"[{int(idx.min())}, {int(idx.max())}] over {local.shape[0]} vertices.",
+                        False,
+                    )
+                pos_chunks.append(posed.astype(np.float32))
+                tri_chunks.append(idx.reshape(-1, 3) + total)
+                spans.append(
+                    ScenePrimitive(
+                        node=node_index,
+                        mesh=mi,
+                        primitive=pi,
+                        first_vertex=total,
+                        vertex_count=int(local.shape[0]),
+                    )
+                )
+                total += int(local.shape[0])
+        child_seen = seen | {node_index}
+        for child in node.get("children") or []:
+            visit(int(child), world, child_seen)
+
+    for root in scenes[scene_index].get("nodes") or []:
+        visit(int(root), np.eye(4, dtype=np.float64), frozenset())
+
+    if not pos_chunks:
+        raise AdapterError(
+            "glb-invalid",
+            f"'{path}' default scene contains no triangle geometry; there is nothing to rig.",
+            False,
+        )
+    positions = np.concatenate(pos_chunks, axis=0)
+    triangles = np.concatenate(tri_chunks, axis=0)
+    report, bad = _nonfinite_census("positions", positions)
+    if bad:
+        raise AdapterError(
+            "invalid-output", f"Input mesh has non-finite vertex positions ({report}).", False
+        )
+    return SceneGeometry(
+        positions=positions,
+        triangles=triangles,
+        primitives=spans,
+        has_skins=bool(doc.get("skins")),
+    )
+
+
 # --- writing ------------------------------------------------------------------
 
 
