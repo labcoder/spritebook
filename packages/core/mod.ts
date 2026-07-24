@@ -11,6 +11,7 @@ export * from './queue.ts';
 export * from './journal.ts';
 export * from './workspace.ts';
 export * from './receipts.ts';
+export * from './roster.ts';
 export * from './cache.ts';
 export * from './stub-bake.ts';
 export * from './sidecar.ts';

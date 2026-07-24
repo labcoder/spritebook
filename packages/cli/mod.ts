@@ -398,6 +398,55 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     }
   }
 
+  if (verb === 'rename' || verb === 'clone') {
+    // the two verbs the identity law makes cheap (D-011): rename touches one
+    // mutable field and invalidates nothing; clone mints a NEW immutable id
+    const { cloneCharacter, renameCharacter } = await import('@spritebook/core');
+    const workspace = flag(args, 'workspace');
+    if (!workspace) {
+      return fail(
+        verb as JobEvent['jobId'],
+        'missing-arg',
+        '--workspace <dir> is required (the character directory)',
+      );
+    }
+    try {
+      if (verb === 'rename') {
+        const name = flag(args, 'name');
+        if (!name) {
+          return fail(
+            'rename' as JobEvent['jobId'],
+            'missing-arg',
+            '--name <new name> is required',
+          );
+        }
+        const m = await renameCharacter(workspace, name);
+        if (json) io.stdout(JSON.stringify({ id: m.id, displayName: m.displayName }));
+        else io.stdout(`renamed to "${m.displayName}" (id ${m.id} unchanged - nothing rebakes)`);
+        return 0;
+      }
+      const to = flag(args, 'to');
+      const id = flag(args, 'id');
+      if (!to || !id) {
+        return fail(
+          'clone' as JobEvent['jobId'],
+          'missing-arg',
+          '--to <dir> and --id <new-character-id> are required',
+        );
+      }
+      const m = await cloneCharacter(workspace, to, { id, displayName: flag(args, 'name') });
+      if (json) io.stdout(JSON.stringify({ id: m.id, displayName: m.displayName, workspace: to }));
+      else io.stdout(`cloned to ${to} as "${m.displayName}" (id ${m.id})`);
+      return 0;
+    } catch (err) {
+      return fail(
+        verb as JobEvent['jobId'],
+        `${verb}-failed`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   if (verb === 'rig') {
     // Track B auto-rig + the repair verbs (P3-T3). Tier 2 rewrites the mesh
     // and so runs BEFORE prediction; tier 1 moves joints on the rigged file.
@@ -792,7 +841,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       'unknown-verb',
       `Unknown verb "${
         verb ?? ''
-      }" - available: prep, gen, pick, rig, models, anim, bake, export, doctor, undo, redo (--version)`,
+      }" - available: prep, gen, pick, rig, clone, rename, models, anim, bake, export, doctor, undo, redo (--version)`,
     );
   }
 
