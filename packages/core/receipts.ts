@@ -45,6 +45,7 @@ import type {
   GenerationResult,
   JsonPatchOp,
   ManifestPatch,
+  RigState,
 } from '@spritebook/schema';
 import {
   canonicalJson,
@@ -205,6 +206,33 @@ export async function setCanonicalMesh(
       op: [{ op: 'replace', path: '/canonicalMesh', value: next }],
       label: opts.label ??
         (fields.reprojected === true ? 'Reproject canonical mesh' : 'Update canonical mesh'),
+    };
+  }, opts.now);
+}
+
+/**
+ * Record the rig (P3-T3), as a journaled patch like everything else — which is
+ * what makes `spritebook undo` work on a joint nudge for free. RigState is
+ * replaced wholesale rather than merged: the rig is one coherent fact (this
+ * skeleton, from this backend, with these repairs applied), and merging halves
+ * of two different rigs would describe a character that never existed.
+ */
+export async function setRigState(
+  workspace: string,
+  rig: RigState,
+  opts: ReceiptOptions = {},
+): Promise<CharacterManifest> {
+  return await commit(workspace, (manifest) => {
+    const current = manifest.rig;
+    if (current && canonicalJson(current) === canonicalJson(rig)) {
+      throw new Error('setRigState was given the rig the character already has.');
+    }
+    return {
+      op: [{ op: current ? 'replace' : 'add', path: '/rig', value: rig }],
+      label: opts.label ??
+        (rig.jointEdits.length > 0
+          ? `Edit ${rig.jointEdits.length} joint${rig.jointEdits.length === 1 ? '' : 's'}`
+          : `Rig (${rig.jointCount} joints, track ${rig.track})`),
     };
   }, opts.now);
 }
