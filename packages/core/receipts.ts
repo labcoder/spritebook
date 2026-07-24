@@ -41,7 +41,9 @@
  * provenance lie, so a first pick with no height refuses.
  */
 import type {
+  Attachment,
   CharacterManifest,
+  DetailLayer,
   GenerationResult,
   JsonPatchOp,
   ManifestPatch,
@@ -234,6 +236,74 @@ export async function setRigState(
           ? `Edit ${rig.jointEdits.length} joint${rig.jointEdits.length === 1 ? '' : 's'}`
           : `Rig (${rig.jointCount} joints, track ${rig.track})`),
     };
+  }, opts.now);
+}
+
+export interface IdentityFields {
+  detailLayers?: DetailLayer[];
+  attachments?: Attachment[];
+  /** region id -> replacement mesh path; lives INSIDE rig (RigState.boneMask) */
+  boneMask?: Record<string, string>;
+}
+
+/**
+ * Record the identity layer (P3-T4/Track A) as ONE journaled patch: decals,
+ * attachments, and the bone mask land together because they were applied
+ * together — a user undoing "add the tattoo and the sword" expects one undo,
+ * not three. Each provided field replaces wholesale (identity is declarative:
+ * the manifest states what the character HAS, not a diff of what changed).
+ *
+ * boneMask patches into `rig.boneMask`, so it requires a rig — replacing
+ * regions of a body that has no skeleton yet is not a meaningful operation,
+ * and the error says which verb to run first.
+ */
+export async function setIdentity(
+  workspace: string,
+  fields: IdentityFields,
+  opts: ReceiptOptions = {},
+): Promise<CharacterManifest> {
+  const provided = Object.entries(fields).filter(([, v]) => v !== undefined);
+  if (provided.length === 0) {
+    throw new Error('setIdentity was given nothing to record.');
+  }
+  return await commit(workspace, (manifest) => {
+    const op: JsonPatchOp[] = [];
+    const parts: string[] = [];
+    if (fields.detailLayers !== undefined) {
+      op.push({
+        op: manifest.detailLayers === undefined ? 'add' : 'replace',
+        path: '/detailLayers',
+        value: fields.detailLayers,
+      });
+      parts.push(
+        `${fields.detailLayers.length} decal${fields.detailLayers.length === 1 ? '' : 's'}`,
+      );
+    }
+    if (fields.attachments !== undefined) {
+      op.push({
+        op: manifest.attachments === undefined ? 'add' : 'replace',
+        path: '/attachments',
+        value: fields.attachments,
+      });
+      parts.push(
+        `${fields.attachments.length} attachment${fields.attachments.length === 1 ? '' : 's'}`,
+      );
+    }
+    if (fields.boneMask !== undefined) {
+      if (!manifest.rig) {
+        throw new Error(
+          'A bone mask replaces regions of a RIGGED body, and this character has no rig yet - ' +
+            'run `spritebook rig` first.',
+        );
+      }
+      op.push({
+        op: manifest.rig.boneMask === undefined ? 'add' : 'replace',
+        path: '/rig/boneMask',
+        value: fields.boneMask,
+      });
+      parts.push(`bone mask (${Object.keys(fields.boneMask).length} regions)`);
+    }
+    return { op, label: opts.label ?? `Identity: ${parts.join(', ')}` };
   }, opts.now);
 }
 

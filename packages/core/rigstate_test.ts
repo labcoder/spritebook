@@ -146,3 +146,53 @@ function canonical(v: unknown): string {
     return val;
   });
 }
+
+Deno.test('setIdentity: one journaled patch for the whole identity change', async () => {
+  const ws = await workspace();
+  try {
+    const { setIdentity } = await import('./receipts.ts');
+    // decals + attachments land without a rig; boneMask requires one
+    await setIdentity(ws, {
+      detailLayers: [{ id: 'tattoo', uvDecalPng: 'tattoo.png', region: 'arm-l' }],
+      attachments: [{ id: 'sword', socketId: 'hand-r', meshSha256: 'b'.repeat(64) }],
+    }, { now: NOW });
+    const paths = workspacePaths(ws);
+    const m = JSON.parse(await Deno.readTextFile(paths.manifest));
+    assertEquals(m.detailLayers[0].id, 'tattoo');
+    assertEquals(m.attachments[0].id, 'sword');
+    const lines = (await Deno.readTextFile(paths.journal)).split('\n').filter((l) => l);
+    assertEquals(lines.length, 1, 'decals AND attachments are ONE undo step');
+    assert(String(JSON.parse(lines[0]).label).includes('1 decal'), 'label reads like history');
+
+    // undo takes the whole identity change back in one step
+    await undoOnce(ws);
+    const undone = JSON.parse(await Deno.readTextFile(paths.manifest));
+    assertEquals(undone.detailLayers, undefined);
+    assertEquals(undone.attachments, undefined);
+  } finally {
+    await Deno.remove(ws, { recursive: true });
+  }
+});
+
+Deno.test('setIdentity: a bone mask without a rig is refused, naming the fix', async () => {
+  const ws = await workspace();
+  try {
+    const { setIdentity } = await import('./receipts.ts');
+    let threw = false;
+    try {
+      await setIdentity(ws, { boneMask: { head: 'custom-head.glb' } }, { now: NOW });
+    } catch (err) {
+      threw = true;
+      assert(String(err).includes('spritebook rig'), `names the verb: ${err}`);
+    }
+    assert(threw);
+
+    // with a rig, it patches INTO rig.boneMask
+    await setRigState(ws, rig(), { now: NOW });
+    await setIdentity(ws, { boneMask: { head: 'custom-head.glb' } }, { now: NOW });
+    const m = JSON.parse(await Deno.readTextFile(workspacePaths(ws).manifest));
+    assertEquals(m.rig.boneMask, { head: 'custom-head.glb' });
+  } finally {
+    await Deno.remove(ws, { recursive: true });
+  }
+});
