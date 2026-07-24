@@ -66,3 +66,35 @@ export type { ApplyEditsResult } from './edits.ts';
 
 export { runRigJob } from './job.ts';
 export type { RigJobOptions, RigJobSummary } from './job.ts';
+
+/**
+ * Track A (P3-T4): ONE canonical rigged humanoid fitted to each generated
+ * mesh, so a hundred characters share a skeleton, a UV layout and an animation
+ * binding — the roster fast path that needs no GPU at all.
+ *
+ *   buildCanonicalBody  a UAL-skeleton rigged glb -> body.glb + body.json
+ *   fitCanonicalBody    canonical body + target mesh -> fitted rigged glb
+ */
+export {
+  assertRestRoundTrip,
+  BAND_MIN_VERTICES,
+  bandScale,
+  BODY_REGIONS,
+  buildCanonicalBody,
+  closestOnTriangle,
+  CUTOFF_FRACTION,
+  FIT_BANDS,
+  fitCanonicalBody,
+  readSurface,
+  REST_ROUNDTRIP_TOLERANCE_M,
+  SNAP_FRACTION,
+  STRAY_TOLERANCE_FRACTION,
+  TriangleGrid,
+} from './fit.ts';
+export type {
+  BuildCanonicalBodyOptions,
+  BuildCanonicalBodyResult,
+  FitCanonicalBodyOptions,
+  FitReport,
+  Surface,
+} from './fit.ts';
