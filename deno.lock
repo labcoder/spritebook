@@ -1053,6 +1053,11 @@
           "npm:fast-png@6.2.0"
         ]
       },
+      "packages/rig": {
+        "dependencies": [
+          "npm:@gltf-transform/core@4.4.1"
+        ]
+      },
       "packages/schema": {
         "dependencies": [
           "npm:zod@4.4.3"
