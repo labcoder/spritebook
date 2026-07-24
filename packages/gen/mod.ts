@@ -13,3 +13,22 @@ export { runPickJob } from './pick.ts';
 export type { PickJobOptions } from './pick.ts';
 export { reprojectTexture } from './reproject.ts';
 export type { ReprojectOptions, ReprojectStats } from './reproject.ts';
+export {
+  applyAttachments,
+  applyBoneMask,
+  compositeDecals,
+  REGION_WEIGHT_FLOOR,
+  sidePartnerRegion,
+} from './identity.ts';
+export type {
+  ApplyAttachmentsOptions,
+  ApplyBoneMaskOptions,
+  AttachmentLanding,
+  AttachmentReport,
+  BoneMaskReplacement,
+  BoneMaskReport,
+  CompositeDecalsOptions,
+  DecalLanding,
+  DecalReport,
+  SocketSpec,
+} from './identity.ts';

@@ -14,7 +14,13 @@
  * atlas_<pass>_<i>.png, style-result.json, contact-<clip>.gif).
  */
 import { decode as decodePng } from 'fast-png';
-import type { CacheKeyInputs, CameraPreset, JobEvent, StylePreset } from '@spritebook/schema';
+import type {
+  CacheKeyInputs,
+  CameraPreset,
+  JobEvent,
+  RenderPass,
+  StylePreset,
+} from '@spritebook/schema';
 import { canonicalJson, RENDER_PASSES } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
 import { renderSignature, runRenderJob } from '@spritebook/render';
@@ -49,6 +55,7 @@ import {
 } from './contracts.ts';
 import { artifactKey, bakeKey, BlobCache, frameKey } from './cache.ts';
 import { assembleManifest, frameGrid } from './manifest.ts';
+import { assertRenderedPrefix, flipCellPng, type MirrorPlan, mirrorPlan } from './mirror.ts';
 import { composePage, encodePagePng } from './atlas.ts';
 import { packLayout } from './maxrects.ts';
 import { aov1x } from './aov1x.ts';
@@ -78,6 +85,13 @@ export interface BakeJobSpec {
   clips?: ClipBindingSpec[];
   /** pack directory holding clips/ (default: the bundled UAL pack) */
   packDir?: string;
+  /**
+   * D-008 mirroring, OFF by default and never inferred: only
+   * `renderedDirections(N, true)` are styled, and the rest are horizontal flips
+   * of their `mirrorSource` (mirror.ts). Changes the output, so it changes the
+   * cache key (buildCacheInputs).
+   */
+  mirroring?: boolean;
 }
 
 export interface ClipBindingSpec extends SampleSpec {
@@ -108,7 +122,14 @@ async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
 export async function buildCacheInputs(
   spec: Pick<
     BakeJobSpec,
-    'characterId' | 'modelPath' | 'camera' | 'style' | 'frames' | 'clips' | 'packDir'
+    | 'characterId'
+    | 'modelPath'
+    | 'camera'
+    | 'style'
+    | 'frames'
+    | 'clips'
+    | 'packDir'
+    | 'mirroring'
   >,
   renderSig: string,
 ): Promise<CacheKeyInputs> {
@@ -143,7 +164,18 @@ export async function buildCacheInputs(
     // skin is whatever the canonical glb carries, keyed as such
     rigStateHash: await sha256Hex(canonicalJson({ track: 'source-skin' })),
     clipBindingHash: await sha256Hex(clipBindings),
-    cameraPresetHash: await sha256Hex(canonicalJson(spec.camera)),
+    // D-011, mirroring edition: mirroring changes the PIXELS (half the
+    // directions become flips, and the adaptive palette pools over fewer
+    // frames), so it must reach the key or a mirrored and an unmirrored bake
+    // would trade cache entries. CacheKeyInputs is frozen and strict, so it
+    // rides the field that already means "how directions are produced" — the
+    // camera. The off path hashes the bare preset exactly as before, so every
+    // pre-D-008 cache entry stays valid (same trick as the idle-stub binding).
+    cameraPresetHash: await sha256Hex(
+      spec.mirroring
+        ? canonicalJson({ camera: spec.camera, mirroring: true })
+        : canonicalJson(spec.camera),
+    ),
     stylePresetHash: await sha256Hex(canonicalJson(spec.style)),
     rendererVersion: renderSig,
     // no generation backend in the T3 path: the mesh comes in from the border
@@ -290,11 +322,41 @@ async function prepareClips(
   return { prepared, warnings };
 }
 
+/**
+ * Produce the mirrored cells (D-008): every pass of a mirrored direction is the
+ * horizontal flip of the SAME frame of its `mirrorSource` direction, so the
+ * mirrored cells enter the packer indistinguishable from rendered ones and the
+ * atlas layout keeps its shape.
+ */
+function fillMirroredCells(
+  cells: Map<string, Map<string, Uint8Array>>,
+  grid: FrameId[],
+  plan: MirrorPlan,
+): void {
+  for (const id of grid) {
+    const source = plan.mirroredFrom.get(id.direction);
+    if (source === undefined) continue;
+    const from = frameIdKey({ ...id, direction: source });
+    const to = frameIdKey(id);
+    for (const [pass, byKey] of cells) {
+      const bytes = byKey.get(from);
+      if (!bytes) {
+        throw new Error(
+          `mirroring: direction ${id.direction} mirrors ${source}, but no ${pass} cell ` +
+            `exists for "${from}" - the rendered set and the mirror map disagree`,
+        );
+      }
+      byKey.set(to, flipCellPng(bytes, pass as RenderPass));
+    }
+  }
+}
+
 /** Full multi-clip recompute: per clip render pose 'clip' -> pooled style -> cells. */
 async function recomputeClips(
   spec: BakeJobSpec,
   prepared: PreparedClip[],
   grid: FrameId[],
+  plan: MirrorPlan,
 ): Promise<BakedCells & { aovDirCleanup: () => Promise<void> }> {
   const s = spec.style.temporal.superSample;
   const aovRoot = await Deno.makeTempDir();
@@ -326,7 +388,11 @@ async function recomputeClips(
       srcs.push({
         clipId: binding.clipId,
         framesDir: `${clipDir}/frames`,
-        directions: spec.camera.directions,
+        // D-008: style only the directions the mirror rule says must be styled.
+        // The rendered set is the prefix [0..n-1] (assertRenderedPrefix), which
+        // is exactly the positional naming the style stage reads, so the extra
+        // dDD_* pages the render seam had to produce are simply never opened.
+        directions: plan.rendered.length,
         frames: binding.frames,
         width: spec.camera.cellPx.w * s,
         height: spec.camera.cellPx.h * s,
@@ -340,6 +406,7 @@ async function recomputeClips(
         ['lit', ...AOV_PASSES].map((p) => [p, new Map<string, Uint8Array>()]),
       );
       for (const id of grid) {
+        if (plan.mirroredFrom.has(id.direction)) continue; // flipped below
         const fik = frameIdKey(id);
         const d = String(id.direction).padStart(2, '0');
         const f = String(id.frame).padStart(3, '0');
@@ -355,6 +422,7 @@ async function recomputeClips(
         cells.get('depth')!.set(fik, encodePagePng(one.depth, 'gray16'));
         cells.get('mask')!.set(fik, encodePagePng(one.mask, 'gray16'));
       }
+      fillMirroredCells(cells, grid, plan);
       return { cells, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
     } finally {
       await Deno.remove(styleOut, { recursive: true }).catch(() => {});
@@ -369,6 +437,7 @@ async function recomputeClips(
 async function recompute(
   spec: BakeJobSpec,
   grid: FrameId[],
+  plan: MirrorPlan,
 ): Promise<BakedCells & { aovDirCleanup: () => Promise<void> }> {
   const s = spec.style.temporal.superSample;
   const aovDir = await Deno.makeTempDir();
@@ -395,7 +464,8 @@ async function recompute(
 
   const src: AovSource = {
     framesDir: `${aovDir}/frames`,
-    directions: spec.camera.directions,
+    // D-008: style only the rendered directions (see recomputeClips)
+    directions: plan.rendered.length,
     frames: spec.frames,
     width: spec.camera.cellPx.w * s,
     height: spec.camera.cellPx.h * s,
@@ -409,6 +479,7 @@ async function recompute(
       ['lit', ...AOV_PASSES].map((p) => [p, new Map<string, Uint8Array>()]),
     );
     for (const id of grid) {
+      if (plan.mirroredFrom.has(id.direction)) continue; // flipped below
       const fik = frameIdKey(id);
       const d = String(id.direction).padStart(2, '0');
       const f = String(id.frame).padStart(3, '0');
@@ -420,6 +491,7 @@ async function recompute(
       cells.get('depth')!.set(fik, encodePagePng(one.depth, 'gray16'));
       cells.get('mask')!.set(fik, encodePagePng(one.mask, 'gray16'));
     }
+    fillMirroredCells(cells, grid, plan);
     return { cells, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
   } catch (err) {
     await cleanup();
@@ -474,6 +546,29 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       ? spec.clips.flatMap((c) => frameGrid(spec.camera.directions, c.frames, c.clipId))
       : frameGrid(spec.camera.directions, spec.frames, CLIP_ID);
     const cache = spec.cacheDir ? new BlobCache(spec.cacheDir) : null;
+    // D-008: the frozen rule (schema/roster.ts), turned into this bake's plan
+    const plan = mirrorPlan(spec.camera.directions, spec.mirroring === true);
+    assertRenderedPrefix(plan);
+    if (plan.mirroredFrom.size > 0) {
+      // Honest accounting, not a silent half-promise: the style, downsample and
+      // cache-write stages really do skip the mirrored directions, but the
+      // RENDER stage cannot yet — runRenderJob takes a whole CameraPreset and
+      // the frozen schema allows `directions` to be only 2 | 4 | 8 | 16, so
+      // there is no way to ask this seam for the subset {0..N/2}. Until
+      // RenderJobSpec can carry a direction list, a mirrored bake still pays
+      // full GPU price and saves only the CPU half. Said out loud because a
+      // user who turns mirroring on to halve their bake deserves to know which
+      // half it halved.
+      yield {
+        t: 'warn',
+        jobId,
+        at: at(),
+        code: 'mirroring-render-not-subset',
+        message: `mirroring is on: ${plan.mirroredFrom.size} of ${spec.camera.directions} ` +
+          `directions are flips, so styling and packing skip them - but the render seam ` +
+          `still renders every direction (RenderJobSpec cannot request a direction subset)`,
+      };
+    }
 
     // 0. the anim stage (clips only): retarget ONCE, emit previews — runs on
     // the cached path too (previews are bake artifacts, pixels or not)
@@ -488,7 +583,9 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     let baked: BakedCells | null = null;
     if (cache && spec.onlyInvalidated) baked = await tryCached(cache, bake, grid);
     if (!baked) {
-      const r = prepared ? await recomputeClips(spec, prepared, grid) : await recompute(spec, grid);
+      const r = prepared
+        ? await recomputeClips(spec, prepared, grid, plan)
+        : await recompute(spec, grid, plan);
       baked = r;
       cleanup = r.aovDirCleanup;
     }
@@ -573,6 +670,7 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       layout,
       pivotPx: pivotFor(spec.camera),
       cacheHits: baked.hits,
+      mirroredFrom: plan.mirroredFrom,
       styleResult: { flickerPct: baked.styleResult.flickerPct, flags: baked.styleResult.flags },
       wallTimeS: (performance.now() - t0) / 1000,
       now: at,

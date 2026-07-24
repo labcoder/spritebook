@@ -18,6 +18,13 @@ export interface AssembleArgs {
   pivotPx: { x: number; y: number };
   /** frame ids that were served from cache (all-or-none under clip-atomic style) */
   cacheHits: Set<string>;
+  /**
+   * D-008: mirrored direction -> the direction its pixels were flipped from.
+   * Recorded per frame so a consumer can tell a mirrored sprite from a rendered
+   * one — which matters the moment anyone asks why a decal changed arms. Empty
+   * (or absent) when mirroring is off, and then no frame carries the field.
+   */
+  mirroredFrom?: Map<number, number>;
   styleResult: { flickerPct: number; flags: QAFlag[] };
   wallTimeS: number;
   now: () => string;
@@ -32,6 +39,9 @@ export async function assembleManifest(args: AssembleArgs): Promise<BakeManifest
   const frames = args.layout.rects.map((r) => {
     const hit = args.cacheHits.has(frameIdKey(r.id));
     if (hit) hits++;
+    // the schema keeps `mirroredFrom` optional and absent when mirroring is
+    // off, so an unmirrored manifest is byte-identical to a pre-D-008 one
+    const source = args.mirroredFrom?.get(r.id.direction);
     return {
       clipId: r.id.clipId,
       direction: r.id.direction,
@@ -39,6 +49,7 @@ export async function assembleManifest(args: AssembleArgs): Promise<BakeManifest
       pivotPx: args.pivotPx,
       atlas: { pageIndex: r.pageIndex, x: r.x, y: r.y, w: r.w, h: r.h },
       cacheHit: hit,
+      ...(source === undefined ? {} : { mirroredFrom: { direction: source } }),
     };
   });
 

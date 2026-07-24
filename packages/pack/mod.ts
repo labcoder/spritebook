@@ -10,6 +10,8 @@ export { artifactKey, bakeKey, BlobCache, frameKey, predictInvalidation } from '
 export { assembleManifest, frameGrid } from './manifest.ts';
 export { DEFAULT_GAP_PX, DEFAULT_MAX_PAGE_SIZE_PX, packLayout } from './maxrects.ts';
 export { assertRectIdentity, composePage, encodePagePng } from './atlas.ts';
+export { assertRenderedPrefix, flipCellPng, flipPlaneH, mirrorPlan } from './mirror.ts';
+export type { MirrorPlan } from './mirror.ts';
 export { aov1x } from './aov1x.ts';
 export { buildContactSheet } from './contactsheet.ts';
 export { buildCacheInputs, pivotFor, runBakeJob } from './bake.ts';
