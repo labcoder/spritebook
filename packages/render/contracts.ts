@@ -35,6 +35,18 @@ export interface RenderJobSpec {
   pose?: 'turntable' | 'idle' | 'clip';
   /** required when pose === 'clip': the poses-<clipId>.bin artifact */
   posesPath?: string;
+  /**
+   * Render ONLY these direction indices (into the camera preset's ring), in
+   * this order. Omitted = every direction, which is the normal case.
+   *
+   * Exists for D-008 mirroring: half the directions are horizontal flips of
+   * the other half, and flipping is nearly free while rendering is not — so
+   * the saving has to be taken HERE or it is not a saving at all. The subset
+   * is validated against the preset's direction count, because a silently
+   * dropped direction is a hole in a sprite sheet nobody notices until the
+   * character teleports.
+   */
+  directionSubset?: number[];
   /** carried through; the NPR style stack is P2-T2 */
   stylePreset: string;
   /** every render product is written under here */

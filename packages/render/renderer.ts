@@ -83,6 +83,8 @@ export class Renderer {
     private scratch: { mats: Float32Array; worlds: Float32Array },
     private pose: PoseMode,
     private clipPoses?: ClipPoses,
+    /** direction indices to draw; undefined = all of them */
+    private subset?: number[],
   ) {}
 
   static async create(
@@ -94,6 +96,7 @@ export class Renderer {
     height: number,
     pose: PoseMode = 'turntable',
     clipPoses?: ClipPoses,
+    subset?: number[],
   ): Promise<Renderer> {
     const { device } = gpu;
     device.pushErrorScope('validation');
@@ -157,11 +160,20 @@ export class Renderer {
       jointScratch(asset),
       pose,
       clipPoses,
+      subset,
     );
   }
 
+  /**
+   * The direction INDICES this renderer will draw, in order. Normally every
+   * direction; a subset when the caller only needs some (D-008 mirroring).
+   */
+  get directionList(): number[] {
+    return this.subset ?? this.framing.cameras.map((_, i) => i);
+  }
+
   get directions(): number {
-    return this.framing.cameras.length;
+    return this.directionList.length;
   }
 
   /**
@@ -221,12 +233,16 @@ export class Renderer {
     await Deno.mkdir(framesDir, { recursive: true });
 
     const pool = new ReadbackPool(this.gpu.device, this.width, this.height, bpp);
-    const total = this.directions * frames;
+    // the frames are laid out subset-major: g -> (list[g/frames], g%frames),
+    // so the FILE NAMES keep the true direction index and a mirrored bake
+    // drops straight into the same naming the packer already reads
+    const list = this.directionList;
+    const total = list.length * frames;
 
     const metrics = await pool.runBatch({
       frames: total,
       submitFrame: (g, slotBuffers) => {
-        const direction = Math.floor(g / frames);
+        const direction = list[Math.floor(g / frames)];
         const frame = g % frames;
         const encoder = this.gpu.device.createCommandEncoder();
         this.encodeFrame(encoder, direction, frame);
@@ -240,7 +256,7 @@ export class Renderer {
         this.gpu.device.queue.submit([encoder.finish()]);
       },
       consume: async (g, planes) => {
-        const direction = Math.floor(g / frames);
+        const direction = list[Math.floor(g / frames)];
         const frame = g % frames;
         const tag = `d${pad(direction, 2)}_f${pad(frame, 3)}`;
         for (let k = 0; k < AOV_TARGETS.length; k++) {
@@ -344,7 +360,10 @@ export class Renderer {
 /** Load + set up a renderer for a spec (shared by the seam and tests). */
 export async function makeRenderer(
   gpu: GpuContext,
-  spec: Pick<RenderJobSpec, 'modelPath' | 'camera' | 'frames' | 'pose' | 'posesPath'>,
+  spec: Pick<
+    RenderJobSpec,
+    'modelPath' | 'camera' | 'frames' | 'pose' | 'posesPath' | 'directionSubset'
+  >,
   shaderSrc: string,
 ): Promise<Renderer> {
   const pose = spec.pose ?? 'turntable';
@@ -385,5 +404,30 @@ export async function makeRenderer(
     spec.camera.cellPx.h,
     pose,
     clipPoses,
+    validateSubset(spec.directionSubset, spec.camera.directions),
   );
+}
+
+/**
+ * A direction subset must name real directions, exactly once each. A silently
+ * dropped or duplicated direction becomes a hole (or a doubled frame) in a
+ * sprite sheet, which nobody notices until the character teleports mid-walk.
+ */
+function validateSubset(subset: number[] | undefined, directions: number): number[] | undefined {
+  if (subset === undefined) return undefined;
+  if (subset.length === 0) {
+    throw new Error('directionSubset is empty - omit it to render every direction');
+  }
+  const seen = new Set<number>();
+  for (const d of subset) {
+    if (!Number.isInteger(d) || d < 0 || d >= directions) {
+      throw new Error(
+        `directionSubset contains ${d}, but this camera preset has ${directions} directions ` +
+          `(valid: 0..${directions - 1})`,
+      );
+    }
+    if (seen.has(d)) throw new Error(`directionSubset lists direction ${d} twice`);
+    seen.add(d);
+  }
+  return [...subset];
 }

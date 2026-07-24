@@ -379,6 +379,9 @@ async function recomputeClips(
           frames: binding.frames,
           pose: 'clip',
           posesPath,
+          // D-008: only the directions that are not flips (mirror.ts) — the
+          // saving has to be taken at the GPU or it is not a saving
+          directionSubset: plan.rendered,
           stylePreset: spec.style.id,
           outDir: clipDir,
         })
@@ -452,6 +455,8 @@ async function recompute(
       camera: supersample(spec.camera, s),
       frames: spec.frames,
       pose: 'idle',
+      // D-008: only the non-flip directions (mirror.ts)
+      directionSubset: plan.rendered,
       stylePreset: spec.style.id,
       outDir: aovDir,
     })
@@ -550,23 +555,17 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     const plan = mirrorPlan(spec.camera.directions, spec.mirroring === true);
     assertRenderedPrefix(plan);
     if (plan.mirroredFrom.size > 0) {
-      // Honest accounting, not a silent half-promise: the style, downsample and
-      // cache-write stages really do skip the mirrored directions, but the
-      // RENDER stage cannot yet — runRenderJob takes a whole CameraPreset and
-      // the frozen schema allows `directions` to be only 2 | 4 | 8 | 16, so
-      // there is no way to ask this seam for the subset {0..N/2}. Until
-      // RenderJobSpec can carry a direction list, a mirrored bake still pays
-      // full GPU price and saves only the CPU half. Said out loud because a
-      // user who turns mirroring on to halve their bake deserves to know which
-      // half it halved.
+      // the saving is real at every stage: the render seam takes
+      // `directionSubset` so the GPU draws only the non-flip directions, and
+      // style/downsample/cache-write skip the rest too
       yield {
         t: 'warn',
         jobId,
         at: at(),
-        code: 'mirroring-render-not-subset',
-        message: `mirroring is on: ${plan.mirroredFrom.size} of ${spec.camera.directions} ` +
-          `directions are flips, so styling and packing skip them - but the render seam ` +
-          `still renders every direction (RenderJobSpec cannot request a direction subset)`,
+        code: 'mirroring-on',
+        message: `mirroring is on: ${plan.rendered.length} of ${spec.camera.directions} ` +
+          `directions are rendered and ${plan.mirroredFrom.size} are horizontal flips. ` +
+          `Turn it off for any character whose left and right differ.`,
       };
     }
 

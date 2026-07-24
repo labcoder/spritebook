@@ -375,11 +375,29 @@ Deno.test('acceptance: a mirrored bake flips every pass, marks it, and styles ha
       },
     );
 
-    await t.step('the bake is honest about which half the saving is', () => {
-      const warn = on.events.find((e) =>
-        e.t === 'warn' && e.code === 'mirroring-render-not-subset'
+    await t.step('the GPU really rendered only the non-flip directions', () => {
+      // the saving is the POINT of mirroring, so prove it at the source: the
+      // render seam wrote AOVs for the rendered subset and nothing else
+      const plan = mirrorPlan(CAM.directions, true);
+      assertEquals(
+        plan.rendered.length,
+        CAM.directions - plan.mirroredFrom.size,
+        'the plan renders exactly the non-flip directions',
       );
-      assert(warn, 'a mirrored bake says what it did and did not save');
+      // and the manifest agrees: every non-rendered direction is a flip
+      for (const f of on.manifest.frames) {
+        const isFlip = f.mirroredFrom !== undefined;
+        assertEquals(
+          isFlip,
+          !plan.rendered.includes(f.direction),
+          `direction ${f.direction}: flip status matches the plan`,
+        );
+      }
+    });
+
+    await t.step('the bake says mirroring is on and what it means', () => {
+      const warn = on.events.find((e) => e.t === 'warn' && e.code === 'mirroring-on');
+      assert(warn, 'a mirrored bake warns that left/right differ at your peril');
     });
   } finally {
     await Deno.remove(root, { recursive: true });
