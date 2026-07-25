@@ -70,6 +70,18 @@ for (const body of BODIES) {
     prune(),
     textureCompress({ targetFormat: 'png', resize: [1024, 1024] }),
   );
+  // DROP every map the pipeline never reads. The renderer samples base color
+  // only (packages/render/shaders.wgsl), so normal/roughness/occlusion/
+  // emissive maps are ~4.4 MB per body of texels nothing looks at - and every
+  // fitted character inherits a copy of them, so a 10-character roster stores
+  // ten copies. Re-add here the day a map becomes an input to the AOV pass.
+  for (const material of doc.getRoot().listMaterials()) {
+    material.setNormalTexture(null)
+      .setMetallicRoughnessTexture(null)
+      .setOcclusionTexture(null)
+      .setEmissiveTexture(null);
+  }
+  await doc.transform(prune());
   const glbPath = `${stage}/${body.file}.glb`;
   await Deno.writeFile(glbPath, await io.writeBinary(doc));
 
