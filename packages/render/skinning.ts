@@ -24,12 +24,16 @@ import { decode as decodePng } from 'fast-png';
 import type { ModelBounds } from './contracts.ts';
 import { type Mat4, mat4Identity, mat4Multiply, mat4RotationY } from './math.ts';
 
-/** A decoded base color image, sRGB bytes, ready for rgba8unorm-srgb upload. */
-export interface RenderTexture {
-  rgba: Uint8Array; // width*height*4
-  width: number;
-  height: number;
-}
+/**
+ * A base color source. The two kinds are uploaded as different GPU formats on
+ * purpose: an IMAGE is authored in sRGB and decodes to linear in hardware, but
+ * a FACTOR is already a linear number and must not make the round trip — 8-bit
+ * sRGB cannot represent it (0.55 encodes to byte 196, which decodes to
+ * 0.552011, a ~0.4% error on every untextured material in the product).
+ */
+export type RenderTexture =
+  | { kind: 'image'; rgba: Uint8Array; width: number; height: number }
+  | { kind: 'factor'; linear: [number, number, number, number] };
 
 /** One draw range of the concatenated index buffer, bound to one texture. */
 export interface PrimitiveRange {
@@ -91,27 +95,11 @@ function concatU32(parts: Uint32Array[]): Uint32Array {
   return out;
 }
 
-/** linear [0,1] -> sRGB-encoded byte (the inverse of the srgb texture decode) */
-function srgbByte(linear: number): number {
-  const c = Math.min(1, Math.max(0, linear));
-  const s = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-  return Math.round(s * 255);
-}
-
 /** The legacy clay constant, now the NO-MATERIAL fallback (was hardcoded in the FS). */
 const CLAY_LINEAR: [number, number, number, number] = [0.55, 0.32, 0.18, 1];
 
 function factorTexture(linearRgba: [number, number, number, number]): RenderTexture {
-  return {
-    rgba: Uint8Array.of(
-      srgbByte(linearRgba[0]),
-      srgbByte(linearRgba[1]),
-      srgbByte(linearRgba[2]),
-      Math.round(Math.min(1, Math.max(0, linearRgba[3])) * 255),
-    ),
-    width: 1,
-    height: 1,
-  };
+  return { kind: 'factor', linear: linearRgba };
 }
 
 /** Decode a glTF PNG image to 8-bit RGBA (any channel count / 16-bit in). */
@@ -138,7 +126,7 @@ function decodeToRgba(png: Uint8Array, label: string): RenderTexture {
     }
   }
   if (rgba.length !== n * 4) throw new Error(`${label}: texture decode size mismatch`);
-  return { rgba, width: img.width, height: img.height };
+  return { kind: 'image', rgba, width: img.width, height: img.height };
 }
 
 /** Column-major identity test — the fast path that keeps today's bytes exact. */

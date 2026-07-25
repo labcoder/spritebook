@@ -54,6 +54,37 @@ function pad(n: number, width: number): string {
   return String(n).padStart(width, '0');
 }
 
+const halfF32 = new Float32Array(1);
+const halfU32 = new Uint32Array(halfF32.buffer);
+
+/**
+ * f32 -> IEEE-754 half (the bits `rgba16float` wants). Only the finite,
+ * normal range matters here — these are material factors in [0,1], where the
+ * worst-case error is ~5e-4 relative, two orders below the 8-bit output
+ * resolution the value ends up in.
+ */
+function toHalf(value: number): number {
+  halfF32[0] = value;
+  const x = halfU32[0];
+  const sign = (x >>> 16) & 0x8000;
+  let exp = (x >>> 23) & 0xff;
+  let mant = x & 0x7fffff;
+  if (exp === 0xff) return sign | 0x7c00 | (mant ? 0x200 : 0); // Inf / NaN
+  exp = exp - 127 + 15;
+  if (exp >= 0x1f) return sign | 0x7c00; // overflow -> Inf
+  if (exp <= 0) {
+    if (exp < -10) return sign; // underflow -> signed zero
+    mant |= 0x800000;
+    const shift = 14 - exp;
+    const half = (mant + (1 << (shift - 1))) >>> shift;
+    return sign | half;
+  }
+  // round half to even, and let a mantissa carry bump the exponent
+  const rounded = mant + 0x1000 + ((mant >>> 13) & 1);
+  if (rounded & 0x800000) return sign | ((exp + 1) << 10);
+  return sign | (exp << 10) | (rounded >>> 13);
+}
+
 export interface RenderSummary {
   directions: number;
   frames: number;
@@ -124,9 +155,13 @@ export class Renderer {
     ];
     const ib = mkBuf(asset.indices, GPUBufferUsage.INDEX);
 
-    // Base color textures: srgb format so sampling returns linear (the FS
-    // lighting math is linear; only the lit AOV re-encodes). One linear
-    // sampler shared by every range.
+    // Base color sources, uploaded in the format that keeps each one HONEST.
+    // An image is authored in sRGB, so rgba8unorm-srgb lets the hardware decode
+    // it to linear for free. A material FACTOR is already a linear number and
+    // gets rgba16float, because sRGB-encoding it into 8 bits does not round
+    // trip (0.55 -> byte 196 -> 0.552011) and that error reaches the albedo
+    // AOV. Both bind as texture_2d<f32>, so the shader and the frozen
+    // interlock see no difference.
     const sampler = device.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
@@ -134,17 +169,23 @@ export class Renderer {
       addressModeV: 'clamp-to-edge',
     });
     const baseColorTex = asset.textures.map((t, i) => {
+      const image = t.kind === 'image';
+      const w = image ? t.width : 1;
+      const h = image ? t.height : 1;
       const tex = device.createTexture({
         label: `base-color-${i}`,
-        size: { width: t.width, height: t.height },
-        format: 'rgba8unorm-srgb',
+        size: { width: w, height: h },
+        format: image ? 'rgba8unorm-srgb' : 'rgba16float',
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
       });
+      const data: BufferSource = image
+        ? t.rgba as BufferSource
+        : Uint16Array.from(t.linear, toHalf) as BufferSource;
       device.queue.writeTexture(
         { texture: tex },
-        t.rgba as BufferSource,
-        { bytesPerRow: t.width * 4, rowsPerImage: t.height },
-        { width: t.width, height: t.height },
+        data,
+        { bytesPerRow: w * (image ? 4 : 8), rowsPerImage: h },
+        { width: w, height: h },
       );
       return tex;
     });

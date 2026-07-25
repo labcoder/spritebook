@@ -19,10 +19,11 @@ struct Camera {
 // Joint matrices live in a STORAGE buffer (skill: no uniform stride/size ceiling
 // for large skeletons). One mat4x4<f32> per joint, column-major.
 @group(0) @binding(1) var<storage, read> jointMats: array<mat4x4<f32>>;
-// Base color, per primitive range (the renderer binds one per draw). The
-// texture is rgba8unorm-srgb, so sampling returns LINEAR — untextured
-// primitives get a 1x1 of their material's (linear) factor, sRGB-encoded at
-// upload so the hardware decode lands back on the factor exactly.
+// Base color, per primitive range (the renderer binds one per draw). Sampling
+// always returns LINEAR: an authored image is uploaded rgba8unorm-srgb and
+// decoded by the hardware, while an untextured material's factor is already
+// linear and is uploaded as a 1x1 rgba16float (8-bit sRGB cannot round-trip
+// it — 0.55 encodes to byte 196, which decodes to 0.552011).
 @group(1) @binding(0) var baseColorTex: texture_2d<f32>;
 @group(1) @binding(1) var baseColorSamp: sampler;
 
