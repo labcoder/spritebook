@@ -918,3 +918,166 @@ Deno.test('decals: a uvRect decal still paints on an unskinned model (explicit a
     assert(report.changedTexels > 0, 'and they still paint');
   });
 });
+
+/** A textured quad whose base atlas is 16-BIT — the depth fast-png hands back
+ * as a Uint16Array, which wraps mod 256 if it is written into a Uint8Array. */
+async function deep16Glb(path: string): Promise<void> {
+  const doc = new Document();
+  const buffer = doc.createBuffer();
+  const acc = (type: 'VEC3' | 'VEC2' | 'VEC4' | 'MAT4' | 'SCALAR', array: ArrayLike<number>) =>
+    doc.createAccessor().setType(type).setArray(array as never).setBuffer(buffer);
+  // 0xFFFF in every channel: narrows to 255, but wraps to 0
+  const deep = new Uint16Array(TEX * TEX * 4).fill(0xffff);
+  const prim = doc.createPrimitive()
+    .setAttribute('POSITION', acc('VEC3', new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0])))
+    .setAttribute('NORMAL', acc('VEC3', new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1])))
+    .setAttribute('TEXCOORD_0', acc('VEC2', new Float32Array([0, 1, 1, 1, 0, 0, 1, 0])))
+    .setIndices(acc('SCALAR', new Uint16Array([0, 1, 2, 1, 3, 2])))
+    .setMaterial(
+      doc.createMaterial('body').setBaseColorTexture(
+        doc.createTexture('base')
+          .setImage(encodePng({ width: TEX, height: TEX, data: deep, depth: 16, channels: 4 }))
+          .setMimeType('image/png'),
+      ),
+    );
+  doc.createScene('s').addChild(
+    doc.createNode('body').setMesh(doc.createMesh('body').addPrimitive(prim)),
+  );
+  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+}
+
+Deno.test('decals: a 16-bit base texture narrows to its high byte, not mod 256', async () => {
+  await withTmp(async (dir) => {
+    const model = `${dir}/deep.glb`;
+    const out = `${dir}/out.glb`;
+    const png = `${dir}/decal.png`;
+    await deep16Glb(model);
+    await Deno.writeFile(
+      png,
+      encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
+    );
+
+    await compositeDecals({
+      modelPath: model,
+      outPath: out,
+      decals: [{
+        id: 'mark',
+        pngPath: png,
+        uvRect: { x: 0, y: 0, w: 0.25, h: 0.25 },
+        z: 0,
+        mirrored: false,
+      }],
+    });
+
+    const tex = await readTexture(out);
+    const px = tex.data as Uint8Array;
+    const last = (tex.width * tex.height - 1) * 4; // outside the decal rect
+    assertEquals(
+      [px[last], px[last + 1], px[last + 2], px[last + 3]],
+      [255, 255, 255, 255],
+      'white stays white - a mod-256 wrap would have turned 0xffff into black',
+    );
+  });
+});
+
+Deno.test('decals: an unnamed atlas on a multi-material model warns which one it took', async () => {
+  await withTmp(async (dir) => {
+    const model = `${dir}/body.glb`;
+    const out = `${dir}/out.glb`;
+    const png = `${dir}/decal.png`;
+    await multiMaterialGlb(model);
+    await Deno.writeFile(
+      png,
+      encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
+    );
+
+    const report = await compositeDecals({
+      modelPath: model,
+      outPath: out,
+      decals: [{
+        id: 'mark',
+        pngPath: png,
+        uvRect: { x: 0, y: 0, w: 0.25, h: 0.25 },
+        z: 0,
+        mirrored: false,
+      }],
+    });
+
+    assertEquals(report.material, 'skin', 'the largest primitive wins the guess');
+    assertEquals(report.warnings.length, 1, 'and the guess is announced, not silent');
+    assert(
+      /2 materials/.test(report.warnings[0]) && /bodyMaterial/.test(report.warnings[0]),
+      `the warning must name the count and the fix: ${report.warnings[0]}`,
+    );
+  });
+});
+
+Deno.test('decals: a body that NAMES its atlas paints there, with no warning', async () => {
+  await withTmp(async (dir) => {
+    const model = `${dir}/body.glb`;
+    const png = `${dir}/decal.png`;
+    await multiMaterialGlb(model);
+    await Deno.writeFile(
+      png,
+      encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
+    );
+
+    const report = await compositeDecals({
+      modelPath: model,
+      body: { ...BODY, bodyMaterial: 'hair' },
+      outPath: `${dir}/out.glb`,
+      decals: [{
+        id: 'mark',
+        pngPath: png,
+        uvRect: { x: 0, y: 0, w: 0.25, h: 0.25 },
+        z: 0,
+        mirrored: false,
+      }],
+    });
+    assertEquals(report.material, 'hair', 'the manifest overrules the size heuristic');
+    assertEquals(report.warnings, [], 'a named atlas is not a guess');
+  });
+});
+
+/**
+ * Two materials, two primitives: a big "skin" quad and a small "hair" one.
+ * The size heuristic must take skin; a manifest naming hair must overrule it.
+ */
+async function multiMaterialGlb(path: string): Promise<void> {
+  const doc = new Document();
+  const buffer = doc.createBuffer();
+  const acc = (type: 'VEC3' | 'VEC2' | 'SCALAR', array: ArrayLike<number>) =>
+    doc.createAccessor().setType(type).setArray(array as never).setBuffer(buffer);
+  const atlas = (name: string, grey: number) => {
+    const base = new Uint8Array(TEX * TEX * 4).fill(grey);
+    for (let i = 3; i < base.length; i += 4) base[i] = 255;
+    return doc.createMaterial(name).setBaseColorTexture(
+      doc.createTexture(name)
+        .setImage(encodePng({ width: TEX, height: TEX, data: base }))
+        .setMimeType('image/png'),
+    );
+  };
+  const quad = (verts: number, material: ReturnType<typeof atlas>) => {
+    const positions = new Float32Array(verts * 3);
+    const uvs = new Float32Array(verts * 2);
+    for (let v = 0; v < verts; v++) {
+      positions[v * 3] = v % 2;
+      positions[v * 3 + 1] = Math.floor(v / 2) % 2;
+      uvs[v * 2] = (v % 2) * 0.25;
+      uvs[v * 2 + 1] = (Math.floor(v / 2) % 2) * 0.25;
+    }
+    return doc.createPrimitive()
+      .setAttribute('POSITION', acc('VEC3', positions))
+      .setAttribute('TEXCOORD_0', acc('VEC2', uvs))
+      .setIndices(acc('SCALAR', new Uint16Array([0, 1, 2, 1, 3, 2])))
+      .setMaterial(material);
+  };
+  doc.createScene('s').addChild(
+    doc.createNode('body').setMesh(
+      doc.createMesh('body')
+        .addPrimitive(quad(8, atlas('skin', 128)))
+        .addPrimitive(quad(4, atlas('hair', 64))),
+    ),
+  );
+  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+}

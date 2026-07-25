@@ -341,6 +341,8 @@ export interface DecalReport {
   missed: string[];
   /** name of the material whose texture was painted (absent: model had none) */
   material?: string;
+  /** non-fatal notes the caller should surface (an ambiguous atlas choice) */
+  warnings: string[];
 }
 
 export interface CompositeDecalsOptions {
@@ -628,6 +630,7 @@ function resolveBodyMaterial(
   doc: Document,
   bodyMaterial: string | undefined,
   what: string,
+  warnings: string[],
 ): Material | undefined {
   const materials = doc.getRoot().listMaterials();
   if (bodyMaterial !== undefined) {
@@ -654,6 +657,18 @@ function resolveBodyMaterial(
       }
     }
   }
+  // With several atlases and nothing naming the right one, the biggest
+  // primitive is a heuristic, not a fact - an armoured character whose plate
+  // out-verts its skin would take the paint on the armour. Say so: a wrong
+  // atlas is INVISIBLE in the output, so silence here reads as success.
+  if (best && materials.length > 1) {
+    warnings.push(
+      `${what}: this model has ${materials.length} materials and the body manifest does not ` +
+        `name one, so decals were painted into "${best.getName()}" (the largest primitive's). ` +
+        'If that is the wrong atlas the decals are invisible - set bodyMaterial on the body ' +
+        'manifest to pin it.',
+    );
+  }
   return best ?? materials[0];
 }
 
@@ -675,30 +690,33 @@ function baseTexture(
   // 3-channel RGB. Every stride computation below assumes 4 channels, so an
   // un-normalized RGB base died inside fast-png with "wrong data size" —
   // found by the identity job's decal test on a plainly-picked fixture mesh.
-  const src = toRgba(decoded.data as Uint8Array, decoded.channels ?? 4);
+  const src = toRgba(decoded.data, decoded.channels ?? 4, decoded.depth ?? 8);
   const size = requested ?? Math.max(decoded.width, decoded.height);
   if (decoded.width === size && decoded.height === size) return { rgba: src, size };
   return { rgba: resampleNearest(src, decoded.width, decoded.height, size, size, false), size };
 }
 
 /** Any PNG channel layout -> RGBA (grey, grey+alpha, RGB, RGBA). */
-function toRgba(data: Uint8Array, channels: number): Uint8Array {
-  if (channels === 4) return data.slice();
+function toRgba(data: ArrayLike<number>, channels: number, depth = 8): Uint8Array {
+  // 16-bit samples arrive as a Uint16Array. Writing those into a Uint8Array
+  // wraps mod 256 (65280 -> 0), which is a silent colour corruption rather
+  // than an error, so the high byte is taken explicitly.
+  const to8 = depth === 16 ? (v: number) => v >>> 8 : (v: number) => v;
   const px = data.length / channels;
   const out = new Uint8Array(px * 4);
   for (let i = 0; i < px; i++) {
     const s = i * channels;
     const d = i * 4;
-    if (channels === 3) {
-      out[d] = data[s];
-      out[d + 1] = data[s + 1];
-      out[d + 2] = data[s + 2];
-      out[d + 3] = 255;
+    if (channels >= 3) {
+      out[d] = to8(data[s]);
+      out[d + 1] = to8(data[s + 1]);
+      out[d + 2] = to8(data[s + 2]);
+      out[d + 3] = channels === 4 ? to8(data[s + 3]) : 255;
     } else if (channels === 2) {
-      out[d] = out[d + 1] = out[d + 2] = data[s];
-      out[d + 3] = data[s + 1];
+      out[d] = out[d + 1] = out[d + 2] = to8(data[s]);
+      out[d + 3] = to8(data[s + 1]);
     } else {
-      out[d] = out[d + 1] = out[d + 2] = data[s];
+      out[d] = out[d + 1] = out[d + 2] = to8(data[s]);
       out[d + 3] = 255;
     }
   }
@@ -717,7 +735,8 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
   const what = 'decals';
   const doc = await readDoc(opts.modelPath, what);
   const before = positionBytes(doc);
-  const bodyMat = resolveBodyMaterial(doc, opts.body?.bodyMaterial, what);
+  const warnings: string[] = [];
+  const bodyMat = resolveBodyMaterial(doc, opts.body?.bodyMaterial, what, warnings);
   const { rgba, size } = baseTexture(bodyMat, opts.textureSize);
   const touched = new Uint8Array(size * size);
 
@@ -758,7 +777,8 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
           'be RGBA, because its alpha is what decides which texels it paints',
       );
     }
-    const src = png.data as Uint8Array;
+    // 16-bit decals decode to Uint16Array; narrow explicitly (see toRgba)
+    const src = toRgba(png.data, 4, png.depth ?? 8);
 
     const target = texelRect(rect, size, `decal "${decal.id}"`);
     landings.push({
@@ -831,6 +851,7 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
     changedTexels: touched.reduce((n, v) => n + v, 0),
     missed: landings.filter((l) => l.changedTexels === 0).map((l) => l.id),
     ...(painted ? { material: painted.getName() } : {}),
+    warnings,
   };
 }
 

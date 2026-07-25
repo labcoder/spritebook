@@ -216,6 +216,21 @@ export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<J
       const reportPath = `${root}/identity-${stage.step}-report.json`;
       await Deno.writeTextFile(reportPath, JSON.stringify(report, null, 2) + '\n');
       done++;
+      // a stage's non-fatal notes are worth an event, not just a line in a
+      // file nobody opens on a green run (an ambiguous decal atlas is
+      // invisible in the output, so the warning IS the only signal)
+      const notes = (report as { warnings?: unknown })?.warnings;
+      if (Array.isArray(notes)) {
+        for (const note of notes) {
+          yield {
+            t: 'warn',
+            jobId,
+            at: at(),
+            code: `identity-${stage.step}`,
+            message: String(note),
+          };
+        }
+      }
       yield { t: 'progress', jobId, at: at(), step: stage.step, done, total };
       yield {
         t: 'artifact',
