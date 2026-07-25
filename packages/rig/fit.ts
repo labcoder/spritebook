@@ -1125,6 +1125,24 @@ export async function buildCanonicalBody(
     };
   });
 
+  // The material the region uvRects are authored against: the LARGEST
+  // primitive's. Region ownership is by dominant joint, and limb/torso joints
+  // dominate only body-mesh vertices — so the rects live in the body atlas's
+  // UV space, and decals must paint THAT texture (not hair, not eyes).
+  let bodyMaterial: string | undefined;
+  let bodyMaterialVerts = -1;
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const name = prim.getMaterial()?.getName();
+      if (!name) continue;
+      const verts = prim.getAttribute('POSITION')?.getCount() ?? 0;
+      if (verts > bodyMaterialVerts) {
+        bodyMaterialVerts = verts;
+        bodyMaterial = name;
+      }
+    }
+  }
+
   const bounds = boundsOf(asset.positions);
   const measured = bounds.max[1] - bounds.min[1];
   const heightM = opts.heightM ?? measured;
@@ -1146,6 +1164,7 @@ export async function buildCanonicalBody(
     vertexCount: asset.vertexCount,
     heightM,
     regions,
+    ...(bodyMaterial ? { bodyMaterial } : {}),
   }, `canonical body "${opts.id}"`);
 
   await Deno.mkdir(opts.outDir, { recursive: true });

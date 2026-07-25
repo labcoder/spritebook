@@ -60,6 +60,14 @@ export const CanonicalBodySchema = z.strictObject({
   /** standing height of the body as authored, metres (D-012 convention) */
   heightM: z.number().positive(),
   regions: z.array(BodyRegionSchema),
+  /**
+   * Name of the glb material whose baseColorTexture the region uvRects
+   * address. A multi-material body (hair/eyes/body) has several atlases, and
+   * a decal painted into the wrong one lands invisibly — this pins the right
+   * one. Absent on single-material bodies: the largest primitive's material
+   * is used.
+   */
+  bodyMaterial: z.string().min(1).optional(),
 });
 export type CanonicalBody = z.output<typeof CanonicalBodySchema>;
 
