@@ -398,6 +398,75 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     }
   }
 
+  if (verb === 'identity') {
+    // the Track A identity layer: decals, attachments, bone mask - applied to
+    // canonical/model.glb and journaled, so `spritebook undo` takes the whole
+    // identity change back as ONE step
+    const workspace = flag(args, 'workspace');
+    if (!workspace) {
+      return fail(
+        'identity' as JobEvent['jobId'],
+        'missing-arg',
+        '--workspace <dir> is required (the character directory)',
+      );
+    }
+    const { runIdentityJob } = await import('@spritebook/gen');
+    const schema = await import('@spritebook/schema');
+    try {
+      const readJson = async (name: string) => {
+        const path = flag(args, name);
+        if (args.includes(`--${name}`) && !path) {
+          throw new Error(`--${name} needs a JSON file path`);
+        }
+        if (!path) return undefined;
+        return JSON.parse(await Deno.readTextFile(path));
+      };
+      const decalsRaw = await readJson('decals');
+      const attachmentsRaw = await readJson('attachments');
+      const boneMaskRaw = await readJson('bone-mask');
+      const decals = decalsRaw === undefined ? undefined : schema.parseWith(
+        schema.DecalPlacementSchema.array(),
+        decalsRaw,
+        'decals file',
+      );
+      const attachments = attachmentsRaw === undefined ? undefined : schema.parseWith(
+        schema.AttachmentPlacementSchema.array(),
+        attachmentsRaw,
+        'attachments file',
+      );
+      const boneMask = boneMaskRaw === undefined ? undefined : schema.parseWith(
+        schema.BoneMaskSchema,
+        boneMaskRaw,
+        'bone-mask file',
+      );
+      if (!decals && !attachments && !boneMask) {
+        return fail(
+          'identity' as JobEvent['jobId'],
+          'missing-arg',
+          'identity needs at least one of --decals <json>, --attachments <json>, --bone-mask <json>',
+        );
+      }
+      const bodyDir = flag(args, 'body');
+      return await pump(
+        runIdentityJob({
+          jobId: 'identity',
+          workspace,
+          bodyManifestPath: bodyDir ? `${bodyDir}/body.json` : undefined,
+          decals,
+          attachments,
+          boneMask,
+        }),
+        emit,
+      );
+    } catch (err) {
+      return fail(
+        'identity' as JobEvent['jobId'],
+        'bad-args',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   if (verb === 'rename' || verb === 'clone') {
     // the two verbs the identity law makes cheap (D-011): rename touches one
     // mutable field and invalidates nothing; clone mints a NEW immutable id
@@ -459,6 +528,33 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         '--model <glb> and --out <dir> are required',
       );
     }
+    // Track A: fit the bundled canonical body - deterministic core code, no
+    // sidecar, no GPU, no registry backend. Track B (below) predicts a fresh
+    // skeleton via UniRig; --track-a is the roster path.
+    if (args.includes('--track-a')) {
+      const body = flag(args, 'body');
+      const target = flag(args, 'target') ?? model;
+      if (!body) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'missing-arg',
+          '--track-a needs --body <dir> (a bundled body lives at packages/rig/bodies/ubc-male)',
+        );
+      }
+      const { runFitJob } = await import('@spritebook/rig');
+      return await pump(
+        runFitJob({
+          jobId: 'rig',
+          bodyDir: body,
+          targetPath: target,
+          outDir: out,
+          heightM: flag(args, 'height') !== undefined ? numFlag(args, 'height', 1.7) : undefined,
+          workspace: flag(args, 'workspace'),
+        }),
+        emit,
+      );
+    }
+
     const registry = await import('@spritebook/registry');
     const { runRigJob } = await import('@spritebook/rig');
     try {
@@ -841,7 +937,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       'unknown-verb',
       `Unknown verb "${
         verb ?? ''
-      }" - available: prep, gen, pick, rig, clone, rename, models, anim, bake, export, doctor, undo, redo (--version)`,
+      }" - available: prep, gen, pick, rig, identity, clone, rename, models, anim, bake, export, doctor, undo, redo (--version)`,
     );
   }
 
