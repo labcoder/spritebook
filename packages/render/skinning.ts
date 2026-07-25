@@ -19,7 +19,7 @@
  * meaningful. Real ClipBinding sampling replaces `evalJointMatrices` when the
  * anim package lands.
  */
-import { type Document, NodeIO, type Texture } from '@gltf-transform/core';
+import { type Document, type Mesh, type Node, NodeIO, type Texture } from '@gltf-transform/core';
 import { decode as decodePng } from 'fast-png';
 import type { ModelBounds } from './contracts.ts';
 import { type Mat4, mat4Identity, mat4Multiply, mat4RotationY } from './math.ts';
@@ -141,6 +141,91 @@ function decodeToRgba(png: Uint8Array, label: string): RenderTexture {
   return { rgba, width: img.width, height: img.height };
 }
 
+/** Column-major identity test — the fast path that keeps today's bytes exact. */
+function isIdentityMat4(m: ArrayLike<number>): boolean {
+  for (let i = 0; i < 16; i++) {
+    if (m[i] !== (i % 5 === 0 ? 1 : 0)) return false;
+  }
+  return true;
+}
+
+/**
+ * Where a mesh sits in the scene. glTF places geometry through NODES, so the
+ * node is the only thing that can say where a mesh is — and until this existed
+ * the renderer never asked, which is why a socketed prop baked at the origin
+ * and why an unskinned canonical mesh lost the importer's height normalization
+ * (it lives on the root node's matrix, never on the vertices).
+ */
+interface MeshPlacement {
+  node: Node;
+  /** the node binds a skin: glTF says its OWN transform must be ignored */
+  skinned: boolean;
+  /** rest world matrix to bake into POSITION/NORMAL; null = identity or skinned */
+  world: Float32Array | null;
+  /** joint a rigid mesh rigid-binds to (nearest ancestor joint; 0 when none) */
+  joint: number;
+}
+
+/**
+ * The nearest joint at or above `node`. Starts AT the node: a node may legally
+ * be both a joint and carry an unskinned mesh, and since `jointWorld · IBM = I`
+ * at rest its own transform is not double-applied.
+ */
+function nearestAncestorJoint(node: Node, jointIndex: Map<Node, number>): number {
+  for (let n: Node | null = node; n; n = n.getParentNode()) {
+    const i = jointIndex.get(n);
+    if (i !== undefined) return i;
+  }
+  return 0; // no joint above it: ride joint 0 (the root, or the static identity joint)
+}
+
+/**
+ * The one node that draws each mesh, in `listMeshes()` order — the SAME order
+ * the vertex streams concatenate in, which is what `packages/rig/apply.ts` and
+ * `packages/rig/fit.ts` pin their flat vertex indices against.
+ */
+function placeMeshes(
+  meshes: Mesh[],
+  jointIndex: Map<Node, number>,
+  label: string,
+): Map<Mesh, MeshPlacement> {
+  const out = new Map<Mesh, MeshPlacement>();
+  for (const mesh of meshes) {
+    const nodes = mesh.listParents().filter((p): p is Node => p.propertyType === 'Node');
+    if (nodes.length === 0) {
+      throw new Error(
+        `${label}: mesh "${mesh.getName()}" is not referenced by any node — a mesh can only ` +
+          'be placed in the scene through a node, so there is nowhere to draw it',
+      );
+    }
+    if (nodes.length > 1) {
+      throw new Error(
+        `${label}: mesh "${mesh.getName()}" is drawn by ${nodes.length} nodes ` +
+          `(${nodes.map((n) => `"${n.getName()}"`).join(', ')}) — instancing is not supported, ` +
+          'because one flat vertex stream cannot hold two placements of the same buffer. ' +
+          'Duplicate the mesh, one per node.',
+      );
+    }
+    const node = nodes[0];
+    const skinned = node.getSkin() !== null;
+    // A skinned mesh node's own transform is ignored per the glTF spec (the
+    // skin's joints place it); an identity transform needs no work, and
+    // leaving `world` null there is what keeps the byte-exact fast path.
+    let world: Float32Array | null = null;
+    if (!skinned) {
+      const m = node.getWorldMatrix();
+      if (!isIdentityMat4(m)) world = Float32Array.from(m);
+    }
+    out.set(mesh, {
+      node,
+      skinned,
+      world,
+      joint: skinned ? 0 : nearestAncestorJoint(node, jointIndex),
+    });
+  }
+  return out;
+}
+
 function boundsOf(positions: Float32Array): ModelBounds {
   const min: [number, number, number] = [Infinity, Infinity, Infinity];
   const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
@@ -175,6 +260,15 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
   const skins = root.listSkins();
   if (skins.length > 1) throw new Error(`${label}: multiple skins unsupported (P2-T1)`);
   const skin = skins[0];
+
+  // joint node -> joint index, needed BEFORE the geometry loop so a rigid mesh
+  // can name the joint it hangs from. The skeleton block below reuses it.
+  const jointNodes = skin ? skin.listJoints() : [];
+  const nodeIndex = new Map(jointNodes.map((n, i) => [n, i]));
+  // Resolve where every mesh sits before touching geometry, so a document we
+  // cannot place fails naming the mesh rather than drawing it somewhere
+  // arbitrary. (The geometry loop consumes these placements.)
+  placeMeshes(meshes, nodeIndex, label);
 
   const posParts: Float32Array[] = [];
   const nrmParts: Float32Array[] = [];
@@ -320,9 +414,7 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
     };
   }
 
-  const jointNodes = skin.listJoints();
   const jointCount = jointNodes.length;
-  const nodeIndex = new Map(jointNodes.map((n, i) => [n, i]));
 
   const parentOf = new Map<typeof jointNodes[number], typeof jointNodes[number]>();
   const walk = (n: typeof jointNodes[number]) => {
