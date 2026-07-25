@@ -7,6 +7,13 @@
  * character is almost always multi-material), and synthesizes a trivial 1-joint
  * skin for static meshes so the skinning pipeline is the only draw path.
  *
+ * Geometry is placed by its NODE, because in glTF that is the only thing that
+ * says where a mesh is: a rigid mesh's rest world transform is baked into its
+ * vertices and it rigid-binds to the nearest joint above it, so a prop hung on
+ * a socket bakes in the hand and rides it through a clip, and the importer's
+ * height normalization (which lives on the root node's matrix, never on the
+ * vertices) reaches the frame instead of being silently dropped.
+ *
  * Texturing (Track A close-out): TEXCOORD_0 and each primitive's base color
  * texture ride along — per-primitive index RANGES carry which texture a draw
  * binds, untextured materials become a 1x1 of their baseColorFactor, and
@@ -138,6 +145,44 @@ function isIdentityMat4(m: ArrayLike<number>): boolean {
 }
 
 /**
+ * Refuse a transform whose upper-3x3 is not a SIMILARITY (uniform scale times
+ * a rotation; mirrors allowed). shaders.wgsl transforms normals by the
+ * upper-3x3 and the FS renormalizes, which is exact for a similarity and
+ * silently wrong for a shear or a non-uniform scale — the kind of wrong that
+ * shows up as mis-lit pixels nobody can trace back. Mirrors pass on purpose:
+ * for M3 = s·Q the inverse-transpose is (1/s)·Q, identical in direction after
+ * renormalizing, even when det Q = -1. (Only winding flips, and the pipeline
+ * runs cullMode 'none' — enabling backface culling would change that.)
+ */
+function assertSimilarity(m: ArrayLike<number>, nodeName: string, label: string): void {
+  // column-major: columns 0,1,2 are the basis vectors
+  const col = (c: number): [number, number, number] => [m[c * 4], m[c * 4 + 1], m[c * 4 + 2]];
+  const [x, y, z] = [col(0), col(1), col(2)];
+  const len = (v: [number, number, number]) => Math.hypot(v[0], v[1], v[2]);
+  const dot = (a: [number, number, number], b: [number, number, number]) =>
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const [lx, ly, lz] = [len(x), len(y), len(z)];
+  const scale = (lx + ly + lz) / 3;
+  if (scale === 0) {
+    throw new Error(`${label}: node "${nodeName}" has a degenerate (zero-scale) transform`);
+  }
+  const tol = 1e-4 * scale;
+  const uneven = Math.abs(lx - ly) > tol || Math.abs(ly - lz) > tol || Math.abs(lx - lz) > tol;
+  const skewed = Math.abs(dot(x, y)) > tol * scale ||
+    Math.abs(dot(y, z)) > tol * scale ||
+    Math.abs(dot(x, z)) > tol * scale;
+  if (uneven || skewed) {
+    throw new Error(
+      `${label}: node "${nodeName}" has a ${
+        uneven ? 'non-uniform scale' : 'skewed'
+      } transform (axis lengths ${lx.toFixed(4)}, ${ly.toFixed(4)}, ${lz.toFixed(4)}) — the ` +
+        'renderer transforms normals by the upper-3x3, which is only correct for a uniform ' +
+        'scale times a rotation. Bake the transform into the mesh, or make the scale uniform.',
+    );
+  }
+}
+
+/**
  * Where a mesh sits in the scene. glTF places geometry through NODES, so the
  * node is the only thing that can say where a mesh is — and until this existed
  * the renderer never asked, which is why a socketed prop baked at the origin
@@ -202,7 +247,10 @@ function placeMeshes(
     let world: Float32Array | null = null;
     if (!skinned) {
       const m = node.getWorldMatrix();
-      if (!isIdentityMat4(m)) world = Float32Array.from(m);
+      if (!isIdentityMat4(m)) {
+        assertSimilarity(m, node.getName(), label);
+        world = Float32Array.from(m);
+      }
     }
     out.set(mesh, {
       node,
@@ -210,6 +258,40 @@ function placeMeshes(
       world,
       joint: skinned ? 0 : nearestAncestorJoint(node, jointIndex),
     });
+  }
+  return out;
+}
+
+/** `m · p` as a POINT (translation applied), into a fresh array. */
+function transformedPositions(src: Float32Array, m: Float32Array): Float32Array {
+  const out = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i += 3) {
+    const x = src[i], y = src[i + 1], z = src[i + 2];
+    out[i] = m[0] * x + m[4] * y + m[8] * z + m[12];
+    out[i + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+    out[i + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+  }
+  return out;
+}
+
+/**
+ * `m` as a DIRECTION (upper-3x3, no translation), renormalized. Exact for the
+ * similarity transforms assertSimilarity admits — see shaders.wgsl, which does
+ * the same thing with the skin matrix.
+ */
+function transformedNormals(src: Float32Array, m: Float32Array): Float32Array {
+  const out = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i += 3) {
+    const x = src[i], y = src[i + 1], z = src[i + 2];
+    const nx = m[0] * x + m[4] * y + m[8] * z;
+    const ny = m[1] * x + m[5] * y + m[9] * z;
+    const nz = m[2] * x + m[6] * y + m[10] * z;
+    const len = Math.hypot(nx, ny, nz);
+    if (len > 0) {
+      out[i] = nx / len;
+      out[i + 1] = ny / len;
+      out[i + 2] = nz / len;
+    }
   }
   return out;
 }
@@ -236,9 +318,14 @@ export async function loadSkinnedAsset(path: string): Promise<SkinnedAsset> {
  * Build a render asset from a glTF-Transform Document. Split out from the file
  * reader so the concatenation path is unit-testable without a binary fixture.
  * Every primitive of every mesh is folded into one vertex/index stream (indices
- * offset per primitive); a primitive lacking JOINTS_0/WEIGHTS_0 is rigid-bound
- * to joint 0 (a prop that rides the root, or the lone identity joint of a static
- * mesh).
+ * offset per primitive), in `listMeshes()` order — the order packages/rig pins
+ * its flat vertex indices against.
+ *
+ * Placement follows the NODE that draws each mesh:
+ *   - a SKINNED node's own transform is ignored (glTF spec — its joints place it);
+ *   - a rigid node's rest world transform is baked into the vertices, and the
+ *     mesh rigid-binds to the nearest joint at or above it, so it rides that
+ *     joint through an animation (joint 0 when there is none).
  */
 export function documentToAsset(doc: Document, label: string): SkinnedAsset {
   const root = doc.getRoot();
@@ -255,8 +342,8 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
   const nodeIndex = new Map(jointNodes.map((n, i) => [n, i]));
   // Resolve where every mesh sits before touching geometry, so a document we
   // cannot place fails naming the mesh rather than drawing it somewhere
-  // arbitrary. (The geometry loop consumes these placements.)
-  placeMeshes(meshes, nodeIndex, label);
+  // arbitrary.
+  const placements = placeMeshes(meshes, nodeIndex, label);
 
   const posParts: Float32Array[] = [];
   const nrmParts: Float32Array[] = [];
@@ -315,27 +402,47 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
   };
 
   for (const mesh of meshes) {
+    const place = placements.get(mesh)!;
     for (const prim of mesh.listPrimitives()) {
       const pos = prim.getAttribute('POSITION')!.getArray() as Float32Array;
       const vcount = pos.length / 3;
-      posParts.push(pos);
+      // A transform is baked into a COPY: `pos` is the accessor's own array,
+      // and mutating it would rewrite the Document under the caller.
+      posParts.push(place.world ? transformedPositions(pos, place.world) : pos);
 
       const nrmAcc = prim.getAttribute('NORMAL');
       if (!nrmAcc) {
         throw new Error(`${label}: primitive missing NORMAL (the importer generates them)`);
       }
-      nrmParts.push(nrmAcc.getArray() as Float32Array);
+      const nrm = nrmAcc.getArray() as Float32Array;
+      nrmParts.push(place.world ? transformedNormals(nrm, place.world) : nrm);
 
       const jAcc = prim.getAttribute('JOINTS_0');
       const wAcc = prim.getAttribute('WEIGHTS_0');
-      if (jAcc && wAcc) {
+      if (place.skinned && jAcc && wAcc) {
         jntParts.push(toU32(jAcc.getArray() as ArrayLike<number>));
         wgtParts.push(wAcc.getArray() as Float32Array);
       } else {
-        // rigid-bind to joint 0: index 0, weight (1,0,0,0)
+        if (!place.skinned && (jAcc || wAcc)) {
+          throw new Error(
+            `${label}: mesh "${mesh.getName()}" carries skin attributes but node ` +
+              `"${place.node.getName()}" binds no skin — those joint indices address a ` +
+              'skeleton this primitive is not attached to',
+          );
+        }
+        // Rigid-bind every vertex to ONE joint with weight 1. At rest that is
+        // the identity (jointWorld · inverseBind = I), so the vertices land
+        // exactly where `world` put them; when the joint animates they ride
+        // it. This is what carries a socketed prop with the hand.
+        //
+        // PRECONDITION: IBM_j = inverse(rest world of j), which is what the
+        // importer produces and what fit.ts asserts (assertRestRoundTrip).
         const j = new Uint32Array(vcount * 4);
         const w = new Float32Array(vcount * 4);
-        for (let i = 0; i < vcount; i++) w[i * 4] = 1;
+        for (let i = 0; i < vcount; i++) {
+          j[i * 4] = place.joint;
+          w[i * 4] = 1;
+        }
         jntParts.push(j);
         wgtParts.push(w);
       }
