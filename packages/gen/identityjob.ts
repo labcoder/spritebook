@@ -76,6 +76,11 @@ export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<J
   yield { t: 'started', jobId, at: at() };
 
   const tmp: string[] = [];
+  // reports for stages that ran; discarded with their output if a LATER stage
+  // fails, because a report describing geometry the workspace threw away is
+  // not evidence, it is a lie the next run has to argue with
+  const reports: string[] = [];
+  let committed = false;
   try {
     const decals = opts.decals ?? [];
     const attachments = opts.attachments ?? [];
@@ -281,6 +286,7 @@ export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<J
     if (maskRegions.length > 0) fields.boneMask = mask;
     if (meshRepin) fields.canonicalMesh = meshRepin;
     await setIdentity(opts.workspace, fields);
+    committed = true; // the reports now describe the workspace, so they stay
     done++;
     yield { t: 'progress', jobId, at: at(), step: 'record', done, total };
 
@@ -305,6 +311,7 @@ export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<J
       retryable: fail.retryable,
     };
   } finally {
+    if (!committed) tmp.push(...reports);
     for (const p of tmp) {
       try {
         await Deno.remove(p);
