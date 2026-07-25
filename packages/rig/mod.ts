@@ -98,3 +98,6 @@ export type {
   FitReport,
   Surface,
 } from './fit.ts';
+
+export { runFitJob, UNPROJECTED_WARN_FRACTION } from './fitjob.ts';
+export type { FitJobOptions } from './fitjob.ts';
