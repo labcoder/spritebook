@@ -18,7 +18,7 @@ Pre-1.0 rules:
 ## rendererVersion and the render signature (D-023)
 
 The render package owns the pipeline version: `RENDERER_VERSION` in `packages/render/contracts.ts`,
-currently `spritebook-render@0.1.0`.
+currently `spritebook-render@0.3.0`.
 
 **Bump it on any pixel-affecting change anywhere in the bake pipeline** — shaders, camera framing,
 the pose driver, AOV encoding, style algorithms, packing — not only changes inside the render
@@ -30,7 +30,7 @@ Cache keys never carry the raw string. At bake time they carry `renderSignature(
 
 ```
 <RENDERER_VERSION>#<8-hex sha256 of the adapter info>
-e.g. spritebook-render@0.1.0#a1b2c3d4
+e.g. spritebook-render@0.3.0#a1b2c3d4
 ```
 
 Composing the adapter-identity hash in means an **adapter change** (different GPU/vendor/device —
