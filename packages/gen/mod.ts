@@ -32,3 +32,5 @@ export type {
   DecalReport,
   SocketSpec,
 } from './identity.ts';
+export { runIdentityJob } from './identityjob.ts';
+export type { IdentityJobOptions } from './identityjob.ts';
