@@ -287,12 +287,10 @@ Deno.test('identity: a decal-only run changes the canonical bytes and the manife
     return;
   }
   // picked WITH reprojection — the order Track A documents (pick, then
-  // reproject, then identity). It also matters mechanically: fixture-gen's
-  // generated texture is 3-channel RGB, which compositeDecals' base-texture
-  // reader does not accept, while reprojection always rewrites the texture
-  // as RGBA. Decals onto a never-reprojected RGB backend texture are a known
-  // gap in identity.ts (frozen building block), reported rather than papered
-  // over here.
+  // reproject, then identity). RGB backend textures are no longer the reason:
+  // compositeDecals normalizes any channel layout at its decode boundary, and
+  // identity_test.ts covers the 3-channel case directly. This stays the
+  // reprojected path because it is the documented one.
   const f = await pickedWorkspace(true);
   try {
     const paths = workspacePaths(f.workspace);
@@ -344,6 +342,15 @@ Deno.test('identity: a decal-only run changes the canonical bytes and the manife
       undefined,
       'placed by uvRect, so no region is recorded',
     );
+
+    // ONE patch for the whole pass: the identity records and the canonical
+    // re-pin land together, so a single undo cannot leave a manifest that
+    // claims no identity while pinning the tattooed bytes
+    const lines = (await Deno.readTextFile(paths.journal)).split('\n').filter((l) => l);
+    const patch = JSON.parse(lines.at(-1)!);
+    const touched = (patch.op as { path: string }[]).map((o) => o.path).sort();
+    assertEquals(touched, ['/canonicalMesh', '/detailLayers'], 'both facts, one patch');
+    assertEquals(patch.inverse.length, 2, 'and one undo takes both back');
   } finally {
     await f.cleanup();
   }

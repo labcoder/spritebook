@@ -20,8 +20,10 @@
  *
  * ## Reversibility (why rewriting canonical/model.glb in place is safe)
  *
- * Undo restores the MANIFEST: both mutations here (setCanonicalMesh and
- * setIdentity) are journaled patches with precomputed inverses. The canonical
+ * Undo restores the MANIFEST: this job's whole effect is ONE journaled patch
+ * with precomputed inverses — the identity records and the canonical mesh
+ * re-pin together, because a single undo of "add the tattoo" must not leave a
+ * manifest claiming no identity while pinning the tattooed bytes. The canonical
  * glb itself is not journaled and does not need to be, because it is
  * RE-DERIVABLE: `results/<picked>/model.glb` is immutable (receipts are
  * append-only history, and `pick` copies rather than moves), so the byte
@@ -40,13 +42,7 @@ import type {
   JobEvent,
 } from '@spritebook/schema';
 import { CanonicalBodySchema, parseWith } from '@spritebook/schema';
-import {
-  type IdentityFields,
-  readWorkspace,
-  setCanonicalMesh,
-  setIdentity,
-  workspacePaths,
-} from '@spritebook/core';
+import { type IdentityFields, readWorkspace, setIdentity, workspacePaths } from '@spritebook/core';
 import { applyAttachments, applyBoneMask, compositeDecals } from './identity.ts';
 
 export interface IdentityJobOptions {
@@ -247,16 +243,15 @@ export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<J
 
     // the manifest must follow the bytes that are ACTUALLY on disk now — the
     // same rule `pick --reproject` enforces, and what D-011 cache keys hang
-    // off. Conditional because setCanonicalMesh refuses a no-op patch, and
-    // "an identity pass always rewrites the file" is an assumption, not a law.
+    // off. It rides in the SAME patch as the identity records below, because
+    // one undo of "add the tattoo" must not leave a manifest that claims no
+    // identity while pinning the tattooed bytes.
     const bytes = await Deno.readFile(paths.canonicalModel);
     const gltfSha256 = await sha256Hex(bytes);
+    let meshRepin: { gltfSha256: string; heightM?: number } | undefined;
     if (gltfSha256 !== canonicalMesh.gltfSha256) {
       const heightM = await heightOf(bytes);
-      await setCanonicalMesh(opts.workspace, {
-        gltfSha256,
-        ...(heightM > 0 ? { heightM } : {}),
-      }, { label: 'Apply identity (canonical mesh)' });
+      meshRepin = { gltfSha256, ...(heightM > 0 ? { heightM } : {}) };
     }
 
     // the records: what the job APPLIED, in the manifest's own vocabulary
@@ -284,6 +279,7 @@ export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<J
       fields.attachments = recorded;
     }
     if (maskRegions.length > 0) fields.boneMask = mask;
+    if (meshRepin) fields.canonicalMesh = meshRepin;
     await setIdentity(opts.workspace, fields);
     done++;
     yield { t: 'progress', jobId, at: at(), step: 'record', done, total };

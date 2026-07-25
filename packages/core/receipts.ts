@@ -222,15 +222,23 @@ export async function setCanonicalMesh(
 export async function setRigState(
   workspace: string,
   rig: RigState,
-  opts: ReceiptOptions = {},
+  opts: ReceiptOptions & { canonicalMesh?: CanonicalMeshPatch } = {},
 ): Promise<CharacterManifest> {
   return await commit(workspace, (manifest) => {
     const current = manifest.rig;
-    if (current && canonicalJson(current) === canonicalJson(rig)) {
+    const sameRig = current !== undefined && canonicalJson(current) === canonicalJson(rig);
+    if (sameRig && opts.canonicalMesh === undefined) {
       throw new Error('setRigState was given the rig the character already has.');
     }
+    // A Track A fit REPLACES the canonical mesh with the fitted body, so the
+    // hash re-pin belongs in this patch: one fit, one undo, and no window
+    // where the manifest pins bytes that are no longer on disk.
+    const op: JsonPatchOp[] = sameRig
+      ? []
+      : [{ op: current ? 'replace' : 'add', path: '/rig', value: rig }];
+    if (opts.canonicalMesh !== undefined) op.push(canonicalMeshOp(manifest, opts.canonicalMesh));
     return {
-      op: [{ op: current ? 'replace' : 'add', path: '/rig', value: rig }],
+      op,
       label: opts.label ??
         (rig.jointEdits.length > 0
           ? `Edit ${rig.jointEdits.length} joint${rig.jointEdits.length === 1 ? '' : 's'}`
@@ -244,6 +252,15 @@ export interface IdentityFields {
   attachments?: Attachment[];
   /** region id -> replacement mesh path; lives INSIDE rig (RigState.boneMask) */
   boneMask?: Record<string, string>;
+  /**
+   * The canonical mesh re-pin, in the SAME patch. Applying identity rewrites
+   * canonical/model.glb, so its hash changes with the identity that produced
+   * it — journaling them separately would let one undo leave a manifest
+   * claiming no identity for bytes that carry the tattoo, and the recovery
+   * path (re-pick, replay what the manifest describes) would then produce
+   * bytes contradicting the pinned hash.
+   */
+  canonicalMesh?: CanonicalMeshPatch;
 }
 
 /**
@@ -303,8 +320,31 @@ export async function setIdentity(
       });
       parts.push(`bone mask (${Object.keys(fields.boneMask).length} regions)`);
     }
+    if (fields.canonicalMesh !== undefined) {
+      op.push(canonicalMeshOp(manifest, fields.canonicalMesh));
+    }
     return { op, label: opts.label ?? `Identity: ${parts.join(', ')}` };
   }, opts.now);
+}
+
+/**
+ * The `/canonicalMesh` replace op, shared by setCanonicalMesh and the writers
+ * that re-pin the mesh as part of a larger single step. Returns nothing to
+ * apply when the fields change nothing, so a caller can pass the current hash
+ * without generating a no-op op.
+ */
+function canonicalMeshOp(
+  manifest: CharacterManifest,
+  fields: CanonicalMeshPatch,
+): JsonPatchOp {
+  const current = manifest.canonicalMesh;
+  if (!current) {
+    throw new Error(
+      `This character has no canonical mesh yet - pick a generation result first; that is ` +
+        `what writes the first one.`,
+    );
+  }
+  return { op: 'replace', path: '/canonicalMesh', value: { ...current, ...defined(fields) } };
 }
 
 // ---------------------------------------------------------------------------
