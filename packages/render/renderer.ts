@@ -81,6 +81,9 @@ export class Renderer {
     private ib: GPUBuffer,
     private camData: Float32Array[],
     private scratch: { mats: Float32Array; worlds: Float32Array },
+    private baseColorTex: GPUTexture[],
+    /** one @group(1) bind group per asset texture, bound per primitive range */
+    private texBindGroups: GPUBindGroup[],
     private pose: PoseMode,
     private clipPoses?: ClipPoses,
     /** direction indices to draw; undefined = all of them */
@@ -117,8 +120,34 @@ export class Renderer {
       mkBuf(asset.normals, GPUBufferUsage.VERTEX),
       mkBuf(asset.joints, GPUBufferUsage.VERTEX),
       mkBuf(asset.weights, GPUBufferUsage.VERTEX),
+      mkBuf(asset.uvs, GPUBufferUsage.VERTEX),
     ];
     const ib = mkBuf(asset.indices, GPUBufferUsage.INDEX);
+
+    // Base color textures: srgb format so sampling returns linear (the FS
+    // lighting math is linear; only the lit AOV re-encodes). One linear
+    // sampler shared by every range.
+    const sampler = device.createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+    });
+    const baseColorTex = asset.textures.map((t, i) => {
+      const tex = device.createTexture({
+        label: `base-color-${i}`,
+        size: { width: t.width, height: t.height },
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      device.queue.writeTexture(
+        { texture: tex },
+        t.rgba as BufferSource,
+        { bytesPerRow: t.width * 4, rowsPerImage: t.height },
+        { width: t.width, height: t.height },
+      );
+      return tex;
+    });
 
     const jointBuf = device.createBuffer({
       size: asset.jointCount * 64,
@@ -135,6 +164,16 @@ export class Renderer {
         { binding: 1, resource: { buffer: jointBuf } },
       ],
     });
+    const texBindGroups = baseColorTex.map((tex, i) =>
+      device.createBindGroup({
+        label: `base-color-bg-${i}`,
+        layout: pipeline.getBindGroupLayout(1),
+        entries: [
+          { binding: 0, resource: tex.createView() },
+          { binding: 1, resource: sampler },
+        ],
+      })
+    );
 
     const camData = framing.cameras.map((c) =>
       packCamera(c.view, c.proj, c.near, c.far, LIGHT_DIR)
@@ -158,6 +197,8 @@ export class Renderer {
       ib,
       camData,
       jointScratch(asset),
+      baseColorTex,
+      texBindGroups,
       pose,
       clipPoses,
       subset,
@@ -186,6 +227,7 @@ export class Renderer {
     for (const t of this.targets.color) t.destroy();
     this.targets.depthStencil.destroy();
     for (const b of this.vb) b.destroy();
+    for (const t of this.baseColorTex) t.destroy();
     this.ib.destroy();
     this.jointBuf.destroy();
     this.camBuf.destroy();
@@ -215,7 +257,11 @@ export class Renderer {
     pass.setBindGroup(0, this.bindGroup);
     for (let i = 0; i < this.vb.length; i++) pass.setVertexBuffer(i, this.vb[i]);
     pass.setIndexBuffer(this.ib, 'uint32');
-    pass.drawIndexed(this.asset.indices.length);
+    // one draw per primitive range, each with its own base color texture
+    for (const r of this.asset.ranges) {
+      pass.setBindGroup(1, this.texBindGroups[r.texture]);
+      pass.drawIndexed(r.indexCount, 1, r.firstIndex);
+    }
     pass.end();
   }
 

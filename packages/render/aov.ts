@@ -28,7 +28,7 @@ import { AOV_TARGETS } from './contracts.ts';
 export const DEPTH_STENCIL_FORMAT: GPUTextureFormat = 'depth24plus';
 
 /**
- * The four vertex buffers, one per attribute, in shaderLocation order — the frozen
+ * The five vertex buffers, one per attribute, in shaderLocation order — the frozen
  * host⇄WGSL interlock (contracts.ts). JOINTS_0 is uint32x4 (the importer upconverts
  * u8/u16 joint indices to u32 so the storage-buffer index type is uniform).
  */
@@ -37,6 +37,7 @@ export const VERTEX_BUFFER_LAYOUT: GPUVertexBufferLayout[] = [
   { arrayStride: 12, attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }] },
   { arrayStride: 16, attributes: [{ shaderLocation: 2, offset: 0, format: 'uint32x4' }] },
   { arrayStride: 16, attributes: [{ shaderLocation: 3, offset: 0, format: 'float32x4' }] },
+  { arrayStride: 8, attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x2' }] },
 ];
 
 /**

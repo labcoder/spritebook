@@ -119,7 +119,7 @@ export const REQUIRED_LIMITS: Record<string, number> = {
  * an ADAPTER change is an honest cache miss (driver-version-only updates are a
  * known gap — see diagnostics.ts).
  */
-export const RENDERER_VERSION = 'spritebook-render@0.1.0';
+export const RENDERER_VERSION = 'spritebook-render@0.2.0'; // 0.2.0: base color TEXTURES sampled (was a hardcoded clay constant)
 
 // ---------------------------------------------------------------------------
 // AOV contract (aov.ts + shaders.wgsl). One MRT pass, five color attachments,
@@ -152,13 +152,17 @@ export const AOV_TARGETS: readonly AovTarget[] = [
 
 // ---------------------------------------------------------------------------
 // Host ⇄ WGSL layout interlock. Vertex buffers (one per attribute):
-//   loc 0 POSITION  float32x3  stride 12
-//   loc 1 NORMAL    float32x3  stride 12
-//   loc 2 JOINTS_0  uint32x4   stride 16   (skinning.ts upconverts u8/u16 -> u32)
-//   loc 3 WEIGHTS_0 float32x4  stride 16
+//   loc 0 POSITION   float32x3  stride 12
+//   loc 1 NORMAL     float32x3  stride 12
+//   loc 2 JOINTS_0   uint32x4   stride 16   (skinning.ts upconverts u8/u16 -> u32)
+//   loc 3 WEIGHTS_0  float32x4  stride 16
+//   loc 4 TEXCOORD_0 float32x2  stride 8    (zeros when a primitive has none)
 // Bindings @group(0):
 //   binding 0  uniform  Camera (160 B, see packCamera)
 //   binding 1  storage  array<mat4x4<f32>>  (jointCount joint matrices)
+// Bindings @group(1) — rebound per primitive range (renderer.ts draw loop):
+//   binding 0  texture_2d<f32>  base color, rgba8unorm-srgb (sample = linear)
+//   binding 1  sampler          linear, clamp-to-edge
 // ---------------------------------------------------------------------------
 export const CAMERA_UNIFORM_FLOATS = 40; // 160 bytes: view(16) proj(16) params(4) lightDir(4)
 

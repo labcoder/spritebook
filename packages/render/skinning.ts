@@ -7,22 +7,49 @@
  * character is almost always multi-material), and synthesizes a trivial 1-joint
  * skin for static meshes so the skinning pipeline is the only draw path.
  *
+ * Texturing (Track A close-out): TEXCOORD_0 and each primitive's base color
+ * texture ride along — per-primitive index RANGES carry which texture a draw
+ * binds, untextured materials become a 1x1 of their baseColorFactor, and
+ * no-material primitives keep the legacy clay constant as a 1x1, so pre-texture
+ * fixtures render exactly as before.
+ *
  * The per-frame pose is a DETERMINISTIC function of the frame index (no wall
  * clock) — a whole-body root turntable about +Y — so it exercises the full skin
  * chain while keeping the feet grounded, and the double-render canary stays
  * meaningful. Real ClipBinding sampling replaces `evalJointMatrices` when the
  * anim package lands.
  */
-import { type Document, NodeIO } from '@gltf-transform/core';
+import { type Document, NodeIO, type Texture } from '@gltf-transform/core';
+import { decode as decodePng } from 'fast-png';
 import type { ModelBounds } from './contracts.ts';
 import { type Mat4, mat4Identity, mat4Multiply, mat4RotationY } from './math.ts';
+
+/** A decoded base color image, sRGB bytes, ready for rgba8unorm-srgb upload. */
+export interface RenderTexture {
+  rgba: Uint8Array; // width*height*4
+  width: number;
+  height: number;
+}
+
+/** One draw range of the concatenated index buffer, bound to one texture. */
+export interface PrimitiveRange {
+  firstIndex: number;
+  indexCount: number;
+  /** index into SkinnedAsset.textures */
+  texture: number;
+}
 
 export interface SkinnedAsset {
   positions: Float32Array; // vec3 per vertex
   normals: Float32Array; // vec3 per vertex
   joints: Uint32Array; // 4 joint indices per vertex (upconverted)
   weights: Float32Array; // 4 weights per vertex
+  uvs: Float32Array; // vec2 per vertex (zeros when a primitive has no TEXCOORD_0)
   indices: Uint32Array; // triangle list
+  /** per-primitive index ranges — the renderer binds ranges[i].texture per draw */
+  ranges: PrimitiveRange[];
+  /** deduped base color textures; untextured materials become 1x1 factors */
+  textures: RenderTexture[];
   jointCount: number;
   /** joint node names, in skin joint order (poses files map onto these BY NAME) */
   jointNames: string[];
@@ -64,6 +91,56 @@ function concatU32(parts: Uint32Array[]): Uint32Array {
   return out;
 }
 
+/** linear [0,1] -> sRGB-encoded byte (the inverse of the srgb texture decode) */
+function srgbByte(linear: number): number {
+  const c = Math.min(1, Math.max(0, linear));
+  const s = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  return Math.round(s * 255);
+}
+
+/** The legacy clay constant, now the NO-MATERIAL fallback (was hardcoded in the FS). */
+const CLAY_LINEAR: [number, number, number, number] = [0.55, 0.32, 0.18, 1];
+
+function factorTexture(linearRgba: [number, number, number, number]): RenderTexture {
+  return {
+    rgba: Uint8Array.of(
+      srgbByte(linearRgba[0]),
+      srgbByte(linearRgba[1]),
+      srgbByte(linearRgba[2]),
+      Math.round(Math.min(1, Math.max(0, linearRgba[3])) * 255),
+    ),
+    width: 1,
+    height: 1,
+  };
+}
+
+/** Decode a glTF PNG image to 8-bit RGBA (any channel count / 16-bit in). */
+function decodeToRgba(png: Uint8Array, label: string): RenderTexture {
+  const img = decodePng(png);
+  const n = img.width * img.height;
+  const ch = img.channels;
+  const rgba = new Uint8Array(n * 4);
+  const to8 = img.depth === 16 ? (v: number) => v >> 8 : (v: number) => v;
+  for (let i = 0; i < n; i++) {
+    const s = i * ch;
+    const d = i * 4;
+    if (ch >= 3) {
+      rgba[d] = to8(img.data[s]);
+      rgba[d + 1] = to8(img.data[s + 1]);
+      rgba[d + 2] = to8(img.data[s + 2]);
+      rgba[d + 3] = ch === 4 ? to8(img.data[s + 3]) : 255;
+    } else {
+      const g = to8(img.data[s]);
+      rgba[d] = g;
+      rgba[d + 1] = g;
+      rgba[d + 2] = g;
+      rgba[d + 3] = ch === 2 ? to8(img.data[s + 1]) : 255;
+    }
+  }
+  if (rgba.length !== n * 4) throw new Error(`${label}: texture decode size mismatch`);
+  return { rgba, width: img.width, height: img.height };
+}
+
 function boundsOf(positions: Float32Array): ModelBounds {
   const min: [number, number, number] = [Infinity, Infinity, Infinity];
   const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
@@ -103,8 +180,57 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
   const nrmParts: Float32Array[] = [];
   const jntParts: Uint32Array[] = [];
   const wgtParts: Float32Array[] = [];
+  const uvParts: Float32Array[] = [];
   const idxParts: Uint32Array[] = [];
+  const ranges: PrimitiveRange[] = [];
+  const textures: RenderTexture[] = [];
+  // dedupe: glTF Texture objects for images, string keys for 1x1 factor colors
+  const textureIndex = new Map<Texture | string, number>();
   let vertexBase = 0;
+  let indexBase = 0;
+
+  const textureFor = (prim: ReturnType<typeof meshes[number]['listPrimitives']>[number]) => {
+    const mat = prim.getMaterial();
+    if (!mat) {
+      // no material: the legacy clay constant, so P2-era fixtures render as before
+      const key = 'factor:clay';
+      let idx = textureIndex.get(key);
+      if (idx === undefined) {
+        idx = textures.push(factorTexture(CLAY_LINEAR)) - 1;
+        textureIndex.set(key, idx);
+      }
+      return idx;
+    }
+    const tex = mat.getBaseColorTexture();
+    if (tex) {
+      let idx = textureIndex.get(tex);
+      if (idx === undefined) {
+        const mime = tex.getMimeType();
+        if (mime && mime !== 'image/png') {
+          throw new Error(
+            `${label}: base color texture is ${mime} — only PNG is supported ` +
+              `(the importer border emits PNG)`,
+          );
+        }
+        const image = tex.getImage();
+        if (!image) throw new Error(`${label}: base color texture has no image payload`);
+        idx = textures.push(decodeToRgba(image, label)) - 1;
+        textureIndex.set(tex, idx);
+      }
+      return idx;
+    }
+    // material without a texture: a 1x1 of its (linear) baseColorFactor.
+    // (When a texture IS present the factor is assumed default [1,1,1,1] —
+    // our border never emits factor-modulated textures.)
+    const f = mat.getBaseColorFactor();
+    const key = `factor:${f[0]},${f[1]},${f[2]},${f[3]}`;
+    let idx = textureIndex.get(key);
+    if (idx === undefined) {
+      idx = textures.push(factorTexture([f[0], f[1], f[2], f[3]])) - 1;
+      textureIndex.set(key, idx);
+    }
+    return idx;
+  };
 
   for (const mesh of meshes) {
     for (const prim of mesh.listPrimitives()) {
@@ -132,17 +258,38 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
         wgtParts.push(w);
       }
 
+      const uvAcc = prim.getAttribute('TEXCOORD_0');
+      if (!uvAcc) uvParts.push(new Float32Array(vcount * 2));
+      else {
+        const arr = uvAcc.getArray()!;
+        if (arr instanceof Float32Array) uvParts.push(arr);
+        else {
+          // quantized UVs (u8/u16 normalized) from vendor files: expand to f32
+          const scale = uvAcc.getNormalized()
+            ? (arr instanceof Uint8Array ? 1 / 255 : 1 / 65535)
+            : 1;
+          const out = new Float32Array(arr.length);
+          for (let i = 0; i < arr.length; i++) out[i] = arr[i] * scale;
+          uvParts.push(out);
+        }
+      }
+
       const iAcc = prim.getIndices();
+      let indexCount: number;
       if (iAcc) {
         const src = iAcc.getArray() as ArrayLike<number>;
         const out = new Uint32Array(src.length);
         for (let i = 0; i < src.length; i++) out[i] = src[i] + vertexBase;
         idxParts.push(out);
+        indexCount = out.length;
       } else {
         const out = new Uint32Array(vcount);
         for (let i = 0; i < vcount; i++) out[i] = vertexBase + i;
         idxParts.push(out);
+        indexCount = out.length;
       }
+      ranges.push({ firstIndex: indexBase, indexCount, texture: textureFor(prim) });
+      indexBase += indexCount;
       vertexBase += vcount;
     }
   }
@@ -154,7 +301,10 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
     normals: concatF32(nrmParts),
     joints: concatU32(jntParts),
     weights: concatF32(wgtParts),
+    uvs: concatF32(uvParts),
     indices: concatU32(idxParts),
+    ranges,
+    textures,
     bounds,
   };
 

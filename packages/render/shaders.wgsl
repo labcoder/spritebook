@@ -1,8 +1,9 @@
-// P2-T1 render shaders: WGSL skinning vertex shader + 5-output MRT fragment
-// shader for the SpriteBook AOV pass. One render pass writes all five AOVs so
-// they are geometrically identical by construction (webgpu-headless-rendering
-// skill). Host/WGSL layout is the frozen interlock in contracts.ts — vertex
-// locations 0-3, @group(0) bindings 0-1, Camera at 160 bytes.
+// P2-T1 render shaders (textured at the Track A close-out): WGSL skinning
+// vertex shader + 5-output MRT fragment shader for the SpriteBook AOV pass.
+// One render pass writes all five AOVs so they are geometrically identical by
+// construction (webgpu-headless-rendering skill). Host/WGSL layout is the
+// frozen interlock in contracts.ts — vertex locations 0-4, @group(0)
+// bindings 0-1, @group(1) = base color texture + sampler, Camera at 160 bytes.
 //
 // Color-space discipline: shade in LINEAR, apply the sRGB encode EXACTLY ONCE,
 // only in the lit AOV. albedo/normal/depth/mask are data AOVs and stay linear.
@@ -18,12 +19,19 @@ struct Camera {
 // Joint matrices live in a STORAGE buffer (skill: no uniform stride/size ceiling
 // for large skeletons). One mat4x4<f32> per joint, column-major.
 @group(0) @binding(1) var<storage, read> jointMats: array<mat4x4<f32>>;
+// Base color, per primitive range (the renderer binds one per draw). The
+// texture is rgba8unorm-srgb, so sampling returns LINEAR — untextured
+// primitives get a 1x1 of their material's (linear) factor, sRGB-encoded at
+// upload so the hardware decode lands back on the factor exactly.
+@group(1) @binding(0) var baseColorTex: texture_2d<f32>;
+@group(1) @binding(1) var baseColorSamp: sampler;
 
 struct VSIn {
   @location(0) pos: vec3<f32>,     // POSITION  float32x3
   @location(1) nrm: vec3<f32>,     // NORMAL    float32x3
   @location(2) joints: vec4<u32>,  // JOINTS_0  uint32x4 (importer upconverts u8/u16 -> u32)
   @location(3) weights: vec4<f32>, // WEIGHTS_0 float32x4
+  @location(4) uv: vec2<f32>,      // TEXCOORD_0 float32x2 (zeros when absent)
 };
 
 struct VSOut {
@@ -31,6 +39,7 @@ struct VSOut {
   @location(0) nrm: vec3<f32>,
   // Positive view-space distance -viewZ, passed to the FS for linearization.
   @location(1) viewZ: f32,
+  @location(2) uv: vec2<f32>,
 };
 
 @vertex
@@ -53,6 +62,7 @@ fn vs_main(in: VSIn) -> VSOut {
   // Camera looks down -Z, so viewPos.z is negative in front of the camera;
   // -viewPos.z is the positive distance the depth AOV linearizes against.
   out.viewZ = -viewPos.z;
+  out.uv = in.uv;
   return out;
 }
 
@@ -79,7 +89,11 @@ fn fs_main(in: VSOut) -> FSOut {
   let n = normalize(in.nrm);
   let ndl = max(dot(n, normalize(cam.lightDir.xyz)), 0.0);
 
-  let albedoLinear = vec3<f32>(0.55, 0.32, 0.18); // linear base color
+  // The base color comes from the MATERIAL now — this is what makes decals,
+  // reprojected textures and generated textures visible in a bake at all.
+  // (The old hardcoded clay constant survives as the no-material fallback,
+  // baked into a 1x1 by the asset loader.)
+  let albedoLinear = textureSample(baseColorTex, baseColorSamp, in.uv).rgb;
   let ambient = 0.12;
   let shaded = albedoLinear * (ambient + (1.0 - ambient) * ndl);
 
