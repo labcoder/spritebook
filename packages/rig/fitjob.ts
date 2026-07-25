@@ -28,7 +28,7 @@ import {
   MANIFEST_FILE,
   parseWith,
 } from '@spritebook/schema';
-import { setRigState } from '@spritebook/core';
+import { readWorkspace, setRigState, workspacePaths } from '@spritebook/core';
 import { fitCanonicalBody, type FitReport } from './fit.ts';
 
 export interface FitJobOptions {
@@ -174,6 +174,50 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
     // same optionality as runRigJob (a user trying the fit on a bare glb has
     // no workspace, and that is fine)
     if (opts.workspace) {
+      // The fitted body IS the character's mesh from here on: Track A's whole
+      // claim is that the roster shares this body, so leaving fitted.glb in an
+      // output dir while canonical/model.glb still held the unfitted generated
+      // mesh made every downstream verb (identity, bake) operate on the wrong
+      // geometry - and a decal aimed at a region would find no skeleton to own
+      // it. Promote the bytes, then pin them in the SAME patch as the rig.
+      const paths = workspacePaths(opts.workspace);
+      let meshRepin: { gltfSha256: string; heightM?: number } | undefined;
+      let promoted = false;
+      try {
+        const manifest = await readWorkspace(opts.workspace);
+        if (manifest.canonicalMesh === undefined) {
+          yield {
+            t: 'warn',
+            jobId,
+            at: at(),
+            code: 'fit-not-promoted',
+            message:
+              'This workspace has no picked canonical mesh, so the fitted body was left in ' +
+              `${fittedPath} instead of becoming canonical/model.glb. Run \`spritebook pick\` ` +
+              'first if you meant this fit to become the character.',
+          };
+        } else {
+          const bytes = await Deno.readFile(fittedPath);
+          await Deno.mkdir(paths.canonicalDir, { recursive: true });
+          await Deno.writeFile(paths.canonicalModel, bytes);
+          promoted = true;
+          const gltfSha256 = await sha256Hex(bytes);
+          if (gltfSha256 !== manifest.canonicalMesh.gltfSha256) {
+            // the fit REPORTS the height it fitted to; no need to re-measure
+            meshRepin = { gltfSha256, heightM: report.heightM };
+          }
+        }
+      } catch (err) {
+        yield {
+          t: 'warn',
+          jobId,
+          at: at(),
+          code: 'fit-not-promoted',
+          message: `The fit is on disk at ${fittedPath} but could not become the workspace's ` +
+            `canonical mesh: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+
       // No `backend` field, deliberately: the fit is deterministic core code
       // (fit.ts arithmetic), not an AI backend — there is no model id or
       // version to record, and inventing one would be provenance fiction.
@@ -187,7 +231,18 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
         accepted: false,
       };
       try {
-        await setRigState(opts.workspace, rigState);
+        await setRigState(opts.workspace, rigState, {
+          ...(meshRepin ? { canonicalMesh: meshRepin } : {}),
+        });
+        if (promoted) {
+          yield {
+            t: 'artifact',
+            jobId,
+            at: at(),
+            kind: 'canonical-model',
+            path: paths.canonicalModel,
+          };
+        }
         yield {
           t: 'artifact',
           jobId,
@@ -229,4 +284,9 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
       retryable: fail.retryable,
     };
   }
+}
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

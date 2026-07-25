@@ -6,6 +6,8 @@
  * - a torn fit WARNS (fit-stray-joints) and still finishes — the maintainer's
  *   rule is warn-don't-fail, and this is the test that keeps it true;
  * - with a workspace the fit lands as ONE journaled Track A RigState patch;
+ * - and on a PICKED workspace it also becomes canonical/model.glb, re-pinned
+ *   in that same patch (Track A's fitted body IS the character's mesh);
  * - a missing or invalid body dir is an actionable error naming the file.
  *
  * The body is the REAL bundled ubc-male (65 UAL joints, CC0, committed at
@@ -15,7 +17,12 @@
 import { assert, assertEquals, assertGreater } from 'jsr:@std/assert@1';
 import type { CharacterId, JobEvent } from '@spritebook/schema';
 import { CharacterManifestSchema, JobEventSchema, parseWith } from '@spritebook/schema';
-import { createWorkspace, workspacePaths } from '@spritebook/core';
+import {
+  appendGenerationResult,
+  createWorkspace,
+  pickResult,
+  workspacePaths,
+} from '@spritebook/core';
 import { BODY, buildTargetGlb, CHUNKY } from './_fit_fixtures.ts';
 import { runFitJob } from './fitjob.ts';
 
@@ -198,6 +205,80 @@ Deno.test('runFitJob: a missing or invalid body dir is an error naming the file'
       assertEquals(bad.code, 'fit-body-invalid');
       assert(bad.message.includes(`${bodyDir}/body.json`), `names the file: ${bad.message}`);
     }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test('runFitJob: on a picked workspace the fit BECOMES the canonical mesh', async () => {
+  const dir = await Deno.makeTempDir({ prefix: 'sb-fitjob-' });
+  try {
+    const ws = `${dir}/character`;
+    await createWorkspace({
+      workspace: ws,
+      characterId: 'hero' as CharacterId,
+      displayName: 'hero',
+      source: { kind: 'image', originalFilename: 'hero.png', sha256: 'a'.repeat(64) },
+    });
+    // a picked character: what every downstream verb assumes it is fitting
+    await appendGenerationResult(ws, {
+      id: 'r1',
+      backend: { modelId: 'fixture-gen', version: '1.0.0' },
+      params: {},
+      seed: 1,
+      startedAt: new Date(0).toISOString(),
+      wallTimeS: 0.1,
+      output: { gltfSha256: 'b'.repeat(64), tris: 12, kind: 'mesh' },
+      discarded: false,
+    });
+    await pickResult(ws, 'r1', { heightM: 1.7, texturedBy: 'backend' });
+    const paths = workspacePaths(ws);
+    const before = (await Deno.readTextFile(paths.journal)).split('\n').filter((l) => l).length;
+
+    const targetPath = `${dir}/target.glb`;
+    await Deno.writeFile(targetPath, await buildTargetGlb(BODY));
+    const events = await collect(runFitJob({
+      jobId: 'fit-promote',
+      bodyDir: UBC_MALE,
+      targetPath,
+      outDir: `${dir}/out`,
+      workspace: ws,
+    }));
+    assertEquals(events.at(-1)?.t, 'done');
+    assert(
+      !events.some((e) => e.t === 'warn' && e.code === 'fit-not-promoted'),
+      'a picked workspace promotes without complaint',
+    );
+
+    // 1. the bytes: canonical/model.glb IS the fitted body
+    const fitted = await Deno.readFile(`${dir}/out/fitted.glb`);
+    const canonical = await Deno.readFile(paths.canonicalModel);
+    assertEquals(canonical, fitted, 'the fitted body became the canonical mesh');
+    assertEquals(
+      artifact(events, 'canonical-model'),
+      paths.canonicalModel,
+      'and the promotion is announced as an artifact',
+    );
+
+    // 2. the manifest pins the bytes that are actually on disk (D-011)
+    const manifest = parseWith(
+      CharacterManifestSchema,
+      JSON.parse(await Deno.readTextFile(paths.manifest)),
+      'CharacterManifest',
+    );
+    const digest = await crypto.subtle.digest('SHA-256', canonical as BufferSource);
+    const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    assertEquals(manifest.canonicalMesh?.gltfSha256, hex, 'the hash follows the bytes');
+    assertEquals(manifest.rig?.track, 'A');
+
+    // 3. ONE patch for the whole fit — rig and re-pin undo together, so an
+    //    undo can never leave a manifest pinning bytes it does not describe
+    const lines = (await Deno.readTextFile(paths.journal)).split('\n').filter((l) => l);
+    assertEquals(lines.length - before, 1, 'one fit, one journal entry');
+    const patch = JSON.parse(lines.at(-1)!);
+    const paths_ = (patch.op as { path: string }[]).map((o) => o.path).sort();
+    assertEquals(paths_, ['/canonicalMesh', '/rig'], 'both facts in the same patch');
+    assert(Array.isArray(patch.inverse) && patch.inverse.length === 2, 'and both are reversible');
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
