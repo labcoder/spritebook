@@ -57,7 +57,7 @@ const AOV_CLEAR_VALUES: readonly GPUColor[] = AOV_TARGETS.map((t): GPUColor => {
 });
 
 /**
- * Create the single-pass MRT pipeline: layout 'auto', the four vertex buffers above,
+ * Create the single-pass MRT pipeline: layout 'auto', the five vertex buffers above,
  * the five color targets from AOV_TARGETS (order + formats), and depth24plus for
  * z-testing only. Validation is scoped so a bad pipeline throws here instead of
  * surfacing as mystery output later (skill rule). Async because popErrorScope resolves

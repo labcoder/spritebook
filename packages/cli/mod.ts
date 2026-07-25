@@ -541,18 +541,29 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           '--track-a needs --body <dir> (a bundled body lives at packages/rig/bodies/ubc-male)',
         );
       }
-      const { runFitJob } = await import('@spritebook/rig');
-      return await pump(
-        runFitJob({
-          jobId: 'rig',
-          bodyDir: body,
-          targetPath: target,
-          outDir: out,
-          heightM: flag(args, 'height') !== undefined ? numFlag(args, 'height', 1.7) : undefined,
-          workspace: flag(args, 'workspace'),
-        }),
-        emit,
-      );
+      // the same bad-args boundary Track B and gen keep: numFlag throws on a
+      // malformed --height, and a raw stack trace would break the NDJSON
+      // contract --json promises
+      try {
+        const { runFitJob } = await import('@spritebook/rig');
+        return await pump(
+          runFitJob({
+            jobId: 'rig',
+            bodyDir: body,
+            targetPath: target,
+            outDir: out,
+            heightM: flag(args, 'height') !== undefined ? numFlag(args, 'height', 1.7) : undefined,
+            workspace: flag(args, 'workspace'),
+          }),
+          emit,
+        );
+      } catch (err) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'bad-args',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
     }
 
     const registry = await import('@spritebook/registry');
