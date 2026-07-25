@@ -464,23 +464,42 @@ function resampleNearest(
  * atlas: the AABB uvRect of scattered UV islands spans most of the page
  * (ubc-male's arm-l rect is 0.996 wide), so an unclipped decal painted the
  * whole character — both arms included, perfectly mirrored, which is the one
- * thing D-008 exists to prevent. Returns undefined when the model has no
- * skin to derive ownership from (uvRect-placed decals on static props).
+ * thing D-008 exists to prevent. And because an underivable mask would fall
+ * straight back into that whole-page paint, it REFUSES (rather than returns
+ * nothing) when the model carries no skeleton or none of the region's joints
+ * — the two ways a body manifest can fail to describe the model it is aimed
+ * at. uvRect-placed decals never come here: explicit coordinates are the
+ * author's own aim.
  */
 function regionTexelMask(
   doc: Document,
   material: Material | undefined,
   region: BodyRegion,
   size: number,
-): Uint8Array | undefined {
+  what: string,
+): Uint8Array {
   const skin = doc.getRoot().listSkins()[0];
-  if (!skin) return undefined;
+  if (!skin) {
+    throw new Error(
+      `${what} is placed by region "${region.id}", but the model has no skeleton to derive ` +
+        'region ownership from - a region is the set of texels its joints own. Fit the ' +
+        'canonical body first (spritebook rig --track-a), or place the decal by uvRect to ' +
+        'paint explicit coordinates',
+    );
+  }
   const jointNames = skin.listJoints().map((j) => j.getName());
   const owned = new Set<number>();
   jointNames.forEach((n, i) => {
     if (region.joints.includes(n)) owned.add(i);
   });
-  if (owned.size === 0) return undefined;
+  if (owned.size === 0) {
+    throw new Error(
+      `${what}: none of region "${region.id}"'s joints (${region.joints.join(', ')}) exist in ` +
+        "the model's skeleton - this body manifest does not describe this model, and painting " +
+        'anyway would cover the whole page rect instead of the region. Check that the body ' +
+        'passed to identity is the one the model was fitted from',
+    );
+  }
 
   const mask = new Uint8Array(size * size);
   for (const mesh of doc.getRoot().listMeshes()) {
@@ -708,15 +727,25 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
     .map((decal, index) => ({ decal, index }))
     .sort((a, b) => a.decal.z - b.decal.z || a.index - b.index);
 
-  // texel-ownership masks, one per region actually painted (raster is O(tris))
-  const maskCache = new Map<string, Uint8Array | undefined>();
-  const maskFor = (regionId: string | null): Uint8Array | undefined => {
-    if (!regionId || !opts.body) return undefined;
-    if (!maskCache.has(regionId)) {
+  // texel-ownership masks, one per region actually painted (raster is O(tris)).
+  // A region-placed decal ALWAYS gets a mask or a refusal - never a silent
+  // fall-through to the raw AABB rect (the whole-page paint of the review's P0).
+  const maskCache = new Map<string, Uint8Array>();
+  const maskFor = (decalId: string, regionId: string | null): Uint8Array | undefined => {
+    if (!regionId || !opts.body) return undefined; // uvRect placement: explicit coordinates
+    let mask = maskCache.get(regionId);
+    if (!mask) {
       const r = opts.body.regions.find((x) => x.id === regionId);
-      maskCache.set(regionId, r ? regionTexelMask(doc, bodyMat, r, size) : undefined);
+      if (!r) {
+        throw new Error(
+          `decal "${decalId}": region "${regionId}" is not in body "${opts.body.id}" - ` +
+            `available: ${opts.body.regions.map((x) => x.id).join(', ')}`,
+        );
+      }
+      mask = regionTexelMask(doc, bodyMat, r, size, `decal "${decalId}"`);
+      maskCache.set(regionId, mask);
     }
-    return maskCache.get(regionId);
+    return mask;
   };
 
   const landings: DecalLanding[] = [];
@@ -743,7 +772,7 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
         target,
         resampleNearest(src, png.width, png.height, target.w, target.h, false),
         touched,
-        maskFor(region),
+        maskFor(decal.id, region),
       ),
     });
 
@@ -772,7 +801,7 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
         partnerRect,
         resampleNearest(src, png.width, png.height, partnerRect.w, partnerRect.h, true),
         touched,
-        maskFor(sidePartnerRegion(region)),
+        maskFor(decal.id, sidePartnerRegion(region)),
       ),
     });
   }

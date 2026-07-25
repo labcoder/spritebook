@@ -9,7 +9,7 @@
  * identity is first-class — and it is the assertion that fails the day someone
  * decides mirroring is a helpful default.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import { Document, NodeIO } from '@gltf-transform/core';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { CanonicalBody } from '@spritebook/schema';
@@ -794,4 +794,127 @@ Deno.test('compositeDecals: an RGB (3-channel) base texture is normalized, not a
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
+});
+
+/** A textured quad with UVs but NO skin — a picked gen mesh before any fit. */
+async function skinlessTexturedGlb(path: string): Promise<void> {
+  const doc = new Document();
+  const buffer = doc.createBuffer();
+  const acc = (type: 'VEC3' | 'VEC2' | 'SCALAR', array: ArrayLike<number>) =>
+    doc.createAccessor().setType(type).setArray(array as never).setBuffer(buffer);
+  const base = new Uint8Array(TEX * TEX * 4).fill(128);
+  for (let i = 3; i < base.length; i += 4) base[i] = 255;
+  const prim = doc.createPrimitive()
+    .setAttribute('POSITION', acc('VEC3', new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0])))
+    .setAttribute('NORMAL', acc('VEC3', new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1])))
+    .setAttribute('TEXCOORD_0', acc('VEC2', new Float32Array([0, 1, 1, 1, 0, 0, 1, 0])))
+    .setIndices(acc('SCALAR', new Uint16Array([0, 1, 2, 1, 3, 2])))
+    .setMaterial(
+      doc.createMaterial('body').setBaseColorTexture(
+        doc.createTexture('base')
+          .setImage(encodePng({ width: TEX, height: TEX, data: base }))
+          .setMimeType('image/png'),
+      ),
+    );
+  doc.createScene('s').addChild(
+    doc.createNode('body').setMesh(doc.createMesh('body').addPrimitive(prim)),
+  );
+  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+}
+
+// A region is the set of texels its JOINTS own. When that ownership cannot be
+// derived, the rect alone is not a region - on a real vendor atlas a region's
+// AABB spans nearly the whole page (ubc-male's arm-l is 0.996 wide), so
+// painting it would cover the entire character, both arms, perfectly
+// mirrored: exactly what D-008 forbids. Both ways to lose ownership refuse.
+Deno.test('decals: a region decal on an UNSKINNED model is refused, not page-painted', async () => {
+  await withTmp(async (dir) => {
+    const model = `${dir}/picked.glb`;
+    const png = `${dir}/decal.png`;
+    await skinlessTexturedGlb(model);
+    await Deno.writeFile(
+      png,
+      encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
+    );
+
+    const err = await assertRejects(
+      () =>
+        compositeDecals({
+          modelPath: model,
+          body: BODY,
+          outPath: `${dir}/out.glb`,
+          decals: [{ id: 'tattoo', pngPath: png, region: 'forearm-l', z: 0, mirrored: false }],
+        }),
+      Error,
+    );
+    assert(
+      /no skeleton/.test(err.message) && /rig --track-a/.test(err.message),
+      `the refusal must name the fix (fit first, or place by uvRect): ${err.message}`,
+    );
+    await assertRejects(
+      () => Deno.stat(`${dir}/out.glb`),
+      Deno.errors.NotFound,
+      undefined,
+      'a refused decal writes no model',
+    );
+  });
+});
+
+Deno.test('decals: a body whose region joints are absent from the skin is refused', async () => {
+  await withTmp(async (dir) => {
+    const model = `${dir}/body.glb`;
+    const png = `${dir}/decal.png`;
+    await bodyGlb(model); // joints: root, forearm-l, forearm-r
+    await Deno.writeFile(
+      png,
+      encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
+    );
+
+    // same region ids, joints from a DIFFERENT skeleton convention
+    const foreign: CanonicalBody = {
+      ...BODY,
+      regions: BODY.regions.map((r) => ({ ...r, joints: r.joints.map((j) => `mixamo:${j}`) })),
+    };
+    const err = await assertRejects(
+      () =>
+        compositeDecals({
+          modelPath: model,
+          body: foreign,
+          outPath: `${dir}/out.glb`,
+          decals: [{ id: 'tattoo', pngPath: png, region: 'forearm-l', z: 0, mirrored: false }],
+        }),
+      Error,
+    );
+    assert(
+      /mixamo:forearm-l/.test(err.message),
+      `the refusal must name the joints it looked for: ${err.message}`,
+    );
+  });
+});
+
+Deno.test('decals: a uvRect decal still paints on an unskinned model (explicit aim)', async () => {
+  await withTmp(async (dir) => {
+    const model = `${dir}/picked.glb`;
+    const out = `${dir}/out.glb`;
+    const png = `${dir}/decal.png`;
+    await skinlessTexturedGlb(model);
+    await Deno.writeFile(
+      png,
+      encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
+    );
+
+    const report = await compositeDecals({
+      modelPath: model,
+      outPath: out,
+      decals: [{
+        id: 'mark',
+        pngPath: png,
+        uvRect: { x: 0.25, y: 0.25, w: 0.25, h: 0.25 },
+        z: 0,
+        mirrored: false,
+      }],
+    });
+    assertEquals(report.missed, [], "explicit coordinates are the author's own aim");
+    assert(report.changedTexels > 0, 'and they still paint');
+  });
 });
