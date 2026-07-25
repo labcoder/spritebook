@@ -56,6 +56,7 @@ import {
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type {
   AttachmentPlacement,
+  BodyRegion,
   BoneMask,
   CanonicalBody,
   DecalPlacement,
@@ -338,6 +339,8 @@ export interface DecalReport {
   changedTexels: number;
   /** ids whose composite changed nothing — a silent miss, made loud */
   missed: string[];
+  /** name of the material whose texture was painted (absent: model had none) */
+  material?: string;
 }
 
 export interface CompositeDecalsOptions {
@@ -454,10 +457,108 @@ function resampleNearest(
 }
 
 /**
+ * The texels a region actually OWNS, rasterized from the mesh itself: a
+ * triangle belongs to the region when the majority of its vertices are
+ * dominantly skinned to the region's joints, and its UV footprint is filled
+ * into the mask. This is what makes a region a real address on a vendor
+ * atlas: the AABB uvRect of scattered UV islands spans most of the page
+ * (ubc-male's arm-l rect is 0.996 wide), so an unclipped decal painted the
+ * whole character — both arms included, perfectly mirrored, which is the one
+ * thing D-008 exists to prevent. Returns undefined when the model has no
+ * skin to derive ownership from (uvRect-placed decals on static props).
+ */
+function regionTexelMask(
+  doc: Document,
+  material: Material | undefined,
+  region: BodyRegion,
+  size: number,
+): Uint8Array | undefined {
+  const skin = doc.getRoot().listSkins()[0];
+  if (!skin) return undefined;
+  const jointNames = skin.listJoints().map((j) => j.getName());
+  const owned = new Set<number>();
+  jointNames.forEach((n, i) => {
+    if (region.joints.includes(n)) owned.add(i);
+  });
+  if (owned.size === 0) return undefined;
+
+  const mask = new Uint8Array(size * size);
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      if (material && prim.getMaterial() !== material) continue;
+      const uv = prim.getAttribute('TEXCOORD_0')?.getArray();
+      const jn = prim.getAttribute('JOINTS_0')?.getArray();
+      const wt = prim.getAttribute('WEIGHTS_0')?.getArray();
+      const pos = prim.getAttribute('POSITION');
+      if (!uv || !jn || !wt || !pos) continue;
+      const vcount = pos.getCount();
+
+      const dominantOwned = new Uint8Array(vcount);
+      for (let v = 0; v < vcount; v++) {
+        let best = -1;
+        let bw = -1;
+        for (let k = 0; k < 4; k++) {
+          const w = wt[v * 4 + k];
+          if (w > bw) {
+            bw = w;
+            best = jn[v * 4 + k];
+          }
+        }
+        if (owned.has(best)) dominantOwned[v] = 1;
+      }
+
+      const idxAcc = prim.getIndices();
+      const idx = idxAcc?.getArray();
+      const triCount = (idx ? idx.length : vcount) / 3;
+      for (let t = 0; t < triCount; t++) {
+        const a = idx ? idx[t * 3] : t * 3;
+        const b = idx ? idx[t * 3 + 1] : t * 3 + 1;
+        const c = idx ? idx[t * 3 + 2] : t * 3 + 2;
+        if (dominantOwned[a] + dominantOwned[b] + dominantOwned[c] < 2) continue;
+        rasterizeUvTriangle(mask, size, uv, a, b, c);
+      }
+    }
+  }
+  return mask;
+}
+
+/** Fill one triangle's UV footprint into `mask` (texel-center sampling). */
+function rasterizeUvTriangle(
+  mask: Uint8Array,
+  size: number,
+  uv: ArrayLike<number>,
+  a: number,
+  b: number,
+  c: number,
+): void {
+  const ax = uv[a * 2] * size, ay = uv[a * 2 + 1] * size;
+  const bx = uv[b * 2] * size, by = uv[b * 2 + 1] * size;
+  const cx = uv[c * 2] * size, cy = uv[c * 2 + 1] * size;
+  const area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+  if (area === 0) return;
+  const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx)));
+  const x1 = Math.min(size - 1, Math.ceil(Math.max(ax, bx, cx)));
+  const y0 = Math.max(0, Math.floor(Math.min(ay, by, cy)));
+  const y1 = Math.min(size - 1, Math.ceil(Math.max(ay, by, cy)));
+  const sign = area > 0 ? 1 : -1;
+  for (let y = y0; y <= y1; y++) {
+    const py = y + 0.5;
+    for (let x = x0; x <= x1; x++) {
+      const px = x + 0.5;
+      const w0 = ((bx - ax) * (py - ay) - (by - ay) * (px - ax)) * sign;
+      const w1 = ((cx - bx) * (py - by) - (cy - by) * (px - bx)) * sign;
+      const w2 = ((ax - cx) * (py - cy) - (ay - cy) * (px - cx)) * sign;
+      if (w0 >= 0 && w1 >= 0 && w2 >= 0) mask[y * size + x] = 1;
+    }
+  }
+}
+
+/**
  * Straight-alpha "over" of one decal into the texture, counting the texels it
  * really changed. The count is the point: a decal whose region resolved to the
  * wrong island, or whose PNG is fully transparent, changes nothing — and a
  * silent no-op is exactly how a user concludes the feature is broken.
+ * `mask` (when given) clips paint to the texels the target region owns.
  */
 function alphaOver(
   base: Uint8Array,
@@ -465,10 +566,12 @@ function alphaOver(
   rect: TexelRect,
   decal: Uint8Array,
   touched: Uint8Array,
+  mask?: Uint8Array,
 ): number {
   let changed = 0;
   for (let y = 0; y < rect.h; y++) {
     for (let x = 0; x < rect.w; x++) {
+      if (mask && !mask[(rect.y + y) * size + rect.x + x]) continue;
       const s = (y * rect.w + x) * 4;
       const a = decal[s + 3];
       if (a === 0) continue;
@@ -495,9 +598,51 @@ function alphaOver(
   return changed;
 }
 
+/**
+ * The material whose base color texture decals paint. Named explicitly by the
+ * body manifest when there is one (region uvRects are authored against ONE
+ * texture's UV space); otherwise the material of the LARGEST primitive — a
+ * character's body always out-verts its hair and eyes, and `listMaterials()[0]`
+ * once painted a tattoo into the ubc-male HAIR atlas, invisibly.
+ */
+function resolveBodyMaterial(
+  doc: Document,
+  bodyMaterial: string | undefined,
+  what: string,
+): Material | undefined {
+  const materials = doc.getRoot().listMaterials();
+  if (bodyMaterial !== undefined) {
+    const hit = materials.find((m) => m.getName() === bodyMaterial);
+    if (!hit) {
+      throw new Error(
+        `${what}: the body manifest names material "${bodyMaterial}" but the model has ` +
+          `[${materials.map((m) => m.getName()).join(', ')}] — a decal painted into the ` +
+          `wrong atlas lands invisibly, so this refuses instead`,
+      );
+    }
+    return hit;
+  }
+  let best: Material | undefined;
+  let bestVerts = -1;
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const mat = prim.getMaterial();
+      if (!mat) continue;
+      const verts = prim.getAttribute('POSITION')?.getCount() ?? 0;
+      if (verts > bestVerts) {
+        bestVerts = verts;
+        best = mat;
+      }
+    }
+  }
+  return best ?? materials[0];
+}
+
 /** Read the model's base color texels (or a neutral base when it has none). */
-function baseTexture(doc: Document, requested?: number): { rgba: Uint8Array; size: number } {
-  const material = doc.getRoot().listMaterials()[0];
+function baseTexture(
+  material: Material | undefined,
+  requested?: number,
+): { rgba: Uint8Array; size: number } {
   const image = material?.getBaseColorTexture()?.getImage();
   if (!image) {
     const size = requested ?? 512;
@@ -553,7 +698,8 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
   const what = 'decals';
   const doc = await readDoc(opts.modelPath, what);
   const before = positionBytes(doc);
-  const { rgba, size } = baseTexture(doc, opts.textureSize);
+  const bodyMat = resolveBodyMaterial(doc, opts.body?.bodyMaterial, what);
+  const { rgba, size } = baseTexture(bodyMat, opts.textureSize);
   const touched = new Uint8Array(size * size);
 
   // stable sort by z: Array.prototype.sort IS stable in every engine we target,
@@ -561,6 +707,17 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
   const ordered = opts.decals
     .map((decal, index) => ({ decal, index }))
     .sort((a, b) => a.decal.z - b.decal.z || a.index - b.index);
+
+  // texel-ownership masks, one per region actually painted (raster is O(tris))
+  const maskCache = new Map<string, Uint8Array | undefined>();
+  const maskFor = (regionId: string | null): Uint8Array | undefined => {
+    if (!regionId || !opts.body) return undefined;
+    if (!maskCache.has(regionId)) {
+      const r = opts.body.regions.find((x) => x.id === regionId);
+      maskCache.set(regionId, r ? regionTexelMask(doc, bodyMat, r, size) : undefined);
+    }
+    return maskCache.get(regionId);
+  };
 
   const landings: DecalLanding[] = [];
   for (const { decal } of ordered) {
@@ -586,6 +743,7 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
         target,
         resampleNearest(src, png.width, png.height, target.w, target.h, false),
         touched,
+        maskFor(region),
       ),
     });
 
@@ -614,24 +772,26 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
         partnerRect,
         resampleNearest(src, png.width, png.height, partnerRect.w, partnerRect.h, true),
         touched,
+        maskFor(sidePartnerRegion(region)),
       ),
     });
   }
 
   const png = encodePng({ width: size, height: size, data: rgba });
   const root = doc.getRoot();
-  const material = root.listMaterials()[0];
-  const texture = material?.getBaseColorTexture();
+  let painted = bodyMat;
+  const texture = painted?.getBaseColorTexture();
   if (texture) {
     texture.setImage(png).setMimeType('image/png');
   } else {
     const tex = doc.createTexture('identity').setImage(png).setMimeType('image/png');
-    const mat = material ?? doc.createMaterial('identity');
+    const mat = painted ?? doc.createMaterial('identity');
     mat.setBaseColorTexture(tex);
-    if (!material) {
+    if (!painted) {
       for (const mesh of root.listMeshes()) {
         for (const prim of mesh.listPrimitives()) prim.setMaterial(mat);
       }
+      painted = mat;
     }
   }
   await writeVerifyingGeometry(doc, before, opts.outPath, what);
@@ -641,6 +801,7 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
     landings,
     changedTexels: touched.reduce((n, v) => n + v, 0),
     missed: landings.filter((l) => l.changedTexels === 0).map((l) => l.id),
+    ...(painted ? { material: painted.getName() } : {}),
   };
 }
 
