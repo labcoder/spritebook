@@ -741,3 +741,57 @@ Deno.test('bone mask: the weight floor is the ownership rule, and it is tunable'
     assert(threw, 'a floor of 1 can never be exceeded — refused rather than a silent no-op');
   });
 });
+
+Deno.test('compositeDecals: an RGB (3-channel) base texture is normalized, not a crash', async () => {
+  // fixture-gen and other generators emit RGB base textures; every stride
+  // computation in the compositor assumes RGBA, so an un-normalized base died
+  // inside fast-png with "wrong data size" (found by the identity job's decal
+  // test - this pins the fix at the decode boundary)
+  const dir = await Deno.makeTempDir();
+  try {
+    const model = `${dir}/rgb-body.glb`;
+    await bodyGlb(model);
+    // swap the texture for a 3-channel RGB one, same size
+    const doc = await new NodeIO().readBinary(await Deno.readFile(model));
+    const rgb = new Uint8Array(TEX * TEX * 3).fill(99);
+    doc.getRoot().listTextures()[0]
+      .setImage(encodePng({ width: TEX, height: TEX, data: rgb, channels: 3 }))
+      .setMimeType('image/png');
+    await Deno.writeFile(model, await new NodeIO().writeBinary(doc));
+
+    const decalPng = `${dir}/mark.png`;
+    await Deno.writeFile(
+      decalPng,
+      encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
+    );
+    const out = `${dir}/out.glb`;
+    const report = await compositeDecals({
+      modelPath: model,
+      decals: [{ id: 'mark', pngPath: decalPng, region: 'forearm-l', z: 0, mirrored: false }],
+      body: BODY,
+      outPath: out,
+    });
+    assert(
+      report.landings.length === 1 && report.changedTexels > 0,
+      'the decal landed on the normalized base',
+    );
+    assertEquals(report.missed, [], 'nothing silently missed');
+
+    // and the output texture is valid RGBA with the untouched area preserved
+    const outDoc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const tex = decodePng(outDoc.getRoot().listTextures()[0].getImage()!);
+    assertEquals(tex.channels, 4, 'output is RGBA');
+    const px = tex.data as Uint8Array;
+    // probe the LAST texel: pixel 0 sits inside forearm-l's uvRect (it starts
+    // at 0,0) and is legitimately painted by the decal - the preserved-base
+    // check belongs on a texel no region covers
+    const last = (tex.width * tex.height - 1) * 4;
+    assertEquals(
+      [px[last], px[last + 1], px[last + 2], px[last + 3]],
+      [99, 99, 99, 255],
+      'RGB base preserved outside the decal, alpha filled to 255',
+    );
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});

@@ -506,10 +506,39 @@ function baseTexture(doc: Document, requested?: number): { rgba: Uint8Array; siz
     return { rgba, size };
   }
   const decoded = decodePng(image);
-  const src = decoded.data as Uint8Array;
+  // Normalize to RGBA HERE, at the decode boundary: a base texture is
+  // whatever the generator emitted, and fixture-gen (among others) writes
+  // 3-channel RGB. Every stride computation below assumes 4 channels, so an
+  // un-normalized RGB base died inside fast-png with "wrong data size" —
+  // found by the identity job's decal test on a plainly-picked fixture mesh.
+  const src = toRgba(decoded.data as Uint8Array, decoded.channels ?? 4);
   const size = requested ?? Math.max(decoded.width, decoded.height);
-  if (decoded.width === size && decoded.height === size) return { rgba: src.slice(), size };
+  if (decoded.width === size && decoded.height === size) return { rgba: src, size };
   return { rgba: resampleNearest(src, decoded.width, decoded.height, size, size, false), size };
+}
+
+/** Any PNG channel layout -> RGBA (grey, grey+alpha, RGB, RGBA). */
+function toRgba(data: Uint8Array, channels: number): Uint8Array {
+  if (channels === 4) return data.slice();
+  const px = data.length / channels;
+  const out = new Uint8Array(px * 4);
+  for (let i = 0; i < px; i++) {
+    const s = i * channels;
+    const d = i * 4;
+    if (channels === 3) {
+      out[d] = data[s];
+      out[d + 1] = data[s + 1];
+      out[d + 2] = data[s + 2];
+      out[d + 3] = 255;
+    } else if (channels === 2) {
+      out[d] = out[d + 1] = out[d + 2] = data[s];
+      out[d + 3] = data[s + 1];
+    } else {
+      out[d] = out[d + 1] = out[d + 2] = data[s];
+      out[d + 3] = 255;
+    }
+  }
+  return out;
 }
 
 /**
