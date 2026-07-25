@@ -154,6 +154,15 @@ Deno.test('runFitJob: with a workspace, the fit is ONE journaled Track A patch',
     assertEquals(manifest.rig?.orientationFixes, []);
     assertEquals(manifest.rig?.accepted, false, "acceptance is the user's to set");
 
+    // the body's sockets became the character's — without them
+    // `identity --attachments` has nothing to hang a prop from
+    assertEquals(
+      manifest.rig?.sockets?.map((s) => s.id).sort(),
+      ['back', 'hand-l', 'hand-r', 'head', 'hip-l', 'hip-r'],
+      'Track A shares one skeleton, so it shares its attach points',
+    );
+    assertEquals(manifest.rig?.sockets?.find((s) => s.id === 'hand-r')?.bone, 'hand_r');
+
     // the journal grew by exactly ONE patch, and it carries its inverse
     const lines = (await Deno.readTextFile(workspacePaths(ws).journal))
       .split('\n')

@@ -61,6 +61,19 @@ export const CanonicalBodySchema = z.strictObject({
   heightM: z.number().positive(),
   regions: z.array(BodyRegionSchema),
   /**
+   * Named places a prop can hang from, in the body's own skeleton. Track A
+   * shares ONE skeleton across the roster, so the sockets are a property of
+   * the BODY rather than of each character - a sword socket that means
+   * "hand_r, palm-forward" is the same fact for every character on it. The
+   * fit stamps these into RigState, which is what `identity --attachments`
+   * resolves against.
+   */
+  sockets: z.array(z.strictObject({
+    id: z.string().min(1),
+    bone: z.string().min(1),
+    localOffset: z.tuple([z.number(), z.number(), z.number()]),
+  })).optional(),
+  /**
    * Name of the glb material whose baseColorTexture the region uvRects
    * address. A multi-material body (hair/eyes/body) has several atlases, and
    * a decal painted into the wrong one lands invisibly — this pins the right

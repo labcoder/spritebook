@@ -227,6 +227,11 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
         jointCount: body.jointCount,
         jointEdits: [],
         orientationFixes: [],
+        // the body's sockets become the character's: Track A shares ONE
+        // skeleton, so "hand-r" means the same place on every character on
+        // this body. Without them `identity --attachments` has nothing to
+        // resolve against and refuses with "available sockets: (none)".
+        ...(body.sockets && body.sockets.length > 0 ? { sockets: body.sockets } : {}),
         // the user has not looked at it yet; `accepted` is theirs to set
         accepted: false,
       };

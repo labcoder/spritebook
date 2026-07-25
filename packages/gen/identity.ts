@@ -880,6 +880,8 @@ export interface AttachmentLanding {
 
 export interface AttachmentReport {
   attached: AttachmentLanding[];
+  /** non-fatal notes the caller should surface (see the renderer gap below) */
+  warnings: string[];
 }
 
 export interface ApplyAttachmentsOptions {
@@ -981,7 +983,25 @@ export async function applyAttachments(
   }
 
   await writeVerifyingGeometry(doc, before, opts.outPath, what, 'appended');
-  return { attached };
+  // KNOWN GAP, said out loud rather than discovered in a sprite sheet: an
+  // attachment rides its joint through the glTF node hierarchy, which is
+  // correct for engines that honour node transforms - but SpriteBook's own
+  // renderer folds every primitive into one skinned draw and rigid-binds a
+  // JOINTS-less primitive to joint 0 (packages/render/skinning.ts), so a
+  // baked sword sits at the model origin instead of in the hand. Exported
+  // glbs are fine; SpriteBook's bakes are not, until the renderer learns
+  // node transforms or this pass bakes the socket's rest world transform
+  // into the copied vertices.
+  const warnings = attached.length > 0
+    ? [
+      `${attached.length} attachment${attached.length === 1 ? '' : 's'} were parented to their ` +
+      'sockets in the glTF node hierarchy. Engines that honour node transforms will place ' +
+      "them correctly, but SpriteBook's own bake does not yet - they will render at the " +
+      'model origin. Export the glb to place them, or keep attachments out of baked sheets ' +
+      'for now.',
+    ]
+    : [];
+  return { attached, warnings };
 }
 
 // ---------------------------------------------------------------------------

@@ -959,6 +959,23 @@ export const BODY_REGIONS: readonly { id: string; joints: readonly string[] }[] 
   { id: 'foot-r', joints: ['foot_r'] },
 ];
 
+/**
+ * The sockets every canonical body carries. Deliberately few and obvious:
+ * these are the places a prop actually hangs from on a humanoid, named for
+ * what a user would ask for rather than for the joint underneath. The offset
+ * is zero because a joint's own origin IS the attach point at rest - a
+ * placement's own `offset` nudges from there, which is where per-prop tuning
+ * belongs (a sword hilt sits differently from a torch).
+ */
+export const BODY_SOCKETS: readonly { id: string; bone: string }[] = [
+  { id: 'hand-r', bone: 'hand_r' },
+  { id: 'hand-l', bone: 'hand_l' },
+  { id: 'head', bone: 'Head' },
+  { id: 'back', bone: 'spine_03' },
+  { id: 'hip-l', bone: 'thigh_l' },
+  { id: 'hip-r', bone: 'thigh_r' },
+];
+
 export interface BuildCanonicalBodyOptions {
   /** a rigged humanoid glb carrying the UAL skeleton, UVs and a skin */
   sourcePath: string;
@@ -1164,6 +1181,13 @@ export async function buildCanonicalBody(
     vertexCount: asset.vertexCount,
     heightM,
     regions,
+    // only sockets whose bone this body actually has: a socket naming a joint
+    // that is not there would refuse at attach time with a confusing message
+    sockets: BODY_SOCKETS.filter((sk) => present.has(sk.bone)).map((sk) => ({
+      id: sk.id,
+      bone: sk.bone,
+      localOffset: [0, 0, 0] as [number, number, number],
+    })),
     ...(bodyMaterial ? { bodyMaterial } : {}),
   }, `canonical body "${opts.id}"`);
 
