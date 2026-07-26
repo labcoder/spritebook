@@ -20,7 +20,12 @@ import { bakeKey } from './cache.ts';
 export interface AssembleArgs {
   inputs: CacheKeyInputs;
   layout: PackLayout;
-  /** per-frame pivot (identical across directions under world-locked framing) */
+  /**
+   * The pivot the RENDERED cells were framed with. World-locked framing makes
+   * it identical across every rendered direction — but a D-008 mirrored cell is
+   * a horizontal flip, so its own pivot flips too and the recorded value is
+   * `w - x` (see the frame loop below). Pre-D-008 this was invariant per bake.
+   */
   pivotPx: { x: number; y: number };
   /** frame ids that were served from cache (all-or-none under clip-atomic style) */
   cacheHits: Set<string>;
@@ -53,11 +58,28 @@ export async function assembleManifest(args: AssembleArgs): Promise<BakeManifest
     // the schema keeps `mirroredFrom` optional and absent when mirroring is
     // off, so an unmirrored manifest is byte-identical to a pre-D-008 one
     const source = args.mirroredFrom?.get(r.id.direction);
+    // A mirrored cell is the horizontal flip of its source, so the pivot flips
+    // with the pixels or every mirrored sprite hangs off the wrong anchor —
+    // and nothing downstream can tell, because export/strips.ts and
+    // export/texturepacker.ts project this field verbatim and neither knows
+    // mirroring exists. `w - x`, NOT `w - 1 - x`: pivotPx is an EDGE coordinate
+    // on the continuous range [0, w] (render/camera.ts:9-12 states the
+    // convention; camera.ts inverts it as pivotPx.x = w*(ndcX+1)/2, so
+    // ndcX = -1 -> 0 and +1 -> w). The pixel flip `x -> w-1-x` (mirror.ts) is
+    // index space; in edge space the identical map is `u -> w - u` (check: the
+    // texel centre x+0.5 lands on w-x-0.5, the centre of texel w-1-x). Solving
+    // u' - pivot' = -(u - pivot) with u' = w - u gives pivot' = w - pivot for
+    // every u. Using w-1-x would put every feature one texel off AND break the
+    // symmetric fixed point — a 64px feet-baseline pivot of 32 must mirror to
+    // itself, and w-1-x gives 31.
+    const pivotPx = source === undefined
+      ? args.pivotPx
+      : { x: r.w - args.pivotPx.x, y: args.pivotPx.y };
     return {
       clipId: r.id.clipId,
       direction: r.id.direction,
       frame: r.id.frame,
-      pivotPx: args.pivotPx,
+      pivotPx,
       atlas: { pageIndex: r.pageIndex, x: r.x, y: r.y, w: r.w, h: r.h },
       cacheHit: hit,
       ...(source === undefined ? {} : { mirroredFrom: { direction: source } }),
