@@ -89,6 +89,13 @@ export const exportTexturePacker: Exporter = async (manifest, bakeDir, outDir, _
   const litPages = manifest.atlases
     .filter((a) => a.pass === 'lit')
     .toSorted((a, b) => a.pageIndex - b.pageIndex);
+  // refuse an unprojectable manifest BEFORE touching the filesystem, the way
+  // godot.ts and strips.ts do: an empty outDir plus [] reads as a successful
+  // export of nothing
+  if (litPages.length === 0) {
+    throw new Error('exportTexturePacker: manifest has no lit atlas pages');
+  }
+  if (manifest.frames.length === 0) throw new Error('exportTexturePacker: manifest has no frames');
   const sortedFrames = manifest.frames.toSorted(byClipDirFrame);
   await Deno.mkdir(outDir, { recursive: true });
 

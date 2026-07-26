@@ -3,7 +3,7 @@
  * 'idle', 2 directions x 2 frames, 16x16 cells on one 64x64 lit page, pivot
  * (8,14)) plus a synthesized two-page variant for the `_p<i>` naming rule.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
 import type { BakeManifest } from '@spritebook/schema';
 import { exportAseprite } from './aseprite.ts';
@@ -147,6 +147,34 @@ Deno.test('exportAseprite emits one JSON per lit page with page-local tags', asy
   // from/to restart per page: tags never reference frames outside their own page
   assertEquals(p0.meta.frameTags, [{ name: 'idle_d00', from: 0, to: 1, direction: 'forward' }]);
   assertEquals(p1.meta.frameTags, [{ name: 'idle_d01', from: 0, to: 1, direction: 'forward' }]);
+});
+
+Deno.test('exportAseprite refuses an empty manifest instead of writing an empty dir', async () => {
+  // godot.ts and strips.ts throw here; aseprite used to iterate zero lit pages,
+  // mkdir the target and return [] — an export that "succeeded" with no output
+  const base = await fixtureManifest();
+  const parent = await Deno.makeTempDir({ prefix: 'sb-ase-empty-' });
+  try {
+    const cases: Array<{ name: string; patch: (m: BakeManifest) => void; msg: string }> = [
+      { name: 'no-pages', patch: (m) => void (m.atlases = []), msg: 'no lit atlas pages' },
+      { name: 'no-frames', patch: (m) => void (m.frames = []), msg: 'no frames' },
+    ];
+    for (const c of cases) {
+      const plain = structuredClone(base);
+      c.patch(plain);
+      const manifest = parseWith(BakeManifestSchema, plain, `${c.name} manifest`);
+      const out = `${parent}/${c.name}`;
+      await assertRejects(() => exportAseprite(manifest, BAKE, out, { fps: 8 }), Error, c.msg);
+      await assertRejects(
+        () => Deno.stat(out),
+        Deno.errors.NotFound,
+        undefined,
+        `${c.name}: a refusal must not leave an output directory behind`,
+      );
+    }
+  } finally {
+    await Deno.remove(parent, { recursive: true });
+  }
 });
 
 Deno.test('exportAseprite refuses an animation split across pages (M1 guard)', async () => {

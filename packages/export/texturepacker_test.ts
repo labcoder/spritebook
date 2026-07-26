@@ -4,7 +4,7 @@
  * pivot (8,14) -> normalized (0.5, 0.875)) plus a synthesized two-page
  * variant for the `_p<i>` naming rule.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
 import type { BakeManifest } from '@spritebook/schema';
 import { exportTexturePacker } from './texturepacker.ts';
@@ -153,6 +153,34 @@ Deno.test('exportTexturePacker emits one hash JSON per lit page', async () => {
   assertEquals(Object.keys(p1.frames), ['idle_d01_f000', 'idle_d01_f001']);
   assertEquals(p0.meta.image, 'atlas_lit_0.png');
   assertEquals(p1.meta.image, 'atlas_lit_1.png');
+});
+
+Deno.test('exportTexturePacker refuses an empty manifest, no empty dir left behind', async () => {
+  // godot.ts and strips.ts throw here; texturepacker used to iterate zero lit
+  // pages, mkdir the target and return [] — a "success" that produced nothing
+  const base = await fixtureManifest();
+  const parent = await Deno.makeTempDir({ prefix: 'sb-tp-empty-' });
+  try {
+    const cases: Array<{ name: string; patch: (m: BakeManifest) => void; msg: string }> = [
+      { name: 'no-pages', patch: (m) => void (m.atlases = []), msg: 'no lit atlas pages' },
+      { name: 'no-frames', patch: (m) => void (m.frames = []), msg: 'no frames' },
+    ];
+    for (const c of cases) {
+      const plain = structuredClone(base);
+      c.patch(plain);
+      const manifest = parseWith(BakeManifestSchema, plain, `${c.name} manifest`);
+      const out = `${parent}/${c.name}`;
+      await assertRejects(() => exportTexturePacker(manifest, BAKE, out, { fps: 8 }), Error, c.msg);
+      await assertRejects(
+        () => Deno.stat(out),
+        Deno.errors.NotFound,
+        undefined,
+        `${c.name}: a refusal must not leave an output directory behind`,
+      );
+    }
+  } finally {
+    await Deno.remove(parent, { recursive: true });
+  }
 });
 
 Deno.test('exportTexturePacker refuses an animation split across pages (M1 guard)', async () => {

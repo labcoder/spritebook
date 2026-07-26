@@ -124,6 +124,37 @@ Deno.test('exportStrips: double export is byte-identical (byte-stability doctrin
   }
 });
 
+Deno.test('exportStrips: an empty manifest is refused before outDir exists', async () => {
+  // all four exporters draw ONE boundary: refuse, and leave nothing behind
+  const base = await fixtureManifest();
+  const parent = await Deno.makeTempDir({ prefix: 'sb-strips-empty-' });
+  try {
+    const cases: Array<{ name: string; patch: (m: BakeManifest) => void; msg: string }> = [
+      { name: 'no-pages', patch: (m) => void (m.atlases = []), msg: 'no lit atlas pages' },
+      { name: 'no-frames', patch: (m) => void (m.frames = []), msg: 'no frames' },
+    ];
+    for (const c of cases) {
+      const plain = structuredClone(base);
+      c.patch(plain);
+      const manifest = parseWith(BakeManifestSchema, plain, `${c.name} manifest`);
+      const out = `${parent}/${c.name}`;
+      await assertRejects(
+        () => exportStrips(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS }),
+        Error,
+        c.msg,
+      );
+      await assertRejects(
+        () => Deno.stat(out),
+        Deno.errors.NotFound,
+        undefined,
+        `${c.name}: a refusal must not leave an output directory behind`,
+      );
+    }
+  } finally {
+    await Deno.remove(parent, { recursive: true });
+  }
+});
+
 Deno.test('exportStrips: non-uniform cell size throws', async () => {
   const manifest = await fixtureManifest();
   const bad = structuredClone(manifest);

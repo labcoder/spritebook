@@ -72,6 +72,9 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
     }
     litPngByIndex.set(page.pageIndex, page.png);
   }
+  // upfront, so a page-less manifest is refused BEFORE outDir exists — the same
+  // boundary godot.ts draws (an empty outDir reads as a successful export)
+  if (litPngByIndex.size === 0) throw new Error('exportStrips: manifest has no lit atlas pages');
 
   const decoded = new Map<number, DecodedPage>();
   const litPage = async (f: FrameRecord): Promise<DecodedPage> => {
