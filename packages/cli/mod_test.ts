@@ -77,6 +77,60 @@ Deno.test('cli undo/redo restore and reapply patches; --json emits valid NDJSON'
   assertEquals(await Deno.readTextFile(manifest), afterBoth);
 });
 
+/**
+ * A workspace whose journal line is a lie: applying it in the named direction
+ * deletes a REQUIRED field. The `undo` case is exactly the inverse the
+ * pre-2026-07-25 invertOp wrote for an `add` over a key that already existed,
+ * but any corrupt or hand-edited journal reaches the same write.
+ */
+async function setupBadJournal(direction: 'undo' | 'redo') {
+  const dir = await Deno.makeTempDir({ prefix: 'sb-cli-bad-' });
+  const doc = JSON.parse(
+    await Deno.readTextFile(
+      new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url),
+    ),
+  ) as Record<string, unknown>;
+  const undoing = direction === 'undo';
+  if (undoing) doc.displayName = 'Sir Bravery';
+  const patch = {
+    seq: 0,
+    at: '2026-07-12T00:00:00Z',
+    target,
+    op: undoing
+      ? [{ op: 'add', path: '/displayName', value: 'Sir Bravery' }]
+      : [{ op: 'remove', path: '/displayName' }],
+    inverse: undoing
+      ? [{ op: 'remove', path: '/displayName' }]
+      : [{ op: 'add', path: '/displayName', value: 'Brave Knight' }],
+    label: 'Rename',
+  };
+  const manifest = `${dir}/character.json`;
+  const bytes = canonicalJson(doc);
+  const cursor = `${manifest}.journal.cursor`;
+  const at = undoing ? '1' : '0';
+  await Deno.writeTextFile(manifest, bytes);
+  await Deno.writeTextFile(`${manifest}.journal.ndjson`, canonicalJson(patch));
+  await Deno.writeTextFile(cursor, at);
+  return { manifest, cursor, bytes, at };
+}
+
+for (const verb of ['undo', 'redo'] as const) {
+  Deno.test(`cli ${verb} refuses to write an invalid manifest, naming the file`, async () => {
+    const w = await setupBadJournal(verb);
+    const c = collector();
+
+    assertEquals(await runCli([verb, '--manifest', w.manifest, '--json'], c.io), 1);
+
+    const event = JSON.parse(c.out[c.out.length - 1]);
+    assertEquals(event.t, 'error');
+    assertEquals(event.code, 'invalid-manifest');
+    assert(event.message.includes(w.manifest), `names the manifest: ${event.message}`);
+    assert(event.message.includes('displayName'), `and what is wrong: ${event.message}`);
+    assertEquals(await Deno.readTextFile(w.manifest), w.bytes, 'the document is untouched');
+    assertEquals(await Deno.readTextFile(w.cursor), w.at, 'the cursor did not move');
+  });
+}
+
 Deno.test('cli without --json stays human-readable; unknown verbs fail actionably', async () => {
   const { manifest } = await setupWorkspace();
   const human = collector();

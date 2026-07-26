@@ -10,6 +10,7 @@
  */
 import {
   canonicalJson,
+  CharacterManifestSchema,
   type ExportTargetId,
   ExportTargetIdSchema,
   type JobEvent,
@@ -56,6 +57,29 @@ async function readJournal(f: JournalFiles) {
     throw new Error(`corrupt cursor file: "${cursorText.trim()}" (journal has ${patches.length})`);
   }
   return { doc, patches, cursor };
+}
+
+/**
+ * `undo` and `redo` write the DOCUMENT, so what they produce has to still BE a
+ * CharacterManifest. ManifestPatchSchema judges the shape of a patch, never
+ * the shape of the result — and a journal line can be wrong in ways that shape
+ * cannot show: hand-edited, truncated, or written by a build whose inverses
+ * were not restores. Writing that result unchecked replaces a working
+ * workspace with one no verb can load, which is the worst possible outcome of
+ * a verb whose entire promise is "put it back".
+ *
+ * Returns the refusal message, or undefined when the document is sound.
+ */
+function manifestFault(doc: unknown, f: JournalFiles, action: string): string | undefined {
+  try {
+    parseWith(CharacterManifestSchema, doc, `CharacterManifest at "${f.manifest}"`);
+    return undefined;
+  } catch (err) {
+    return `${action} would leave "${f.manifest}" holding an invalid manifest, so nothing was ` +
+      `written: ${err instanceof Error ? err.message : String(err)}. The document and ` +
+      `"${f.journal}" disagree — restore the journal from version control, or re-run the verb ` +
+      `that wrote it.`;
+  }
 }
 
 function flag(args: string[], name: string): string | undefined {
@@ -1109,6 +1133,8 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       if (state.cursor === 0) return fail(jobId, 'nothing-to-undo', 'Nothing to undo');
       const patch = state.patches[state.cursor - 1];
       const next = applyPatchOps(state.doc, patch.inverse);
+      const fault = manifestFault(next, f, `Undoing "${patch.label}"`);
+      if (fault) return fail(jobId, 'invalid-manifest', fault);
       await Deno.writeTextFile(f.manifest, canonicalJson(next));
       await Deno.writeTextFile(f.cursor, String(state.cursor - 1));
       emit(
@@ -1121,6 +1147,10 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       }
       const patch = state.patches[state.cursor];
       const next = applyPatchOps(state.doc, patch.op);
+      // redo has the same gap for the same reason: the forward ops came off
+      // the same file the inverses did
+      const fault = manifestFault(next, f, `Redoing "${patch.label}"`);
+      if (fault) return fail(jobId, 'invalid-manifest', fault);
       await Deno.writeTextFile(f.manifest, canonicalJson(next));
       await Deno.writeTextFile(f.cursor, String(state.cursor + 1));
       emit(
