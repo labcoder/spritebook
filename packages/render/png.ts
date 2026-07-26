@@ -2,7 +2,7 @@
  * Encode a stripped AOV plane to PNG bytes. Each AOV declares how it encodes
  * (contracts.ts): lit/albedo/normal are 8-bit RGBA verbatim (the lit bytes are
  * already display-ready sRGB — no re-encode); depth is r32float mapped to 16-bit
- * gray; mask is the r32uint object id written as 16-bit gray. fast-png is pure
+ * gray; mask is the r32uint coverage written as 16-bit gray. fast-png is pure
  * JS/WASM and runs in Deno.
  */
 import { encode as encodePng } from 'fast-png';

@@ -113,7 +113,8 @@ export class Renderer {
     private camData: Float32Array[],
     private scratch: { mats: Float32Array; worlds: Float32Array },
     private baseColorTex: GPUTexture[],
-    /** one @group(1) bind group per asset texture, bound per primitive range */
+    private matBufs: GPUBuffer[],
+    /** one @group(1) bind group per MATERIAL, bound per primitive range */
     private texBindGroups: GPUBindGroup[],
     private pose: PoseMode,
     private clipPoses?: ClipPoses,
@@ -205,13 +206,32 @@ export class Renderer {
         { binding: 1, resource: { buffer: jointBuf } },
       ],
     });
-    const texBindGroups = baseColorTex.map((tex, i) =>
+    // One uniform + one bind group PER MATERIAL, because base color is
+    // `factor x texture` and two materials can share a texture with different
+    // factors (contracts.ts, THE MATERIAL CONTRACT). Std140: vec4 factor at 0,
+    // then cutoff and mode as floats at 16 — 32 bytes, the minimum a uniform
+    // binding can be without padding games.
+    const matBufs = asset.materials.map((m, i) => {
+      const buf = device.createBuffer({
+        label: `material-${i}`,
+        size: 32,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      const data = new Float32Array(8);
+      data.set(m.factor, 0);
+      data[4] = m.alphaCutoff;
+      data[5] = m.alphaMode === 'MASK' ? 1 : 0;
+      device.queue.writeBuffer(buf, 0, data as BufferSource);
+      return buf;
+    });
+    const texBindGroups = asset.materials.map((m, i) =>
       device.createBindGroup({
-        label: `base-color-bg-${i}`,
+        label: `material-bg-${i}`,
         layout: pipeline.getBindGroupLayout(1),
         entries: [
-          { binding: 0, resource: tex.createView() },
+          { binding: 0, resource: baseColorTex[m.texture].createView() },
           { binding: 1, resource: sampler },
+          { binding: 2, resource: { buffer: matBufs[i] } },
         ],
       })
     );
@@ -239,6 +259,7 @@ export class Renderer {
       camData,
       jointScratch(asset),
       baseColorTex,
+      matBufs,
       texBindGroups,
       pose,
       clipPoses,
@@ -269,6 +290,7 @@ export class Renderer {
     this.targets.depthStencil.destroy();
     for (const b of this.vb) b.destroy();
     for (const t of this.baseColorTex) t.destroy();
+    for (const b of this.matBufs) b.destroy();
     this.ib.destroy();
     this.jointBuf.destroy();
     this.camBuf.destroy();
@@ -300,7 +322,7 @@ export class Renderer {
     pass.setIndexBuffer(this.ib, 'uint32');
     // one draw per primitive range, each with its own base color texture
     for (const r of this.asset.ranges) {
-      pass.setBindGroup(1, this.texBindGroups[r.texture]);
+      pass.setBindGroup(1, this.texBindGroups[r.material]);
       pass.drawIndexed(r.indexCount, 1, r.firstIndex);
     }
     pass.end();

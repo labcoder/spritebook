@@ -27,6 +27,16 @@ struct Camera {
 @group(1) @binding(0) var baseColorTex: texture_2d<f32>;
 @group(1) @binding(1) var baseColorSamp: sampler;
 
+// Per-material state. glTF base color is factor * texture, and the factor
+// cannot be folded into the texels because textures are deduped and two
+// materials may share one (contracts.ts, THE MATERIAL CONTRACT).
+struct Material {
+  factor: vec4<f32>,   // @0  linear baseColorFactor
+  cutoff: f32,         // @16 alphaCutoff
+  mode: f32,           // @20 1 = MASK (discard below cutoff), 0 = OPAQUE
+};
+@group(1) @binding(2) var<uniform> mat: Material;
+
 struct VSIn {
   @location(0) pos: vec3<f32>,     // POSITION  float32x3
   @location(1) nrm: vec3<f32>,     // NORMAL    float32x3
@@ -74,7 +84,7 @@ struct FSOut {
   @location(1) albedo: vec4<f32>, // rgba8unorm, LINEAR base color (data AOV)
   @location(2) normal: vec4<f32>, // rgba8unorm, encoded n*0.5+0.5
   @location(3) depth: f32,        // r32float, linearized view depth in [0,1]
-  @location(4) mask: u32,         // r32uint, object id (1 where drawn, 0 = empty)
+  @location(4) mask: u32,         // r32uint coverage: 1 where drawn, 0 = empty
 };
 
 // Shade in linear, sRGB-encode ONCE here (lit AOV only): the rgba8unorm target
@@ -90,11 +100,16 @@ fn fs_main(in: VSOut) -> FSOut {
   let n = normalize(in.nrm);
   let ndl = max(dot(n, normalize(cam.lightDir.xyz)), 0.0);
 
-  // The base color comes from the MATERIAL now — this is what makes decals,
-  // reprojected textures and generated textures visible in a bake at all.
-  // (The old hardcoded clay constant survives as the no-material fallback,
-  // baked into a 1x1 by the asset loader.)
-  let albedoLinear = textureSample(baseColorTex, baseColorSamp, in.uv).rgb;
+  // Base color is factor * texture, both halves honoured (glTF). Alpha decides
+  // the SILHOUETTE: discarding here means lit/albedo/normal/depth/mask all
+  // agree, so a hair card or a cape cannot bake as a solid slab in the mask
+  // while looking cut out in colour.
+  let sampled = textureSample(baseColorTex, baseColorSamp, in.uv);
+  let base = sampled * mat.factor;
+  if (mat.mode > 0.5 && base.a < mat.cutoff) {
+    discard;
+  }
+  let albedoLinear = base.rgb;
   let ambient = 0.12;
   let shaded = albedoLinear * (ambient + (1.0 - ambient) * ndl);
 

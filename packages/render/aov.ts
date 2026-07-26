@@ -43,7 +43,7 @@ export const VERTEX_BUFFER_LAYOUT: GPUVertexBufferLayout[] = [
 /**
  * Per-attachment clear values in AOV_TARGETS order. lit/albedo/normal clear to
  * transparent black (undrawn texels read 0); the depth AOV clears to r=1 (far); the
- * mask clears to 0 (empty object id).
+ * mask clears to 0 (nothing drawn).
  */
 const AOV_CLEAR_VALUES: readonly GPUColor[] = AOV_TARGETS.map((t): GPUColor => {
   switch (t.pass) {
@@ -107,7 +107,7 @@ export interface AovTargets {
   readonly normal: GPUTexture;
   /** depth r32float — linearized view depth in [0,1]. */
   readonly depth: GPUTexture;
-  /** mask r32uint — object id (1 where drawn, 0 = empty). */
+  /** mask r32uint — coverage: 1 where a fragment survived, 0 = empty. */
   readonly mask: GPUTexture;
   /** depth24plus — z-test attachment only; never copied (not copyable). */
   readonly depthStencil: GPUTexture;

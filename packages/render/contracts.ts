@@ -147,7 +147,11 @@ export const AOV_TARGETS: readonly AovTarget[] = [
   { pass: 'albedo', format: 'rgba8unorm', bpp: 4, encode: 'rgba8' }, // linear (data AOV)
   { pass: 'normal', format: 'rgba8unorm', bpp: 4, encode: 'rgba8' }, // n*0.5+0.5
   { pass: 'depth', format: 'r32float', bpp: 4, encode: 'gray16' }, // linearized view depth
-  { pass: 'mask', format: 'r32uint', bpp: 4, encode: 'u32' }, // object id; 0 = empty
+  // coverage, NOT an object id: the FS writes a constant 1 wherever a fragment
+  // survives, so 1 = drawn and 0 = empty. Multi-primitive characters and
+  // socketed props are indistinguishable here; a real per-primitive id would
+  // change these bytes and is a separate opt-in change.
+  { pass: 'mask', format: 'r32uint', bpp: 4, encode: 'u32' }, // 1 = drawn; 0 = empty
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -161,8 +165,11 @@ export const AOV_TARGETS: readonly AovTarget[] = [
 //   binding 0  uniform  Camera (160 B, see packCamera)
 //   binding 1  storage  array<mat4x4<f32>>  (jointCount joint matrices)
 // Bindings @group(1) — rebound per primitive range (renderer.ts draw loop):
-//   binding 0  texture_2d<f32>  base color, rgba8unorm-srgb (sample = linear)
+//   binding 0  texture_2d<f32>  base color image (rgba8unorm-srgb, or
+//                               rgba16float for a 1x1 white stand-in)
 //   binding 1  sampler          linear, clamp-to-edge
+//   binding 2  uniform Material 32 B: factor vec4 @0, cutoff f32 @16,
+//                               mode f32 @20 (1 = MASK, 0 = OPAQUE)
 // ---------------------------------------------------------------------------
 
 /**

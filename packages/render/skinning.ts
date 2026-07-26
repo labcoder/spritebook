@@ -26,9 +26,16 @@
  * meaningful. Real ClipBinding sampling replaces `evalJointMatrices` when the
  * anim package lands.
  */
-import { type Document, type Mesh, type Node, NodeIO, type Texture } from '@gltf-transform/core';
+import {
+  type Document,
+  type Material,
+  type Mesh,
+  type Node,
+  NodeIO,
+  type Texture,
+} from '@gltf-transform/core';
 import { decode as decodePng } from 'fast-png';
-import type { ModelBounds } from './contracts.ts';
+import { BLEND_AS_CUTOUT_AT, type ModelBounds } from './contracts.ts';
 import { type Mat4, mat4Identity, mat4Multiply, mat4RotationY } from './math.ts';
 
 /**
@@ -42,12 +49,28 @@ export type RenderTexture =
   | { kind: 'image'; rgba: Uint8Array; width: number; height: number }
   | { kind: 'factor'; linear: [number, number, number, number] };
 
-/** One draw range of the concatenated index buffer, bound to one texture. */
+/**
+ * A material as the GPU needs it. The unit of binding is the MATERIAL, not the
+ * texture, because glTF base color is `factor × texture` and two materials may
+ * share one texture with different factors — so the factor cannot be folded
+ * into the deduped texels (contracts.ts, THE MATERIAL CONTRACT).
+ */
+export interface RenderMaterial {
+  /** index into SkinnedAsset.textures */
+  texture: number;
+  /** linear baseColorFactor, multiplied with the sampled texel */
+  factor: [number, number, number, number];
+  /** MASK discards below `alphaCutoff`; OPAQUE ignores alpha entirely */
+  alphaMode: 'OPAQUE' | 'MASK';
+  alphaCutoff: number;
+}
+
+/** One draw range of the concatenated index buffer, bound to one material. */
 export interface PrimitiveRange {
   firstIndex: number;
   indexCount: number;
-  /** index into SkinnedAsset.textures */
-  texture: number;
+  /** index into SkinnedAsset.materials */
+  material: number;
 }
 
 export interface SkinnedAsset {
@@ -57,10 +80,12 @@ export interface SkinnedAsset {
   weights: Float32Array; // 4 weights per vertex
   uvs: Float32Array; // vec2 per vertex (zeros when a primitive has no TEXCOORD_0)
   indices: Uint32Array; // triangle list
-  /** per-primitive index ranges — the renderer binds ranges[i].texture per draw */
+  /** per-primitive index ranges — the renderer binds ranges[i].material per draw */
   ranges: PrimitiveRange[];
-  /** deduped base color textures; untextured materials become 1x1 factors */
+  /** deduped base color images; an untextured material gets a 1x1 white one */
   textures: RenderTexture[];
+  /** deduped materials, one bind group each */
+  materials: RenderMaterial[];
   jointCount: number;
   /** joint node names, in skin joint order (poses files map onto these BY NAME) */
   jointNames: string[];
@@ -353,50 +378,81 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
   const idxParts: Uint32Array[] = [];
   const ranges: PrimitiveRange[] = [];
   const textures: RenderTexture[] = [];
-  // dedupe: glTF Texture objects for images, string keys for 1x1 factor colors
+  const materials: RenderMaterial[] = [];
+  // dedupe images by glTF Texture identity, materials by glTF Material
+  // identity. They are separate maps because the SAME texture can appear in
+  // two materials with different factors — folding the factor into the texels
+  // would make those two collide.
   const textureIndex = new Map<Texture | string, number>();
+  const materialIndex = new Map<Material | string, number>();
   let vertexBase = 0;
   let indexBase = 0;
 
-  const textureFor = (prim: ReturnType<typeof meshes[number]['listPrimitives']>[number]) => {
-    const mat = prim.getMaterial();
-    if (!mat) {
-      // no material: the legacy clay constant, so P2-era fixtures render as before
-      const key = 'factor:clay';
-      let idx = textureIndex.get(key);
-      if (idx === undefined) {
-        idx = textures.push(factorTexture(CLAY_LINEAR)) - 1;
-        textureIndex.set(key, idx);
-      }
-      return idx;
-    }
-    const tex = mat.getBaseColorTexture();
-    if (tex) {
-      let idx = textureIndex.get(tex);
-      if (idx === undefined) {
-        const mime = tex.getMimeType();
-        if (mime && mime !== 'image/png') {
-          throw new Error(
-            `${label}: base color texture is ${mime} — only PNG is supported ` +
-              `(the importer border emits PNG)`,
-          );
-        }
-        const image = tex.getImage();
-        if (!image) throw new Error(`${label}: base color texture has no image payload`);
-        idx = textures.push(decodeToRgba(image, label)) - 1;
-        textureIndex.set(tex, idx);
-      }
-      return idx;
-    }
-    // material without a texture: a 1x1 of its (linear) baseColorFactor.
-    // (When a texture IS present the factor is assumed default [1,1,1,1] —
-    // our border never emits factor-modulated textures.)
-    const f = mat.getBaseColorFactor();
-    const key = `factor:${f[0]},${f[1]},${f[2]},${f[3]}`;
+  /** A 1x1 opaque white image, so an untextured material is factor x white. */
+  const whiteTexture = () => {
+    const key = 'image:white';
     let idx = textureIndex.get(key);
     if (idx === undefined) {
-      idx = textures.push(factorTexture([f[0], f[1], f[2], f[3]])) - 1;
+      idx = textures.push(factorTexture([1, 1, 1, 1])) - 1;
       textureIndex.set(key, idx);
+    }
+    return idx;
+  };
+
+  const imageTextureFor = (tex: Texture) => {
+    let idx = textureIndex.get(tex);
+    if (idx === undefined) {
+      const mime = tex.getMimeType();
+      if (mime && mime !== 'image/png') {
+        throw new Error(
+          `${label}: base color texture is ${mime} — only PNG is supported ` +
+            `(the importer border emits PNG)`,
+        );
+      }
+      const image = tex.getImage();
+      if (!image) throw new Error(`${label}: base color texture has no image payload`);
+      idx = textures.push(decodeToRgba(image, label)) - 1;
+      textureIndex.set(tex, idx);
+    }
+    return idx;
+  };
+
+  const materialFor = (prim: ReturnType<typeof meshes[number]['listPrimitives']>[number]) => {
+    const mat = prim.getMaterial();
+    if (!mat) {
+      // no material at all: the legacy clay constant, so pre-material fixtures
+      // render exactly as they did before this file learned about materials
+      const key = 'material:clay';
+      let idx = materialIndex.get(key);
+      if (idx === undefined) {
+        idx = materials.push({
+          texture: whiteTexture(),
+          factor: [...CLAY_LINEAR] as [number, number, number, number],
+          alphaMode: 'OPAQUE',
+          alphaCutoff: 0,
+        }) - 1;
+        materialIndex.set(key, idx);
+      }
+      return idx;
+    }
+
+    let idx = materialIndex.get(mat);
+    if (idx === undefined) {
+      const tex = mat.getBaseColorTexture();
+      const f = mat.getBaseColorFactor();
+      // BLEND becomes a cutout at 0.5: the AOV pass declares no blend state and
+      // depth/mask are not blendable, so real blending would cost the
+      // geometrically-identical-AOVs guarantee (contracts.ts).
+      const declared = mat.getAlphaMode();
+      const alphaMode = declared === 'OPAQUE' ? 'OPAQUE' : 'MASK';
+      const alphaCutoff = declared === 'MASK' ? mat.getAlphaCutoff() : BLEND_AS_CUTOUT_AT;
+      idx = materials.push({
+        texture: tex ? imageTextureFor(tex) : whiteTexture(),
+        factor: [f[0], f[1], f[2], f[3]],
+        alphaMode,
+        alphaCutoff,
+      }) - 1;
+      materialIndex.set(mat, idx);
     }
     return idx;
   };
@@ -477,7 +533,7 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
         idxParts.push(out);
         indexCount = out.length;
       }
-      ranges.push({ firstIndex: indexBase, indexCount, texture: textureFor(prim) });
+      ranges.push({ firstIndex: indexBase, indexCount, material: materialFor(prim) });
       indexBase += indexCount;
       vertexBase += vcount;
     }
@@ -494,6 +550,7 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
     indices: concatU32(idxParts),
     ranges,
     textures,
+    materials,
     bounds,
   };
 

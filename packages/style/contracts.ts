@@ -26,7 +26,7 @@ import type { CameraPreset, QAFlag, StylePreset } from '@spritebook/schema';
 // lit/albedo/normal are 8-bit RGBA; depth/mask are 16-bit single-channel.
 // lit is sRGB display-ready (the render module encodes it); albedo is linear;
 // normal is encoded n*0.5+0.5; depth is normalized linear view depth in
-// [0,65535]; mask is the object id (0 = empty).
+// [0,65535]; mask is coverage (1 = drawn, 0 = empty).
 // ---------------------------------------------------------------------------
 export interface AovImage {
   width: number;

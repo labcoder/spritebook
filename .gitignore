@@ -38,4 +38,6 @@ spikes/autorig/work/
 # ai stuff
 superpowers/
 docs/superpowers/
-.claude/.worktrees/
+# agent worktrees: transient clones, never source. (Was ".claude/.worktrees/",
+# which matched nothing — the real path has no leading dot on `worktrees`.)
+.claude/worktrees/

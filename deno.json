@@ -29,7 +29,12 @@
     "exclude": ["spikes"]
   },
   "unstable": ["webgpu"],
-  "exclude": ["spikes/shell/app/dist", "spikes/shell/app/node_modules", "spikes/autorig/UniRig"],
+  "exclude": [
+    "spikes/shell/app/dist",
+    "spikes/shell/app/node_modules",
+    "spikes/autorig/UniRig",
+    ".claude"
+  ],
   "tasks": {
     "dev": "deno test --watch --watch-exclude=node_modules --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=nvidia-smi,uv",
     "test": "deno test --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=nvidia-smi,uv",
