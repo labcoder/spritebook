@@ -43,6 +43,7 @@
 import type {
   Attachment,
   CharacterManifest,
+  ClipBinding,
   DetailLayer,
   GenerationResult,
   JsonPatchOp,
@@ -341,6 +342,57 @@ export async function setIdentity(
   }, opts.now);
 }
 
+export interface BakeRecord {
+  /** the camera + style the bake actually ran with, ids and all */
+  look: NonNullable<CharacterManifest['look']>;
+  /** the clip bindings the bake ran with; absent leaves the stored ones alone */
+  animationSet?: ClipBinding[];
+  /** first 8 hex of the bake's cache key — the bake dir's name */
+  lastBakeId: string;
+}
+
+/**
+ * Record what a bake ran with (D-029): its look, its clips, and the bake it
+ * produced — as ONE journaled patch.
+ *
+ * One patch, not three, and that is the whole point. `lastBakeId` names a bake
+ * dir whose manifest pins the look and clips beside it here; splitting them
+ * would let a single `spritebook undo` roll back the look while leaving
+ * `lastBakeId` pointing at atlases baked from it, so the manifest would
+ * describe a character whose most recent bake does not match its own settings.
+ * Same argument as `setIdentity`'s decals + attachments + mesh re-pin.
+ *
+ * A bake that changes nothing (same look, same clips, same inputs, so the same
+ * bakeId) journals nothing at all — re-running a bake is not an edit, and an
+ * undo stack full of empty steps is an undo stack a human stops trusting.
+ */
+export async function recordBake(
+  workspace: string,
+  record: BakeRecord,
+  opts: ReceiptOptions = {},
+): Promise<CharacterManifest> {
+  return await commit(workspace, (manifest) => {
+    const op: JsonPatchOp[] = [];
+    if (canonicalJson(record.look) !== canonicalJson(manifest.look ?? null)) {
+      op.push(setOp('/look', record.look, manifest.look));
+    }
+    // absent means "this bake did not settle the question" — an idle-stub bake
+    // ran no clips, which is not the same statement as "this character has
+    // none", and clearing the bindings on its way past would delete a choice it
+    // was never asked about
+    if (
+      record.animationSet !== undefined &&
+      canonicalJson(record.animationSet) !== canonicalJson(manifest.animationSet ?? null)
+    ) {
+      op.push(setOp('/animationSet', record.animationSet, manifest.animationSet));
+    }
+    if (record.lastBakeId !== manifest.lastBakeId) {
+      op.push(setOp('/lastBakeId', record.lastBakeId, manifest.lastBakeId));
+    }
+    return { op, label: opts.label ?? `Bake ${record.lastBakeId}` };
+  }, opts.now);
+}
+
 /**
  * The `/canonicalMesh` replace op, shared by setCanonicalMesh and the writers
  * that re-pin the mesh as part of a larger single step. Returns nothing to
@@ -426,6 +478,12 @@ async function commit(
     `CharacterManifest at "${paths.manifest}"`,
   );
   const { op, label } = build(current);
+  // A patch that changes nothing is not history. `recordBake` reaches this when
+  // a bake is re-run unchanged; journaling it would push an empty step onto the
+  // undo stack, and an undo that visibly does nothing is how a user stops
+  // trusting the stack. Refusals still throw from `build` — this is the
+  // narrower case of a build that ran and found no difference.
+  if (op.length === 0) return current;
 
   const kept = state.patches.slice(0, state.cursor);
   const journal = new ManifestJournal(state.doc, { now });

@@ -8,7 +8,13 @@ import {
 } from '@spritebook/schema';
 import { applyPatchOps } from './journal.ts';
 import { createWorkspace, readWorkspace, workspacePaths } from './workspace.ts';
-import { appendGenerationResult, discardResult, pickResult, setCanonicalMesh } from './receipts.ts';
+import {
+  appendGenerationResult,
+  discardResult,
+  pickResult,
+  recordBake,
+  setCanonicalMesh,
+} from './receipts.ts';
 
 const NOW = () => '2026-07-12T00:00:00Z';
 const sha = (c: string) => c.repeat(64);
@@ -376,5 +382,116 @@ Deno.test('setCanonicalMesh refuses before there is a canonical mesh, or with no
     const empty = await assertRejects(() => setCanonicalMesh(dir, {}, { now: NOW }), Error);
     assert(empty.message.includes('nothing to change'), empty.message);
     assertEquals((await journalLines(dir)).length, 2, 'no empty patch was journaled');
+  });
+});
+
+// --- recordBake (D-029) -----------------------------------------------------
+
+const LOOK = {
+  cameraPresetId: 'standard-30',
+  cameraOverrides: { directions: 2 as const, cellPx: { w: 48, h: 48 } },
+  stylePresetId: 'cel-2',
+};
+const CLIPS = [
+  { clipId: 'walk-loop', packId: 'ual', enabled: true, frames: 6, speed: 1.5, holdLast: false },
+];
+
+Deno.test('recordBake writes look, clips and lastBakeId as ONE patch', async () => {
+  await withCharacter(async (dir) => {
+    const manifest = await recordBake(dir, {
+      look: LOOK,
+      animationSet: CLIPS,
+      lastBakeId: 'a1b2c3d4',
+    }, { now: NOW });
+    assertEquals(manifest.look, LOOK);
+    assertEquals(manifest.animationSet, CLIPS);
+    assertEquals(manifest.lastBakeId, 'a1b2c3d4');
+
+    const patches = await journalLines(dir);
+    assertEquals(patches.length, 1, 'one bake, one journal line');
+    assertEquals(patches[0].op.length, 3, 'three fields, still one step');
+    assertEquals(patches[0].label, 'Bake a1b2c3d4');
+    // all three are `add`, because the fresh character carried none of them —
+    // the inverse of an add is a remove, and getting that wrong is how undo
+    // deletes a field it was supposed to restore
+    assertEquals(patches[0].op.map((o) => o.op), ['add', 'add', 'add']);
+    assertEquals(patches[0].inverse.map((o) => o.op), ['remove', 'remove', 'remove']);
+    assertEquals(await cursorOf(dir), 1);
+  });
+});
+
+Deno.test('one undo takes the whole bake back, not part of it', async () => {
+  // The reason these three fields share a patch: `lastBakeId` names a bake dir
+  // whose atlases were rendered from THIS look. Split across two patches, a
+  // single undo would roll back the look and leave lastBakeId pointing at
+  // sprites baked from it - a manifest describing a character whose most recent
+  // bake does not match its own settings.
+  await withCharacter(async (dir) => {
+    await recordBake(dir, { look: LOOK, animationSet: CLIPS, lastBakeId: 'a1b2c3d4' }, {
+      now: NOW,
+    });
+    await cliUndo(dir);
+    const back = await readWorkspace(dir);
+    assertEquals(back.look, undefined);
+    assertEquals(back.animationSet, undefined);
+    assertEquals(back.lastBakeId, undefined);
+  });
+});
+
+Deno.test('re-running an unchanged bake journals nothing at all', async () => {
+  // An undo stack with empty steps in it is an undo stack a user stops
+  // trusting: the verb reports done and the document is visibly identical.
+  await withCharacter(async (dir) => {
+    await recordBake(dir, { look: LOOK, animationSet: CLIPS, lastBakeId: 'a1b2c3d4' }, {
+      now: NOW,
+    });
+    const before = await manifestBytes(dir);
+    const again = await recordBake(dir, {
+      look: LOOK,
+      animationSet: CLIPS,
+      lastBakeId: 'a1b2c3d4',
+    }, { now: NOW });
+
+    assertEquals(await journalLines(dir).then((p) => p.length), 1, 'still one line');
+    assertEquals(await cursorOf(dir), 1);
+    assertEquals(await manifestBytes(dir), before, 'not even a rewrite');
+    assertEquals(canonicalJson(again), before, 'and it still returns the manifest');
+  });
+});
+
+Deno.test('a second bake patches only what actually moved', async () => {
+  await withCharacter(async (dir) => {
+    await recordBake(dir, { look: LOOK, animationSet: CLIPS, lastBakeId: 'a1b2c3d4' }, {
+      now: NOW,
+    });
+    await recordBake(dir, {
+      look: { ...LOOK, stylePresetId: 'painterly' },
+      animationSet: CLIPS,
+      lastBakeId: 'e5f6a7b8',
+    }, { now: NOW });
+
+    const patches = await journalLines(dir);
+    assertEquals(patches.length, 2);
+    assertEquals(patches[1].op.map((o) => o.path), ['/look', '/lastBakeId'], 'clips did not move');
+    assertEquals(patches[1].op.map((o) => o.op), ['replace', 'replace'], 'present -> replace');
+    // undo restores the previous VALUES, which a remove-based inverse would not
+    await cliUndo(dir);
+    const back = await readWorkspace(dir);
+    assertEquals(back.look?.stylePresetId, 'cel-2');
+    assertEquals(back.lastBakeId, 'a1b2c3d4');
+  });
+});
+
+Deno.test('an absent animationSet leaves the stored bindings alone', async () => {
+  // An idle-stub bake ran no clips, which is not the same statement as "this
+  // character has none" - clearing them on the way past would delete a choice
+  // the bake was never asked about.
+  await withCharacter(async (dir) => {
+    await recordBake(dir, { look: LOOK, animationSet: CLIPS, lastBakeId: 'a1b2c3d4' }, {
+      now: NOW,
+    });
+    const after = await recordBake(dir, { look: LOOK, lastBakeId: 'e5f6a7b8' }, { now: NOW });
+    assertEquals(after.animationSet, CLIPS);
+    assertEquals((await journalLines(dir))[1].op.map((o) => o.path), ['/lastBakeId']);
   });
 });

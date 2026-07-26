@@ -12,6 +12,7 @@
  *     source/<sha256><ext>            the source image, content-addressed
  *     results/<resultId>/{raw.glb,model.glb,preflight.json}
  *     canonical/model.glb             a copy of the PICKED result
+ *     bakes/bake-<bakeId>/            where `bake --workspace` lands (D-029)
  *
  * ## Why creation writes a journal it has nothing to say in
  *
@@ -31,6 +32,7 @@
  */
 import type { CharacterManifest } from '@spritebook/schema';
 import {
+  BAKES_DIR,
   CANONICAL_DIR,
   CANONICAL_MODEL,
   canonicalJson,
@@ -62,6 +64,8 @@ export interface WorkspacePaths {
   canonicalDir: string;
   /** the picked result, copied so downstream verbs have one stable path */
   canonicalModel: string;
+  /** outRoot for `bake --workspace`; each bake is `bake-<bakeId>` inside it */
+  bakesDir: string;
 }
 
 export interface ResultPaths {
@@ -95,6 +99,7 @@ export function workspacePaths(workspace: string, characterId?: string): Workspa
     resultsDir: `${root}/${RESULTS_DIR}`,
     canonicalDir: `${root}/${CANONICAL_DIR}`,
     canonicalModel: `${root}/${CANONICAL_DIR}/${CANONICAL_MODEL}`,
+    bakesDir: `${root}/${BAKES_DIR}`,
   };
 }
 

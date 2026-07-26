@@ -28,6 +28,8 @@
  *     results/<resultId>/preflight.json
  *     canonical/model.glb             the PICKED result (a copy, so every
  *                                     downstream verb has one stable path)
+ *     bakes/bake-<bakeId>/            where `bake --workspace` lands, unless
+ *                                     --out says otherwise (D-029)
  *
  * Result ids are `r1`, `r2`, ... assigned in creation order and never reused;
  * a discarded result keeps its id and its files (receipts are append-only
@@ -45,6 +47,8 @@ export const CANONICAL_MODEL = 'model.glb';
 export const RAW_MODEL = 'raw.glb';
 /** what the border wrote next to a result */
 export const RESULT_PREFLIGHT = 'preflight.json';
+/** outRoot for `bake --workspace`; the bake itself is `bake-<bakeId>` inside it */
+export const BAKES_DIR = 'bakes';
 
 /** `r1`, `r2`, ... — creation order, never reused. */
 export const ResultIdSchema = z.string().regex(/^r[1-9][0-9]*$/);
