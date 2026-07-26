@@ -53,7 +53,26 @@ Deno.test('acceptance: multi-clip bake — exact counts, clip ids, previews', as
     // the fixture implements the full 21-joint core and its feet plant within
     // tolerance — a warn here means the retarget evidence path regressed
     const warns = events.filter((e) => e.t === 'warn');
-    assertEquals(warns, [], 'clean fixture bakes without retarget warnings');
+    const retargetWarns = warns.filter((w) =>
+      w.code === 'anim-unmapped-core' || w.code === 'anim-foot-contact'
+    );
+    assertEquals(retargetWarns, [], 'clean fixture bakes without retarget warnings');
+
+    // This assertion used to be `warns === []`, which was really a claim about
+    // the retarget path (see the comment above) but happened to also assert
+    // that NOTHING else ever warns. The silhouette-clipped detector then
+    // revealed a genuine property of this fixture: at 24 px/m in a 64px cell
+    // with feet-baseline putting the baseline at row 58, the walk cycle swings
+    // a foot below the grounded plane and reaches the bottom border (4px) on 3
+    // of the 12 frames. That is real and worth flagging, so it is asserted
+    // rather than silenced - if the fixture or the framing ever changes so the
+    // character fits, this is the line that says so.
+    const clip = warns.find((w) => w.code === 'silhouette-clipped');
+    assert(
+      clip,
+      `the tight fixture reports its clipping; got ${JSON.stringify(warns.map((w) => w.code))}`,
+    );
+    assert(/bottom/.test(clip.message), `and names the edge: ${clip.message}`);
 
     const manifestPath = (events.find((e) => e.t === 'artifact' && e.kind === 'bake-manifest') as {
       path: string;

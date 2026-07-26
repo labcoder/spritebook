@@ -159,30 +159,45 @@ function finishAlpha(rgba: Uint8Array, style: StylePreset, w: number, h: number)
  * pixelsPerMeter x height exceeds cellPx ships decapitated in every frame of
  * every direction of every clip, and the only signal is looking at the pixels.
  */
-function touchesCellEdge(rgba: Uint8Array, w: number, h: number): boolean {
+function touchedEdges(rgba: Uint8Array, w: number, h: number): string[] {
+  let top = 0, bottom = 0, left = 0, right = 0;
   for (let x = 0; x < w; x++) {
-    if (rgba[(0 * w + x) * 4 + 3] !== 0) return true;
-    if (rgba[((h - 1) * w + x) * 4 + 3] !== 0) return true;
+    if (rgba[x * 4 + 3] !== 0) top++;
+    if (rgba[((h - 1) * w + x) * 4 + 3] !== 0) bottom++;
   }
   for (let y = 0; y < h; y++) {
-    if (rgba[(y * w + 0) * 4 + 3] !== 0) return true;
-    if (rgba[(y * w + (w - 1)) * 4 + 3] !== 0) return true;
+    if (rgba[y * w * 4 + 3] !== 0) left++;
+    if (rgba[(y * w + (w - 1)) * 4 + 3] !== 0) right++;
   }
-  return false;
+  const hit: string[] = [];
+  if (top) hit.push(`top:${top}px`);
+  if (bottom) hit.push(`bottom:${bottom}px`);
+  if (left) hit.push(`left:${left}px`);
+  if (right) hit.push(`right:${right}px`);
+  return hit;
 }
 
-/** The QA flag a clipped silhouette raises, with the frames that were cut. */
-function clippedFlag(refs: QAFlag['frameRefs']): QAFlag | null {
+/**
+ * The QA flag a silhouette raises when it reaches the cell edge, naming which
+ * edges and how far. The claim is deliberately what a styled cell can actually
+ * show: reaching the border means the padding budget is spent there, so
+ * anything further out IS lost — whether this particular frame lost pixels is
+ * not knowable from the cell alone, and saying "cut off" flatly would overstate
+ * it. Which edge is the diagnostic: `bottom` on a feet-baseline preset means a
+ * foot swings below the grounded plane, `left`/`right` mean the arm span
+ * outgrew the cell.
+ */
+function clippedFlag(refs: QAFlag['frameRefs'], edges: Set<string>): QAFlag | null {
   if (refs.length === 0) return null;
-  const shown = refs.slice(0, 8);
   return {
     code: 'silhouette-clipped',
     severity: 'warn',
     sourceStage: 'look',
-    frameRefs: shown,
+    frameRefs: refs.slice(0, 8),
     message: `the silhouette reaches the cell edge on ${refs.length} frame` +
-      `${refs.length === 1 ? '' : 's'} - it is being cut off, not merely tight. ` +
-      'Lower pixelsPerMeter or raise cellPx so the character fits its cell.',
+      `${refs.length === 1 ? '' : 's'} (${[...edges].sort().join(', ')}). The padding budget ` +
+      'is exhausted there, so anything further out is cut. Lower pixelsPerMeter or raise ' +
+      'cellPx to give the character room.',
   };
 }
 
@@ -264,6 +279,7 @@ export async function styleClipsFromAovs(
   const flickerFrames: Uint8Array[] = [];
 
   const clipped: QAFlag['frameRefs'] = [];
+  const clippedEdges = new Set<string>();
   for (const src of srcs) {
     const aovs = perClip.get(src.clipId)!;
     const clipDir = `${styledDir}/${src.clipId}`;
@@ -274,8 +290,10 @@ export async function styleClipsFromAovs(
         const { rgba, labels } = processFrame(aovs[d][f], style, palette, color, dither, prev);
         prev = labels;
         finishAlpha(rgba, style, w1, h1);
-        if (touchesCellEdge(rgba, w1, h1)) {
+        const hitM = touchedEdges(rgba, w1, h1);
+        if (hitM.length > 0) {
           clipped.push({ clipId: src.clipId, direction: d, frame: f });
+          for (const e of hitM) clippedEdges.add(e.split(':')[0]);
         }
         if (src === srcs[0] && d === 0) flickerFrames.push(rgba.slice());
         await Deno.writeFile(
@@ -296,7 +314,10 @@ export async function styleClipsFromAovs(
     superSample: s,
     paletteHex: paletteToHex(palette),
     flickerPct: flickerPct(flickerFrames, w1, h1),
-    flags: [...qaFlags(style, camera), ...[clippedFlag(clipped)].filter((f) => f !== null)],
+    flags: [
+      ...qaFlags(style, camera),
+      ...[clippedFlag(clipped, clippedEdges)].filter((f) => f !== null),
+    ],
     styledDir,
   };
 }
@@ -339,13 +360,18 @@ export async function styleFromAovs(
 
   const idleFrames: Uint8Array[] = []; // direction 0's styled frames, for flicker
   const clipped: QAFlag['frameRefs'] = [];
+  const clippedEdges = new Set<string>();
   for (let d = 0; d < src.directions; d++) {
     let prev: Int32Array | null = null;
     for (let f = 0; f < src.frames; f++) {
       const { rgba, labels } = processFrame(aovs[d][f], style, palette, color, dither, prev);
       prev = labels;
       finishAlpha(rgba, style, w1, h1);
-      if (touchesCellEdge(rgba, w1, h1)) clipped.push({ clipId: 'idle', direction: d, frame: f });
+      const hitS = touchedEdges(rgba, w1, h1);
+      if (hitS.length > 0) {
+        clipped.push({ clipId: 'idle', direction: d, frame: f });
+        for (const e of hitS) clippedEdges.add(e.split(':')[0]);
+      }
       if (d === 0) idleFrames.push(rgba.slice());
       await Deno.writeFile(
         `${styledDir}/${tag(d, f)}.png`,
@@ -363,7 +389,10 @@ export async function styleFromAovs(
     superSample: s,
     paletteHex: paletteToHex(palette),
     flickerPct: flickerPct(idleFrames, w1, h1),
-    flags: [...qaFlags(style, camera), ...[clippedFlag(clipped)].filter((f) => f !== null)],
+    flags: [
+      ...qaFlags(style, camera),
+      ...[clippedFlag(clipped, clippedEdges)].filter((f) => f !== null),
+    ],
     styledDir,
   };
 }

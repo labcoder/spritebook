@@ -108,8 +108,7 @@ export const StylePresetSchema = StylePresetBaseSchema
       ctx.addIssue({
         code: 'custom',
         path: ['quantize'],
-        message:
-          'temporal.clusterVote requires quantize: the vote is taken over palette labels, ' +
+        message: 'temporal.clusterVote requires quantize: the vote is taken over palette labels, ' +
           'so without a palette every pixel votes -1 and the sprite is blank',
       });
     }

@@ -267,8 +267,15 @@ Deno.test('silhouette-clipped fires when the character runs out of cell', async 
       );
       assertEquals(fired!.severity, 'warn');
       assertEquals(fired!.sourceStage, 'look');
-      assert(fired!.frameRefs.length > 0, 'and names the frames that were cut');
-      assert(/cut off/.test(fired!.message), 'and says what is wrong');
+      assert(fired!.frameRefs.length > 0, 'and names the frames');
+      // the message names WHICH edges — the diagnostic that turns "too tight"
+      // into "a foot is below the baseline" or "the arm span outgrew the cell"
+      assert(
+        /top/.test(fired!.message) && /bottom/.test(fired!.message) &&
+          /left/.test(fired!.message) && /right/.test(fired!.message),
+        `a rect touching all four borders names all four: ${fired!.message}`,
+      );
+      assert(/padding budget is exhausted/.test(fired!.message), 'and says what it means');
     } finally {
       await Deno.remove(outCut, { recursive: true });
       await Deno.remove(outFits, { recursive: true });

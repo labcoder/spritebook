@@ -119,7 +119,9 @@ export const REQUIRED_LIMITS: Record<string, number> = {
  * an ADAPTER change is an honest cache miss (driver-version-only updates are a
  * known gap — see diagnostics.ts).
  */
-export const RENDERER_VERSION = 'spritebook-render@0.3.0'; // 0.3.0: material factors sampled exactly; mesh NODE transforms honoured
+// 0.4.0: materials honoured (factor x texture, alpha cutout); median cut
+// reaches maxColors DISTINCT colours; area average weights colour by coverage.
+export const RENDERER_VERSION = 'spritebook-render@0.4.0';
 
 // ---------------------------------------------------------------------------
 // AOV contract (aov.ts + shaders.wgsl). One MRT pass, five color attachments,
