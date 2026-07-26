@@ -97,9 +97,24 @@ export function clusterVoteDownsample(
 }
 
 /**
- * Straight-alpha area average: mean of each s*s block per channel (r,g,b AND alpha,
- * unpremultiplied) -> 1x rgba8. For painterly/cel styles that do not quantize. Rounding
- * is round-half-up via the integer `+ area/2` bias. Output is (wSx/s)*(hSx/s)*4 bytes.
+ * Straight-alpha area average -> 1x rgba8, for the styles that do not quantize.
+ *
+ * Alpha is an AREA mean (coverage really is "what fraction of this block was
+ * covered"), but colour is weighted BY that coverage: summing r,g,b over the
+ * cleared (0,0,0,0) texels and dividing by the full area mixes transparent
+ * black into every partial-coverage block, which darkens exactly the pixels at
+ * the silhouette edge. Measured before this fix: a 4x4 block half-covered by
+ * rgb(200,0,0) came out rgb(100,0,0) — 2.00x too dark — giving painterly, the
+ * one preset that deliberately ships no outline, an unintended dark rim.
+ *
+ * Formally this is the premultiplied mean, unpremultiplied at the end:
+ *   colour = sum(rgb_i * a_i) / sum(a_i),   alpha = sum(a_i) / area
+ * A fully-opaque block is unchanged (every a_i is 255, so the weight factors
+ * out), which is why the styled goldens move only along coverage boundaries.
+ * A fully-transparent block has no colour to report and stays (0,0,0,0).
+ *
+ * Rounding stays round-half-up via an integer bias. Output is
+ * (wSx/s)*(hSx/s)*4 bytes.
  */
 export function areaAverageDownsample(
   rgba: Uint8Array,
@@ -119,21 +134,26 @@ export function areaAverageDownsample(
     for (let ox = 0; ox < w; ox++) {
       const baseY = oy * s;
       const baseX = ox * s;
+      // r,g,b are accumulated PREMULTIPLIED (weighted by each texel's alpha);
+      // `a` is the plain coverage sum used both to unpremultiply and to report
       let r = 0, g = 0, b = 0, a = 0;
       for (let dy = 0; dy < s; dy++) {
         let idx = ((baseY + dy) * wSx + baseX) * 4;
         for (let dx = 0; dx < s; dx++) {
-          r += rgba[idx];
-          g += rgba[idx + 1];
-          b += rgba[idx + 2];
-          a += rgba[idx + 3];
+          const w8 = rgba[idx + 3];
+          r += rgba[idx] * w8;
+          g += rgba[idx + 1] * w8;
+          b += rgba[idx + 2] * w8;
+          a += w8;
           idx += 4;
         }
       }
       const o = (oy * w + ox) * 4;
-      out[o] = ((r + half) / area) | 0;
-      out[o + 1] = ((g + half) / area) | 0;
-      out[o + 2] = ((b + half) / area) | 0;
+      if (a === 0) continue; // nothing covered: leave (0,0,0,0)
+      const bias = a >> 1;
+      out[o] = ((r + bias) / a) | 0;
+      out[o + 1] = ((g + bias) / a) | 0;
+      out[o + 2] = ((b + bias) / a) | 0;
       out[o + 3] = ((a + half) / area) | 0;
     }
   }

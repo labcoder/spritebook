@@ -55,18 +55,28 @@ Deno.test('clusterVote: throws when the Sx grid is indivisible or mis-sized', ()
 
 // --- area average -----------------------------------------------------------
 
-Deno.test('areaAverage: per-channel mean of a 2x2 block is exact', () => {
-  // four texels p0..p3 across the 2x2; each channel averages to a clean integer
+Deno.test('areaAverage: colour is the ALPHA-WEIGHTED mean, alpha is the area mean', () => {
+  // four texels p0..p3 with rising alpha (40, 80, 120, 160). This previously
+  // expected [25, 50, 75, 100] — the plain unweighted mean — which is the
+  // defect: a texel contributing 40/255 of a pixel's coverage was given the
+  // same say in its colour as one contributing 160/255.
+  //   sum(a)          = 400
+  //   sum(r*a)        = 10*40 + 20*80 + 30*120 + 40*160 = 12000  -> 30
+  //   alpha (area)    = 400 / 4                                  -> 100
   const rgba = Uint8Array.from([10, 20, 30, 40, 20, 40, 60, 80, 30, 60, 90, 120, 40, 80, 120, 160]);
   const out = areaAverageDownsample(rgba, 2, 2, 2);
-  assertEquals(Array.from(out), [25, 50, 75, 100]);
+  assertEquals(Array.from(out), [30, 60, 90, 100]);
 });
 
-Deno.test('areaAverage: half black + half white rounds to 128 (round-half-up)', () => {
-  // two black texels, two white -> per-channel mean 127.5, rounds up to 128
+Deno.test('areaAverage: EMPTY texels do not darken the covered ones', () => {
+  // Two texels at (0,0,0,0) and two opaque white. This previously expected
+  // [128,128,128,128] under the name "half black + half white" — but those
+  // texels are not black, they are EMPTY: alpha 0 means nothing was drawn
+  // there. Averaging their zero RGB into the result is precisely how painterly
+  // grew a dark rim. The block is white, covered half the time.
   const rgba = Uint8Array.from([0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255]);
   const out = areaAverageDownsample(rgba, 2, 2, 2);
-  assertEquals(Array.from(out), [128, 128, 128, 128]);
+  assertEquals(Array.from(out), [255, 255, 255, 128]);
 });
 
 Deno.test('areaAverage: independent blocks map to their own output texels', () => {
@@ -120,4 +130,85 @@ Deno.test('coverage: independent blocks (one full, one half)', () => {
 Deno.test('coverage: throws on an indivisible or mis-sized grid', () => {
   assertThrows(() => downsampleCoverage(new Uint8Array(9), 3, 3, 2), RangeError);
   assertThrows(() => downsampleCoverage(new Uint8Array(3), 2, 2, 2), RangeError);
+});
+
+Deno.test('areaAverage: colour is weighted by coverage, not diluted by empty texels', () => {
+  // The defect: summing r,g,b over cleared (0,0,0,0) texels and dividing by the
+  // full area mixes transparent black into every partial-coverage block. A 4x4
+  // block half covered by rgb(200,0,0) came out rgb(100,0,0) - 2.00x too dark -
+  // which put a dark rim on painterly, the one preset that ships no outline.
+  const s = 4;
+  const rgba = new Uint8Array(s * s * 4); // starts fully transparent black
+  for (let i = 0; i < 8; i++) {
+    rgba[i * 4] = 200;
+    rgba[i * 4 + 3] = 255; // 8 of 16 texels opaque red
+  }
+  const out = areaAverageDownsample(rgba, s, s, s);
+  assertEquals(
+    [out[0], out[1], out[2]],
+    [200, 0, 0],
+    'the covered colour survives at full strength; [100,0,0] is the old bug',
+  );
+  assertEquals(out[3], 128, 'alpha is still the AREA mean: 8/16 -> 128');
+});
+
+Deno.test('areaAverage: a fully opaque block is unchanged by the weighting', () => {
+  // Why the styled goldens move only along coverage boundaries: when every
+  // alpha is 255 the weight factors out of numerator and denominator exactly.
+  const s = 2;
+  const rgba = new Uint8Array([
+    10,
+    20,
+    30,
+    255,
+    40,
+    60,
+    80,
+    255,
+    12,
+    22,
+    32,
+    255,
+    38,
+    58,
+    78,
+    255,
+  ]);
+  const out = areaAverageDownsample(rgba, s, s, s);
+  assertEquals([out[0], out[1], out[2], out[3]], [25, 40, 55, 255]);
+});
+
+Deno.test('areaAverage: a fully transparent block reports nothing, not black', () => {
+  const s = 2;
+  const out = areaAverageDownsample(new Uint8Array(s * s * 4), s, s, s);
+  assertEquals([out[0], out[1], out[2], out[3]], [0, 0, 0, 0]);
+});
+
+Deno.test('areaAverage: partial coverage of two colours weights by their alphas', () => {
+  // one texel fully opaque red, one half-alpha blue, two empty:
+  // colour = (200*255 + 0*128)/(255+128) for r, (0*255 + 200*128)/383 for b
+  const s = 2;
+  const rgba = new Uint8Array([
+    200,
+    0,
+    0,
+    255,
+    0,
+    0,
+    200,
+    128,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+  ]);
+  const out = areaAverageDownsample(rgba, s, s, s);
+  const denom = 255 + 128;
+  assertEquals(out[0], ((200 * 255 + (denom >> 1)) / denom) | 0, 'red weighted by its alpha');
+  assertEquals(out[2], ((200 * 128 + (denom >> 1)) / denom) | 0, 'blue weighted by its alpha');
+  assertEquals(out[3], ((denom + 2) / 4) | 0, 'alpha stays the area mean');
 });
