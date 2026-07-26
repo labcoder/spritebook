@@ -339,8 +339,12 @@ function cameraOverridesOf(preset: CameraPreset, resolved: CameraPreset): Camera
  * silently deleted it would destroy a choice the bake was never asked about.
  * Existing entries keep their position; new ones append, so the order is a
  * function of history rather than of iteration.
+ *
+ * Exported for the same reason `bakeSpecFromFlags` is: the only path that
+ * reaches it is a clip bake, which needs a GPU and a retargetable skeleton, and
+ * untestable wiring is how `--mirror` went missing.
  */
-function mergeAnimationSet(
+export function mergeAnimationSet(
   existing: ClipBinding[] | undefined,
   ran: ClipBindingSpec[],
   packId: string,
@@ -1211,12 +1215,13 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       );
     }
 
-    // Which pack this bake reads, resolved only when there are clips to read
-    // from one — a plain idle-stub bake must not start depending on a pack it
-    // never opens.
+    // Which pack this bake reads. Resolved only when the answer is USED: to
+    // validate stored bindings against, and to record in the writeback. A bake
+    // with no workspace records nothing, and an idle-stub bake opens no pack at
+    // all — neither should start failing on a pack.json it never needed.
     const packDir = flag(args, 'pack') ?? BUNDLED_PACK;
     let packId: string | undefined;
-    if (flag(args, 'clips') !== undefined || stored.length > 0) {
+    if (workspace !== undefined && (flag(args, 'clips') !== undefined || stored.length > 0)) {
       try {
         const { loadPack } = await import('@spritebook/anim');
         packId = (await loadPack(packDir)).id;

@@ -1,7 +1,7 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
 import { CAMERA_PRESETS, ManifestJournal } from '@spritebook/core';
-import { bakeSpecFromFlags, runCli } from './mod.ts';
+import { bakeSpecFromFlags, mergeAnimationSet, runCli } from './mod.ts';
 
 const now = () => '2026-07-12T00:00:00Z';
 const target = { kind: 'character', id: 'brave-knight' } as const;
@@ -144,6 +144,51 @@ Deno.test('cli without --json stays human-readable; unknown verbs fail actionabl
   const missing = collector();
   assertEquals(await runCli(['undo'], missing.io), 1);
   assert(missing.err[0].includes('--manifest'));
+});
+
+Deno.test('undo works on a workspace written by an older build', async () => {
+  // Without the migration at readJournal, `undo` applies the inverse to a v2
+  // document and manifestFault then refuses the RESULT for being v2 - a verb
+  // whose entire promise is "put it back", failing on a document whose only
+  // fault is being old.
+  const dir = await Deno.makeTempDir({ prefix: 'sb-cli-v2-' });
+  try {
+    const v3 = JSON.parse(
+      await Deno.readTextFile(
+        new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url),
+      ),
+    ) as Record<string, unknown>;
+    // wind the fixture back to what a pre-D-029 build wrote
+    const v2 = {
+      ...v3,
+      schemaVersion: 2,
+      preflight: { at: now(), checks: [{ id: 'cutout', status: 'ok', message: 'Clean' }] },
+      displayName: 'Sir Bravery',
+    };
+    const manifest = `${dir}/character.json`;
+    await Deno.writeTextFile(manifest, canonicalJson(v2));
+    await Deno.writeTextFile(
+      `${manifest}.journal.ndjson`,
+      canonicalJson({
+        seq: 0,
+        at: now(),
+        target,
+        op: [{ op: 'replace', path: '/displayName', value: 'Sir Bravery' }],
+        inverse: [{ op: 'replace', path: '/displayName', value: 'Brave Knight' }],
+        label: 'Rename',
+      }),
+    );
+    await Deno.writeTextFile(`${manifest}.journal.cursor`, '1');
+
+    const c = collector();
+    assertEquals(await runCli(['undo', '--manifest', manifest, '--json'], c.io), 0, c.err.join(''));
+    const after = JSON.parse(await Deno.readTextFile(manifest));
+    assertEquals(after.displayName, 'Brave Knight', 'the undo did what it said');
+    assertEquals(after.schemaVersion, 3, 'and the write persisted the upgrade');
+    assertEquals(after.preflight, undefined);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 });
 
 Deno.test('bake --clips arg validation fails fast, before any GPU work', async () => {
@@ -295,6 +340,79 @@ Deno.test("a character's own clips drive the bake, disabled ones excepted", () =
       .clips,
     [{ clipId: 'run-loop', frames: 3, speed: 1, holdLast: false }],
   );
+});
+
+Deno.test('a bake merges its clips over the stored ones, deleting nothing', () => {
+  const stored = [
+    { clipId: 'walk-loop', packId: 'ual', enabled: true, frames: 6, speed: 1, holdLast: false },
+    { clipId: 'idle-loop', packId: 'ual', enabled: false, frames: 4, speed: 1, holdLast: false },
+  ];
+  const merged = mergeAnimationSet(
+    stored,
+    [
+      { clipId: 'walk-loop', frames: 8, speed: 1.5, holdLast: true },
+      { clipId: 'run-loop', frames: 3, speed: 1, holdLast: false },
+    ],
+    'ual',
+  );
+  assertEquals(merged, [
+    // re-baked: the new binding wins, and it is enabled because it just ran
+    { clipId: 'walk-loop', packId: 'ual', enabled: true, frames: 8, speed: 1.5, holdLast: true },
+    // NOT in this bake: `enabled: false` is a choice the bake was never asked
+    // about, so a `--clips walk-loop:8,run-loop:3` must not delete it
+    { clipId: 'idle-loop', packId: 'ual', enabled: false, frames: 4, speed: 1, holdLast: false },
+    // new: appended, so order follows history rather than iteration
+    { clipId: 'run-loop', packId: 'ual', enabled: true, frames: 3, speed: 1, holdLast: false },
+  ]);
+
+  // a first bake on a character with no bindings yet
+  assertEquals(
+    mergeAnimationSet(
+      undefined,
+      [{ clipId: 'walk-loop', frames: 2, speed: 1, holdLast: false }],
+      'ual',
+    ),
+    [{ clipId: 'walk-loop', packId: 'ual', enabled: true, frames: 2, speed: 1, holdLast: false }],
+  );
+});
+
+Deno.test('clips from another pack are refused, not resolved against this one', async () => {
+  // The same clip id in a different pack is a different animation. Guessing
+  // would render it, write it to the atlas, and report done.
+  const ws = await Deno.makeTempDir({ prefix: 'sb-pack-' });
+  try {
+    const { createWorkspace, recordBake } = await import('@spritebook/core');
+    await createWorkspace({
+      workspace: ws,
+      characterId: 'brave-knight',
+      displayName: 'Brave Knight',
+      source: { kind: 'image', originalFilename: 'k.png', sha256: 'a'.repeat(64) },
+      now,
+    });
+    await recordBake(ws, {
+      look: { cameraPresetId: 'standard-30', stylePresetId: 'pixel-8' },
+      animationSet: [
+        {
+          clipId: 'walk-loop',
+          packId: 'mixamo-personal',
+          enabled: true,
+          frames: 4,
+          speed: 1,
+          holdLast: false,
+        },
+      ],
+      lastBakeId: 'aaaaaaaa',
+    }, { now });
+
+    const c = collector();
+    assertEquals(await runCli(['bake', '--workspace', ws, '--json'], c.io), 1);
+    const e = JSON.parse(c.out[c.out.length - 1]);
+    assertEquals(e.code, 'pack-mismatch');
+    assert(e.message.includes('mixamo-personal'), e.message);
+    assert(e.message.includes('--pack'), 'and says how to fix it');
+  } finally {
+    await Deno.remove(ws, { recursive: true });
+  }
 });
 
 Deno.test('a look naming a preset that does not exist says which one, and where from', async () => {
