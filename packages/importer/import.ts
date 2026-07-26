@@ -125,26 +125,73 @@ export async function importToCanonical(opts: ImportOptions): Promise<ImportResu
   return { bytes: out, report, provenance: { format, vrm, tool, converter, generator: GENERATOR } };
 }
 
-/** Executor shape for the core queue: emits progress + artifacts + done. */
+/**
+ * Executor shape for the core queue: emits progress + artifacts + done.
+ *
+ * ## Cancellation
+ *
+ * The signal is checked at the checkpoints between the phases that can outlive
+ * a cancel — the read/canonicalize pass, and the write. A cancelled run emits
+ * ONE terminal event, the `cancelled` error the queue expects (queue.ts checks
+ * `signal.aborted` before `sawDone`, so an executor that yields `done` anyway
+ * makes the queue append a second terminal event and the log drawer renders
+ * `done` followed by `error` for a single job). Anything already written is
+ * removed on the way out: a cancelled import that leaves canonical.glb behind
+ * is a workspace claiming an import that never finished.
+ */
 export function makeImportExecutor(opts: Omit<ImportOptions, 'now'> & { outDir: string }) {
   return async function* importExecutor(
     spec: JobSpec,
-    _signal: AbortSignal,
+    signal: AbortSignal,
   ): AsyncIterable<JobEvent> {
     const now = () => new Date().toISOString();
     const { jobId } = spec;
     const t0 = Date.now();
+    const written: string[] = [];
+    const cancelled = (): JobEvent => ({
+      t: 'error',
+      jobId,
+      at: now(),
+      code: 'cancelled',
+      message: 'Job cancelled',
+      retryable: false,
+    });
+    const discard = async () => {
+      for (const path of written) {
+        await Deno.remove(path).catch(() => {});
+      }
+    };
+
     yield { t: 'started', jobId, at: now() };
     try {
+      if (signal.aborted) {
+        yield cancelled();
+        return;
+      }
       yield { t: 'progress', jobId, at: now(), step: 'read', done: 1, total: 3 };
       const result = await importToCanonical(opts);
+      // the long pass is where a cancel actually lands; refusing here is what
+      // keeps the writes below from happening at all
+      if (signal.aborted) {
+        yield cancelled();
+        return;
+      }
       yield { t: 'progress', jobId, at: now(), step: 'canonicalize', done: 2, total: 3 };
 
       await Deno.mkdir(opts.outDir, { recursive: true });
       const glbPath = `${opts.outDir}/canonical.glb`;
       const reportPath = `${opts.outDir}/preflight.json`;
       await Deno.writeFile(glbPath, result.bytes);
+      written.push(glbPath);
       await Deno.writeTextFile(reportPath, canonicalJson(result.report));
+      written.push(reportPath);
+      // a cancel landing mid-write leaves half an import on disk, so the files
+      // go back before the terminal event claims nothing happened
+      if (signal.aborted) {
+        await discard();
+        yield cancelled();
+        return;
+      }
       yield { t: 'progress', jobId, at: now(), step: 'write', done: 3, total: 3 };
       yield { t: 'artifact', jobId, at: now(), kind: 'canonical-gltf', path: glbPath };
       yield { t: 'artifact', jobId, at: now(), kind: 'preflight', path: reportPath };
@@ -166,6 +213,14 @@ export function makeImportExecutor(opts: Omit<ImportOptions, 'now'> & { outDir: 
       }
       yield { t: 'done', jobId, at: now(), wallTimeS: (Date.now() - t0) / 1000 };
     } catch (err) {
+      // a cancel that surfaced as a throw is still a cancel, not an import
+      // failure - reporting it as `import-failed` would send the queue down
+      // the retry path for work the user asked to stop
+      if (signal.aborted) {
+        await discard();
+        yield cancelled();
+        return;
+      }
       const clean = toImportError(err, 'import failed');
       yield {
         t: 'error',

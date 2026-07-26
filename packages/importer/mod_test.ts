@@ -163,6 +163,56 @@ Deno.test('acceptance: failures are actionable - no stack traces, names named', 
   assert(badFormat.message.includes('supported:'));
 });
 
+// --- executor: cancelling means cancelled, on the wire and on disk -----------
+Deno.test('cancelled import emits ONE terminal event and leaves no artifacts', async () => {
+  const outDir = await Deno.makeTempDir({ prefix: 'sb-import-cancel-' });
+  const bus = new EventBus();
+  const queue = new JobQueue({ bus, concurrency: 1 });
+  const spec = parseWith(
+    JobSpecSchema,
+    { jobId: 'import-cancel', verb: 'prep', payload: {} },
+    'JobSpec',
+  );
+
+  // cancel the moment the executor is genuinely running: cancelling while the
+  // job is still pending is the QUEUE's path, and would never reach import.ts
+  const started = new Promise<void>((resolve) => {
+    const stop = bus.listen((e) => {
+      if (e.t === 'started') {
+        stop();
+        resolve();
+      }
+    });
+  });
+  const handle = queue.submit(
+    spec,
+    makeImportExecutor({ input: fx('cube.obj'), declaredHeightM: 0.5, outDir }),
+  );
+  await started;
+  handle.cancel();
+  const outcome = await handle.done;
+
+  assertEquals(outcome.kind, 'cancelled');
+  assertEquals(outcome.error?.code, 'cancelled');
+
+  // the event vocabulary is a contract (schema/jobs.ts) and the log drawer
+  // renders it verbatim: one job, one terminal event
+  const events = bus.ring.snapshot();
+  const terminal = events.filter((e) => e.t === 'done' || e.t === 'error');
+  assertEquals(terminal.map((e) => e.t), ['error'], JSON.stringify(events.map((e) => e.t)));
+  assertEquals(events.filter((e) => e.t === 'artifact').length, 0, 'no artifacts were announced');
+
+  // and a cancelled import does not leave a workspace claiming it finished
+  for (const name of ['canonical.glb', 'preflight.json']) {
+    await assertRejects(
+      () => Deno.stat(`${outDir}/${name}`),
+      Deno.errors.NotFound,
+      undefined,
+      `${name} survived a cancelled import`,
+    );
+  }
+});
+
 // --- executor: preflight lands as an artifact event ---------------------------
 Deno.test('import executor emits canonical + preflight artifacts through the bus', async () => {
   const outDir = await Deno.makeTempDir({ prefix: 'sb-import-' });
