@@ -25,10 +25,18 @@
     ]
   },
   "lint": {
-    "rules": { "tags": ["recommended"] },
-    "exclude": ["spikes"]
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    },
+    "exclude": [
+      "spikes"
+    ]
   },
-  "unstable": ["webgpu"],
+  "unstable": [
+    "webgpu"
+  ],
   "exclude": [
     "spikes/shell/app/dist",
     "spikes/shell/app/node_modules",
@@ -39,6 +47,7 @@
     "dev": "deno test --watch --watch-exclude=node_modules --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=nvidia-smi,uv",
     "test": "deno test --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=nvidia-smi,uv",
     "test:gpu": "SPRITEBOOK_REQUIRE_GPU=1 deno test --allow-read --allow-write --allow-env --allow-ffi packages/render/ packages/style/",
+    "test:godot": "deno test --allow-read --allow-write --allow-env --allow-ffi --allow-run packages/export/godot_smoke_test.ts",
     "lint": "deno lint",
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",

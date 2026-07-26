@@ -18,6 +18,18 @@ import { BakeManifestSchema, parseWith } from '@spritebook/schema';
 import { exportGodot } from './godot.ts';
 
 const GODOT = Deno.env.get('GODOT4_BIN');
+
+/**
+ * `deno task test` runs with `--allow-run=nvidia-smi,uv`, so spawning Godot is
+ * DENIED there no matter what GODOT4_BIN says — setting the variable turned a
+ * skip into a hard failure of the whole suite, which is why nobody had ever
+ * seen this lane run. Ask for the permission rather than assume it, and say
+ * which task grants it.
+ */
+async function canRunGodot(bin: string): Promise<boolean> {
+  const { state } = await Deno.permissions.query({ name: 'run', command: bin });
+  return state === 'granted';
+}
 const BAKE = new URL('./fixtures/bake-aabbccdd', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
   '$1',
@@ -27,6 +39,13 @@ Deno.test({
   name: 'godot smoke: a real Godot 4 loads the exported SpriteFrames',
   ignore: !GODOT,
   fn: async () => {
+    if (!(await canRunGodot(GODOT!))) {
+      console.log(
+        `skip: GODOT4_BIN is set but this run cannot spawn it — asserted NOTHING. ` +
+          `Use \`deno task test:godot\`, which grants --allow-run.`,
+      );
+      return;
+    }
     const project = await Deno.makeTempDir({ prefix: 'sb-godot-smoke-' });
     try {
       const manifest = parseWith(
