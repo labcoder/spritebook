@@ -72,6 +72,16 @@ export interface PickOptions extends ReceiptOptions {
   texturedBy?: 'backend' | 'texture-substage';
   /** a freshly picked mesh has not been reprojected yet (default false) */
   reprojected?: boolean;
+  /**
+   * Canonical mesh fields the caller MEASURED off the bytes it just landed,
+   * overriding what the receipt implies — the same seam `setRigState` opens
+   * for a Track A fit, and for the same reason. `pick --reproject` repaints
+   * the mesh before it becomes canonical, so the bytes on disk are not the
+   * receipt's any more; their hash has to ride in THIS patch. Journaling the
+   * re-pin separately means one `spritebook undo` restores the pre-reproject
+   * sha while the file still holds reprojected bytes.
+   */
+  canonicalMesh?: CanonicalMeshPatch;
 }
 
 export interface CanonicalMeshPatch {
@@ -143,6 +153,9 @@ export async function pickResult(
       heightM,
       texturedBy,
       reprojected: opts.reprojected ?? false,
+      // what the caller measured wins over what the receipt implies: the
+      // manifest must pin the bytes that are ACTUALLY canonical now
+      ...defined(opts.canonicalMesh ?? {}),
     };
     return {
       op: [

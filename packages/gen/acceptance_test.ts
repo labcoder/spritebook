@@ -21,6 +21,7 @@ import { CharacterManifestSchema, parseWith } from '@spritebook/schema';
 import type { JobEvent } from '@spritebook/schema';
 import { runInstallJob } from '@spritebook/registry';
 import { loadCatalog } from '@spritebook/registry';
+import { applyPatchOps, workspacePaths } from '@spritebook/core';
 import { runGenJob, runPickJob } from './mod.ts';
 
 const SIDECAR_DIR = decodeURIComponent(
@@ -322,6 +323,58 @@ Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash'
       hex,
       'the manifest pins the bytes that are ACTUALLY on disk after reprojection',
     );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+/** The ManifestPatch lines the workspace's journal currently holds. */
+async function journalPatches(workspace: string) {
+  const text = await Deno.readTextFile(workspacePaths(workspace).journal).catch(() => '');
+  return text.split('\n').filter((l) => l.length > 0).map((l) => JSON.parse(l));
+}
+
+Deno.test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', async () => {
+  if (!(await sidecarAvailable())) return;
+  const f = await setup();
+  try {
+    const gen = await collect(runGenJob(genOpts(f)));
+    assert(!gen.find((e) => e.t === 'error'), JSON.stringify(gen.at(-1)));
+    const before = (await journalPatches(f.workspace)).length;
+
+    const picked = await collect(
+      runPickJob({
+        jobId: 'itest-pick',
+        workspace: f.workspace,
+        resultId: 'r1',
+        reproject: true,
+      }),
+    );
+    assert(!picked.find((e) => e.t === 'error'), JSON.stringify(picked.at(-1)));
+
+    // promote + repaint + record is ONE step, so it is ONE journal line: a
+    // second patch makes `spritebook undo` pop half of it
+    const patches = await journalPatches(f.workspace);
+    assertEquals(
+      patches.length - before,
+      1,
+      `one step is one patch (labels: ${patches.slice(before).map((p) => p.label).join(', ')})`,
+    );
+
+    // ...and popping it undoes the WHOLE pick, rather than leaving a manifest
+    // that pins the pre-reproject sha for bytes that were repainted
+    const doc = JSON.parse(await Deno.readTextFile(workspacePaths(f.workspace).manifest));
+    const undone = applyPatchOps(doc, patches[patches.length - 1].inverse);
+    const restored = parseWith(CharacterManifestSchema, undone, 'undone CharacterManifest');
+    assertEquals(restored.generation.pickedResultId, undefined, 'the pick came off');
+    assertEquals(restored.canonicalMesh, undefined, 'and so did the hash it pinned');
+
+    // the staging temps do not outlive the step
+    const strays: string[] = [];
+    for await (const e of Deno.readDir(workspacePaths(f.workspace).canonicalDir)) {
+      if (e.name.includes('.tmp.')) strays.push(e.name);
+    }
+    assertEquals(strays, [], 'no staging temps left in canonical/');
   } finally {
     await f.cleanup();
   }

@@ -11,13 +11,27 @@
  * With `--reproject` the source image is painted back onto the picked mesh
  * (see reproject.ts) BEFORE the canonical hash is recorded, so the manifest's
  * `canonicalMesh.gltfSha256` always pins the bytes that are actually on disk.
+ *
+ * ## One step, one patch, one undo
+ *
+ * The whole verb — promote, optionally repaint, record — is ONE journaled
+ * patch, the shape identityjob.ts and the Track A fit already use. Splitting
+ * the re-pin off into a second patch made `spritebook undo` after
+ * `pick --reproject` pop only half the step, leaving a manifest that pinned
+ * the pre-reproject sha for bytes that had been repainted.
+ *
+ * The stages run file-to-file through temps in canonical/ and the rename into
+ * `canonical/model.glb` happens only once every stage succeeded, so the bytes
+ * and the manifest change together and a failed reprojection leaves the
+ * workspace exactly as it was. The glb is not journaled and does not need to
+ * be: `results/<id>/model.glb` is immutable (pick copies, never moves), so the
+ * byte recovery path is always to pick again.
  */
 import { CANONICAL_MODEL, type JobEvent } from '@spritebook/schema';
 import {
   pickResult,
   readWorkspace,
   resultPaths,
-  setCanonicalMesh,
   sourceImagePath,
   workspacePaths,
 } from '@spritebook/core';
@@ -70,6 +84,7 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
   yield { t: 'queued', jobId, at: at() };
   yield { t: 'started', jobId, at: at() };
 
+  const tmp: string[] = [];
   try {
     const manifest = await readWorkspace(opts.workspace);
     const receipt = manifest.generation.results.find((r) => r.id === opts.resultId);
@@ -104,20 +119,16 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       );
     }
     await Deno.mkdir(paths.canonicalDir, { recursive: true });
-    await Deno.writeFile(canonicalPath, bytes);
-    yield {
-      t: 'progress',
-      jobId,
-      at: at(),
-      step: 'promote',
-      done: 1,
-      total: opts.reproject ? 3 : 2,
-    };
+    const total = opts.reproject ? 3 : 2;
 
-    // journal the pick itself first, so the manifest names a picked result
-    // even if reprojection then fails and the user retries with --reproject.
-    // The height is measured from the mesh: the receipt does not carry one,
-    // and core refuses to invent it.
+    // staged, not written straight to canonicalPath: the bytes and the
+    // manifest have to change together, so nothing becomes canonical until
+    // every stage of this verb has succeeded
+    let staged = `${paths.canonicalDir}/pick-${opts.resultId}.tmp.glb`;
+    tmp.push(staged);
+    await Deno.writeFile(staged, bytes);
+    yield { t: 'progress', jobId, at: at(), step: 'promote', done: 1, total };
+
     // texturedBy is a property of the JOB, so derive it from what the backend
     // declared it emits rather than guessing from the file
     let texturedBy: 'backend' | 'texture-substage' = 'backend';
@@ -130,11 +141,6 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       // a backend that has since left the catalog cannot change what already
       // ran; 'backend' is the honest default for a mesh that arrived textured
     }
-    await pickResult(opts.workspace, opts.resultId, {
-      label: `Pick ${opts.resultId}`,
-      heightM: await heightOf(bytes),
-      texturedBy,
-    });
 
     let reprojected = false;
     if (opts.reproject) {
@@ -149,12 +155,15 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
           { code: 'no-source' },
         );
       }
+      const painted = `${paths.canonicalDir}/pick-${opts.resultId}-reprojected.tmp.glb`;
+      tmp.push(painted);
       try {
         const stats = await reprojectTexture({
-          modelPath: canonicalPath,
+          modelPath: staged,
           imagePath: image,
-          outPath: canonicalPath,
+          outPath: painted,
         });
+        staged = painted;
         reprojected = true;
         yield {
           t: 'progress',
@@ -184,17 +193,24 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       }
     }
 
-    // pickResult already recorded canonicalMesh for the promoted bytes, so
-    // only reprojection has anything left to say — and when it does, the
-    // manifest must follow the bytes that are ACTUALLY on disk now
-    if (reprojected) {
-      const finalBytes = await Deno.readFile(canonicalPath);
-      await setCanonicalMesh(opts.workspace, {
-        gltfSha256: await sha256Hex(finalBytes),
-        heightM: await heightOf(finalBytes),
-        reprojected: true,
-      }, { label: `Reproject ${opts.resultId}` });
-    }
+    // every stage succeeded: the staged file becomes THE canonical mesh in one
+    // rename, and the manifest follows it in ONE patch. Both the promotion and
+    // the re-pin land together, so `spritebook undo` after `pick --reproject`
+    // pops the whole step instead of half of it.
+    await Deno.rename(staged, canonicalPath);
+    const finalBytes = await Deno.readFile(canonicalPath);
+    await pickResult(opts.workspace, opts.resultId, {
+      label: reprojected ? `Pick ${opts.resultId} (reprojected)` : `Pick ${opts.resultId}`,
+      // the height is measured from the mesh: the receipt does not carry one,
+      // and core refuses to invent it
+      heightM: await heightOf(finalBytes),
+      texturedBy,
+      reprojected,
+      // reprojection repaints the texture, so the receipt's hash describes
+      // bytes that are no longer the canonical ones
+      ...(reprojected ? { canonicalMesh: { gltfSha256: await sha256Hex(finalBytes) } } : {}),
+    });
+    yield { t: 'progress', jobId, at: at(), step: 'record', done: total, total };
 
     yield { t: 'artifact', jobId, at: at(), kind: 'canonical-model', path: canonicalPath };
     yield { t: 'artifact', jobId, at: at(), kind: 'character-manifest', path: paths.manifest };
@@ -213,5 +229,14 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       message: err instanceof Error ? err.message : String(err),
       retryable: false,
     };
+  } finally {
+    for (const path of tmp) {
+      try {
+        await Deno.remove(path);
+      } catch {
+        // renamed into place, or never written — either way there is nothing
+        // left to clean
+      }
+    }
   }
 }

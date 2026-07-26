@@ -207,6 +207,41 @@ Deno.test('pickResult sets pickedResultId and writes canonicalMesh', async () =>
   });
 });
 
+Deno.test('pickResult carries a MEASURED canonicalMesh in the SAME patch', async () => {
+  await withCharacter(async (dir) => {
+    await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
+    const before = await manifestBytes(dir);
+
+    // `pick --reproject` repaints the mesh before it becomes canonical, so the
+    // bytes on disk are not the receipt's any more and the hash describing
+    // them has to ride in THIS patch — a second patch means one `undo` pops
+    // half the step and leaves the pre-reproject sha pinned to repainted bytes
+    const manifest = await pickResult(dir, 'r1', {
+      heightM: 1.7,
+      texturedBy: 'backend',
+      reprojected: true,
+      canonicalMesh: { gltfSha256: sha('d') },
+      now: NOW,
+    });
+    assertEquals(manifest.canonicalMesh, {
+      gltfSha256: sha('d'),
+      heightM: 1.7,
+      texturedBy: 'backend',
+      reprojected: true,
+    });
+
+    const patches = await journalLines(dir);
+    assertEquals(patches.length, 2, 'one step is one patch');
+
+    // so ONE undo takes the whole pick off
+    await cliUndo(dir);
+    assertEquals(await manifestBytes(dir), before, 'byte-for-byte restoration');
+    const restored = await readWorkspace(dir);
+    assertEquals(restored.generation.pickedResultId, undefined);
+    assertEquals(restored.canonicalMesh, undefined);
+  });
+});
+
 Deno.test('pickResult refuses an unknown id and lists what is available', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
