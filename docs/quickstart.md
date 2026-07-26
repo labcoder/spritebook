@@ -146,6 +146,8 @@ hysteresis), so frames do not shimmer in motion.
 | `--style <id>`       | `pixel-8`  | `cel-2`, `pixel-8`, or `painterly`                              |
 | `--directions <n>`   | `8`        | `2`, `4`, `8`, or `16`                                          |
 | `--frames <n>`       | `6`        | frames of the built-in idle pose (positive integer)             |
+| `--clips <spec>`     | (idle)     | `clip:frames[@speed][!hold][,...]` — bake real clips instead    |
+| `--pack <dir>`       | (bundled)  | animation pack the `--clips` ids resolve in                     |
 | `--cell <px>`        | `64`       | square output cell size                                         |
 | `--ppm <n>`          | `32`       | pixels per meter (world scale)                                  |
 | `--elevation <deg>`  | `30`       | camera elevation angle                                          |
