@@ -4,7 +4,7 @@
  * character (displayName) can never invalidate anything because displayName
  * cannot even be expressed in CacheKeyInputs (schema-strict + type-asserted).
  */
-import type { CacheKeyInputs, CharacterManifest } from '@spritebook/schema';
+import type { CacheKeyInputs } from '@spritebook/schema';
 import { CacheKeyInputsSchema, canonicalJson, parseWith } from '@spritebook/schema';
 
 export async function sha256Hex(text: string): Promise<string> {
@@ -19,45 +19,20 @@ export async function computeCacheKey(inputs: CacheKeyInputs): Promise<string> {
 }
 
 /**
- * Derive CacheKeyInputs from a character manifest + resolved presets.
- * Reads structural state only — displayName is not an input by construction.
+ * ## Where the recipe is derived
+ *
+ * `buildCacheInputs` in @spritebook/pack, and only there. A second derivation
+ * lived here — `deriveCacheKeyInputs`, manifest-in — with zero production
+ * callers, and it was weaker in three ways that mattered: it hashed clip
+ * BINDINGS with no clip content (so an in-place pack upgrade served stale
+ * pixels, review F1), it trusted `canonicalMesh.gltfSha256` (what the manifest
+ * CLAIMS) over the bytes on disk, and it required a rig, a mesh and a picked
+ * result, so it could not describe `bake --model x.glb` at all.
+ *
+ * Two derivations of one key is a hole waiting for a caller to pick the wrong
+ * one, so the weaker went. What it had that the survivor lacked — the real rig
+ * and the real backend — moved across as `BakeProvenance`.
  */
-export async function deriveCacheKeyInputs(
-  manifest: CharacterManifest,
-  resolved: {
-    cameraPreset: unknown;
-    stylePreset: unknown;
-    rendererVersion: string;
-  },
-): Promise<CacheKeyInputs> {
-  if (!manifest.canonicalMesh) throw new Error('deriveCacheKeyInputs: no canonical mesh yet');
-  if (!manifest.rig) throw new Error('deriveCacheKeyInputs: no rig state yet');
-  const picked = manifest.generation.results.find(
-    (r) => r.id === manifest.generation.pickedResultId,
-  );
-  if (!picked) throw new Error('deriveCacheKeyInputs: no picked generation result');
-  return parseWith(CacheKeyInputsSchema, {
-    characterId: manifest.id,
-    canonicalMeshSha256: manifest.canonicalMesh.gltfSha256,
-    rigStateHash: await sha256Hex(canonicalJson(manifest.rig)),
-    clipBindingHash: await sha256Hex(canonicalJson(manifest.animationSet ?? [])),
-    // mirroring folds into the camera hash, exactly as pack/bake.ts does it:
-    // a mirrored bake renders half the directions and flips the rest, so it
-    // produces DIFFERENT pixels from an unmirrored one. Hashing the preset
-    // alone let the two trade cache entries - `mirroring` is per character,
-    // so this derivation is the only place that can see it.
-    cameraPresetHash: await sha256Hex(
-      canonicalJson({ camera: resolved.cameraPreset, mirroring: manifest.mirroring.enabled }),
-    ),
-    stylePresetHash: await sha256Hex(canonicalJson(resolved.stylePreset)),
-    rendererVersion: resolved.rendererVersion,
-    backend: {
-      modelId: picked.backend.modelId,
-      version: picked.backend.version,
-      paramsHash: await sha256Hex(canonicalJson(picked.params)),
-    },
-  }, 'derived CacheKeyInputs');
-}
 
 export interface CacheStore {
   has(key: string): Promise<boolean>;

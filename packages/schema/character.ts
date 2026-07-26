@@ -128,13 +128,15 @@ export const CharacterManifestSchema = z.strictObject({
     reprojected: z.boolean(),
   }).optional(),
   rig: RigStateSchema.optional(),
-  /** The character's own clip choices. UNREAD TODAY, being wired (D-029):
-   * `bake` will read these as defaults and write them back, and they will join
-   * the cache key — deriveCacheKeyInputs already hashes this field. */
+  /** The character's own clip choices (D-029). `bake` reads the ENABLED ones as
+   * defaults when `--clips` is absent, and merges what it ran back over these
+   * — a binding kept as `enabled: false` survives, because it is a choice the
+   * bake was never asked about. Clip content is hashed into the bake key
+   * alongside the binding, so an in-place pack upgrade invalidates. */
   animationSet: z.array(ClipBindingSchema).optional(),
-  /** The character's own camera + style. UNREAD TODAY, being wired (D-029):
-   * today camera and style reach runBakeJob only through BakeJobSpec, so a
-   * character cannot carry its own look. P4's Look stage edits this.
+  /** The character's own camera + style (D-029). `bake --workspace` reads this
+   * as its defaults and writes back what it ran with; any explicit flag wins.
+   * P4's Look stage edits it.
    *
    * Both ids resolve against a built-in table — `CAMERA_PRESETS` in
    * @spritebook/core, `PRESETS` in @spritebook/style — and both sides take
@@ -148,12 +150,17 @@ export const CharacterManifestSchema = z.strictObject({
     stylePresetId: z.string().min(1),
     overrides: StyleOverridesSchema.optional(),
   }).optional(),
-  /** OPT-IN (D-008): asymmetry is first-class */
+  /** OPT-IN (D-008): asymmetry is first-class, so this is never inferred from
+   * GEOMETRY. `bake` does read it — `--mirror` records the choice here and
+   * later bakes honour it without the flag, which is the same explicit decision
+   * remembered, not a guess. `--no-mirror` overrides it for one bake. */
   mirroring: z.strictObject({ enabled: z.boolean() }),
   detailLayers: z.array(DetailLayerSchema).optional(),
   attachments: z.array(AttachmentSchema).optional(),
-  /** The character's most recent bake. UNREAD TODAY, being wired (D-029) —
-   * only the writer is missing; cloneCharacter already drops it correctly. */
+  /** The character's most recent bake (D-029), written by `bake --workspace` in
+   * the same journaled patch as `look`, `animationSet` and `mirroring` — one
+   * undo takes the whole bake back rather than half of it. `cloneCharacter`
+   * drops it: a copy has baked nothing. */
   lastBakeId: BakeIdSchema.optional(),
 });
 export type CharacterManifest = z.output<typeof CharacterManifestSchema>;

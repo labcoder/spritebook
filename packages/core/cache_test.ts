@@ -1,21 +1,10 @@
 import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert@1';
-import type { CacheKeyInputs, CharacterManifest } from '@spritebook/schema';
-import { CharacterManifestSchema, parseWith } from '@spritebook/schema';
-import { computeCacheKey, deriveCacheKeyInputs, DiskCacheStore, InputHashCache } from './cache.ts';
-import { ManifestJournal } from './journal.ts';
+import type { CacheKeyInputs } from '@spritebook/schema';
+import { computeCacheKey, DiskCacheStore, InputHashCache } from './cache.ts';
 
 async function fixtureInputs(): Promise<CacheKeyInputs> {
   const url = new URL('../schema/fixtures/valid/cache-key-inputs.json', import.meta.url);
   return JSON.parse(await Deno.readTextFile(url));
-}
-
-async function fixtureManifest(): Promise<CharacterManifest> {
-  const url = new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url);
-  return parseWith(
-    CharacterManifestSchema,
-    JSON.parse(await Deno.readTextFile(url)),
-    'CharacterManifest fixture',
-  );
 }
 
 Deno.test('acceptance: same inputs hit; ANY single input change misses', async () => {
@@ -49,39 +38,6 @@ Deno.test('acceptance: same inputs hit; ANY single input change misses', async (
     assert(!miss.hit, `mutating ${path.join('.')} must miss`);
     assertNotEquals(miss.key, again.key);
   }
-});
-
-Deno.test('acceptance: displayName rename causes ZERO cache invalidation', async () => {
-  const manifest = await fixtureManifest();
-  const resolved = {
-    cameraPreset: { id: 'cam' },
-    stylePreset: { id: 'style' },
-    rendererVersion: '0.1.0',
-  };
-  const cache = new InputHashCache();
-
-  const before = await deriveCacheKeyInputs(manifest, resolved);
-  const key = await cache.put(before, 'bake-e41c');
-
-  // rename through the real journal path (the only sanctioned mutation route)
-  const journal = new ManifestJournal(
-    manifest as unknown as Record<string, unknown>,
-    { now: () => '2026-07-12T00:00:00Z' },
-  );
-  journal.commit({
-    target: { kind: 'character', id: 'brave-knight' },
-    op: [{ op: 'replace', path: '/displayName', value: 'Completely New Name' }],
-    label: 'Rename',
-  });
-  const renamed = parseWith(CharacterManifestSchema, journal.doc, 'renamed manifest');
-  assertEquals(renamed.displayName, 'Completely New Name');
-
-  const after = await deriveCacheKeyInputs(renamed, resolved);
-  assertEquals(after, before, 'derived inputs identical after rename');
-  const lookup = await cache.lookup(after);
-  assert(lookup.hit, 'rename never invalidates');
-  assertEquals(lookup.key, key);
-  assertEquals((await cache.keys()).length, 1, 'no new entries, nothing evicted');
 });
 
 Deno.test('computeCacheKey is key-order independent and validates inputs', async () => {
@@ -119,42 +75,6 @@ Deno.test('DiskCacheStore round-trips and lists keys', async () => {
     assert(String(err).includes('sha256'));
   }
   assert(guarded, 'non-hash keys are rejected');
-});
-
-Deno.test('deriveCacheKeyInputs refuses manifests missing structural stages', async () => {
-  const manifest = await fixtureManifest();
-  const resolved = { cameraPreset: {}, stylePreset: {}, rendererVersion: '0.1.0' };
-  const noMesh = { ...manifest, canonicalMesh: undefined };
-  let threw = false;
-  try {
-    await deriveCacheKeyInputs(noMesh as CharacterManifest, resolved);
-  } catch (err) {
-    threw = true;
-    assert(String(err).includes('canonical mesh'));
-  }
-  assert(threw);
-});
-
-Deno.test('deriveCacheKeyInputs: mirroring moves the key', async () => {
-  // Mirroring renders half the directions and flips the rest, so it produces
-  // DIFFERENT pixels. Before this, two manifests differing only in
-  // mirroring.enabled hashed identically and could trade cache entries -
-  // pack/bake.ts documents and fixes the same hole downstream, but this
-  // manifest-bound derivation never got it.
-  const base = await fixtureManifest();
-  const resolved = { cameraPreset: {}, stylePreset: {}, rendererVersion: '0.1.0' };
-  const off = await deriveCacheKeyInputs(
-    { ...base, mirroring: { enabled: false } },
-    resolved,
-  );
-  const on = await deriveCacheKeyInputs(
-    { ...base, mirroring: { enabled: true } },
-    resolved,
-  );
-  assert(
-    off.cameraPresetHash !== on.cameraPresetHash,
-    'a mirrored bake must not share a camera hash with an unmirrored one',
-  );
 });
 
 Deno.test('DiskCacheStore.put is atomic: no torn value is ever served as a hit', async () => {

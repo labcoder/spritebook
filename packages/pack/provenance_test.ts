@@ -122,3 +122,45 @@ Deno.test('renaming a character cannot reach the key at all', async () => {
   assert(!('displayName' in inputs), 'not a field a bake recipe has');
   assertEquals(inputs.characterId, 'c', 'identity binds on the immutable id');
 });
+
+Deno.test('ACCEPTANCE: renaming a character invalidates nothing, through the real verb', async () => {
+  // This lived in core/cache_test.ts and core/roster_test.ts against
+  // `deriveCacheKeyInputs`, which no production path called. It belongs against
+  // the derivation the bake actually runs. Renaming is the one mutation that
+  // must never cost a user a re-bake, and `displayName` is not merely absent
+  // from the recipe - CacheKeyInputs is strict, so it cannot be expressed.
+  const { createWorkspace, readWorkspace, renameCharacter } = await import('@spritebook/core');
+  const raw = await Deno.makeTempDir({ prefix: 'sb-rename-key-' });
+  const ws = raw.replaceAll('\\', '/');
+  try {
+    await createWorkspace({
+      workspace: ws,
+      characterId: 'brave-knight',
+      displayName: 'Original Name',
+      source: { kind: 'mesh', originalFilename: 'humanoid.glb', sha256: 'a'.repeat(64) },
+      now: () => '2026-07-12T00:00:00Z',
+    });
+    const before = await readWorkspace(ws);
+    const keyBefore = await buildCacheInputs({ ...spec, characterId: before.id }, SIG, {
+      rig: RIG,
+      backend: BACKEND,
+    });
+
+    const after = await renameCharacter(ws, 'Totally Different Name', {
+      now: () => '2026-07-12T00:00:00Z',
+    });
+    assertEquals(after.displayName, 'Totally Different Name');
+
+    const keyAfter = await buildCacheInputs({ ...spec, characterId: after.id }, SIG, {
+      rig: RIG,
+      backend: BACKEND,
+    });
+    assertEquals(
+      keyAfter,
+      keyBefore,
+      'every cached frame of this character is still valid after a rename',
+    );
+  } finally {
+    await Deno.remove(raw, { recursive: true });
+  }
+});

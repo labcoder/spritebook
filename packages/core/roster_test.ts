@@ -8,8 +8,7 @@
 import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import type { CharacterId } from '@spritebook/schema';
 import { canonicalJson } from '@spritebook/schema';
-import { deriveCacheKeyInputs } from './cache.ts';
-import { createWorkspace, readWorkspace, workspacePaths } from './workspace.ts';
+import { createWorkspace, workspacePaths } from './workspace.ts';
 import { cloneCharacter, renameCharacter } from './roster.ts';
 
 const NOW = () => '2026-07-19T00:00:00Z';
@@ -88,32 +87,6 @@ Deno.test('rename changes one field and nothing else', async () => {
       .split('\n').filter((l) => l);
     assertEquals(lines.length, 1);
     assert(JSON.parse(lines[0]).inverse.length > 0, 'the rename is undoable');
-  } finally {
-    await Deno.remove(ws, { recursive: true });
-  }
-});
-
-Deno.test('ACCEPTANCE: rename invalidates nothing - the derived key is identical', async () => {
-  const ws = await character('Original Name');
-  try {
-    const resolved = {
-      cameraPreset: { id: 'cam' },
-      stylePreset: { id: 'style' },
-      rendererVersion: '0.1.0',
-    };
-    const before = await readWorkspace(ws);
-    const keyBefore = await deriveCacheKeyInputs(before, resolved);
-
-    // rename through the REAL verb, not a hand-built patch
-    const after = await renameCharacter(ws, 'Totally Different Name', { now: NOW });
-    assertEquals(after.displayName, 'Totally Different Name');
-
-    const keyAfter = await deriveCacheKeyInputs(after, resolved);
-    assertEquals(
-      keyAfter,
-      keyBefore,
-      'every cached frame of this character is still valid after a rename',
-    );
   } finally {
     await Deno.remove(ws, { recursive: true });
   }
