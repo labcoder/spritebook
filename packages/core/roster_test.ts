@@ -169,3 +169,53 @@ function deepSorted(v: unknown): string {
     return val;
   });
 }
+
+Deno.test('undo on a fresh clone actually undoes something', async () => {
+  // It used to journal `replace /displayName` to the value the document
+  // already held, so `undo` reported "undid: Clone of knight" and changed
+  // nothing. An undo that visibly does nothing is how a user stops trusting
+  // the stack, and the label made it look deliberate.
+  const src = await character('Brave Knight');
+  const dest = await Deno.makeTempDir();
+  try {
+    await Deno.remove(dest, { recursive: true });
+    await cloneCharacter(src, dest, { id: 'squire' as CharacterId, now: NOW });
+
+    const patch = JSON.parse(
+      (await Deno.readTextFile(workspacePaths(dest).journal)).split('\n')[0],
+    );
+    assertEquals(patch.op[0], {
+      op: 'replace',
+      path: '/displayName',
+      value: 'Brave Knight copy',
+    });
+    assertEquals(patch.inverse[0], {
+      op: 'replace',
+      path: '/displayName',
+      value: 'Brave Knight',
+    }, 'the inverse restores the source name, not the value already there');
+  } finally {
+    await Deno.remove(src, { recursive: true });
+    await Deno.remove(dest, { recursive: true });
+  }
+});
+
+Deno.test('a clone that keeps its source name journals nothing at all', async () => {
+  // Then there is genuinely nothing to undo, and an empty journal says so —
+  // the shape createWorkspace already lays down for a fresh character.
+  const src = await character('Brave Knight');
+  const dest = await Deno.makeTempDir();
+  try {
+    await Deno.remove(dest, { recursive: true });
+    await cloneCharacter(src, dest, {
+      id: 'squire' as CharacterId,
+      displayName: 'Brave Knight',
+      now: NOW,
+    });
+    assertEquals(await Deno.readTextFile(workspacePaths(dest).journal), '');
+    assertEquals(await Deno.readTextFile(workspacePaths(dest).cursor), '0');
+  } finally {
+    await Deno.remove(src, { recursive: true });
+    await Deno.remove(dest, { recursive: true });
+  }
+});

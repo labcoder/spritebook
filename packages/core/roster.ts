@@ -28,6 +28,7 @@ import {
   parseWith,
 } from '@spritebook/schema';
 import { ManifestJournal } from './journal.ts';
+import { writeAtomic } from './receipts.ts';
 import { readWorkspace, workspacePaths } from './workspace.ts';
 
 export interface RosterOptions {
@@ -68,9 +69,12 @@ export async function renameCharacter(
   }, 'ManifestPatch');
   const next = parseWith(CharacterManifestSchema, journal.doc, 'renamed CharacterManifest');
 
-  await Deno.writeTextFile(paths.journal, [...kept, patch].map((p) => canonicalJson(p)).join(''));
-  await Deno.writeTextFile(paths.cursor, String(kept.length + 1));
-  await Deno.writeTextFile(paths.manifest, journal.canonicalBytes);
+  // journal -> cursor -> manifest, each atomically: same three files as
+  // receipts.ts, so the same crash-safety argument applies (its module header
+  // spells it out). This path used to write them plainly.
+  await writeAtomic(paths.journal, [...kept, patch].map((p) => canonicalJson(p)).join(''));
+  await writeAtomic(paths.cursor, String(kept.length + 1));
+  await writeAtomic(paths.manifest, journal.canonicalBytes);
   return next;
 }
 
@@ -137,18 +141,34 @@ export async function cloneCharacter(
   const validated = parseWith(CharacterManifestSchema, cloned, 'cloned CharacterManifest');
 
   await Deno.mkdir(destWorkspace, { recursive: true });
-  await Deno.writeTextFile(destPaths.manifest, canonicalJson(validated));
-  // a fresh history, whose first line says where this character came from
-  const journal = new ManifestJournal(JSON.parse(canonicalJson(validated)), { now: opts.now });
-  const built = journal.commit({
-    target: { kind: 'character', id: validated.id },
-    op: [{ op: 'replace', path: '/displayName', value: validated.displayName }],
-    label: opts.label ?? `Clone of ${source.id} ("${source.displayName}")`,
-  });
-  const patch = parseWith(ManifestPatchSchema, { ...built, seq: 0 }, 'ManifestPatch');
-  await Deno.writeTextFile(destPaths.journal, canonicalJson(patch));
-  await Deno.writeTextFile(destPaths.cursor, '1');
-  await Deno.writeTextFile(destPaths.manifest, journal.canonicalBytes);
+
+  // A fresh history whose first line says where this character came from — and
+  // whose first line is TRUE. It used to journal `replace /displayName` to the
+  // value the document already held, so `undo` on a fresh clone reported
+  // "undid: Clone of knight" and changed nothing; an undo that visibly does
+  // nothing is how a user stops trusting the stack. The journal's base is
+  // therefore the copy BEFORE its rename, which makes the patch a real change:
+  // undo takes the copy back to the source's name, which is a thing someone
+  // who did not want the " copy" suffix would actually ask for.
+  const renamed = validated.displayName !== source.displayName;
+  const base = { ...validated, displayName: source.displayName };
+  const journal = new ManifestJournal(JSON.parse(canonicalJson(base)), { now: opts.now });
+  if (renamed) {
+    const built = journal.commit({
+      target: { kind: 'character', id: validated.id },
+      op: [{ op: 'replace', path: '/displayName', value: validated.displayName }],
+      label: opts.label ?? `Clone of ${source.id} ("${source.displayName}")`,
+    });
+    const patch = parseWith(ManifestPatchSchema, { ...built, seq: 0 }, 'ManifestPatch');
+    await writeAtomic(destPaths.journal, canonicalJson(patch));
+    await writeAtomic(destPaths.cursor, '1');
+  } else {
+    // a clone that kept the source's name changed nothing, so there is nothing
+    // to undo — an empty journal, exactly as createWorkspace lays down
+    await writeAtomic(destPaths.journal, '');
+    await writeAtomic(destPaths.cursor, '0');
+  }
+  await writeAtomic(destPaths.manifest, journal.canonicalBytes);
   return parseWith(CharacterManifestSchema, journal.doc, 'cloned CharacterManifest');
 }
 

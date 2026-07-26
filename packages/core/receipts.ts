@@ -516,8 +516,14 @@ async function commit(
   return next;
 }
 
-/** Write via a sibling temp file so a reader never sees a half-written doc. */
-async function writeAtomic(path: string, text: string): Promise<void> {
+/**
+ * Write via a sibling temp file so a reader never sees a half-written doc.
+ *
+ * Exported because `roster.ts` writes the same three files and was writing them
+ * plainly — the crash-safety argument at the top of this module applies to
+ * whoever touches the journal, not to whoever happens to live in this file.
+ */
+export async function writeAtomic(path: string, text: string): Promise<void> {
   const tmp = `${path}.tmp`;
   await Deno.writeTextFile(tmp, text);
   await Deno.rename(tmp, path);
