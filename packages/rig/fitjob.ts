@@ -28,8 +28,9 @@ import {
   MANIFEST_FILE,
   parseWith,
 } from '@spritebook/schema';
-import { readWorkspace, setRigState, workspacePaths } from '@spritebook/core';
+import { setRigState, workspacePaths } from '@spritebook/core';
 import { fitCanonicalBody, type FitReport } from './fit.ts';
+import { promoteToCanonical } from './promote.ts';
 
 export interface FitJobOptions {
   jobId: string;
@@ -181,40 +182,23 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
       // geometry - and a decal aimed at a region would find no skeleton to own
       // it. Promote the bytes, then pin them in the SAME patch as the rig.
       const paths = workspacePaths(opts.workspace);
-      let meshRepin: { gltfSha256: string; heightM?: number } | undefined;
-      let promoted = false;
-      try {
-        const manifest = await readWorkspace(opts.workspace);
-        if (manifest.canonicalMesh === undefined) {
-          yield {
-            t: 'warn',
-            jobId,
-            at: at(),
-            code: 'fit-not-promoted',
-            message:
-              'This workspace has no picked canonical mesh, so the fitted body was left in ' +
-              `${fittedPath} instead of becoming canonical/model.glb. Run \`spritebook pick\` ` +
-              'first if you meant this fit to become the character.',
-          };
-        } else {
-          const bytes = await Deno.readFile(fittedPath);
-          await Deno.mkdir(paths.canonicalDir, { recursive: true });
-          await Deno.writeFile(paths.canonicalModel, bytes);
-          promoted = true;
-          const gltfSha256 = await sha256Hex(bytes);
-          if (gltfSha256 !== manifest.canonicalMesh.gltfSha256) {
-            // the fit REPORTS the height it fitted to; no need to re-measure
-            meshRepin = { gltfSha256, heightM: report.heightM };
-          }
-        }
-      } catch (err) {
+      // the fit REPORTS the height it fitted to, so the re-pin carries it; no
+      // need to re-measure, and a rig (which does not change height) passes none
+      const promotion = await promoteToCanonical(opts.workspace, fittedPath, report.heightM);
+      const promoted = promotion.promoted;
+      const meshRepin = promotion.promoted ? promotion.meshRepin : undefined;
+      if (!promotion.promoted) {
         yield {
           t: 'warn',
           jobId,
           at: at(),
           code: 'fit-not-promoted',
-          message: `The fit is on disk at ${fittedPath} but could not become the workspace's ` +
-            `canonical mesh: ${err instanceof Error ? err.message : String(err)}`,
+          message: promotion.reason === 'no-canonical-mesh'
+            ? 'This workspace has no picked canonical mesh, so the fitted body was left in ' +
+              `${fittedPath} instead of becoming canonical/model.glb. Run \`spritebook pick\` ` +
+              'first if you meant this fit to become the character.'
+            : `The fit is on disk at ${fittedPath} but could not become the workspace's ` +
+              `canonical mesh: ${promotion.error.message}`,
         };
       }
 
@@ -289,9 +273,4 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
       retryable: fail.retryable,
     };
   }
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

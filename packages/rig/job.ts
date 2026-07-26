@@ -36,8 +36,9 @@ import {
   RIG_WEIGHTS_FILE,
   RigSkeletonSchema,
 } from '@spritebook/schema';
-import { setRigState, SidecarSession } from '@spritebook/core';
+import { setRigState, SidecarSession, workspacePaths } from '@spritebook/core';
 import { applyRig } from './apply.ts';
+import { promoteToCanonical } from './promote.ts';
 import { deformCheck } from './deform.ts';
 import { applyOrientationFixes, detectFacingFile } from './orient.ts';
 import { applyEditsToRiggedGlb, applyJointEdits, hintsFromEdits } from './edits.ts';
@@ -348,8 +349,55 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
         // the user has not looked at it yet; `accepted` is theirs to set
         accepted: false,
       };
+
+      // The rigged bytes BECOME the character's mesh, the way a Track A fit's
+      // do (fitjob.ts). Recording the RigState alone left the manifest
+      // describing a skeleton `canonical/model.glb` did not have, and a
+      // character in that state is not merely untidy: `bake --clips` fails at
+      // retarget with `target skeleton is missing the hips joint` immediately
+      // after a rig that reported success, a bone mask has no skeleton to
+      // resolve regions against, and the bake key hashes a RigState absent from
+      // the bytes it keys. Track A REPLACES the body; Track B skins the same
+      // vertices, so the canonical mesh becomes its own skinned self — the
+      // safer of the two promotions.
+      const paths = workspacePaths(opts.workspace);
+      // heightM is NOT re-stated: rigging adds a skeleton to the vertices it
+      // was given and does not change how tall the character stands, so
+      // carrying the pick's height forward is the truthful move
+      const promotion = await promoteToCanonical(opts.workspace, riggedPath);
+      if (!promotion.promoted) {
+        yield {
+          t: 'warn',
+          jobId,
+          at: at(),
+          code: 'rig-not-promoted',
+          message: promotion.reason === 'no-canonical-mesh'
+            ? 'This workspace has no picked canonical mesh, so the rigged model was left at ' +
+              `${riggedPath} instead of becoming canonical/model.glb. Run \`spritebook pick\` ` +
+              'first if you meant this rig to become the character.'
+            : `The rig is on disk at ${riggedPath} but could not become the workspace's ` +
+              `canonical mesh: ${promotion.error.message}`,
+        };
+      }
+
       try {
-        await setRigState(opts.workspace, rigState);
+        // ONE patch: the rig and the hash of the bytes it produced. Journaled
+        // apart, a single undo would restore the pre-rig RigState while
+        // canonical/model.glb still held the rigged mesh.
+        await setRigState(opts.workspace, rigState, {
+          ...(promotion.promoted && promotion.meshRepin
+            ? { canonicalMesh: promotion.meshRepin }
+            : {}),
+        });
+        if (promotion.promoted) {
+          yield {
+            t: 'artifact',
+            jobId,
+            at: at(),
+            kind: 'canonical-model',
+            path: paths.canonicalModel,
+          };
+        }
         yield {
           t: 'artifact',
           jobId,

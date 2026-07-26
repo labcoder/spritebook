@@ -8,7 +8,18 @@ import type { CacheKeyInputs } from '@spritebook/schema';
 import { CacheKeyInputsSchema, canonicalJson, parseWith } from '@spritebook/schema';
 
 export async function sha256Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return await sha256Bytes(new TextEncoder().encode(text));
+}
+
+/**
+ * The same digest over raw bytes — for hashing a file rather than a canonical
+ * string. Named apart from `sha256Hex` deliberately: `rig/fitjob.ts` used to
+ * carry a LOCAL `sha256Hex(bytes: Uint8Array)` that shadowed the exported
+ * `sha256Hex(text: string)`, so the two differed only in a parameter type at a
+ * call site that read identically either way.
+ */
+export async function sha256Bytes(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
