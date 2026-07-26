@@ -4,9 +4,10 @@
  * budget, the outline-exceeds-padding QA flag, and same-inputs determinism. The
  * perceptual per-preset goldens live in goldens_test.ts.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { decode as decodePng } from 'fast-png';
+import { assert, assertEquals, assertRejects, assertThrows } from 'jsr:@std/assert@1';
+import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { CameraPreset } from '@spritebook/schema';
+import { parseWith, StylePresetSchema } from '@spritebook/schema';
 import { styleFromAovs } from './pipeline.ts';
 import { CEL_2, PAINTERLY, PIXEL_8, PRESETS } from './presets.ts';
 import { srgbToHex } from './oklab.ts';
@@ -164,5 +165,116 @@ Deno.test('painterly: a bigger budget never shrinks the palette, and no entry is
   } finally {
     await Deno.remove(out, { recursive: true });
     await Deno.remove(out8, { recursive: true });
+  }
+});
+
+Deno.test('cluster-vote without a palette is refused, not silently blank', () => {
+  // Measured before this guard: a schema-valid preset with clusterVote and no
+  // quantize wrote 64x64 sprites with opaque=0 and reported flickerPct 0.000 —
+  // a perfect stability score for an image containing nothing.
+  // the schema refuses it outright, so the state cannot even be persisted
+  const bad = { ...PIXEL_8, id: 'blank-maker', quantize: undefined };
+  assertThrows(() => parseWith(StylePresetSchema, bad, 'StylePreset'), Error, 'clusterVote');
+});
+
+Deno.test('cluster-vote with an empty palette refuses at runtime too', async () => {
+  // Defence in depth: styleFromAovs takes a StylePreset object, so a caller
+  // that skipped validation still must not produce a blank sprite reporting
+  // success.
+  const out = await Deno.makeTempDir();
+  try {
+    const bad = { ...PIXEL_8, id: 'blank-maker', quantize: undefined } as unknown as typeof PIXEL_8;
+    const err = await assertRejects(() => styleFromAovs(SRC, CAM, bad, out), Error);
+    assert(
+      /clusterVote needs a palette/.test(err.message) && /blank/.test(err.message),
+      `the refusal explains the blank sprite: ${err.message}`,
+    );
+  } finally {
+    await Deno.remove(out, { recursive: true });
+  }
+});
+
+/**
+ * Write a minimal AOV frame set whose lit plane is a filled rect. `inset` 0
+ * makes the silhouette reach the border; a positive inset leaves a margin.
+ */
+async function writeSyntheticAov(dir: string, sx: number, inset: number) {
+  const rgba = new Uint8Array(sx * sx * 4);
+  for (let y = inset; y < sx - inset; y++) {
+    for (let x = inset; x < sx - inset; x++) {
+      const i = (y * sx + x) * 4;
+      rgba[i] = 180;
+      rgba[i + 1] = 60;
+      rgba[i + 2] = 60;
+      rgba[i + 3] = 255;
+    }
+  }
+  const gray = new Uint16Array(sx * sx).fill(1000);
+  const write = async (pass: string, data: Uint8Array | Uint16Array, channels: number) => {
+    await Deno.writeFile(
+      `${dir}/d00_f000_${pass}.png`,
+      encodePng({ width: sx, height: sx, data, channels, depth: channels === 1 ? 16 : 8 } as never),
+    );
+  };
+  await write('lit', rgba, 4);
+  await write('albedo', rgba, 4);
+  await write('normal', rgba, 4);
+  await write('depth', gray, 1);
+  await write('mask', gray, 1);
+}
+
+Deno.test('silhouette-clipped fires when the character runs out of cell', async () => {
+  // Nothing detected this before: camera.ts is explicit that the frustum never
+  // depends on the model bounds, so a roster whose pixelsPerMeter x height
+  // exceeds cellPx ships decapitated in every frame of every direction, and the
+  // only signal was looking at the pixels. qaFlags had exactly one code.
+  //
+  // Synthetic AOVs, because the committed fixture was framed to fit and the
+  // style stage cannot reframe it - it only downsamples what the renderer
+  // already produced.
+  const sx = 32; // superSample 4 -> an 8x8 cell
+  const cut = await Deno.makeTempDir();
+  const fits = await Deno.makeTempDir();
+  try {
+    await writeSyntheticAov(cut, sx, 0); // touches every border
+    await writeSyntheticAov(fits, sx, 8); // a clear margin all round
+    const src = (framesDir: string): AovSource => ({
+      framesDir,
+      directions: 1,
+      frames: 1,
+      width: sx,
+      height: sx,
+    });
+    const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 } };
+
+    const outCut = await Deno.makeTempDir();
+    const outFits = await Deno.makeTempDir();
+    try {
+      const clipped = await styleFromAovs(src(cut), cam, PIXEL_8, outCut);
+      const ok = await styleFromAovs(src(fits), cam, PIXEL_8, outFits);
+
+      assertEquals(
+        ok.flags.find((f) => f.code === 'silhouette-clipped'),
+        undefined,
+        'a character that fits raises no flag',
+      );
+      const fired = clipped.flags.find((f) => f.code === 'silhouette-clipped');
+      assert(
+        fired,
+        `a cut-off character raises the flag; got ${
+          JSON.stringify(clipped.flags.map((f) => f.code))
+        }`,
+      );
+      assertEquals(fired!.severity, 'warn');
+      assertEquals(fired!.sourceStage, 'look');
+      assert(fired!.frameRefs.length > 0, 'and names the frames that were cut');
+      assert(/cut off/.test(fired!.message), 'and says what is wrong');
+    } finally {
+      await Deno.remove(outCut, { recursive: true });
+      await Deno.remove(outFits, { recursive: true });
+    }
+  } finally {
+    await Deno.remove(cut, { recursive: true });
+    await Deno.remove(fits, { recursive: true });
   }
 });

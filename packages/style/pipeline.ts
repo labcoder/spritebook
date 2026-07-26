@@ -91,6 +91,19 @@ function processFrame(
   );
 
   if (style.temporal.clusterVote) {
+    // The vote is taken over palette LABELS, so an empty palette makes every
+    // opaque pixel label -1 and the sprite comes out blank — with `done` and
+    // flickerPct 0, which reads as a perfect stability score rather than a
+    // failure. StylePresetSchema refuses this combination, so reaching here
+    // means a hand-built preset bypassed validation; refuse rather than write
+    // 64x64 of nothing and call it success.
+    if (palette.size === 0) {
+      throw new Error(
+        `style "${style.id}": temporal.clusterVote needs a palette, but quantize produced ` +
+          'none - the vote is over palette labels, so every pixel would label -1 and the ' +
+          'sprite would be blank. Set quantize on the preset.',
+      );
+    }
     // blockSize = s: the Bayer dither is indexed by the 1x output block, so it
     // survives the vote instead of being averaged away (M3).
     const labelsSx = labelSx(comp, aov.width, aov.height, palette, dither, s);
@@ -133,6 +146,44 @@ function finishAlpha(rgba: Uint8Array, style: StylePreset, w: number, h: number)
     cutAlpha1bit(rgba, style.alpha.cutoff);
   }
   if (style.alpha.bleedPx > 0) dilateEdgeColors(rgba, w, h, style.alpha.bleedPx);
+}
+
+/**
+ * True when any opaque pixel sits on the cell's border row or column — i.e. the
+ * silhouette ran out of cell and was cut off by the frame edge.
+ *
+ * Nothing else detects this. `posedBounds` is often described as making "the
+ * padding fit" hold, but camera.ts is explicit that the frustum never depends
+ * on the bounds: bounds move the pivot anchor and the near/far bracket, and
+ * nothing at all constrains the silhouette to the cell. So a roster whose
+ * pixelsPerMeter x height exceeds cellPx ships decapitated in every frame of
+ * every direction of every clip, and the only signal is looking at the pixels.
+ */
+function touchesCellEdge(rgba: Uint8Array, w: number, h: number): boolean {
+  for (let x = 0; x < w; x++) {
+    if (rgba[(0 * w + x) * 4 + 3] !== 0) return true;
+    if (rgba[((h - 1) * w + x) * 4 + 3] !== 0) return true;
+  }
+  for (let y = 0; y < h; y++) {
+    if (rgba[(y * w + 0) * 4 + 3] !== 0) return true;
+    if (rgba[(y * w + (w - 1)) * 4 + 3] !== 0) return true;
+  }
+  return false;
+}
+
+/** The QA flag a clipped silhouette raises, with the frames that were cut. */
+function clippedFlag(refs: QAFlag['frameRefs']): QAFlag | null {
+  if (refs.length === 0) return null;
+  const shown = refs.slice(0, 8);
+  return {
+    code: 'silhouette-clipped',
+    severity: 'warn',
+    sourceStage: 'look',
+    frameRefs: shown,
+    message: `the silhouette reaches the cell edge on ${refs.length} frame` +
+      `${refs.length === 1 ? '' : 's'} - it is being cut off, not merely tight. ` +
+      'Lower pixelsPerMeter or raise cellPx so the character fits its cell.',
+  };
 }
 
 function qaFlags(style: StylePreset, camera: CameraPreset): QAFlag[] {
@@ -212,6 +263,7 @@ export async function styleClipsFromAovs(
   const styledDir = `${outDir}/styled`;
   const flickerFrames: Uint8Array[] = [];
 
+  const clipped: QAFlag['frameRefs'] = [];
   for (const src of srcs) {
     const aovs = perClip.get(src.clipId)!;
     const clipDir = `${styledDir}/${src.clipId}`;
@@ -222,6 +274,9 @@ export async function styleClipsFromAovs(
         const { rgba, labels } = processFrame(aovs[d][f], style, palette, color, dither, prev);
         prev = labels;
         finishAlpha(rgba, style, w1, h1);
+        if (touchesCellEdge(rgba, w1, h1)) {
+          clipped.push({ clipId: src.clipId, direction: d, frame: f });
+        }
         if (src === srcs[0] && d === 0) flickerFrames.push(rgba.slice());
         await Deno.writeFile(
           `${clipDir}/${tag(d, f)}.png`,
@@ -241,7 +296,7 @@ export async function styleClipsFromAovs(
     superSample: s,
     paletteHex: paletteToHex(palette),
     flickerPct: flickerPct(flickerFrames, w1, h1),
-    flags: qaFlags(style, camera),
+    flags: [...qaFlags(style, camera), ...[clippedFlag(clipped)].filter((f) => f !== null)],
     styledDir,
   };
 }
@@ -283,12 +338,14 @@ export async function styleFromAovs(
   await Deno.mkdir(styledDir, { recursive: true });
 
   const idleFrames: Uint8Array[] = []; // direction 0's styled frames, for flicker
+  const clipped: QAFlag['frameRefs'] = [];
   for (let d = 0; d < src.directions; d++) {
     let prev: Int32Array | null = null;
     for (let f = 0; f < src.frames; f++) {
       const { rgba, labels } = processFrame(aovs[d][f], style, palette, color, dither, prev);
       prev = labels;
       finishAlpha(rgba, style, w1, h1);
+      if (touchesCellEdge(rgba, w1, h1)) clipped.push({ clipId: 'idle', direction: d, frame: f });
       if (d === 0) idleFrames.push(rgba.slice());
       await Deno.writeFile(
         `${styledDir}/${tag(d, f)}.png`,
@@ -306,7 +363,7 @@ export async function styleFromAovs(
     superSample: s,
     paletteHex: paletteToHex(palette),
     flickerPct: flickerPct(idleFrames, w1, h1),
-    flags: qaFlags(style, camera),
+    flags: [...qaFlags(style, camera), ...[clippedFlag(clipped)].filter((f) => f !== null)],
     styledDir,
   };
 }
