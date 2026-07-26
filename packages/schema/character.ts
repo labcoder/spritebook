@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 import { BakeIdSchema, CharacterIdSchema, IsoTimeSchema, Sha256Schema } from './identity.ts';
-import { StylePresetBaseSchema } from './project.ts';
+import { CameraOverridesSchema, StylePresetBaseSchema } from './project.ts';
 import { SCHEMA_VERSION } from './migrate.ts';
 
 export const SourceRecordSchema = z.strictObject({
@@ -133,9 +133,17 @@ export const CharacterManifestSchema = z.strictObject({
   animationSet: z.array(ClipBindingSchema).optional(),
   /** The character's own camera + style. UNREAD TODAY, being wired (D-029):
    * today camera and style reach runBakeJob only through BakeJobSpec, so a
-   * character cannot carry its own look. P4's Look stage edits this. */
+   * character cannot carry its own look. P4's Look stage edits this.
+   *
+   * Both ids resolve against a built-in table — `CAMERA_PRESETS` in
+   * @spritebook/core, `PRESETS` in @spritebook/style — and both sides take
+   * overrides for the same reason: the PRD's Look stage exposes controls that
+   * are not detents (direction count, px/m, cell size beside the elevation
+   * slider; outline width and palette beside the style picker), and a
+   * per-character choice on one of those must not require minting a preset. */
   look: z.strictObject({
     cameraPresetId: z.string().min(1),
+    cameraOverrides: CameraOverridesSchema.optional(),
     stylePresetId: z.string().min(1),
     overrides: StylePresetBaseSchema.partial().optional(),
   }).optional(),

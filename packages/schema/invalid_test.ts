@@ -8,7 +8,7 @@ import { parseWith, SchemaError } from './canonical.ts';
 import { CharacterIdSchema } from './identity.ts';
 import { CacheKeyInputsSchema } from './cache.ts';
 import { JsonPatchOpSchema, ManifestPatchSchema } from './patch.ts';
-import { StylePresetSchema } from './project.ts';
+import { CameraOverridesSchema, StylePresetSchema } from './project.ts';
 import { JobEventSchema } from './jobs.ts';
 import { migrateCharacterManifest } from './migrate.ts';
 
@@ -130,6 +130,29 @@ Deno.test("StylePreset: passes must include 'lit' (parallel-layout law)", () => 
     'StylePreset',
     "must include 'lit'",
   );
+});
+
+Deno.test('CameraOverrides: every field optional, but each still judged', () => {
+  // the whole point of a partial: a character overriding one control must not
+  // have to restate the other six
+  parseWith(CameraOverridesSchema, {}, 'CameraOverrides');
+  parseWith(CameraOverridesSchema, { directions: 16 }, 'CameraOverrides');
+  // ...and "optional" is not "unchecked". These are the same refusals the full
+  // preset makes, and a hand-edited manifest is exactly where they show up.
+  expectFailure(CameraOverridesSchema, { elevationDeg: 90 }, 'CameraOverrides', 'elevationDeg');
+  expectFailure(CameraOverridesSchema, { directions: 5 }, 'CameraOverrides', 'directions');
+  expectFailure(CameraOverridesSchema, { pixelsPerMeter: 0 }, 'CameraOverrides', 'pixelsPerMeter');
+  expectFailure(CameraOverridesSchema, { cellPx: { w: 64 } }, 'CameraOverrides', 'h');
+});
+
+Deno.test('CameraOverrides cannot rename the preset it refines', () => {
+  // `id` is omitted on purpose (D-029): an override refines a preset, and the
+  // resolved camera keeps the preset's id so a bake manifest can still say
+  // where its framing came from. Accepting `id` here would let a character
+  // record framing under a name no table can resolve — the exact defect
+  // `cli-e30x8` was.
+  expectFailure(CameraOverridesSchema, { id: 'my-camera' }, 'CameraOverrides', 'id');
+  expectFailure(CameraOverridesSchema, { elevation: 30 }, 'CameraOverrides', 'elevation');
 });
 
 Deno.test('JobEvent rejects unknown discriminants and bad timestamps', () => {
