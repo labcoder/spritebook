@@ -150,24 +150,45 @@ hysteresis), so frames do not shimmer in motion.
 
 ### `spritebook bake`
 
-| Flag                 | Default    | Meaning                                                         |
-| -------------------- | ---------- | --------------------------------------------------------------- |
-| `--model <path>`     | (required) | rigged `.glb` to bake                                           |
-| `--character <id>`   | (required) | immutable character slug; binds cache keys                      |
-| `--out <dir>`        | (required) | bakes land at `<dir>/bake-<id>`                                 |
-| `--style <id>`       | `pixel-8`  | `cel-2`, `pixel-8`, or `painterly`                              |
-| `--directions <n>`   | `8`        | `2`, `4`, `8`, or `16`                                          |
-| `--frames <n>`       | `6`        | frames of the built-in idle pose (positive integer)             |
-| `--clips <spec>`     | (idle)     | `clip:frames[@speed][!hold][,...]` — bake real clips instead    |
-| `--pack <dir>`       | (bundled)  | animation pack the `--clips` ids resolve in                     |
-| `--cell <px>`        | `64`       | square output cell size                                         |
-| `--ppm <n>`          | `32`       | pixels per meter (world scale)                                  |
-| `--elevation <deg>`  | `30`       | camera elevation angle                                          |
-| `--padding <px>`     | `6`        | transparent padding inside each cell                            |
-| `--cache <dir>`      | (off)      | input-hash frame cache; the bake always writes through when set |
-| `--only-invalidated` | (off)      | serve unchanged frames from the cache (all-or-none per bake)    |
-| `--mirror`           | (off)      | produce the back-half directions by flipping the front half     |
-| `--json`             | (off)      | NDJSON job events on stdout                                     |
+| Flag                 | Default       | Meaning                                                         |
+| -------------------- | ------------- | --------------------------------------------------------------- |
+| `--workspace <dir>`  | (off)         | a character directory; supplies the four rows below it          |
+| `--model <path>`     | (required)    | rigged `.glb` to bake                                           |
+| `--character <id>`   | (required)    | immutable character slug; binds cache keys                      |
+| `--out <dir>`        | (required)    | bakes land at `<dir>/bake-<id>`                                 |
+| `--camera <id>`      | `standard-30` | `low-15`, `two-to-one`, `standard-30`, or `isometric`           |
+| `--style <id>`       | `pixel-8`     | `cel-2`, `pixel-8`, or `painterly`                              |
+| `--directions <n>`   | `8`           | `2`, `4`, `8`, or `16`                                          |
+| `--frames <n>`       | `6`           | frames of the built-in idle pose (positive integer)             |
+| `--clips <spec>`     | (idle)        | `clip:frames[@speed][!hold][,...]` — bake real clips instead    |
+| `--pack <dir>`       | (bundled)     | animation pack the `--clips` ids resolve in                     |
+| `--cell <px>`        | `64`          | square output cell size                                         |
+| `--ppm <n>`          | `32`          | pixels per meter (world scale)                                  |
+| `--elevation <deg>`  | `30`          | camera elevation angle                                          |
+| `--padding <px>`     | `6`           | transparent padding inside each cell                            |
+| `--cache <dir>`      | (off)         | input-hash frame cache; the bake always writes through when set |
+| `--only-invalidated` | (off)         | serve unchanged frames from the cache (all-or-none per bake)    |
+| `--mirror`           | (off)         | produce the back-half directions by flipping the front half     |
+| `--json`             | (off)         | NDJSON job events on stdout                                     |
+
+With `--workspace <dir>`, `--model`, `--character` and `--out` become optional: the model is the
+workspace's `canonical/model.glb`, the character is the id in its manifest, and bakes land in
+`<workspace>/bakes/`. The character's own `look` (camera preset, style preset, and any overrides on
+either) and its enabled `animationSet` bindings supply the defaults, so
+
+```
+spritebook bake --workspace ./characters/hero
+```
+
+reproduces that character's last bake exactly — same `bakeId`, every frame served from cache. Any
+flag you do pass still wins, and what the bake ran with is written back to the manifest as one
+undoable step (`look`, `animationSet`, `lastBakeId`).
+
+Two things do not round-trip, by design. `--frames` is the frame count of the built-in idle pose,
+which has no home in the manifest because frames are a per-clip setting (`--clips`, and
+`animationSet` where they persist). And a stored clip binding names the pack it came from: if that
+is not the pack this bake reads, the bake refuses rather than resolving the same clip id against
+different animation.
 
 `--mirror` renders only the directions that cannot be derived (5 of 8) and makes the rest horizontal
 flips of their partner, cutting render, style and cache work by ~37%. It is **off by default and

@@ -26,7 +26,6 @@ import type {
   ClipBinding,
   JointEdit,
   OrientationFix,
-  StylePreset,
 } from '@spritebook/schema';
 import {
   applyPatchOps,

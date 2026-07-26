@@ -1,7 +1,6 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
 import { CAMERA_PRESETS, ManifestJournal } from '@spritebook/core';
-import { PRESETS } from '@spritebook/style';
 import { bakeSpecFromFlags, runCli } from './mod.ts';
 
 const now = () => '2026-07-12T00:00:00Z';
