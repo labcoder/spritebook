@@ -154,6 +154,22 @@ export const StylePresetSchema = StylePresetBaseSchema
         message: "passes must include 'lit' (AOV pages share the lit layout, D-010)",
       });
     }
+    if (
+      Array.isArray(v.quantize?.palette) && v.quantize.palette.length > v.quantize.maxColors
+    ) {
+      // `buildPalette` hands a fixed palette straight to `paletteFromHex` and
+      // never consults maxColors, so 40 hex colours with maxColors 8 painted
+      // with 40 — the user set a ceiling and the pipeline ignored it. Refused
+      // rather than truncated: silently dropping the last 32 colours the user
+      // typed is the same class of wrong, and which 32 would be our guess.
+      ctx.addIssue({
+        code: 'custom',
+        path: ['quantize', 'palette'],
+        message: `a fixed palette of ${v.quantize.palette.length} colors exceeds maxColors ` +
+          `${v.quantize.maxColors} — raise maxColors or shorten the palette; the pipeline ` +
+          `paints with every color you list, so the two must agree`,
+      });
+    }
     if (v.temporal.clusterVote && v.quantize === undefined) {
       // Cluster-vote downsamples palette LABELS, so with no palette every
       // opaque pixel labels as -1 and the sprite comes out entirely blank —

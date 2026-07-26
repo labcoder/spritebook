@@ -132,6 +132,47 @@ Deno.test("StylePreset: passes must include 'lit' (parallel-layout law)", () => 
   );
 });
 
+Deno.test('StylePreset: a fixed palette cannot exceed maxColors', () => {
+  // buildPalette hands a fixed palette straight to paletteFromHex and never
+  // consults maxColors, so 40 hex colours with maxColors 8 painted with 40 —
+  // a ceiling the user set and the pipeline ignored.
+  const base = {
+    id: 'fixed',
+    mode: 'pixel' as const,
+    temporal: { superSample: 1, clusterVote: false, paletteHysteresisEps: 0, texelSnap: true },
+    passes: ['lit'],
+    alpha: { mode: 'soft' as const, bleedPx: 2 },
+  };
+  const hex = (n: number) =>
+    Array.from({ length: n }, (_, i) => `#${i.toString(16).padStart(6, '0')}`);
+  expectFailure(
+    StylePresetSchema,
+    {
+      ...base,
+      quantize: { palette: hex(40), maxColors: 8, space: 'oklab', dither: { kind: 'none' } },
+    },
+    'StylePreset',
+    'exceeds maxColors',
+  );
+  // equal is fine, and so is an adaptive palette (maxColors is its budget)
+  parseWith(
+    StylePresetSchema,
+    {
+      ...base,
+      quantize: { palette: hex(8), maxColors: 8, space: 'oklab', dither: { kind: 'none' } },
+    },
+    'StylePreset',
+  );
+  parseWith(
+    StylePresetSchema,
+    {
+      ...base,
+      quantize: { palette: 'adaptive', maxColors: 8, space: 'oklab', dither: { kind: 'none' } },
+    },
+    'StylePreset',
+  );
+});
+
 Deno.test('CameraOverrides: every field optional, but each still judged', () => {
   // the whole point of a partial: a character overriding one control must not
   // have to restate the other six

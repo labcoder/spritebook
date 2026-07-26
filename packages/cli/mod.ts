@@ -1,7 +1,18 @@
 /**
  * @spritebook/cli - verb surface. P1-T3 landed `undo`/`redo`; P2-T3 lands
  * `bake` (canonical glb -> bake dir via render->style->pack) and `export`
- * (bake dir -> engine-ready files). `--json` gives always-NDJSON output.
+ * (bake dir -> engine-ready files).
+ *
+ * ## What `--json` gives you
+ *
+ * A JOB emits NDJSON: one JobEvent per line, streamed as the work happens —
+ * bake, export, gen, pick, rig, identity, prep, models install.
+ *
+ * A QUERY emits ONE document, because a query has no events to stream: it has
+ * an answer. `anim --list`, `anim --import-pack`, `models list`, `rename`,
+ * `clone`, and `doctor` are queries. This header used to say `--json` was
+ * always NDJSON, which sent anyone piping `models list` into a line reader
+ * looking for a bug in the wrong place.
  *
  * On-disk journal layout, next to the manifest:
  *   <manifest>                    canonical JSON document
