@@ -1334,6 +1334,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         animationSet: spec.clips === undefined || packId === undefined
           ? undefined
           : mergeAnimationSet(manifest?.animationSet, spec.clips, packId),
+        mirroring: spec.mirroring === true,
         lastBakeId: baked.bakeId,
       }, { now: io.now });
     } catch (err) {

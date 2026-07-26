@@ -347,19 +347,23 @@ export interface BakeRecord {
   look: NonNullable<CharacterManifest['look']>;
   /** the clip bindings the bake ran with; absent leaves the stored ones alone */
   animationSet?: ClipBinding[];
+  /** the D-008 choice the bake ran with */
+  mirroring: boolean;
   /** first 8 hex of the bake's cache key — the bake dir's name */
   lastBakeId: string;
 }
 
 /**
- * Record what a bake ran with (D-029): its look, its clips, and the bake it
- * produced — as ONE journaled patch.
+ * Record what a bake ran with (D-029): its look, its clips, its mirroring, and
+ * the bake it produced — as ONE journaled patch.
  *
- * One patch, not three, and that is the whole point. `lastBakeId` names a bake
+ * One patch, not four, and that is the whole point. `lastBakeId` names a bake
  * dir whose manifest pins the look and clips beside it here; splitting them
  * would let a single `spritebook undo` roll back the look while leaving
  * `lastBakeId` pointing at atlases baked from it, so the manifest would
  * describe a character whose most recent bake does not match its own settings.
+ * `mirroring` is the sharpest case: undo it alone and the manifest claims
+ * symmetry for a bake whose back half is literally flipped copies.
  * Same argument as `setIdentity`'s decals + attachments + mesh re-pin.
  *
  * A bake that changes nothing (same look, same clips, same inputs, so the same
@@ -385,6 +389,11 @@ export async function recordBake(
       canonicalJson(record.animationSet) !== canonicalJson(manifest.animationSet ?? null)
     ) {
       op.push(setOp('/animationSet', record.animationSet, manifest.animationSet));
+    }
+    // always a `replace`: `mirroring` is required on the manifest, so it is
+    // never absent and an `add` would invert to a `remove` of a required field
+    if (record.mirroring !== manifest.mirroring.enabled) {
+      op.push({ op: 'replace', path: '/mirroring/enabled', value: record.mirroring });
     }
     if (record.lastBakeId !== manifest.lastBakeId) {
       op.push(setOp('/lastBakeId', record.lastBakeId, manifest.lastBakeId));

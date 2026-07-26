@@ -401,6 +401,7 @@ Deno.test('recordBake writes look, clips and lastBakeId as ONE patch', async () 
     const manifest = await recordBake(dir, {
       look: LOOK,
       animationSet: CLIPS,
+      mirroring: false,
       lastBakeId: 'a1b2c3d4',
     }, { now: NOW });
     assertEquals(manifest.look, LOOK);
@@ -427,7 +428,12 @@ Deno.test('one undo takes the whole bake back, not part of it', async () => {
   // sprites baked from it - a manifest describing a character whose most recent
   // bake does not match its own settings.
   await withCharacter(async (dir) => {
-    await recordBake(dir, { look: LOOK, animationSet: CLIPS, lastBakeId: 'a1b2c3d4' }, {
+    await recordBake(dir, {
+      look: LOOK,
+      animationSet: CLIPS,
+      mirroring: false,
+      lastBakeId: 'a1b2c3d4',
+    }, {
       now: NOW,
     });
     await cliUndo(dir);
@@ -442,13 +448,19 @@ Deno.test('re-running an unchanged bake journals nothing at all', async () => {
   // An undo stack with empty steps in it is an undo stack a user stops
   // trusting: the verb reports done and the document is visibly identical.
   await withCharacter(async (dir) => {
-    await recordBake(dir, { look: LOOK, animationSet: CLIPS, lastBakeId: 'a1b2c3d4' }, {
+    await recordBake(dir, {
+      look: LOOK,
+      animationSet: CLIPS,
+      mirroring: false,
+      lastBakeId: 'a1b2c3d4',
+    }, {
       now: NOW,
     });
     const before = await manifestBytes(dir);
     const again = await recordBake(dir, {
       look: LOOK,
       animationSet: CLIPS,
+      mirroring: false,
       lastBakeId: 'a1b2c3d4',
     }, { now: NOW });
 
@@ -461,12 +473,18 @@ Deno.test('re-running an unchanged bake journals nothing at all', async () => {
 
 Deno.test('a second bake patches only what actually moved', async () => {
   await withCharacter(async (dir) => {
-    await recordBake(dir, { look: LOOK, animationSet: CLIPS, lastBakeId: 'a1b2c3d4' }, {
+    await recordBake(dir, {
+      look: LOOK,
+      animationSet: CLIPS,
+      mirroring: false,
+      lastBakeId: 'a1b2c3d4',
+    }, {
       now: NOW,
     });
     await recordBake(dir, {
       look: { ...LOOK, stylePresetId: 'painterly' },
       animationSet: CLIPS,
+      mirroring: false,
       lastBakeId: 'e5f6a7b8',
     }, { now: NOW });
 
@@ -482,15 +500,59 @@ Deno.test('a second bake patches only what actually moved', async () => {
   });
 });
 
+Deno.test('mirroring rides the same patch, and always as a replace', async () => {
+  await withCharacter(async (dir) => {
+    const on = await recordBake(dir, {
+      look: LOOK,
+      animationSet: CLIPS,
+      mirroring: true,
+      lastBakeId: 'a1b2c3d4',
+    }, { now: NOW });
+    assertEquals(on.mirroring, { enabled: true });
+
+    const patches = await journalLines(dir);
+    assertEquals(patches[0].op.length, 4, 'look, clips, mirroring, lastBakeId - still one step');
+    const mirrorOp = patches[0].op.find((o) => o.path === '/mirroring/enabled');
+    // `mirroring` is REQUIRED on the manifest, so it is never absent: an `add`
+    // here would invert to a `remove` of a required field, and the undo would
+    // leave a document no verb can load
+    assertEquals(mirrorOp?.op, 'replace');
+    assertEquals(
+      patches[0].inverse.find((o) => o.path === '/mirroring/enabled'),
+      { op: 'replace', path: '/mirroring/enabled', value: false },
+    );
+  });
+});
+
+Deno.test('one undo cannot leave a manifest claiming symmetry for flipped atlases', async () => {
+  // The sharpest case for the single patch. Split across two, an undo could
+  // roll mirroring back to false while lastBakeId still names a bake whose
+  // back half is literally flipped copies of its front.
+  await withCharacter(async (dir) => {
+    await recordBake(dir, { look: LOOK, mirroring: true, lastBakeId: 'a1b2c3d4' }, { now: NOW });
+    await cliUndo(dir);
+    const back = await readWorkspace(dir);
+    assertEquals(back.mirroring, { enabled: false }, 'D-008 default restored');
+    assertEquals(back.lastBakeId, undefined, 'and the bake it described went with it');
+  });
+});
+
 Deno.test('an absent animationSet leaves the stored bindings alone', async () => {
   // An idle-stub bake ran no clips, which is not the same statement as "this
   // character has none" - clearing them on the way past would delete a choice
   // the bake was never asked about.
   await withCharacter(async (dir) => {
-    await recordBake(dir, { look: LOOK, animationSet: CLIPS, lastBakeId: 'a1b2c3d4' }, {
+    await recordBake(dir, {
+      look: LOOK,
+      animationSet: CLIPS,
+      mirroring: false,
+      lastBakeId: 'a1b2c3d4',
+    }, {
       now: NOW,
     });
-    const after = await recordBake(dir, { look: LOOK, lastBakeId: 'e5f6a7b8' }, { now: NOW });
+    const after = await recordBake(dir, { look: LOOK, mirroring: false, lastBakeId: 'e5f6a7b8' }, {
+      now: NOW,
+    });
     assertEquals(after.animationSet, CLIPS);
     assertEquals((await journalLines(dir))[1].op.map((o) => o.path), ['/lastBakeId']);
   });

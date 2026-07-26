@@ -441,6 +441,7 @@ Deno.test('clips from another pack are refused, not resolved against this one', 
           holdLast: false,
         },
       ],
+      mirroring: false,
       lastBakeId: 'aaaaaaaa',
     }, { now });
 
@@ -468,6 +469,7 @@ Deno.test('a look naming a preset that does not exist says which one, and where 
     });
     await recordBake(ws, {
       look: { cameraPresetId: 'topdown30x8', stylePresetId: 'pixel-8' },
+      mirroring: false,
       lastBakeId: 'aaaaaaaa',
     }, { now });
 

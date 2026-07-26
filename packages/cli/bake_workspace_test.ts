@@ -148,6 +148,7 @@ Deno.test('acceptance: a workspace bake reproduces the last one exactly', async 
       // nothing else about the bake changes
       await recordBake(dir, {
         look: { ...before.look!, overrides: { alpha: { mode: 'soft', bleedPx: 4 } } },
+        mirroring: false,
         lastBakeId: before.lastBakeId!,
       }, { now: NOW });
 
