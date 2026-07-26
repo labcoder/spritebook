@@ -98,7 +98,7 @@ Deno.test('render: depth and mask AOVs encode drawn vs background correctly', as
     // corner (0,0) is background: depth cleared to far (1.0 -> 65535), mask empty (0)
     assertEquals(dd[0], 65535, 'depth background = far');
     assertEquals(md[0], 0, 'mask background = 0');
-    // drawn texels exist: nearer depth (< far) and object id 1
+    // drawn texels exist: nearer depth (< far) and coverage 1
     assert(dd.some((v) => v < 65535), 'depth has drawn (nearer) texels');
     assert(md.some((v) => v === 1), 'mask has object-id texels');
   } finally {

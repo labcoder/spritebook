@@ -14,7 +14,7 @@
  * (the cross product flips sign because the mirror's determinant is −1), so the
  * image flips in x, and depth and the vertical axis are untouched. That makes
  * lit, albedo, depth and mask pure column reversals — they carry colors, a
- * scalar distance, and an object id, none of which know about direction.
+ * scalar distance, and a coverage flag, none of which know about direction.
  *
  * `normal` does. The AOV stores the WORLD-space normal encoded as n*0.5+0.5
  * (render/shaders.wgsl), and the mirror maps a normal n to (−n.x, n.y, n.z). So

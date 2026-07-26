@@ -105,7 +105,7 @@ export function atlasPageName(pass: RenderPass, pageIndex: number): string {
 //   albedo  rgba8   AREA-AVERAGE (it is a color)
 //   normal  rgba8   CENTER-TAP  (data AOV — averaging invents directions)
 //   depth   gray16  CENTER-TAP  (data AOV)
-//   mask    gray16  CENTER-TAP  (object ids must never blend)
+//   mask    gray16  CENTER-TAP  (coverage is 0 or 1; averaging invents halves)
 // Center-tap = the (s/2, s/2) subpixel of each s x s block (deterministic).
 // ---------------------------------------------------------------------------
 export interface Aov1xCells {

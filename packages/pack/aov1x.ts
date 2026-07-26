@@ -7,7 +7,7 @@
  *                                  alpha, round-half-up in integer math
  *   normal  rgba8   CENTER-TAP     data AOV — averaged normals are not unit vectors
  *   depth   gray16  CENTER-TAP     data AOV — averaged depths invent surfaces
- *   mask    gray16  CENTER-TAP     object ids must NEVER blend
+ *   mask    gray16  CENTER-TAP     coverage is 0 or 1 and must NEVER blend
  *
  * Center-tap picks the (floor(s/2), floor(s/2)) subpixel of each s x s block — a fixed,
  * deterministic representative, no filtering. Everything here is integer math in fixed

@@ -96,10 +96,17 @@ export const StylePresetBaseSchema = z
       clusterVote: z.boolean(),
       paletteHysteresisEps: z.number().nonnegative(),
       /**
-       * UNREAD. camera.ts snaps the pivot onto the texel lattice
-       * unconditionally, so `false` renders byte-identically to `true`. Unlike
-       * `ramp` this was never documented as carried-but-unapplied; either wire
-       * it to the snap or drop it.
+       * UNREAD by the pipeline, like `mode` and `passes` below. `camera.ts`
+       * snaps the pivot onto the texel lattice unconditionally, so `false`
+       * renders byte-identically to `true`.
+       *
+       * Carried rather than dropped, and the reason is worth stating so nobody
+       * re-opens it as a bug: an unsnapped pivot lands a sprite on a half-texel
+       * and every frame of that direction shimmers against its neighbours, so
+       * `false` is not a mode anyone should get. Deleting the field is the
+       * honest alternative, but it lives on StylePreset, which reaches Project
+       * and `look.overrides`, and that costs a schema version bump to remove a
+       * field whose only correct value is the one it already has.
        */
       texelSnap: z.boolean(),
     }),
