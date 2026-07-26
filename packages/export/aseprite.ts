@@ -22,8 +22,14 @@
  *
  * Cells are packed as full rects (no trim, no rotation), hence
  * spriteSourceSize = {0, 0, w, h}, sourceSize = {w, h}, and rotated = trimmed
- * = false. duration is a uniform Math.round(1000 / opts.fps) ms per frame
- * until ClipBinding lands (see contracts.ts ExportOptions).
+ * = false.
+ *
+ * TIMING: `duration` is Math.round(1000 / fps) ms of the CLIP that frame
+ * belongs to, from `BakeManifest.clips`; opts.fps is the fallback for a bake
+ * that recorded no timing. Loop/hold is NOT projected: the Aseprite JSON has
+ * no loop flag, and a frameTag's optional `repeat` is a play COUNT, not a loop
+ * boolean — emitting one would be guessing. Consumers that need it read
+ * `clips[].loop` from the manifest (or export godot/strips, which carry it).
  */
 import type { FrameRecord } from '@spritebook/schema';
 import type { Exporter } from '../pack/contracts.ts';
@@ -97,7 +103,11 @@ export const exportAseprite: Exporter = async (manifest, bakeDir, outDir, opts) 
     throw new RangeError(`exportAseprite: fps must be positive and finite, got ${opts.fps}`);
   }
   assertNoSplitAnimations(manifest, 'exportAseprite');
-  const duration = Math.round(1000 / opts.fps);
+  // per-clip ms, so clips of different lengths keep their own rates; `clips` is
+  // optional, so an untimed clip falls back to opts.fps as before
+  const timingByClip = new Map((manifest.clips ?? []).map((c) => [c.clipId, c]));
+  const durationOf = (f: FrameRecord): number =>
+    Math.round(1000 / (timingByClip.get(f.clipId)?.fps ?? opts.fps));
   const litPages = manifest.atlases
     .filter((a) => a.pass === 'lit')
     .toSorted((a, b) => a.pageIndex - b.pageIndex);
@@ -125,7 +135,7 @@ export const exportAseprite: Exporter = async (manifest, bakeDir, outDir, opts) 
         trimmed: false,
         spriteSourceSize: { x: 0, y: 0, w: f.atlas.w, h: f.atlas.h },
         sourceSize: { w: f.atlas.w, h: f.atlas.h },
-        duration,
+        duration: durationOf(f),
       })),
       meta: {
         app: META_APP,

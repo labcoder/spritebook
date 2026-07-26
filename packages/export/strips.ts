@@ -9,6 +9,11 @@
  * packages/pack/contracts.ts). fast-png decodes and encodes losslessly, so
  * pixels cross unchanged; the single meta cellPx forces cells to be uniform
  * across the whole bake, which subsumes the per-strip uniformity assert.
+ *
+ * TIMING: each strip carries its clip's own `fps` and `loop` from
+ * `BakeManifest.clips` — this sidecar is our own format, so there is no reason
+ * to flatten clips of different lengths onto one rate. `meta.fps` is only the
+ * default an untimed clip falls back to.
  */
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { FrameRecord } from '@spritebook/schema';
@@ -33,9 +38,18 @@ export interface StripEntry {
   clipId: string;
   direction: number;
   frames: number;
+  /** this clip's own rate — meta.fps when the bake recorded no timing for it */
+  fps: number;
+  /** playback loops; false is a held clip (a death pose stops on its last frame) */
+  loop: boolean;
 }
 
-/** Shape of `<characterId>-strips.json` (fixed construction order = fixed bytes). */
+/**
+ * Shape of `<characterId>-strips.json` (fixed construction order = fixed bytes).
+ * This sidecar is SpriteBook's own format, so it carries timing per strip; the
+ * top-level `fps` is only the export-wide default that untimed clips fall back
+ * to. Read `strips[].fps` / `strips[].loop`, not `fps`.
+ */
 export interface StripsMeta {
   cellPx: { w: number; h: number };
   fps: number;
@@ -123,6 +137,10 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
     }
   }
 
+  // per-clip timing when the bake recorded it; `clips` is optional, so an
+  // untimed clip keeps the old behaviour (opts.fps, looping)
+  const timingByClip = new Map((manifest.clips ?? []).map((c) => [c.clipId, c]));
+
   await Deno.mkdir(outDir, { recursive: true });
   const written: string[] = [];
   const stripEntries: StripEntry[] = [];
@@ -147,7 +165,15 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
       encodePng({ width: stripW, height: ch, data: strip }),
     );
     written.push(`${outDir}/${file}`);
-    stripEntries.push({ file, clipId: g.clipId, direction: g.direction, frames: g.frames.length });
+    const timing = timingByClip.get(g.clipId);
+    stripEntries.push({
+      file,
+      clipId: g.clipId,
+      direction: g.direction,
+      frames: g.frames.length,
+      fps: timing?.fps ?? opts.fps,
+      loop: timing?.loop ?? true,
+    });
   }
 
   // pivot of the first frame of each direction, keys ascending — fixed order
@@ -164,6 +190,7 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
 
   const meta: StripsMeta = {
     cellPx: { w: cw, h: ch },
+    // the export-wide DEFAULT; per-strip fps/loop above is the truth
     fps: opts.fps,
     pivotPx,
     strips: stripEntries,

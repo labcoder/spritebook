@@ -8,7 +8,7 @@ import { assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import { decode as decodePng } from 'fast-png';
 import { type BakeManifest, BakeManifestSchema, parseWith } from '@spritebook/schema';
 import { DEFAULT_FPS } from '../pack/contracts.ts';
-import { exportStrips } from './strips.ts';
+import { exportStrips, type StripsMeta } from './strips.ts';
 
 const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const FIXTURE_DIR = win(new URL('fixtures/bake-aabbccdd', import.meta.url));
@@ -89,15 +89,86 @@ Deno.test('exportStrips: meta json is byte-exact with a fixed key order', async 
         d00: { x: 8, y: 14 },
         d01: { x: 8, y: 14 },
       },
+      // per-strip fps is the CLIP's rate (fixture clip records 2), never the
+      // export-wide meta.fps default above
       strips: [
-        { file: 'fixture-char-idle-d00-strip.png', clipId: 'idle', direction: 0, frames: 2 },
-        { file: 'fixture-char-idle-d01-strip.png', clipId: 'idle', direction: 1, frames: 2 },
+        {
+          file: 'fixture-char-idle-d00-strip.png',
+          clipId: 'idle',
+          direction: 0,
+          frames: 2,
+          fps: 2,
+          loop: true,
+        },
+        {
+          file: 'fixture-char-idle-d01-strip.png',
+          clipId: 'idle',
+          direction: 1,
+          frames: 2,
+          fps: 2,
+          loop: true,
+        },
       ],
     };
     assertEquals(
       await Deno.readTextFile(`${out}/fixture-char-strips.json`),
       JSON.stringify(expected, null, 2) + '\n',
     );
+  } finally {
+    await Deno.remove(out, { recursive: true });
+  }
+});
+
+Deno.test('exportStrips: each strip carries its own clip rate and loop mode', async () => {
+  const plain = structuredClone(await fixtureManifest());
+  for (const direction of [0, 1]) {
+    plain.frames.push({
+      clipId: 'death01',
+      direction,
+      frame: 0,
+      pivotPx: { x: 8, y: 14 },
+      atlas: { pageIndex: 0, x: direction * 16, y: 16, w: 16, h: 16 },
+      cacheHit: false,
+    });
+  }
+  plain.clips = [
+    { clipId: 'death01', frames: 1, speed: 1, holdLast: true, loop: false, fps: 12 },
+    { clipId: 'idle', frames: 2, speed: 1, holdLast: false, loop: true, fps: 2 },
+  ];
+  const manifest = parseWith(BakeManifestSchema, plain, 'two-clip manifest');
+  const out = await Deno.makeTempDir({ prefix: 'sb-strips-clips-' });
+  try {
+    await exportStrips(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
+    const meta = JSON.parse(
+      await Deno.readTextFile(`${out}/fixture-char-strips.json`),
+    ) as StripsMeta;
+    assertEquals(
+      meta.strips.map((s) => [s.clipId, s.direction, s.fps, s.loop]),
+      [
+        ['death01', 0, 12, false],
+        ['death01', 1, 12, false],
+        ['idle', 0, 2, true],
+        ['idle', 1, 2, true],
+      ],
+      'one --fps must not flatten two clips onto one rate',
+    );
+    assertEquals(meta.fps, DEFAULT_FPS, 'meta.fps stays the export-wide default');
+  } finally {
+    await Deno.remove(out, { recursive: true });
+  }
+});
+
+Deno.test('exportStrips: an untimed bake falls back to opts.fps and loops', async () => {
+  const plain = structuredClone(await fixtureManifest());
+  delete plain.clips;
+  const manifest = parseWith(BakeManifestSchema, plain, 'legacy idle manifest');
+  const out = await Deno.makeTempDir({ prefix: 'sb-strips-legacy-' });
+  try {
+    await exportStrips(manifest, FIXTURE_DIR, out, { fps: 24 });
+    const meta = JSON.parse(
+      await Deno.readTextFile(`${out}/fixture-char-strips.json`),
+    ) as StripsMeta;
+    assertEquals(meta.strips.map((s) => [s.fps, s.loop]), [[24, true], [24, true]]);
   } finally {
     await Deno.remove(out, { recursive: true });
   }

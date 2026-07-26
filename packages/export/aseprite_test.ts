@@ -56,12 +56,13 @@ Deno.test('exportAseprite projects sorted frames, tags, and meta from the fixtur
 
   const raw = await Deno.readTextFile(jsonPath);
   const doc = JSON.parse(raw);
+  // 500 ms = 1000 / the fixture clip's own fps of 2, NOT 1000 / opts.fps (8)
   assertEquals(doc, {
     frames: [
-      expectedFrame('idle_d00_f000', 0, 125),
-      expectedFrame('idle_d00_f001', 16, 125),
-      expectedFrame('idle_d01_f000', 32, 125),
-      expectedFrame('idle_d01_f001', 48, 125),
+      expectedFrame('idle_d00_f000', 0, 500),
+      expectedFrame('idle_d00_f001', 16, 500),
+      expectedFrame('idle_d01_f000', 32, 500),
+      expectedFrame('idle_d01_f001', 48, 500),
     ],
     meta: {
       app: 'spritebook',
@@ -87,9 +88,50 @@ Deno.test('exportAseprite projects sorted frames, tags, and meta from the fixtur
   }
 });
 
-Deno.test('exportAseprite durations follow opts.fps (round(1000 / fps))', async () => {
-  const manifest = await fixtureManifest();
+Deno.test('exportAseprite durations follow each clip own rate, not one --fps', async () => {
+  // Aseprite's format carries per-frame ms, so clips of different lengths must
+  // not be flattened onto one rate the way `export --fps` used to do
+  const plain = structuredClone(await fixtureManifest());
+  for (const direction of [0, 1]) {
+    plain.frames.push({
+      clipId: 'death01',
+      direction,
+      frame: 0,
+      pivotPx: { x: 8, y: 14 },
+      atlas: { pageIndex: 0, x: direction * 16, y: 16, w: 16, h: 16 },
+      cacheHit: false,
+    });
+  }
+  plain.clips = [
+    { clipId: 'death01', frames: 1, speed: 1, holdLast: true, loop: false, fps: 24 },
+    { clipId: 'idle', frames: 2, speed: 1, holdLast: false, loop: true, fps: 2 },
+  ];
+  const manifest = parseWith(BakeManifestSchema, plain, 'two-clip manifest');
   const out = await Deno.makeTempDir({ prefix: 'sb-ase-fps-' });
+  await exportAseprite(manifest, BAKE, out, { fps: 8 });
+  const doc = JSON.parse(await Deno.readTextFile(`${out}/fixture-char.ase.json`));
+  assertEquals(
+    doc.frames.map((f: { filename: string; duration: number }) => [f.filename, f.duration]),
+    [
+      ['death01_d00_f000', 42], // 1000/24
+      ['death01_d01_f000', 42],
+      ['idle_d00_f000', 500], // 1000/2
+      ['idle_d00_f001', 500],
+      ['idle_d01_f000', 500],
+      ['idle_d01_f001', 500],
+    ],
+  );
+  assert(
+    !doc.frames.some((f: { duration: number }) => f.duration === 125),
+    'opts.fps (8 -> 125ms) must not reach a timed clip',
+  );
+});
+
+Deno.test('exportAseprite falls back to opts.fps when the bake recorded no clips', async () => {
+  const plain = structuredClone(await fixtureManifest());
+  delete plain.clips;
+  const manifest = parseWith(BakeManifestSchema, plain, 'legacy idle manifest');
+  const out = await Deno.makeTempDir({ prefix: 'sb-ase-legacy-' });
   await exportAseprite(manifest, BAKE, out, { fps: 24 });
   const doc = JSON.parse(await Deno.readTextFile(`${out}/fixture-char.ase.json`));
   assertEquals(
