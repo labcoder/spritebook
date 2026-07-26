@@ -38,6 +38,9 @@
   ],
   "bakeId": "aabbccdd",
   "characterId": "fixture-char",
+  "clips": [
+    { "clipId": "idle", "fps": 2, "frames": 2, "holdLast": false, "loop": true, "speed": 1 }
+  ],
   "createdAt": "2026-07-15T00:00:00.000Z",
   "flags": [],
   "frames": [

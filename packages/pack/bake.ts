@@ -17,6 +17,7 @@ import { decode as decodePng } from 'fast-png';
 import type {
   CacheKeyInputs,
   CameraPreset,
+  ClipTiming,
   JobEvent,
   RenderPass,
   StylePreset,
@@ -269,6 +270,29 @@ async function tryCached(
 interface PreparedClip {
   binding: ClipBindingSpec;
   sampled: SampledPoses;
+  /** the clip's natural duration, kept so the manifest can report a real fps */
+  durationS: number;
+}
+
+/**
+ * Per-clip timing for the manifest. Every value comes from the binding or the
+ * clip's own duration — both already inside `inputs.clipBindingHash` — so this
+ * cannot drift from the cache key, and two bakes of one recipe stay identical.
+ *
+ * `fps` is the rate that replays the sampled window at the requested speed:
+ * the bake covers `durationS / speed` seconds in `frames` samples, so
+ * `fps = frames / (durationS / speed)`. `loop` is the inverse of `holdLast` —
+ * holding the last frame is exactly what a non-looping clip does.
+ */
+function clipTimings(prepared: PreparedClip[]): ClipTiming[] {
+  return prepared.map(({ binding, durationS }) => ({
+    clipId: binding.clipId,
+    frames: binding.frames,
+    speed: binding.speed,
+    holdLast: binding.holdLast,
+    loop: !binding.holdLast,
+    fps: binding.frames / (durationS / binding.speed),
+  }));
 }
 
 /** Post-correction foot residual above this is worth a warn event (meters). */
@@ -317,7 +341,11 @@ async function prepareClips(
       });
     }
     await writePreviewGlb(spec.modelPath, clip, `${bakeDir}/preview-${binding.clipId}.glb`);
-    prepared.push({ binding, sampled: sampleClip(clip, targetRest, binding) });
+    prepared.push({
+      binding,
+      sampled: sampleClip(clip, targetRest, binding),
+      durationS: clip.duration,
+    });
   }
   return { prepared, warnings };
 }
@@ -671,6 +699,7 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       cacheHits: baked.hits,
       mirroredFrom: plan.mirroredFrom,
       styleResult: { flickerPct: baked.styleResult.flickerPct, flags: baked.styleResult.flags },
+      ...(prepared ? { clips: clipTimings(prepared) } : {}),
       wallTimeS: (performance.now() - t0) / 1000,
       now: at,
     });

@@ -125,6 +125,10 @@ const manifest = parseWith(BakeManifestSchema, {
   })),
   metrics: { flickerPct: 0.05, cacheHitPct: 0, wallTimeS: 1.5, framesTotal: 4 },
   flags: [],
+  // 2 frames per direction over a 1 s clip at speed 1 -> 2 fps. A looping clip
+  // here; the exporter tests clone this and flip holdLast to cover the
+  // hold-last case without needing a second clip's worth of atlas cells.
+  clips: [{ clipId: 'idle', frames: 2, speed: 1, holdLast: false, loop: true, fps: 2 }],
   createdAt: '2026-07-15T00:00:00.000Z',
 }, 'fixture BakeManifest');
 

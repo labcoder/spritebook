@@ -73,6 +73,25 @@ Deno.test('acceptance: multi-clip bake — exact counts, clip ids, previews', as
     assertEquals(byClip.get('walk-loop'), 8);
     assertEquals(byClip.get('idle-loop'), 4);
 
+    // Per-clip timing an exporter can act on. Before this existed the bindings
+    // reached the manifest only as a sha256, so Godot hardcoded loop:true for
+    // every clip and one --fps was applied to clips of different lengths.
+    const timings = manifest.clips;
+    assert(timings, 'a clip bake records its clip timing');
+    assertEquals(timings.length, 2, 'one entry per bound clip');
+    const walk = timings.find((c) => c.clipId === 'walk-loop')!;
+    const idle = timings.find((c) => c.clipId === 'idle-loop')!;
+    assertEquals(walk.frames, 4);
+    assertEquals(idle.frames, 2);
+    assertEquals(walk.holdLast, false);
+    assertEquals(walk.loop, true, 'loop is the inverse of holdLast');
+    // the two clips have different lengths, so a single exported fps is a lie
+    assert(
+      walk.fps !== idle.fps,
+      `clips of different lengths must not share an fps: ${walk.fps} vs ${idle.fps}`,
+    );
+    for (const c of timings) assert(c.fps > 0 && Number.isFinite(c.fps), `real fps: ${c.fps}`);
+
     // retarget-once artifacts: one preview GLB per clip
     await Deno.stat(`${bakeDir}/preview-walk-loop.glb`);
     await Deno.stat(`${bakeDir}/preview-idle-loop.glb`);

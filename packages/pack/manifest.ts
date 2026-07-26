@@ -6,7 +6,13 @@
  * + flags (the palette itself ships as style-result.json in the bake dir — the
  * schema has no palette field by design; see progress notes).
  */
-import type { BakeManifest, CacheKeyInputs, QAFlag, RenderPass } from '@spritebook/schema';
+import type {
+  BakeManifest,
+  CacheKeyInputs,
+  ClipTiming,
+  QAFlag,
+  RenderPass,
+} from '@spritebook/schema';
 import { BakeManifestSchema, parseWith, RENDER_PASSES, SCHEMA_VERSION } from '@spritebook/schema';
 import { atlasPageName, type FrameId, frameIdKey, type PackLayout } from './contracts.ts';
 import { bakeKey } from './cache.ts';
@@ -26,6 +32,11 @@ export interface AssembleArgs {
    */
   mirroredFrom?: Map<number, number>;
   styleResult: { flickerPct: number; flags: QAFlag[] };
+  /**
+   * Per-clip timing for exporters (schema/bake.ts ClipTiming). Absent for a
+   * legacy idle bake, which keeps its manifest byte-identical to a pre-clip one.
+   */
+  clips?: ClipTiming[];
   wallTimeS: number;
   now: () => string;
 }
@@ -80,6 +91,7 @@ export async function assembleManifest(args: AssembleArgs): Promise<BakeManifest
       framesTotal,
     },
     flags: args.styleResult.flags,
+    ...(args.clips?.length ? { clips: args.clips } : {}),
     createdAt: args.now(),
   }, 'BakeManifest');
 }

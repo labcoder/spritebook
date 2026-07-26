@@ -164,6 +164,38 @@ export const AOV_TARGETS: readonly AovTarget[] = [
 //   binding 0  texture_2d<f32>  base color, rgba8unorm-srgb (sample = linear)
 //   binding 1  sampler          linear, clamp-to-edge
 // ---------------------------------------------------------------------------
+
+/**
+ * THE MATERIAL CONTRACT (implemented by skinning.ts + shaders.wgsl).
+ *
+ * 1. BASE COLOR IS A PRODUCT. glTF defines base color as
+ *    `baseColorFactor * baseColorTexture`, and both halves must be honoured.
+ *    Treating the factor as [1,1,1,1] whenever a texture exists — which this
+ *    renderer did until the 2026-07-25 audit — renders a factor-tinted
+ *    character at full brightness in lit AND albedo, and the adaptive palette
+ *    is then built from those wrong colours.
+ *
+ * 2. THE FACTOR TRAVELS SEPARATELY FROM THE TEXTURE. It cannot be
+ *    pre-multiplied into the decoded texels, because textures are deduped by
+ *    glTF `Texture` identity and two materials may share one texture with
+ *    different factors. So the unit of binding is the MATERIAL, not the
+ *    texture.
+ *
+ * 3. ALPHA DECIDES THE SILHOUETTE, IN EVERY AOV. `alphaMode: 'MASK'` discards
+ *    below `alphaCutoff`, so lit/albedo/normal/depth/mask agree by
+ *    construction. A cutout that reached only the colour passes would leave
+ *    the mask — and therefore the outline and the packed silhouette — claiming
+ *    geometry that is not there.
+ *
+ * 4. BLEND IS TREATED AS A CUTOUT AT 0.5, deliberately. The AOV pass declares
+ *    no blend state, and depth and mask are not blendable formats, so real
+ *    alpha blending cannot be expressed without giving up the
+ *    geometrically-identical-AOVs guarantee that makes one pass produce five
+ *    consistent buffers. Sprite output is 1-bit or soft alpha at the style
+ *    stage regardless. A semi-transparent material therefore bakes
+ *    hard-edged — stated here so it is a known limit rather than a surprise.
+ */
+export const BLEND_AS_CUTOUT_AT = 0.5;
 export const CAMERA_UNIFORM_FLOATS = 40; // 160 bytes: view(16) proj(16) params(4) lightDir(4)
 
 /**

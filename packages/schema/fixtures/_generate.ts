@@ -226,6 +226,16 @@ const bakeManifest = parseWith(BakeManifestSchema, {
     frameRefs: [{ clipId: 'walk_relaxed', direction: 0, frame: 0 }],
     message: 'Outline width 2 px meets padding 4 px on tight frames',
   }],
+  // a looping clip: holdLast false -> loop true. 1.6 s at speed 1 over 2
+  // frames is 1.25 fps, which is what an exporter should write.
+  clips: [{
+    clipId: 'walk_relaxed',
+    frames: 2,
+    speed: 1,
+    holdLast: false,
+    loop: true,
+    fps: 1.25,
+  }],
   createdAt: T0,
 }, 'BakeManifest fixture');
 

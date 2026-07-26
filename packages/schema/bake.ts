@@ -62,6 +62,35 @@ export const QAFlagSchema = z.strictObject({
 });
 export type QAFlag = z.output<typeof QAFlagSchema>;
 
+/**
+ * How one clip was sampled, in terms an exporter can act on.
+ *
+ * The bindings reach `inputs.clipBindingHash` as a sha256, which proves two
+ * bakes used the same recipe but tells an exporter nothing — so Godot used to
+ * hardcode `loop: true` for every clip (a death animation restarted forever)
+ * and one `--fps` was applied to clips of different lengths. Every field here
+ * is DERIVED from data already inside that hash, so this can never disagree
+ * with the cache key and two bakes of one recipe stay byte-identical.
+ *
+ * `loop` comes from the binding's `holdLast`, not from the pack's clip
+ * metadata: `holdLast` is the user's explicit `!hold`, it is already part of
+ * the cache key, and `anim/contracts.ts` already defines the pair as "loop
+ * (holdLast=false)". The pack's own `loop` flag is a filename heuristic
+ * (`name.endsWith('_Loop')`) that sits OUTSIDE the hash, so honouring it would
+ * let two recipes differing only in `loop` collide on one bakeId.
+ */
+export const ClipTimingSchema = z.strictObject({
+  clipId: z.string().min(1),
+  frames: z.int().positive(),
+  speed: z.number().positive(),
+  holdLast: z.boolean(),
+  /** playback should loop — the inverse of holdLast */
+  loop: z.boolean(),
+  /** frames / (durationS / speed): the rate that replays the clip at `speed` */
+  fps: z.number().positive(),
+});
+export type ClipTiming = z.output<typeof ClipTimingSchema>;
+
 export const BakeManifestSchema = z.strictObject({
   schemaVersion: z.literal(SCHEMA_VERSION),
   bakeId: BakeIdSchema,
@@ -72,6 +101,13 @@ export const BakeManifestSchema = z.strictObject({
   atlases: z.array(AtlasPageSchema),
   metrics: BakeMetricsSchema,
   flags: z.array(QAFlagSchema),
+  /**
+   * Per-clip timing, for exporters. OPTIONAL and absent by default, the same
+   * way `mirroredFrom` is: `runExportJob` parses manifests straight out of a
+   * bake dir with no migration hook, so a required field would make every
+   * already-baked directory unexportable.
+   */
+  clips: z.array(ClipTimingSchema).optional(),
   createdAt: IsoTimeSchema,
 });
 export type BakeManifest = z.output<typeof BakeManifestSchema>;
