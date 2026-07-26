@@ -34,6 +34,7 @@ import {
   CANONICAL_DIR,
   CANONICAL_MODEL,
   canonicalJson,
+  CHARACTER_SCHEMA_VERSION,
   CharacterIdSchema,
   CharacterManifestSchema,
   MANIFEST_FILE,
@@ -42,7 +43,6 @@ import {
   RESULT_PREFLIGHT,
   ResultIdSchema,
   RESULTS_DIR,
-  SCHEMA_VERSION,
   SOURCE_DIR,
 } from '@spritebook/schema';
 
@@ -142,7 +142,7 @@ export async function createWorkspace(opts: CreateWorkspaceOptions): Promise<Cha
   // generated, picked, rigged or baked yet, and an empty stub would read as a
   // claim that it had
   const manifest = parseWith(CharacterManifestSchema, {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: CHARACTER_SCHEMA_VERSION,
     id: opts.characterId,
     displayName: opts.displayName,
     createdAt: now(),

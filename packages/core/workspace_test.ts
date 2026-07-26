@@ -3,12 +3,12 @@ import type { CharacterManifest } from '@spritebook/schema';
 import {
   CANONICAL_MODEL,
   canonicalJson,
+  CHARACTER_SCHEMA_VERSION,
   CharacterManifestSchema,
   MANIFEST_FILE,
   parseWith,
   RAW_MODEL,
   RESULT_PREFLIGHT,
-  SCHEMA_VERSION,
 } from '@spritebook/schema';
 import {
   createWorkspace,
@@ -47,7 +47,7 @@ function manifestWith(
   results: Array<{ id: string; discarded?: boolean }>,
 ): CharacterManifest {
   return parseWith(CharacterManifestSchema, {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: CHARACTER_SCHEMA_VERSION,
     id: 'brave-knight',
     displayName: 'Brave Knight',
     createdAt: NOW(),

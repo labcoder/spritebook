@@ -15,10 +15,10 @@ import { encode as encodePng } from 'fast-png';
 import { Document, NodeIO } from '@gltf-transform/core';
 import type { CanonicalBody, JobEvent, RigState } from '@spritebook/schema';
 import {
+  CHARACTER_SCHEMA_VERSION,
   CharacterManifestSchema,
   JobEventSchema,
   parseWith,
-  SCHEMA_VERSION,
 } from '@spritebook/schema';
 import { setRigState, workspacePaths } from '@spritebook/core';
 import { loadCatalog, runInstallJob } from '@spritebook/registry';
@@ -161,7 +161,7 @@ async function pickedWorkspace(reproject: boolean): Promise<Fixture> {
 const TEX = 64;
 
 const MINI_BODY: CanonicalBody = {
-  schemaVersion: SCHEMA_VERSION,
+  schemaVersion: CHARACTER_SCHEMA_VERSION,
   id: 'mini-body',
   displayName: 'Mini body',
   license: 'CC0-1.0',

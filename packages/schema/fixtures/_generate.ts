@@ -122,8 +122,17 @@ const cacheKeyInputs = parseWith(CacheKeyInputsSchema, {
   backend: { modelId: 'pixal3d', version: '1.2', paramsHash: sha('0') },
 }, 'CacheKeyInputs fixture');
 
+/** The v1-era `preflight` block, kept here to build the migration input. */
+const preflightReport = {
+  at: T0,
+  checks: [
+    { id: 'cutout', status: 'ok', message: 'Background removed cleanly' },
+    { id: 'pose', status: 'warn', message: 'Arms close to torso; A-pose preferred' },
+  ],
+} as const;
+
 const characterManifest = parseWith(CharacterManifestSchema, {
-  schemaVersion: 2,
+  schemaVersion: 3,
   id: 'brave-knight',
   displayName: 'Brave Knight',
   createdAt: T0,
@@ -131,13 +140,6 @@ const characterManifest = parseWith(CharacterManifestSchema, {
     kind: 'image',
     originalFilename: 'knight-ref.png',
     sha256: sha('1'),
-  },
-  preflight: {
-    at: T0,
-    checks: [
-      { id: 'cutout', status: 'ok', message: 'Background removed cleanly' },
-      { id: 'pose', status: 'warn', message: 'Arms close to torso; A-pose preferred' },
-    ],
   },
   generation: {
     results: [{
@@ -176,8 +178,12 @@ const characterManifest = parseWith(CharacterManifestSchema, {
     speed: 1,
     holdLast: false,
   }],
+  // both ids resolve against the built-in tables (CAMERA_PRESETS, PRESETS), so
+  // this fixture is a character that could actually be baked — 'topdown30x8'
+  // named a preset that exists only inside the Project fixture
   look: {
-    cameraPresetId: 'topdown30x8',
+    cameraPresetId: 'standard-30',
+    cameraOverrides: { directions: 16 },
     stylePresetId: 'cel-2',
     overrides: { alpha: { mode: '1bit', cutoff: 0.4, bleedPx: 2 } },
   },
@@ -272,10 +278,13 @@ const jobEvents = [
   { t: 'done', jobId: 'job-1', at: T0, wallTimeS: 12.25 },
 ].map((e) => parseWith(JobEventSchema, e, 'JobEvent fixture'));
 
-// v1 migration input: no schemaVersion, no mirroring (pre-D-008 document)
+// v1 migration input: no schemaVersion, no mirroring (pre-D-008), and it still
+// carries `preflight` — because a v1 document did. Deriving it from the current
+// manifest keeps the two in step; re-adding the block is what makes the v3 step
+// (which drops it) something the migration test can actually observe.
 const characterV1 = (() => {
   const { schemaVersion: _v, mirroring: _m, ...rest } = characterManifest;
-  return rest;
+  return { ...rest, preflight: preflightReport };
 })();
 
 const here = new URL('.', import.meta.url);

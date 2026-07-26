@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import { BakeIdSchema, CharacterIdSchema, IsoTimeSchema, Sha256Schema } from './identity.ts';
 import { CameraOverridesSchema, StyleOverridesSchema } from './project.ts';
-import { SCHEMA_VERSION } from './migrate.ts';
+import { CHARACTER_SCHEMA_VERSION } from './migrate.ts';
 
 export const SourceRecordSchema = z.strictObject({
   kind: z.enum(['image', 'mesh']),
@@ -105,17 +105,18 @@ export const AttachmentSchema = z.strictObject({
 export type Attachment = z.output<typeof AttachmentSchema>;
 
 export const CharacterManifestSchema = z.strictObject({
-  schemaVersion: z.literal(SCHEMA_VERSION),
+  schemaVersion: z.literal(CHARACTER_SCHEMA_VERSION),
   /** immutable — minted at creation (see identity.ts) */
   id: CharacterIdSchema,
   /** mutable; `spritebook rename` touches only this */
   displayName: z.string().min(1),
   createdAt: IsoTimeSchema,
   source: SourceRecordSchema,
-  /** SCHEDULED FOR REMOVAL (D-029): the report already lives at
-   * results/<resultId>/preflight.json, and a second copy here is two things
-   * that can disagree. Nothing reads this field today. */
-  preflight: PreflightReportSchema.optional(),
+  // REMOVED in v3 (D-029): `preflight` used to sit here. The authoritative
+  // report lives at results/<resultId>/preflight.json — one import, one report
+  // — and the manifest's copy was a second thing that could disagree with it.
+  // Nothing ever read it. PreflightReportSchema stays; it is the schema of that
+  // file, which @spritebook/importer still writes.
   generation: z.strictObject({
     results: z.array(GenerationResultSchema),
     pickedResultId: z.string().optional(),
