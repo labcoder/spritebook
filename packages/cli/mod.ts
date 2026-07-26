@@ -213,21 +213,105 @@ export function bakeSpecFromFlags(
   };
 }
 
+/**
+ * Every flag each verb accepts, so a flag it does NOT accept becomes an error
+ * instead of silence. Without this, `spritebook bake --mirror ...` ran a full
+ * UNMIRRORED bake and reported `done` — the user paying full GPU cost for 8
+ * rendered directions believing 3 were flips. A typo (`--framse 4`) did the
+ * same thing more quietly. Keep a verb's row in sync with the flags its branch
+ * actually reads; a flag missing here is a flag the user cannot type.
+ */
+const VERB_FLAGS: Record<string, readonly string[]> = {
+  bake: [
+    'model',
+    'character',
+    'out',
+    'style',
+    'directions',
+    'frames',
+    'clips',
+    'pack',
+    'cell',
+    'ppm',
+    'elevation',
+    'padding',
+    'cache',
+    'only-invalidated',
+    'mirror',
+  ],
+  export: ['bake', 'out', 'targets', 'fps'],
+  undo: ['manifest'],
+  redo: ['manifest'],
+  anim: ['list', 'packs', 'tag', 'category', 'import-pack', 'into'],
+  gen: [
+    'workspace',
+    'out',
+    'character',
+    'image',
+    'adjust',
+    'model',
+    'model-version',
+    'seed',
+    'more-like',
+    'height',
+    'sidecar',
+    'models-dir',
+    'catalog',
+  ],
+  pick: ['workspace', 'out', 'result', 'reproject', 'image', 'sidecar'],
+  identity: ['workspace', 'decals', 'attachments', 'bone-mask', 'body'],
+  rename: ['workspace', 'name'],
+  clone: ['workspace', 'to', 'id', 'name'],
+  rig: [
+    'model',
+    'out',
+    'track-a',
+    'body',
+    'target',
+    'height',
+    'workspace',
+    'face-front',
+    'feet-ground',
+    'center',
+    'rotate',
+    'edits',
+    'rerun-with-hints',
+    'backend',
+    'seed',
+    'no-deform-check',
+    'sidecar',
+    'models-dir',
+  ],
+  prep: ['image', 'out', 'sidecar', 'models-dir'],
+  models: ['models-dir', 'catalog', 'installed', 'accept-license', 'territory', 'from'],
+  doctor: [],
+};
+
+/** Accepted everywhere. */
+const GLOBAL_FLAGS = ['json'] as const;
+
+/**
+ * The `--`-prefixed tokens this verb does not accept. Only `--` tokens are
+ * candidates: `flag()` refuses a value beginning with `--`, so no verb can
+ * legitimately take one, and positionals (`models install unirig@0.1.0`) are
+ * never candidates. An unlisted verb yields nothing — the unknown-verb error
+ * further down is the more useful message for `spritebook transmogrify --x`.
+ *
+ * Object.hasOwn, not a bare index: `spritebook constructor` would otherwise
+ * find Object.prototype.constructor and die spreading a function (the same
+ * prototype-chain trap the `--style` lookup already guards).
+ */
+function unknownFlags(verb: string | undefined, args: string[]): string[] {
+  if (verb === undefined || !Object.hasOwn(VERB_FLAGS, verb)) return [];
+  const accepted = new Set<string>([...VERB_FLAGS[verb], ...GLOBAL_FLAGS]);
+  return args.slice(1).filter((a) => a.startsWith('--') && !accepted.has(a.slice(2)));
+}
+
 /** Run the CLI. Returns the process exit code. */
 export async function runCli(args: string[], io: CliIo): Promise<number> {
   const now = io.now ?? (() => new Date().toISOString());
   const json = args.includes('--json');
   const verb = args[0];
-
-  if (verb === '--version' || verb === '-v') {
-    const { SPRITEBOOK_VERSION } = await import('./version.ts');
-    io.stdout(`spritebook ${SPRITEBOOK_VERSION}`);
-    return 0;
-  }
-  if (verb === 'doctor') {
-    const { runDoctor } = await import('./doctor.ts');
-    return await runDoctor(args, io);
-  }
 
   const emit = (e: JobEvent, human: string) => {
     if (json) io.stdout(encodeEvent(e).trimEnd());
@@ -239,6 +323,38 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     else io.stderr(`error: ${message}`);
     return 1;
   };
+
+  // before ANY work: a flag the verb cannot honor must never look like success
+  const unknown = unknownFlags(verb, args);
+  if (unknown.length > 0) {
+    const accepted = [...VERB_FLAGS[verb], ...GLOBAL_FLAGS]
+      .map((f) => `--${f}`)
+      .sort()
+      .join(', ');
+    // `--cell=64` reads as the flag "cell=64": flag() takes space-separated
+    // values only, so the = form silently fell through to the default
+    const eq = unknown.find((u) => u.includes('='));
+    const hint = eq
+      ? ` (values are space-separated: \`${eq.replace('=', ' ')}\`, not \`${eq}\`)`
+      : '';
+    return fail(
+      verb as JobEvent['jobId'],
+      'unknown-flag',
+      `Unknown flag${unknown.length > 1 ? 's' : ''} for \`${verb}\`: ${
+        unknown.join(', ')
+      }${hint} - accepted: ${accepted}`,
+    );
+  }
+
+  if (verb === '--version' || verb === '-v') {
+    const { SPRITEBOOK_VERSION } = await import('./version.ts');
+    io.stdout(`spritebook ${SPRITEBOOK_VERSION}`);
+    return 0;
+  }
+  if (verb === 'doctor') {
+    const { runDoctor } = await import('./doctor.ts');
+    return await runDoctor(args, io);
+  }
 
   if (verb === 'anim') {
     // query/install verbs over animation packs (P3-T1). Like doctor, --json

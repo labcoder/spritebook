@@ -140,6 +140,66 @@ Deno.test('bake --mirror reaches the spec, so D-008 is reachable at all', () => 
   assertEquals(spec.onlyInvalidated, true);
 });
 
+Deno.test('an unsupported flag is an error event, never silent success', async () => {
+  const bake = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
+  const cases: Array<[string[], string]> = [
+    // THE defect: --mirror was unsupported, so this ran a full unmirrored bake
+    // at full GPU cost and printed `done`. Any unsupported flag must refuse.
+    [[...bake, '--mirrror'], '--mirrror'],
+    [[...bake, '--framse', '4'], '--framse'],
+    [['export', '--bake', 'b', '--out', 'o', '--targets', 'godot', '--nope'], '--nope'],
+    [['undo', '--manifest', 'm', '--force'], '--force'],
+    [['anim', '--list', '--tags', 'walk'], '--tags'],
+    [['doctor', '--verbose'], '--verbose'],
+    // `--cell=64` is not a value the CLI can read: flag() takes space-separated
+    // values, so before this check it silently baked at the default 64px cell
+    [[...bake, '--cell=32'], 'space-separated'],
+  ];
+  for (const [args, needle] of cases) {
+    const c = collector();
+    assertEquals(await runCli([...args, '--json'], c.io), 1, args.join(' '));
+    const e = JSON.parse(c.out[c.out.length - 1]);
+    // --json must yield a JobEvent, not a stack trace
+    parseWith(JobEventSchema, e, 'cli NDJSON line');
+    assertEquals(e.t, 'error', args.join(' '));
+    assertEquals(e.code, 'unknown-flag', args.join(' '));
+    assert(e.message.includes(needle), `${args.join(' ')}: ${e.message}`);
+  }
+
+  // and the message says what the verb DOES take
+  const listed = collector();
+  await runCli([...bake, '--mirrror', '--json'], listed.io);
+  assert(JSON.parse(listed.out[0]).message.includes('--mirror'), 'names the real flag');
+});
+
+Deno.test('flag checking does not fire on flags the verbs legitimately take', async () => {
+  // the guard must not become a second place where a real flag goes missing:
+  // every flag reaching a real code path has to survive the gate
+  const ok: string[][] = [
+    ['bake', '--model', 'nope.glb', '--character', 'c', '--out', 'o', '--mirror'],
+    ['bake', '--model', 'nope.glb', '--character', 'c', '--out', 'o', '--clips', 'walk-loop:2'],
+    ['bake', '--model', 'nope.glb', '--character', 'c', '--out', 'o', '--only-invalidated'],
+  ];
+  for (const args of ok) {
+    const c = collector();
+    await runCli([...args, '--json'], c.io);
+    const codes = c.out.map((l) => JSON.parse(l).code).filter(Boolean);
+    assert(!codes.includes('unknown-flag'), `${args.join(' ')} -> ${codes.join(',')}`);
+    // it got as far as the job and failed on the missing model, not on parsing
+    assert(codes.includes('bake-failed'), `${args.join(' ')} reached the bake: ${codes.join(',')}`);
+  }
+
+  // an unknown VERB keeps its own, more useful message
+  const badVerb = collector();
+  assertEquals(await runCli(['transmogrify', '--wat'], badVerb.io), 1);
+  assert(badVerb.err[0].includes('Unknown verb'), badVerb.err[0]);
+
+  // and a prototype-chain verb name must not crash the lookup
+  const proto = collector();
+  assertEquals(await runCli(['constructor', '--wat'], proto.io), 1);
+  assert(proto.err[0].includes('Unknown verb'), proto.err[0]);
+});
+
 Deno.test('anim --list finds the bundled pack; --tag filters; --json is one document', async () => {
   const c = collector();
   assertEquals(await runCli(['anim', '--list', '--tag', 'walk', '--json'], c.io), 0);
