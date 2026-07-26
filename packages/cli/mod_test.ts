@@ -1,7 +1,7 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
 import { CAMERA_PRESETS, ManifestJournal } from '@spritebook/core';
-import { bakeSpecFromFlags, mergeAnimationSet, runCli } from './mod.ts';
+import { bakeSpecFromFlags, mergeAnimationSet, mirroringFor, runCli } from './mod.ts';
 
 const now = () => '2026-07-12T00:00:00Z';
 const target = { kind: 'character', id: 'brave-knight' } as const;
@@ -212,6 +212,46 @@ Deno.test('bake --clips arg validation fails fast, before any GPU work', async (
     assertEquals(e.code, 'bad-args', args.join(' '));
     assert(e.message.includes(needle), `${args.join(' ')}: ${e.message}`);
   }
+});
+
+Deno.test('mirroring: the flags beat the stored choice, which beats off', () => {
+  const on = ['bake', '--mirror'];
+  const off = ['bake', '--no-mirror'];
+  const silent = ['bake'];
+
+  // nothing said, nothing stored -> off. D-008's default, unchanged.
+  assertEquals(mirroringFor(silent, undefined), false);
+  assertEquals(mirroringFor(silent, false), false);
+  // THE wiring: a character that has already said yes bakes mirrored with no
+  // flag at all. `mirroring.enabled` had a schema, a writer in createWorkspace
+  // and a cache-key story, and the bake read none of it.
+  assertEquals(mirroringFor(silent, true), true);
+
+  // and either flag overrides whatever is stored, in both directions
+  assertEquals(mirroringFor(on, false), true);
+  assertEquals(mirroringFor(on, true), true);
+  assertEquals(mirroringFor(off, true), false, '--no-mirror is how a yes says no for one bake');
+  assertEquals(mirroringFor(off, false), false);
+});
+
+Deno.test('mirroring reaches the SPEC from the stored choice, not just the flag', () => {
+  const base = ['bake'];
+  const resolved = { model: 'm.glb', character: 'c', out: 'o' };
+  assertEquals(bakeSpecFromFlags(base, { ...resolved, mirroring: true }).mirroring, true);
+  assertEquals(
+    bakeSpecFromFlags([...base, '--no-mirror'], { ...resolved, mirroring: true }).mirroring,
+    false,
+  );
+  assertEquals(bakeSpecFromFlags(base, resolved).mirroring, false);
+});
+
+Deno.test('--mirror and --no-mirror together are refused, not silently resolved', async () => {
+  const c = collector();
+  const args = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o', '--json'];
+  assertEquals(await runCli([...args, '--mirror', '--no-mirror'], c.io), 1);
+  const e = JSON.parse(c.out[c.out.length - 1]);
+  assertEquals(e.code, 'bad-args');
+  assert(e.message.includes('contradict'), e.message);
 });
 
 Deno.test('bake --mirror reaches the spec, so D-008 is reachable at all', () => {

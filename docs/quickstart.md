@@ -169,6 +169,7 @@ hysteresis), so frames do not shimmer in motion.
 | `--cache <dir>`      | (off)         | input-hash frame cache; the bake always writes through when set |
 | `--only-invalidated` | (off)         | serve unchanged frames from the cache (all-or-none per bake)    |
 | `--mirror`           | (off)         | produce the back-half directions by flipping the front half     |
+| `--no-mirror`        | (off)         | force mirroring off, overriding the character's own setting     |
 | `--json`             | (off)         | NDJSON job events on stdout                                     |
 
 With `--workspace <dir>`, `--model`, `--character` and `--out` become optional: the model is the
@@ -195,6 +196,11 @@ flips of their partner, cutting render, style and cache work by ~37%. It is **of
 never inferred from geometry**: for anyone asymmetric the saving is a lie — a tattoo changes arms, a
 prosthetic swaps sides, text reads backwards. The bake warns for the whole run when it is on, and
 each mirrored frame is marked in the manifest with the direction it was flipped from.
+
+Under `--workspace` the choice persists like the rest of the look: `--mirror` once records
+`mirroring.enabled` on the character, and every later bake mirrors without the flag. That is not
+inference — it is the same explicit choice, made once and remembered, and the warning still fires
+every run. `--no-mirror` is how a character that has said yes says no for a single bake.
 
 ### `spritebook export`
 

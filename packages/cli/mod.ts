@@ -268,6 +268,28 @@ function clipsFor(args: string[], animationSet?: ClipBinding[]): ClipBindingSpec
   }));
 }
 
+/**
+ * Whether this bake mirrors: `--mirror` beats `--no-mirror` beats the
+ * character's own choice, which beats off.
+ *
+ * D-008 says mirroring is opt-in and NEVER INFERRED — but what it refuses to
+ * infer from is GEOMETRY ("the saving is a lie for anyone asymmetric": a tattoo
+ * changes arms, a prosthetic swaps sides, text reads backwards). Reading a
+ * stored `mirroring.enabled` is not inference; it is the same explicit choice,
+ * made once and remembered, and the run-long `mirroring-on` warning still fires
+ * every time. Off stays the default for a character that has never said.
+ *
+ * `--no-mirror` exists because without it a character who has said yes has no
+ * way to say no for one bake — and "delete the field" is not a CLI gesture.
+ * Naming both is a contradiction, and the caller refuses it rather than picking
+ * a winner.
+ */
+export function mirroringFor(args: string[], stored?: boolean): boolean {
+  if (args.includes('--mirror')) return true;
+  if (args.includes('--no-mirror')) return false;
+  return stored ?? false;
+}
+
 export interface BakeResolution {
   model: string;
   character: string;
@@ -276,6 +298,8 @@ export interface BakeResolution {
   look?: CharacterLook;
   /** the character's stored clip bindings, when baking from a workspace */
   animationSet?: ClipBinding[];
+  /** the character's stored D-008 choice, when baking from a workspace */
+  mirroring?: boolean;
 }
 
 /**
@@ -306,10 +330,7 @@ export function bakeSpecFromFlags(args: string[], resolved: BakeResolution): Bak
     onlyInvalidated: args.includes('--only-invalidated'),
     clips: clipsFor(args, resolved.animationSet),
     packDir: flag(args, 'pack'),
-    // D-008 is opt-in and NEVER inferred (schema/roster.ts): the saving is a
-    // lie for anyone asymmetric, so it costs an explicit flag and the bake
-    // warns while it runs.
-    mirroring: args.includes('--mirror'),
+    mirroring: mirroringFor(args, resolved.mirroring),
   };
 }
 
@@ -404,6 +425,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'cache',
     'only-invalidated',
     'mirror',
+    'no-mirror',
   ],
   export: ['bake', 'out', 'targets', 'fps'],
   undo: ['manifest'],
@@ -1205,6 +1227,16 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     if (args.includes('--pack') && !flag(args, 'pack')) {
       return fail(bakeId, 'bad-args', '--pack needs a directory path');
     }
+    // naming both is a contradiction, and picking a winner would mean baking
+    // the opposite of half of what the user typed
+    if (args.includes('--mirror') && args.includes('--no-mirror')) {
+      return fail(
+        bakeId,
+        'bad-args',
+        '--mirror and --no-mirror contradict each other - pass one, or neither to use the ' +
+          "character's own setting",
+      );
+    }
     const stored = manifest?.animationSet?.filter((c) => c.enabled) ?? [];
     if (flag(args, 'pack') && !flag(args, 'clips') && stored.length === 0) {
       return fail(
@@ -1256,7 +1288,14 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
 
     let spec: BakeJobSpec;
     try {
-      spec = bakeSpecFromFlags(args, { model, character, out, look, animationSet: stored });
+      spec = bakeSpecFromFlags(args, {
+        model,
+        character,
+        out,
+        look,
+        animationSet: stored,
+        mirroring: manifest?.mirroring.enabled,
+      });
     } catch (err) {
       return fail(bakeId, 'bad-args', err instanceof Error ? err.message : String(err));
     }
