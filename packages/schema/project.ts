@@ -116,6 +116,21 @@ export const StylePresetBaseSchema = z
     }),
   });
 
+/**
+ * A partial style, for refining a named preset (`look.overrides`).
+ *
+ * `id` is omitted for the same reason it is on CameraOverridesSchema: an
+ * override refines a preset, it does not rename one, and the resolved style
+ * keeps the preset's id so a bake manifest can say where its look came from.
+ *
+ * There is no `.superRefine` here and there cannot be — the cross-field rules
+ * below judge a WHOLE style ("cutoff is required when mode is 1bit"), and a
+ * partial has no whole to judge. `resolveStyle` re-validates the merged result
+ * against StylePresetSchema, which is where those rules get their say.
+ */
+export const StyleOverridesSchema = StylePresetBaseSchema.omit({ id: true }).partial();
+export type StyleOverrides = z.output<typeof StyleOverridesSchema>;
+
 export const StylePresetSchema = StylePresetBaseSchema
   .superRefine((v, ctx) => {
     if (v.alpha.mode === '1bit' && v.alpha.cutoff === undefined) {

@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 import { BakeIdSchema, CharacterIdSchema, IsoTimeSchema, Sha256Schema } from './identity.ts';
-import { CameraOverridesSchema, StylePresetBaseSchema } from './project.ts';
+import { CameraOverridesSchema, StyleOverridesSchema } from './project.ts';
 import { SCHEMA_VERSION } from './migrate.ts';
 
 export const SourceRecordSchema = z.strictObject({
@@ -145,7 +145,7 @@ export const CharacterManifestSchema = z.strictObject({
     cameraPresetId: z.string().min(1),
     cameraOverrides: CameraOverridesSchema.optional(),
     stylePresetId: z.string().min(1),
-    overrides: StylePresetBaseSchema.partial().optional(),
+    overrides: StyleOverridesSchema.optional(),
   }).optional(),
   /** OPT-IN (D-008): asymmetry is first-class */
   mirroring: z.strictObject({ enabled: z.boolean() }),

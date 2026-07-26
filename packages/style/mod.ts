@@ -12,7 +12,14 @@ import { styleFromAovs } from './pipeline.ts';
 
 export { styleClipsFromAovs, styleFromAovs } from './pipeline.ts';
 export type { ClipAovSource } from './pipeline.ts';
-export { CEL_2, PAINTERLY, PIXEL_8, PRESETS } from './presets.ts';
+export {
+  CEL_2,
+  DEFAULT_STYLE_PRESET_ID,
+  PAINTERLY,
+  PIXEL_8,
+  PRESETS,
+  resolveStyle,
+} from './presets.ts';
 // pure AOV utilities, re-exported for the pack stage (bake composes render ->
 // style -> pack via files; pack reads the same Sx AOVs to build 1x AOV pages)
 export { readAov } from './aovio.ts';

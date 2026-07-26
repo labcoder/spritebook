@@ -9,7 +9,7 @@
  * palette + area-average downsample. Ramp-based cel shading is a future
  * render-side mode; `ramp` is carried for schema completeness but not applied.
  */
-import { type StylePreset, StylePresetSchema } from '@spritebook/schema';
+import { type StyleOverrides, type StylePreset, StylePresetSchema } from '@spritebook/schema';
 import { parseWith } from '@spritebook/schema';
 
 const ALL_PASSES = ['lit', 'albedo', 'normal', 'depth', 'mask'] as const;
@@ -77,3 +77,49 @@ export const PRESETS: Record<string, StylePreset> = {
   'pixel-8': PIXEL_8,
   'painterly': PAINTERLY,
 };
+
+/** What `resolveStyle` falls back to, and what `bake --style` defaults to. */
+export const DEFAULT_STYLE_PRESET_ID = 'pixel-8';
+
+/**
+ * Resolve a preset id and optional overrides into the style a bake runs with —
+ * the peer of `resolveCamera` in @spritebook/core, and the half of
+ * `CharacterManifest.look` that P4's Look stage edits (D-029).
+ *
+ * Overrides are a SHALLOW merge, so `alpha` replaces wholesale: switching a
+ * painterly character to 1-bit alpha means restating `bleedPx` too. That reads
+ * like a trap until you see what the alternative costs — a deep merge would let
+ * `{ alpha: { mode: '1bit' } }` produce a style with no `cutoff`, which is
+ * precisely the combination StylePresetSchema exists to refuse.
+ *
+ * Which is the other half of this function: the merged result is re-validated
+ * against StylePresetSchema, superRefine and all, NOT against the base object.
+ * Every cross-field rule there is reachable by a legal-looking override —
+ * '1bit' without a cutoff, `passes` without 'lit' (AOV pages share the lit
+ * layout, D-010), `clusterVote` without a palette (which paints a blank sprite
+ * and reports flickerPct 0, a perfect stability score). A preset is valid and
+ * an override is valid; only their COMBINATION can be wrong.
+ */
+export function resolveStyle(
+  presetId: string = DEFAULT_STYLE_PRESET_ID,
+  overrides?: StyleOverrides,
+): StylePreset {
+  // Object.hasOwn, not a bare index: `--style __proto__` would otherwise find
+  // Object.prototype and die later as a confusing TypeError (m7)
+  if (!Object.hasOwn(PRESETS, presetId)) {
+    throw new Error(
+      `Unknown style "${presetId}" - available: ${Object.keys(PRESETS).sort().join(', ')}`,
+    );
+  }
+  const base = PRESETS[presetId];
+  if (overrides === undefined) return base;
+  // an explicit `undefined` means "not overridden", not "unset" — erasing a
+  // required field through the spread would fail with a baffling message
+  const applied: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(overrides)) if (v !== undefined) applied[k] = v;
+  return parseWith(
+    StylePresetSchema,
+    { ...base, ...applied },
+    `StylePreset "${presetId}" with overrides`,
+  );
+}
