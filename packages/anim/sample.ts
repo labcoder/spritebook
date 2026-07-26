@@ -4,10 +4,19 @@
  * poses file the render seam consumes by path. The SAME sampled matrices feed
  * the preview GLB — preview/bake parity by construction.
  *
- * Sampling semantics (contracts.ts): duration' = duration / speed;
- *   loop:     t_i = (i / N) * duration'          (exclusive end — no dup pose)
- *   holdLast: t_i = min(i * duration'/(N-1), duration')   (lands on the end)
+ * Sampling semantics: the samples always span the WHOLE clip —
+ *   loop:     t_i = (i / N) * duration          (exclusive end — no dup pose)
+ *   holdLast: t_i = i * duration / (N - 1)      (lands on the end)
  * LINEAR (slerp/lerp) and STEP; clamped at track ends.
+ *
+ * `speed` is a PLAYBACK rate, not a sampling window. It used to divide the
+ * duration here, which sampled only part of the cycle: `walk-loop:6@0.5`
+ * covered 200% of a 1.2 s clip and clamped, shipping 6 frames of which the
+ * last 3 were byte-identical frozen poses, while `@2` shipped half a stride
+ * that snapped back every loop. Both reported `frames` distinct frames with no
+ * warn. Speed now lives where a rate belongs: BakeManifest.clips[].fps is
+ * `frames / (durationS / speed)`, so a consumer plays the whole animation in
+ * `duration / speed` seconds — which is what asking for double speed means.
  */
 import { canonicalJson } from '@spritebook/schema';
 import type { Clip, JointTrack, PosesHeader, SkeletonRest } from './contracts.ts';
@@ -36,11 +45,14 @@ export function frameTimes(duration: number, spec: SampleSpec): number[] {
   if (!Number.isFinite(spec.speed) || !(spec.speed > 0)) {
     throw new Error(`frameTimes: speed must be a positive finite number, got ${spec.speed}`);
   }
-  const d = duration / spec.speed;
+  // `speed` is validated above but deliberately NOT applied here — it is a
+  // playback rate, carried by BakeManifest.clips[].fps. Sampling always spans
+  // the whole clip so every frame is a distinct pose.
+  const d = duration;
   const out: number[] = [];
   for (let i = 0; i < spec.frames; i++) {
     if (spec.holdLast) {
-      out.push(spec.frames === 1 ? 0 : Math.min((i * d) / (spec.frames - 1), d));
+      out.push(spec.frames === 1 ? 0 : (i * d) / (spec.frames - 1));
     } else {
       out.push((i / spec.frames) * d);
     }

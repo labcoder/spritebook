@@ -16,10 +16,9 @@ const UAL = new URL('./fixtures/ual-subset.glb', import.meta.url).pathname.repla
   '$1',
 );
 
-Deno.test('frameTimes: loop is exclusive-end; holdLast lands on the end; speed scales', () => {
+Deno.test('frameTimes: loop is exclusive-end; holdLast lands on the end', () => {
   assertEquals(frameTimes(2, { frames: 4, speed: 1, holdLast: false }), [0, 0.5, 1, 1.5]);
   assertEquals(frameTimes(2, { frames: 3, speed: 1, holdLast: true }), [0, 1, 2]);
-  assertEquals(frameTimes(2, { frames: 4, speed: 2, holdLast: false }), [0, 0.25, 0.5, 0.75]);
   assertEquals(frameTimes(1, { frames: 1, speed: 1, holdLast: true }), [0]);
 });
 
@@ -82,5 +81,31 @@ Deno.test('poses round-trip: anim writes, ANIM and RENDER read identical bytes',
     assertEquals(await Deno.readFile(path), await Deno.readFile(path2));
   } finally {
     await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test('frameTimes: speed does NOT shrink the sampling window', () => {
+  // This replaces an assertion that `frameTimes(2, {frames:4, speed:2})` is
+  // [0, 0.25, 0.5, 0.75] - i.e. that double speed samples only the FIRST HALF
+  // of the clip. That locked the defect in as the contract: `walk-loop:6@0.5`
+  // shipped 6 frames whose last 3 were byte-identical frozen poses (sampled
+  // past the end and clamped), and `@2` shipped half a stride that snapped
+  // back every loop, both reporting `frames` distinct frames with no warn.
+  //
+  // Speed is a playback RATE. It belongs in BakeManifest.clips[].fps
+  // (frames / (durationS / speed)), so the whole animation plays in
+  // duration/speed seconds - which is what double speed means. The samples
+  // must therefore cover the whole cycle at every speed.
+  const at = (speed: number) => frameTimes(2, { frames: 4, speed, holdLast: false });
+  assertEquals(at(1), [0, 0.5, 1, 1.5]);
+  assertEquals(at(2), at(1), 'double speed samples the same poses, played faster');
+  assertEquals(at(0.5), at(1), 'half speed samples the same poses, played slower');
+
+  // and no sample ever lands past the clip, which is what produced the frozen
+  // duplicates: at speed 0.5 the old code asked for t = 2, 3, 4, 5 on a 2s clip
+  for (const speed of [0.25, 0.5, 1, 2, 4]) {
+    for (const t of frameTimes(2, { frames: 6, speed, holdLast: true })) {
+      assert(t >= 0 && t <= 2, `speed ${speed}: sample ${t} is outside the clip`);
+    }
   }
 });
