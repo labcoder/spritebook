@@ -108,12 +108,27 @@ function applyOp(doc: Doc, op: JsonPatchOp): void {
 /** Compute the exact inverse of one op against the CURRENT document state. */
 function invertOp(doc: Doc, op: JsonPatchOp): JsonPatchOp {
   if (op.op === 'add') {
-    // inverse of add = remove at the concrete index ('-' resolved now)
     const site = locate(doc, op.path, 'add');
-    const concrete = Array.isArray(site.parent) && op.path.endsWith('/-')
-      ? op.path.slice(0, -2) + '/' + String(site.key)
-      : op.path;
-    return { op: 'remove', path: concrete };
+    if (Array.isArray(site.parent)) {
+      // an array add INSERTS, so it never destroys anything: the inverse is
+      // always a remove at the concrete index ('-' resolved now)
+      const concrete = op.path.endsWith('/-')
+        ? op.path.slice(0, -2) + '/' + String(site.key)
+        : op.path;
+      return { op: 'remove', path: concrete };
+    }
+    // RFC-6902 `add` on an EXISTING object member is an OVERWRITE - that is
+    // exactly what applyOp does - so its inverse must restore the old value.
+    // Removing instead would delete a field undo was supposed to put back.
+    //
+    // Object.hasOwn, never the `has()` helper: `key in parent` walks the
+    // prototype chain, so `add /toString` would be read as an overwrite and
+    // then structuredClone(Object.prototype.toString) would throw
+    // DataCloneError - a working commit turned into a crash.
+    if (!Object.hasOwn(site.parent, site.key as string)) {
+      return { op: 'remove', path: op.path };
+    }
+    return { op: 'replace', path: op.path, value: structuredClone(read(site)) };
   }
   const site = locate(doc, op.path, 'other');
   if (!has(site)) throw new Error(`${op.op}: nothing exists at "${op.path}"`);

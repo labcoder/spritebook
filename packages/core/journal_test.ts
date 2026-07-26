@@ -118,6 +118,109 @@ Deno.test('failing op leaves the document untouched (all-or-nothing)', async () 
   assertEquals(journal.undoDepth, 0);
 });
 
+// --- the inverse of `add` depends on what was already there ------------------
+// applyOp implements RFC-6902 `add` on a present OBJECT member as an
+// OVERWRITE, so "inverse of add is remove" is only true when the member was
+// absent. These four cases pin all of it.
+
+Deno.test('add over an EXISTING object member inverts to replace, not remove', async () => {
+  const original = await loadFixtureDoc();
+  const originalBytes = canonicalJson(original);
+  const journal = new ManifestJournal(original, { now });
+
+  const patch = journal.commit({
+    target,
+    op: [{ op: 'add', path: '/displayName', value: 'Renamed' }],
+    label: 'Rename via add',
+  });
+
+  assertEquals(patch.inverse, [{ op: 'replace', path: '/displayName', value: 'Brave Knight' }]);
+  assertEquals(journal.doc.displayName, 'Renamed');
+  journal.undo();
+  assertEquals(journal.doc.displayName, 'Brave Knight', 'undo restores, never deletes');
+  assertEquals(journal.canonicalBytes, originalBytes, 'byte-for-byte restoration');
+});
+
+Deno.test('add over an existing OBJECT value restores the whole old subtree', async () => {
+  const original = await loadFixtureDoc();
+  const originalBytes = canonicalJson(original);
+  const journal = new ManifestJournal(original, { now });
+
+  journal.commit({
+    target,
+    op: [{ op: 'add', path: '/look/overrides', value: { ramp: { stops: 3 } } }],
+    label: 'Replace overrides via add',
+  });
+  // a later patch mutating the NEW subtree must not reach the captured old one
+  journal.commit({
+    target,
+    op: [{ op: 'replace', path: '/look/overrides/ramp/stops', value: 5 }],
+    label: 'Tweak ramp',
+  });
+
+  journal.undo();
+  journal.undo();
+  assertEquals(journal.canonicalBytes, originalBytes, 'the old overrides came back intact');
+});
+
+Deno.test('add of an ABSENT object member still inverts to remove', async () => {
+  const original = await loadFixtureDoc();
+  const originalBytes = canonicalJson(original);
+  const journal = new ManifestJournal(original, { now });
+
+  const patch = journal.commit({
+    target,
+    op: [{ op: 'add', path: '/look/overrides/ramp', value: { stops: 3, rimStrength: 0.5 } }],
+    label: 'Add ramp',
+  });
+
+  assertEquals(patch.inverse, [{ op: 'remove', path: '/look/overrides/ramp' }]);
+  journal.undo();
+  assertEquals(journal.canonicalBytes, originalBytes);
+});
+
+Deno.test('array add stays an insert: both /- and an index invert to remove', async () => {
+  const original = await loadFixtureDoc();
+  const originalBytes = canonicalJson(original);
+  const journal = new ManifestJournal(original, { now });
+
+  const appended = journal.commit({
+    target,
+    op: [{ op: 'add', path: '/detailLayers/-', value: { id: 'crest', uvDecalPng: 'crest.png' } }],
+    label: 'Append crest',
+  });
+  // '-' is resolved to the concrete index at commit time
+  assertEquals(appended.inverse, [{ op: 'remove', path: '/detailLayers/1' }]);
+
+  const inserted = journal.commit({
+    target,
+    op: [{ op: 'add', path: '/detailLayers/0', value: { id: 'tattoo', uvDecalPng: 't.png' } }],
+    label: 'Insert tattoo first',
+  });
+  assertEquals(inserted.inverse, [{ op: 'remove', path: '/detailLayers/0' }]);
+
+  journal.undo();
+  journal.undo();
+  assertEquals(journal.canonicalBytes, originalBytes, 'neither insert destroyed a sibling');
+});
+
+Deno.test('add of a prototype-chain key is an addition, not an overwrite', () => {
+  // `'toString' in parent` is true for every plain object, so reading presence
+  // that way would call structuredClone on an inherited function and throw
+  const journal = new ManifestJournal({ keep: 1 }, { now });
+
+  const patch = journal.commit({
+    target,
+    op: [{ op: 'add', path: '/toString', value: 'not a function' }],
+    label: 'Shadow a prototype key',
+  });
+
+  assertEquals(patch.inverse, [{ op: 'remove', path: '/toString' }]);
+  assertEquals(journal.doc, { keep: 1, toString: 'not a function' });
+  journal.undo();
+  assertEquals(journal.doc, { keep: 1 });
+});
+
 Deno.test('JSON Pointer escapes (~0 ~1) resolve correctly', () => {
   const journal = new ManifestJournal({ 'a/b': { 'c~d': 1 } }, { now });
   journal.commit({
