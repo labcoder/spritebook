@@ -99,9 +99,18 @@ export interface ClipBindingSpec extends SampleSpec {
   clipId: string;
 }
 
-// decodeURIComponent: URL.pathname percent-encodes (spaces, non-ASCII) — an
-// install under "C:\Users\First Last\..." must still resolve (review F3)
-const BUNDLED_PACK = decodeURIComponent(
+/**
+ * Where clip ids resolve when `spec.packDir` is absent.
+ *
+ * Exported because the CLI has to answer "which pack is this bake actually
+ * reading?" before it trusts a manifest's clip bindings — a binding naming pack
+ * "x" resolved against pack "y" renders a different animation under the same
+ * clip id, and reports done.
+ *
+ * decodeURIComponent: URL.pathname percent-encodes (spaces, non-ASCII) — an
+ * install under "C:\Users\First Last\..." must still resolve (review F3)
+ */
+export const BUNDLED_PACK = decodeURIComponent(
   new URL('../anim/packs/ual', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
 );
 

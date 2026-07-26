@@ -9,6 +9,7 @@
  *   <manifest>.journal.cursor     how many patches are currently applied
  */
 import {
+  BakeManifestSchema,
   canonicalJson,
   CharacterManifestSchema,
   type ExportTargetId,
@@ -18,11 +19,28 @@ import {
   migrateCharacterManifest,
   parseWith,
 } from '@spritebook/schema';
-import type { CameraPreset, JointEdit, OrientationFix, StylePreset } from '@spritebook/schema';
-import { applyPatchOps, encodeEvent } from '@spritebook/core';
-import { PRESETS } from '@spritebook/style';
-import type { BakeJobSpec } from '@spritebook/pack';
-import { runBakeJob } from '@spritebook/pack';
+import type {
+  CameraOverrides,
+  CameraPreset,
+  CharacterManifest,
+  ClipBinding,
+  JointEdit,
+  OrientationFix,
+  StylePreset,
+} from '@spritebook/schema';
+import {
+  applyPatchOps,
+  CAMERA_PRESETS,
+  DEFAULT_CAMERA_PRESET_ID,
+  encodeEvent,
+  readWorkspace,
+  recordBake,
+  resolveCamera,
+  workspacePaths,
+} from '@spritebook/core';
+import { DEFAULT_STYLE_PRESET_ID, PRESETS, resolveStyle } from '@spritebook/style';
+import type { BakeJobSpec, ClipBindingSpec } from '@spritebook/pack';
+import { BUNDLED_PACK, runBakeJob } from '@spritebook/pack';
 import { runExportJob } from '@spritebook/export';
 
 export interface CliIo {
@@ -193,23 +211,72 @@ function parseAdjust(raw: string | undefined): Record<string, unknown> {
   return out;
 }
 
-/** Build the CameraPreset for `spritebook bake` from CLI flags + defaults. */
-function cameraFromFlags(args: string[]): CameraPreset {
-  const directions = intFlag(args, 'directions', 8);
-  if (!DIR_CHOICES.has(directions)) throw new Error('--directions must be 2, 4, 8, or 16');
-  const cell = intFlag(args, 'cell', 64);
-  const elevation = numFlag(args, 'elevation', 30);
-  return {
-    id: `cli-e${elevation}x${directions}`,
-    elevationDeg: elevation,
-    directions: directions as CameraPreset['directions'],
-    yawOffsetDeg: 0,
-    pixelsPerMeter: intFlag(args, 'ppm', 32),
-    cellPx: { w: cell, h: cell },
-    paddingPx: intFlag(args, 'padding', 6),
-    pivot: 'feet-baseline',
-    orthographic: true,
-  };
+/** The character's own camera + style, when `bake` was pointed at a workspace. */
+type CharacterLook = NonNullable<CharacterManifest['look']>;
+
+/**
+ * The camera geometry flags as an override object, holding ONLY the ones the
+ * user actually typed.
+ *
+ * Presence detection, not defaults, and that distinction is what makes
+ * `--workspace` safe: `intFlag(args, 'cell', 64)` cannot tell "the user asked
+ * for 64" from "nobody said anything", so folding defaults in would overwrite a
+ * character's stored cell size on every bake that did not restate it.
+ */
+function cameraOverridesFromFlags(args: string[]): CameraOverrides {
+  const out: CameraOverrides = {};
+  if (flag(args, 'elevation') !== undefined) out.elevationDeg = numFlag(args, 'elevation', 30);
+  if (flag(args, 'directions') !== undefined) {
+    const directions = intFlag(args, 'directions', 8);
+    // checked here as well as in the schema so the message names the choices
+    if (!DIR_CHOICES.has(directions)) throw new Error('--directions must be 2, 4, 8, or 16');
+    out.directions = directions as CameraPreset['directions'];
+  }
+  if (flag(args, 'ppm') !== undefined) out.pixelsPerMeter = intFlag(args, 'ppm', 32);
+  if (flag(args, 'cell') !== undefined) {
+    const cell = intFlag(args, 'cell', 64);
+    out.cellPx = { w: cell, h: cell };
+  }
+  if (flag(args, 'padding') !== undefined) out.paddingPx = intFlag(args, 'padding', 6);
+  return out;
+}
+
+/** `--camera` beats the character's stored look, which beats the default. */
+export function cameraPresetIdFor(args: string[], look?: CharacterLook): string {
+  return flag(args, 'camera') ?? look?.cameraPresetId ?? DEFAULT_CAMERA_PRESET_ID;
+}
+
+/** `--style` beats the character's stored look, which beats the default. */
+export function stylePresetIdFor(args: string[], look?: CharacterLook): string {
+  return flag(args, 'style') ?? look?.stylePresetId ?? DEFAULT_STYLE_PRESET_ID;
+}
+
+/**
+ * `--clips` beats the character's stored bindings. Disabled bindings are
+ * skipped rather than baked at zero frames — `enabled: false` is the user
+ * saying "not this one", which is a different statement from deleting it.
+ */
+function clipsFor(args: string[], animationSet?: ClipBinding[]): ClipBindingSpec[] | undefined {
+  const raw = flag(args, 'clips');
+  if (raw !== undefined) return parseClips(raw);
+  const enabled = animationSet?.filter((c) => c.enabled) ?? [];
+  if (enabled.length === 0) return undefined;
+  return enabled.map((c) => ({
+    clipId: c.clipId,
+    frames: c.frames,
+    speed: c.speed,
+    holdLast: c.holdLast,
+  }));
+}
+
+export interface BakeResolution {
+  model: string;
+  character: string;
+  out: string;
+  /** the character's stored camera + style, when baking from a workspace */
+  look?: CharacterLook;
+  /** the character's stored clip bindings, when baking from a workspace */
+  animationSet?: ClipBinding[];
 }
 
 /**
@@ -217,29 +284,94 @@ function cameraFromFlags(args: string[]): CameraPreset {
  * only way to test the wiring without a GPU, and untestable wiring is how
  * `--mirror` went missing: D-008 mirroring was implemented, tested and
  * documented in @spritebook/pack while no flag anywhere reached it.
+ *
+ * Flags and the character's own look go through ONE resolution path (D-029).
+ * Two paths would drift: the flag defaults used to synthesize a camera whose id
+ * (`cli-e30x8`) named no preset at all, so a look-driven bake and a
+ * flag-driven bake of identical geometry produced different cache keys and
+ * could not share a single cached frame.
  */
-export function bakeSpecFromFlags(
-  args: string[],
-  resolved: { model: string; character: string; out: string; style: StylePreset },
-): BakeJobSpec {
-  const clips = flag(args, 'clips');
+export function bakeSpecFromFlags(args: string[], resolved: BakeResolution): BakeJobSpec {
   return {
     jobId: 'bake',
     characterId: resolved.character,
     modelPath: resolved.model,
-    camera: cameraFromFlags(args),
-    style: resolved.style,
+    camera: resolveCamera(cameraPresetIdFor(args, resolved.look), {
+      ...resolved.look?.cameraOverrides,
+      ...cameraOverridesFromFlags(args), // an explicit flag wins over the stored look
+    }),
+    style: resolveStyle(stylePresetIdFor(args, resolved.look), resolved.look?.overrides),
     frames: intFlag(args, 'frames', 6),
     outRoot: resolved.out,
     cacheDir: flag(args, 'cache'),
     onlyInvalidated: args.includes('--only-invalidated'),
-    clips: clips ? parseClips(clips) : undefined,
+    clips: clipsFor(args, resolved.animationSet),
     packDir: flag(args, 'pack'),
     // D-008 is opt-in and NEVER inferred (schema/roster.ts): the saving is a
     // lie for anyone asymmetric, so it costs an explicit flag and the bake
     // warns while it runs.
     mirroring: args.includes('--mirror'),
   };
+}
+
+/**
+ * The fields of a resolved camera that differ from its preset — what
+ * `look.cameraOverrides` should record.
+ *
+ * Only the differences, so the manifest says what this character CHANGED
+ * rather than restating the preset it already names. Round-trips exactly:
+ * resolving a preset against an empty override set returns the preset.
+ */
+function cameraOverridesOf(preset: CameraPreset, resolved: CameraPreset): CameraOverrides {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(resolved)) {
+    if (k === 'id') continue;
+    if (canonicalJson(v) !== canonicalJson(preset[k as keyof CameraPreset])) out[k] = v;
+  }
+  return out as CameraOverrides;
+}
+
+/**
+ * The character's clip bindings after a bake: what ran, merged over what was
+ * already recorded.
+ *
+ * Merged, not replaced. A binding the manifest carries as `enabled: false` is a
+ * clip the user chose to leave out, and a `bake --clips walk-loop:6` that
+ * silently deleted it would destroy a choice the bake was never asked about.
+ * Existing entries keep their position; new ones append, so the order is a
+ * function of history rather than of iteration.
+ */
+function mergeAnimationSet(
+  existing: ClipBinding[] | undefined,
+  ran: ClipBindingSpec[],
+  packId: string,
+): ClipBinding[] {
+  const byId = new Map(ran.map((c) => [c.clipId, c]));
+  const out: ClipBinding[] = (existing ?? []).map((prev) => {
+    const now = byId.get(prev.clipId);
+    byId.delete(prev.clipId);
+    // not in this bake: it keeps whatever it said, including enabled: false
+    if (now === undefined) return prev;
+    return {
+      ...prev,
+      packId,
+      enabled: true,
+      frames: now.frames,
+      speed: now.speed,
+      holdLast: now.holdLast,
+    };
+  });
+  for (const c of byId.values()) {
+    out.push({
+      clipId: c.clipId,
+      packId,
+      enabled: true,
+      frames: c.frames,
+      speed: c.speed,
+      holdLast: c.holdLast,
+    });
+  }
+  return out;
 }
 
 /**
@@ -252,9 +384,11 @@ export function bakeSpecFromFlags(
  */
 const VERB_FLAGS: Record<string, readonly string[]> = {
   bake: [
+    'workspace',
     'model',
     'character',
     'out',
+    'camera',
     'style',
     'directions',
     'frames',
@@ -1007,58 +1141,170 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
   }
 
   if (verb === 'bake') {
-    const model = flag(args, 'model');
-    const character = flag(args, 'character');
-    const out = flag(args, 'out');
+    const bakeId = 'bake' as JobEvent['jobId'];
+    // --workspace supplies the model, the character id, the output root, and
+    // the character's own look + clips; every one of those is still overridable
+    // by its flag. Optional, like `rig --workspace`: without it `bake` behaves
+    // exactly as it always has.
+    const workspace = flag(args, 'workspace');
+    let manifest: CharacterManifest | undefined;
+    if (workspace !== undefined) {
+      try {
+        manifest = await readWorkspace(workspace);
+      } catch (err) {
+        return fail(bakeId, 'no-workspace', err instanceof Error ? err.message : String(err));
+      }
+    }
+    const ws = workspace === undefined ? undefined : workspacePaths(workspace);
+    const model = flag(args, 'model') ?? ws?.canonicalModel;
+    const character = flag(args, 'character') ?? manifest?.id;
+    const out = flag(args, 'out') ?? ws?.bakesDir;
     if (!model || !character || !out) {
       return fail(
-        'bake' as JobEvent['jobId'],
+        bakeId,
         'missing-arg',
-        '--model <glb>, --character <id>, and --out <dir> are required',
+        '--model <glb>, --character <id>, and --out <dir> are required - or --workspace <dir>, ' +
+          'which supplies all three from the character it holds',
       );
     }
-    const styleId = flag(args, 'style') ?? 'pixel-8';
+    const look = manifest?.look;
     // Object.hasOwn: `--style __proto__` must be unknown-style, not a
     // prototype-chain hit that dies later as a confusing TypeError (m7)
-    const style = Object.hasOwn(PRESETS, styleId) ? PRESETS[styleId] : undefined;
-    if (!style) {
+    const styleId = stylePresetIdFor(args, look);
+    if (!Object.hasOwn(PRESETS, styleId)) {
       return fail(
-        'bake' as JobEvent['jobId'],
+        bakeId,
         'unknown-style',
-        `Unknown style "${styleId}" - available: ${Object.keys(PRESETS).sort().join(', ')}`,
+        `Unknown style "${styleId}"${
+          flag(args, 'style') === undefined ? " (from the character's look)" : ''
+        } - available: ${Object.keys(PRESETS).sort().join(', ')}`,
+      );
+    }
+    const cameraId = cameraPresetIdFor(args, look);
+    if (!Object.hasOwn(CAMERA_PRESETS, cameraId)) {
+      return fail(
+        bakeId,
+        'unknown-camera',
+        `Unknown camera preset "${cameraId}"${
+          flag(args, 'camera') === undefined ? " (from the character's look)" : ''
+        } - available: ${Object.keys(CAMERA_PRESETS).sort().join(', ')}`,
       );
     }
     // a valueless --clips must not silently bake the legacy idle stub, and a
-    // --pack without --clips changes nothing - both are user error, say so
+    // --pack with no clips to resolve changes nothing - both are user error
     if (args.includes('--clips') && !flag(args, 'clips')) {
       return fail(
-        'bake' as JobEvent['jobId'],
+        bakeId,
         'bad-args',
         '--clips needs a value: clip:frames[@speed][!hold][,...] - see `spritebook anim --list`',
       );
     }
     if (args.includes('--pack') && !flag(args, 'pack')) {
-      return fail('bake' as JobEvent['jobId'], 'bad-args', '--pack needs a directory path');
+      return fail(bakeId, 'bad-args', '--pack needs a directory path');
     }
-    if (flag(args, 'pack') && !flag(args, 'clips')) {
+    const stored = manifest?.animationSet?.filter((c) => c.enabled) ?? [];
+    if (flag(args, 'pack') && !flag(args, 'clips') && stored.length === 0) {
       return fail(
-        'bake' as JobEvent['jobId'],
+        bakeId,
         'bad-args',
-        '--pack only applies with --clips (it picks where clip ids resolve)',
+        '--pack only applies when there are clips to resolve: pass --clips, or point --workspace ' +
+          'at a character whose animationSet has enabled bindings',
       );
     }
+
+    // Which pack this bake reads, resolved only when there are clips to read
+    // from one — a plain idle-stub bake must not start depending on a pack it
+    // never opens.
+    const packDir = flag(args, 'pack') ?? BUNDLED_PACK;
+    let packId: string | undefined;
+    if (flag(args, 'clips') !== undefined || stored.length > 0) {
+      try {
+        const { loadPack } = await import('@spritebook/anim');
+        packId = (await loadPack(packDir)).id;
+      } catch (err) {
+        return fail(
+          bakeId,
+          'bad-pack',
+          `Cannot read an animation pack at "${packDir}": ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+      // A stored binding names the pack its clip came FROM. Resolving it
+      // against a different pack renders a different animation under the same
+      // clip id and reports done, so the mismatch is refused rather than
+      // guessed at. Only stored bindings are checked: `--clips` is the user
+      // naming ids right now, against the pack they also named.
+      const foreign = flag(args, 'clips') === undefined
+        ? stored.find((c) => c.packId !== packId)
+        : undefined;
+      if (foreign) {
+        return fail(
+          bakeId,
+          'pack-mismatch',
+          `This character's clip "${foreign.clipId}" comes from pack "${foreign.packId}", but ` +
+            `this bake reads "${packId}" at "${packDir}". Pass --pack <dir> pointing at ` +
+            `"${foreign.packId}" - resolving the id against another pack would bake a ` +
+            `different animation under the same name.`,
+        );
+      }
+    }
+
+    let spec: BakeJobSpec;
     try {
-      return await pump(
-        runBakeJob(bakeSpecFromFlags(args, { model, character, out, style })),
-        emit,
-      );
+      spec = bakeSpecFromFlags(args, { model, character, out, look, animationSet: stored });
     } catch (err) {
+      return fail(bakeId, 'bad-args', err instanceof Error ? err.message : String(err));
+    }
+    let bakeDir: string | undefined;
+    let code: number;
+    try {
+      code = await pump(runBakeJob(spec), (e, human) => {
+        if (e.t === 'artifact' && e.kind === 'bake-dir') bakeDir = e.path;
+        emit(e, human);
+      });
+    } catch (err) {
+      return fail(bakeId, 'bad-args', err instanceof Error ? err.message : String(err));
+    }
+    if (code !== 0 || workspace === undefined || bakeDir === undefined) return code;
+
+    // D-029: record what this bake ran with, as ONE journaled patch. A failed
+    // bake records nothing — `lastBakeId` names a bake dir that has to exist.
+    try {
+      const baked = parseWith(
+        BakeManifestSchema,
+        JSON.parse(await Deno.readTextFile(`${bakeDir}/manifest.json`)),
+        `BakeManifest at "${bakeDir}/manifest.json"`,
+      );
+      const cameraOverrides = cameraOverridesOf(CAMERA_PRESETS[cameraId], spec.camera);
+      await recordBake(workspace, {
+        look: {
+          cameraPresetId: cameraId,
+          // omitted when the camera IS the preset: recording an override set
+          // identical to the preset would claim a change nobody made
+          ...(Object.keys(cameraOverrides).length > 0 ? { cameraOverrides } : {}),
+          stylePresetId: styleId,
+          // nothing on the CLI edits a style's sub-fields, so what the manifest
+          // already carried is what this bake ran with
+          ...(look?.overrides === undefined ? {} : { overrides: look.overrides }),
+        },
+        animationSet: spec.clips === undefined || packId === undefined
+          ? undefined
+          : mergeAnimationSet(manifest?.animationSet, spec.clips, packId),
+        lastBakeId: baked.bakeId,
+      }, { now: io.now });
+    } catch (err) {
+      // The atlases are on disk and valid; only the bookkeeping failed. Saying
+      // "done" would leave the manifest quietly disagreeing with the bake dir.
       return fail(
-        'bake' as JobEvent['jobId'],
-        'bad-args',
-        err instanceof Error ? err.message : String(err),
+        bakeId,
+        'record-failed',
+        `The bake finished at "${bakeDir}", but recording it in "${workspace}" failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
       );
     }
+    return code;
   }
 
   if (verb === 'export') {

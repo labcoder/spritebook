@@ -14,5 +14,5 @@ export { assertRenderedPrefix, flipCellPng, flipPlaneH, mirrorPlan } from './mir
 export type { MirrorPlan } from './mirror.ts';
 export { aov1x } from './aov1x.ts';
 export { buildContactSheet } from './contactsheet.ts';
-export { buildCacheInputs, pivotFor, runBakeJob } from './bake.ts';
-export type { BakeJobSpec } from './bake.ts';
+export { buildCacheInputs, BUNDLED_PACK, pivotFor, runBakeJob } from './bake.ts';
+export type { BakeJobSpec, ClipBindingSpec } from './bake.ts';

@@ -1,6 +1,6 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
-import { ManifestJournal } from '@spritebook/core';
+import { CAMERA_PRESETS, ManifestJournal } from '@spritebook/core';
 import { PRESETS } from '@spritebook/style';
 import { bakeSpecFromFlags, runCli } from './mod.ts';
 
@@ -153,7 +153,7 @@ Deno.test('bake --clips arg validation fails fast, before any GPU work', async (
     // valueless --clips must NOT silently bake the legacy idle stub (review F9)
     [[...base, '--clips'], '--clips needs a value'],
     [[...base, '--pack'], '--pack needs a directory'],
-    [[...base, '--pack', 'somewhere'], '--pack only applies with --clips'],
+    [[...base, '--pack', 'somewhere'], '--pack only applies when there are clips'],
     // duplicates fail here, not after a full render (review F4)
     [[...base, '--clips', 'walk-loop:2,walk-loop:4'], 'twice'],
     [[...base, '--clips', 'walk-loop:2@0'], 'speed must be > 0'],
@@ -172,7 +172,7 @@ Deno.test('bake --clips arg validation fails fast, before any GPU work', async (
 
 Deno.test('bake --mirror reaches the spec, so D-008 is reachable at all', () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
-  const resolved = { model: 'm.glb', character: 'c', out: 'o', style: PRESETS['pixel-8'] };
+  const resolved = { model: 'm.glb', character: 'c', out: 'o' };
 
   // the entire defect in one assertion: BakeJobSpec.mirroring existed, the
   // whole mirror path was implemented and tested, and NO flag set this field -
@@ -192,6 +192,138 @@ Deno.test('bake --mirror reaches the spec, so D-008 is reachable at all', () => 
   assertEquals(spec.frames, 4);
   assertEquals(spec.camera.directions, 4);
   assertEquals(spec.onlyInvalidated, true);
+});
+
+const RESOLVED = { model: 'm.glb', character: 'c', out: 'o' };
+
+Deno.test('flags and a stored look resolve to the SAME camera (D-029)', () => {
+  // The whole reason one resolution path replaced two: the flag defaults used
+  // to synthesize a camera whose id (`cli-e30x8`) named no preset anywhere, so
+  // a look-driven bake and a flag-driven bake of identical geometry produced
+  // different cameraPresetHash values, different bakeIds, and could not share a
+  // single cached frame.
+  const viaFlags = bakeSpecFromFlags(
+    ['bake', '--directions', '2', '--cell', '48'],
+    RESOLVED,
+  ).camera;
+  const viaLook = bakeSpecFromFlags(['bake'], {
+    ...RESOLVED,
+    look: {
+      cameraPresetId: 'standard-30',
+      cameraOverrides: { directions: 2, cellPx: { w: 48, h: 48 } },
+      stylePresetId: 'pixel-8',
+    },
+  }).camera;
+  assertEquals(canonicalJson(viaFlags), canonicalJson(viaLook));
+  assertEquals(viaFlags.id, 'standard-30', 'the id names a preset that resolves');
+});
+
+Deno.test('the bake defaults are the standard-30 preset, field for field', () => {
+  // The cross-check core/presets_test.ts points at. If either side moves alone,
+  // a default bake silently changes framing.
+  assertEquals(
+    canonicalJson(bakeSpecFromFlags(['bake'], RESOLVED).camera),
+    canonicalJson(CAMERA_PRESETS['standard-30']),
+  );
+  assertEquals(bakeSpecFromFlags(['bake'], RESOLVED).style.id, 'pixel-8');
+});
+
+Deno.test('an explicit flag beats the stored look; silence defers to it', () => {
+  const look = {
+    cameraPresetId: 'isometric',
+    cameraOverrides: { directions: 4 as const, paddingPx: 10 },
+    stylePresetId: 'cel-2',
+  };
+  const stored = bakeSpecFromFlags(['bake'], { ...RESOLVED, look });
+  assertEquals(stored.camera.id, 'isometric');
+  assertEquals(stored.camera.directions, 4);
+  assertEquals(stored.camera.paddingPx, 10);
+  assertEquals(stored.style.id, 'cel-2');
+
+  const overridden = bakeSpecFromFlags(
+    ['bake', '--camera', 'low-15', '--directions', '16', '--style', 'painterly'],
+    { ...RESOLVED, look },
+  );
+  assertEquals(overridden.camera.id, 'low-15');
+  assertEquals(overridden.camera.directions, 16);
+  assertEquals(
+    overridden.camera.paddingPx,
+    10,
+    'an untouched override still comes from the look - flags refine, they do not replace',
+  );
+  assertEquals(overridden.style.id, 'painterly');
+});
+
+Deno.test('a default is not a decision: unspoken flags do not overwrite a look', () => {
+  // `intFlag(args, 'cell', 64)` cannot tell "the user asked for 64" from
+  // "nobody said anything". Folding defaults in would silently reset a
+  // character's stored cell size on every bake that did not restate it.
+  const spec = bakeSpecFromFlags(['bake'], {
+    ...RESOLVED,
+    look: {
+      cameraPresetId: 'standard-30',
+      cameraOverrides: { cellPx: { w: 128, h: 128 }, pixelsPerMeter: 64, elevationDeg: 22 },
+      stylePresetId: 'pixel-8',
+    },
+  });
+  assertEquals(spec.camera.cellPx, { w: 128, h: 128 });
+  assertEquals(spec.camera.pixelsPerMeter, 64);
+  assertEquals(spec.camera.elevationDeg, 22);
+});
+
+Deno.test("a character's own clips drive the bake, disabled ones excepted", () => {
+  const animationSet = [
+    { clipId: 'walk-loop', packId: 'ual', enabled: true, frames: 6, speed: 1.5, holdLast: false },
+    { clipId: 'idle-loop', packId: 'ual', enabled: false, frames: 4, speed: 1, holdLast: false },
+  ];
+  const spec = bakeSpecFromFlags(['bake'], { ...RESOLVED, animationSet });
+  assertEquals(spec.clips, [{ clipId: 'walk-loop', frames: 6, speed: 1.5, holdLast: false }]);
+
+  // `enabled: false` is the user saying "not this one" — baking it at its
+  // stored frame count would render a clip they had switched off
+  assertEquals(
+    bakeSpecFromFlags(['bake'], {
+      ...RESOLVED,
+      animationSet: [{ ...animationSet[1] }],
+    }).clips,
+    undefined,
+    'nothing enabled -> the idle-stub bake, not an empty clip list',
+  );
+
+  // and --clips still wins outright
+  assertEquals(
+    bakeSpecFromFlags(['bake', '--clips', 'run-loop:3'], { ...RESOLVED, animationSet })
+      .clips,
+    [{ clipId: 'run-loop', frames: 3, speed: 1, holdLast: false }],
+  );
+});
+
+Deno.test('a look naming a preset that does not exist says which one, and where from', async () => {
+  const ws = await Deno.makeTempDir({ prefix: 'sb-look-' });
+  try {
+    const { createWorkspace, recordBake } = await import('@spritebook/core');
+    await createWorkspace({
+      workspace: ws,
+      characterId: 'brave-knight',
+      displayName: 'Brave Knight',
+      source: { kind: 'image', originalFilename: 'k.png', sha256: 'a'.repeat(64) },
+      now,
+    });
+    await recordBake(ws, {
+      look: { cameraPresetId: 'topdown30x8', stylePresetId: 'pixel-8' },
+      lastBakeId: 'aaaaaaaa',
+    }, { now });
+
+    const c = collector();
+    assertEquals(await runCli(['bake', '--workspace', ws, '--json'], c.io), 1);
+    const e = JSON.parse(c.out[c.out.length - 1]);
+    assertEquals(e.code, 'unknown-camera');
+    assert(e.message.includes('topdown30x8'), e.message);
+    assert(e.message.includes("from the character's look"), e.message);
+    assert(e.message.includes('standard-30'), 'names what it could have been');
+  } finally {
+    await Deno.remove(ws, { recursive: true });
+  }
 });
 
 Deno.test('an unsupported flag is an error event, never silent success', async () => {
