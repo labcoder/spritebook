@@ -48,12 +48,23 @@ export function getGpu(): Promise<GpuContext> {
  * runners have no GPU, so render suites skip there. Set SPRITEBOOK_REQUIRE_GPU
  * (the lavapipe lane does) to turn a missing adapter back into a hard failure, so
  * a broken software-Vulkan lane can't masquerade as "all tests skipped, green".
+ *
+ * The skip SAYS SO, once per caller. `if (!(await tryGetGpu())) return;` is how
+ * roughly sixteen tests across eight files begin, and a bare `return` makes Deno
+ * print `ok` — so on a machine with no adapter the entire acceptance suite
+ * reported success while asserting nothing, which is the exact shape of failure
+ * this project keeps finding. Deno prints the test's name immediately above its
+ * output, so one line here reads as that test declining to run.
  */
 export async function tryGetGpu(): Promise<GpuContext | null> {
   try {
     return await getGpu();
   } catch (err) {
     if (Deno.env.get('SPRITEBOOK_REQUIRE_GPU')) throw err;
+    console.log(
+      'skip: no GPU adapter — this test asserted NOTHING. ' +
+        'Set SPRITEBOOK_REQUIRE_GPU=1 to make a missing adapter a failure instead.',
+    );
     return null;
   }
 }
