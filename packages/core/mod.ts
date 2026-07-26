@@ -13,6 +13,7 @@ export * from './workspace.ts';
 export * from './receipts.ts';
 export * from './roster.ts';
 export * from './cache.ts';
+export * from './presets.ts';
 export * from './stub-bake.ts';
 export * from './sidecar.ts';
 export * from './params.ts';

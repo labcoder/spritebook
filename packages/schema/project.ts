@@ -37,6 +37,22 @@ export const CameraPresetSchema = z.strictObject({
 });
 export type CameraPreset = z.output<typeof CameraPresetSchema>;
 
+/**
+ * A partial camera, for refining a named preset (`look.cameraOverrides`).
+ *
+ * DIVERGENCE from data-models.ts v0.2, documented: the draft gave `look` a
+ * `stylePresetId` + `overrides` pair but only an id for the camera, which
+ * cannot express the four controls the PRD's Look stage puts NEXT to the
+ * elevation slider — direction count, px/m, cell size. Those are per-character
+ * choices, not detents, so they need the same id+overrides shape style has.
+ *
+ * `id` is omitted deliberately: an override refines a preset, it does not
+ * rename one. The resolved camera keeps the preset's id so a bake manifest can
+ * still say where its framing came from.
+ */
+export const CameraOverridesSchema = CameraPresetSchema.omit({ id: true }).partial();
+export type CameraOverrides = z.output<typeof CameraOverridesSchema>;
+
 export const RENDER_PASSES = ['lit', 'albedo', 'normal', 'depth', 'mask'] as const;
 export const RenderPassSchema = z.enum(RENDER_PASSES);
 export type RenderPass = z.output<typeof RenderPassSchema>;
