@@ -112,6 +112,9 @@ export const CharacterManifestSchema = z.strictObject({
   displayName: z.string().min(1),
   createdAt: IsoTimeSchema,
   source: SourceRecordSchema,
+  /** SCHEDULED FOR REMOVAL (D-029): the report already lives at
+   * results/<resultId>/preflight.json, and a second copy here is two things
+   * that can disagree. Nothing reads this field today. */
   preflight: PreflightReportSchema.optional(),
   generation: z.strictObject({
     results: z.array(GenerationResultSchema),
@@ -124,7 +127,13 @@ export const CharacterManifestSchema = z.strictObject({
     reprojected: z.boolean(),
   }).optional(),
   rig: RigStateSchema.optional(),
+  /** The character's own clip choices. UNREAD TODAY, being wired (D-029):
+   * `bake` will read these as defaults and write them back, and they will join
+   * the cache key — deriveCacheKeyInputs already hashes this field. */
   animationSet: z.array(ClipBindingSchema).optional(),
+  /** The character's own camera + style. UNREAD TODAY, being wired (D-029):
+   * today camera and style reach runBakeJob only through BakeJobSpec, so a
+   * character cannot carry its own look. P4's Look stage edits this. */
   look: z.strictObject({
     cameraPresetId: z.string().min(1),
     stylePresetId: z.string().min(1),
@@ -134,6 +143,8 @@ export const CharacterManifestSchema = z.strictObject({
   mirroring: z.strictObject({ enabled: z.boolean() }),
   detailLayers: z.array(DetailLayerSchema).optional(),
   attachments: z.array(AttachmentSchema).optional(),
+  /** The character's most recent bake. UNREAD TODAY, being wired (D-029) —
+   * only the writer is missing; cloneCharacter already drops it correctly. */
   lastBakeId: BakeIdSchema.optional(),
 });
 export type CharacterManifest = z.output<typeof CharacterManifestSchema>;
