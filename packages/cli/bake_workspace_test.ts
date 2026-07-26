@@ -1,6 +1,14 @@
 /**
- * D-029 acceptance, on a real bake (GPU-gated; SPRITEBOOK_REQUIRE_GPU forces it
- * on the lavapipe lane):
+ * The manifest-driven-bake acceptances, on real bakes (GPU-gated;
+ * SPRITEBOOK_REQUIRE_GPU forces them on the lavapipe lane).
+ *
+ * **Mirroring.** `--mirror` once records the choice on the character; a bake
+ * with NO flags at all still mirrors; `--no-mirror` turns it off for one bake
+ * and moves the bakeId, because mirroring changes the pixels. Four directions
+ * is the cheapest count that mirrors at all — at two, nothing does, and the
+ * test would pass while asserting nothing.
+ *
+ * **Look and clips (D-029):**
  *
  *   1. a flag-driven `bake --workspace` records the look it ran with and the
  *      bake it produced;
@@ -64,20 +72,124 @@ function recipe(m: BakeManifest): string {
   });
 }
 
+/** A workspace whose canonical model is the asymmetric fixture. */
+async function character(dir: string): Promise<void> {
+  await createWorkspace({
+    workspace: dir,
+    characterId: 'brave-knight',
+    displayName: 'Brave Knight',
+    source: { kind: 'mesh', originalFilename: 'asymmetric.glb', sha256: 'a'.repeat(64) },
+    now: NOW,
+  });
+  await Deno.copyFile(GLB, workspacePaths(dir).canonicalModel);
+}
+
+/** Which directions this bake produced by flipping, and from where. */
+function flips(m: BakeManifest): Array<[number, number]> {
+  const out = new Map<number, number>();
+  for (const f of m.frames) {
+    if (f.mirroredFrom) out.set(f.direction, f.mirroredFrom.direction);
+  }
+  return [...out].sort((a, b) => a[0] - b[0]);
+}
+
+Deno.test('acceptance: --mirror once, then mirrored from the workspace alone', async (t) => {
+  if (!(await tryGetGpu())) return;
+  const raw = await Deno.makeTempDir({ prefix: 'sb-mirror-ws-' });
+  const dir = raw.replaceAll('\\', '/');
+  const cache = `${dir}/cache`;
+  // 4 directions is the cheapest count that mirrors at all: direction 3 is the
+  // flip of direction 1, and 0 and 2 face along the mirror plane so they have
+  // no partner. At 2 nothing mirrors and the test would pass vacuously.
+  const geometry = ['--directions', '4', '--cell', '48', '--style', 'cel-2'];
+  try {
+    await character(dir);
+
+    let mirroredId = '';
+    await t.step('--mirror records the choice on the character', async () => {
+      const c = collector();
+      assertEquals(
+        await runCli(
+          [
+            'bake',
+            '--workspace',
+            dir,
+            ...geometry,
+            '--mirror',
+            '--cache',
+            cache,
+            '--only-invalidated',
+            '--json',
+          ],
+          c.io,
+        ),
+        0,
+        c.err.join('\n'),
+      );
+      const manifest = await readWorkspace(dir);
+      assertEquals(manifest.mirroring, { enabled: true }, 'the bake wrote its own D-008 choice');
+      mirroredId = manifest.lastBakeId!;
+      assertEquals(flips(await bakeManifest(dir, mirroredId)), [[3, 1]], 'direction 3 is a flip');
+    });
+
+    await t.step('THE acceptance: no flags at all, and it still mirrors', async () => {
+      const c = collector();
+      assertEquals(
+        await runCli(
+          ['bake', '--workspace', dir, '--cache', cache, '--only-invalidated', '--json'],
+          c.io,
+        ),
+        0,
+        c.err.join('\n'),
+      );
+      const manifest = await readWorkspace(dir);
+      assertEquals(manifest.lastBakeId, mirroredId, 'same recipe, same bakeId');
+      const baked = await bakeManifest(dir, mirroredId);
+      assertEquals(flips(baked), [[3, 1]], 'and the same direction is still a flip');
+      assertEquals(baked.frames.every((f) => f.cacheHit), true, 'served entirely from cache');
+    });
+
+    await t.step('--no-mirror is how a yes says no for one bake', async () => {
+      const c = collector();
+      assertEquals(
+        await runCli(
+          [
+            'bake',
+            '--workspace',
+            dir,
+            '--no-mirror',
+            '--cache',
+            cache,
+            '--only-invalidated',
+            '--json',
+          ],
+          c.io,
+        ),
+        0,
+        c.err.join('\n'),
+      );
+      const manifest = await readWorkspace(dir);
+      assertEquals(manifest.mirroring, { enabled: false }, 'and the override is recorded too');
+      assert(
+        manifest.lastBakeId !== mirroredId,
+        'mirroring changes the PIXELS, so it moves the key',
+      );
+      const baked = await bakeManifest(dir, manifest.lastBakeId!);
+      assertEquals(flips(baked), [], 'every direction rendered for real');
+      assertEquals(baked.frames.length, 4 * 6, '4 directions x the default 6 frames');
+    });
+  } finally {
+    await Deno.remove(raw, { recursive: true });
+  }
+});
+
 Deno.test('acceptance: a workspace bake reproduces the last one exactly', async (t) => {
   if (!(await tryGetGpu())) return;
   const raw = await Deno.makeTempDir({ prefix: 'sb-bake-ws-' });
   const dir = raw.replaceAll('\\', '/');
   const cache = `${dir}/cache`;
   try {
-    await createWorkspace({
-      workspace: dir,
-      characterId: 'brave-knight',
-      displayName: 'Brave Knight',
-      source: { kind: 'mesh', originalFilename: 'asymmetric.glb', sha256: 'a'.repeat(64) },
-      now: NOW,
-    });
-    await Deno.copyFile(GLB, workspacePaths(dir).canonicalModel);
+    await character(dir);
 
     let firstId = '';
     let firstRecipe = '';
