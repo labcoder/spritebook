@@ -440,15 +440,27 @@ export function documentToAsset(doc: Document, label: string): SkinnedAsset {
     if (idx === undefined) {
       const tex = mat.getBaseColorTexture();
       const f = mat.getBaseColorFactor();
-      // BLEND becomes a cutout at 0.5: the AOV pass declares no blend state and
-      // depth/mask are not blendable, so real blending would cost the
-      // geometrically-identical-AOVs guarantee (contracts.ts).
       const declared = mat.getAlphaMode();
       const alphaMode = declared === 'OPAQUE' ? 'OPAQUE' : 'MASK';
       const alphaCutoff = declared === 'MASK' ? mat.getAlphaCutoff() : BLEND_AS_CUTOUT_AT;
+      // BLEND becomes a cutout at 0.5 (contracts.ts: the AOV pass declares no
+      // blend state and depth/mask are not blendable), and the cutout tests the
+      // TEXTURE's alpha alone — factor alpha is dropped to 1.
+      //
+      // Because a uniform factor carries no SHAPE. glTF alpha is
+      // factor.a * texture.a, so keeping the factor would compare a constant
+      // against the cutoff and discard either everything or nothing: a cape at
+      // 40% opacity vanished from every AOV, which is not "hard-edged" as the
+      // contract promises but absent. The texture's alpha is the only part with
+      // a silhouette in it, so it is the only part a cutout can honour.
+      //
+      // MASK keeps the full glTF product on purpose. There, factor.a below the
+      // cutoff discarding everything IS the spec, and it is the author saying
+      // the surface is fully transparent rather than us guessing.
+      const alphaFactor = declared === 'BLEND' ? 1 : f[3];
       idx = materials.push({
         texture: tex ? imageTextureFor(tex) : whiteTexture(),
-        factor: [f[0], f[1], f[2], f[3]],
+        factor: [f[0], f[1], f[2], alphaFactor],
         alphaMode,
         alphaCutoff,
       }) - 1;

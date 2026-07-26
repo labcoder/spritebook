@@ -224,3 +224,54 @@ Deno.test('material: two materials sharing one texture keep their own factors', 
   assertEquals(asset.materials[0].factor[0], 0.25);
   assertEquals(asset.materials[1].factor[0], 1);
 });
+
+Deno.test('material: a semi-transparent BLEND surface bakes PRESENT, not absent', async () => {
+  if (!(await tryGetGpu())) return;
+  // The regression this pins, measured on GPU before the fix: a BLEND material
+  // whose baseColorFactor alpha sat below the 0.5 cutout discarded EVERY
+  // fragment, so a 40%-opacity cape, visor or glass vanished from all five
+  // AOVs with no warn and no flag. The contract promised "hard-edged", and
+  // absent is not hard-edged.
+  //
+  // The cutout tests the texture's alpha alone for BLEND, because a uniform
+  // factor carries no silhouette - comparing it to a cutoff can only discard
+  // everything or nothing.
+  const opaque = albedoOf((await render(quadDoc({}))).planes);
+
+  for (const a of [0.9, 0.5, 0.4, 0.05]) {
+    const blend = albedoOf(
+      (await render(quadDoc({ factor: [1, 1, 1, a], alphaMode: 'BLEND' }))).planes,
+    );
+    assertEquals(
+      blend.covered,
+      opaque.covered,
+      `BLEND at factor alpha ${a} must still draw its surface (covered ${blend.covered} of ` +
+        `${opaque.covered}); 0 is the regression where the whole surface vanished`,
+    );
+  }
+
+  // and a BLEND texture that DOES carry alpha shape still cuts out
+  const shaped = albedoOf(
+    (await render(quadDoc({ rightHalfTransparent: true, alphaMode: 'BLEND' }))).planes,
+  );
+  const ratio = shaped.covered / opaque.covered;
+  assert(ratio > 0.4 && ratio < 0.6, `texture alpha still shapes the cutout (ratio ${ratio})`);
+});
+
+Deno.test('material: MASK keeps the full glTF product, factor alpha included', async () => {
+  if (!(await tryGetGpu())) return;
+  // Not a bug, and deliberately NOT changed: glTF says alpha is
+  // factor.a * texture.a, so a MASK material whose factor alpha is below its
+  // own cutoff is the author declaring the surface fully transparent. We honour
+  // that rather than second-guessing it - the BLEND carve-out above exists only
+  // because the 0.5 cutout there is OUR choice, not the file's.
+  const opaque = albedoOf((await render(quadDoc({}))).planes);
+  const above = albedoOf(
+    (await render(quadDoc({ factor: [1, 1, 1, 0.6], alphaMode: 'MASK', cutoff: 0.5 }))).planes,
+  );
+  const below = albedoOf(
+    (await render(quadDoc({ factor: [1, 1, 1, 0.4], alphaMode: 'MASK', cutoff: 0.5 }))).planes,
+  );
+  assertEquals(above.covered, opaque.covered, 'factor alpha above the cutoff draws');
+  assertEquals(below.covered, 0, 'factor alpha below the cutoff is the author saying invisible');
+});

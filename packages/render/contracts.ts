@@ -201,13 +201,21 @@ export const AOV_TARGETS: readonly AovTarget[] = [
  *    the mask — and therefore the outline and the packed silhouette — claiming
  *    geometry that is not there.
  *
- * 4. BLEND IS TREATED AS A CUTOUT AT 0.5, deliberately. The AOV pass declares
- *    no blend state, and depth and mask are not blendable formats, so real
- *    alpha blending cannot be expressed without giving up the
- *    geometrically-identical-AOVs guarantee that makes one pass produce five
- *    consistent buffers. Sprite output is 1-bit or soft alpha at the style
- *    stage regardless. A semi-transparent material therefore bakes
- *    hard-edged — stated here so it is a known limit rather than a surprise.
+ * 4. BLEND IS TREATED AS A CUTOUT AT 0.5, deliberately, AND THE CUTOUT TESTS
+ *    THE TEXTURE'S ALPHA ALONE. The AOV pass declares no blend state, and
+ *    depth and mask are not blendable formats, so real alpha blending cannot be
+ *    expressed without giving up the geometrically-identical-AOVs guarantee
+ *    that makes one pass produce five consistent buffers. Sprite output is
+ *    1-bit or soft alpha at the style stage regardless.
+ *
+ *    Dropping the factor's alpha for BLEND is not a shortcut: a uniform factor
+ *    carries no SHAPE, so comparing it against a cutoff discards either every
+ *    fragment or none. Keeping it made a cape at 40% opacity bake as NOTHING in
+ *    all five AOVs (measured: 0 of 1024 mask texels) — absent, not hard-edged.
+ *    A semi-transparent material bakes fully present and hard-edged; a texture
+ *    with alpha holes still cuts out. MASK keeps the full glTF product, where
+ *    factor.a below the cutoff really does mean the author declared the surface
+ *    transparent.
  */
 export const BLEND_AS_CUTOUT_AT = 0.5;
 export const CAMERA_UNIFORM_FLOATS = 40; // 160 bytes: view(16) proj(16) params(4) lightDir(4)
