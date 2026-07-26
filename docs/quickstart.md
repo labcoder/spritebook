@@ -113,15 +113,27 @@ done in 0.07s
 
 One subdirectory per target:
 
-| Target           | Files                                                          | Point your engine at it                                                                                                                                                           |
-| ---------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `godot/`         | `hero.tres` + `atlas_lit_*.png`                                | copy both into a Godot 4 project; assign `hero.tres` as the SpriteFrames of an `AnimatedSprite2D`; animations are named `idle_d00` ... `idle_d07`                                 |
-| `aseprite/`      | `hero.ase.json` + `atlas_lit_*.png`                            | Aseprite: **File -> Import Sprite Sheet** honors the JSON                                                                                                                         |
-| `texturepacker/` | `hero.tp.json` + `atlas_lit_*.png`                             | Phaser 3: `this.load.atlas('hero', 'atlas_lit_0.png', 'hero.tp.json')`; frame names are `idle_d00_f000` etc.; set `frameRate` at anim creation (this format carries no durations) |
-| `strips/`        | `hero-idle-d<DD>-strip.png` per direction + `hero-strips.json` | hand-rolled loaders; the JSON carries cell size, fps, and per-direction pivots                                                                                                    |
+| Target           | Files                                                          | Point your engine at it                                                                                                                                                            |
+| ---------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `godot/`         | `hero.tres` + `atlas_lit_*.png`                                | copy both into a Godot 4 project; assign `hero.tres` as the SpriteFrames of an `AnimatedSprite2D`; animations are named `idle_d00` ... `idle_d07`; leave `centered` on — see below |
+| `aseprite/`      | `hero.ase.json` + `atlas_lit_*.png`                            | Aseprite: **File -> Import Sprite Sheet** honors the JSON                                                                                                                          |
+| `texturepacker/` | `hero.tp.json` + `atlas_lit_*.png`                             | Phaser 3: `this.load.atlas('hero', 'atlas_lit_0.png', 'hero.tp.json')`; frame names are `idle_d00_f000` etc.; set `frameRate` at anim creation (this format carries no durations)  |
+| `strips/`        | `hero-idle-d<DD>-strip.png` per direction + `hero-strips.json` | hand-rolled loaders; the JSON carries cell size, fps, and per-direction pivots                                                                                                     |
 
 Multi-page bakes suffix the Aseprite/TexturePacker JSON per page (`hero_p1.ase.json`); animations
 never span pages.
+
+### Where the Godot node origin lands
+
+The bake records a pivot per frame — with the default `feet-baseline` pivot, the character's feet.
+Each `AtlasTexture` in `hero.tres` carries a transparent `margin` that puts that pivot at the middle
+of the texture, so an `AnimatedSprite2D` with its **default `centered = true` and
+`offset = (0, 0)`** puts the node origin on the feet. Place the node at a tile's floor position and
+the character stands on it.
+
+So: change nothing on the node. If you set `centered = false`, the sprite jumps by half the padded
+texture — set `offset` yourself in that case. `manifest.json` has the exact `pivotPx` per frame if
+you need it, and the TexturePacker and strips exports carry it too.
 
 ## Styles
 

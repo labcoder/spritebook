@@ -8,8 +8,10 @@ smokes run once at the very end of the project**, not per phase.
 
 - **Structural**: `packages/export/tres-parse.ts` strictly parses every `.tres` we emit and
   cross-checks it against the manifest (regions in bounds, frame counts per animation, referenced
-  pages exist, `load_steps` arithmetic). Aseprite/TexturePacker JSON is parsed back and checked for
-  rect/pivot fidelity. Strips are decoded and pixel-compared against the atlas rects.
+  pages exist, `load_steps` arithmetic, and every frame's ANCHOR — where a default
+  `AnimatedSprite2D` puts the node origin — landing on the pivot the bake recorded).
+  Aseprite/TexturePacker JSON is parsed back and checked for rect/pivot fidelity. Strips are decoded
+  and pixel-compared against the atlas rects.
 - **Byte-stability**: two independent bakes of identical inputs → all exporter outputs compared
   byte-for-byte (volatile manifest fields — `createdAt`, `metrics.wallTimeS`, `metrics.cacheHitPct`
   — must never be projected).
@@ -29,8 +31,12 @@ the expected animations. It is skipped (loudly, as `ignored`) when `GODOT4_BIN` 
 
 1. Create a fresh Godot 4 project; copy an export (`<char>.tres` + `atlas_lit_*.png`) into it.
 2. Open the project — the import must complete with **no errors or reimport warnings**.
-3. Add an `AnimatedSprite2D`; assign the `.tres` as its SpriteFrames.
-4. Confirm every animation `idle_d00 … idle_dNN` appears; each shows the correct frame count.
+3. Add an `AnimatedSprite2D`; assign the `.tres` as its SpriteFrames. Leave `centered` and `offset`
+   at their defaults — the exported `AtlasTexture.margin` already anchors the node origin on the
+   baked pivot.
+4. Confirm every animation `idle_d00 … idle_dNN` appears; each shows the correct frame count. Put
+   the node on a tile boundary and confirm the character STANDS on it in every direction: the node
+   origin must sit at the feet, not at the middle of the cell.
 5. Play each direction: frames advance at the exported fps, loop cleanly, and show the correct
    character orientation (the asymmetric fixture's single arm makes wrong directions unmissable).
 6. Toggle nearest-neighbor filtering on the texture; verify no bleed from neighboring atlas cells at

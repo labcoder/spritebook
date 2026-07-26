@@ -31,6 +31,8 @@ export interface TresSubResource {
   /** ext_resource id referenced by `atlas = ExtResource("...")` */
   atlasExtId: string;
   region: TresRect;
+  /** transparent pad that re-centres the texture on the frame's pivot */
+  margin: TresRect;
 }
 
 export interface TresAnimationFrame {
@@ -68,6 +70,7 @@ const EXT_RE = /^\[ext_resource type="(Texture2D)" path="([^"]+)" id="([^"]+)"\]
 const SUB_RE = /^\[sub_resource type="AtlasTexture" id="([^"]+)"\]$/;
 const ATLAS_RE = /^atlas = ExtResource\("([^"]+)"\)$/;
 const REGION_RE = /^region = Rect2\(([^\s,()]+), ([^\s,()]+), ([^\s,()]+), ([^\s,()]+)\)$/;
+const MARGIN_RE = /^margin = Rect2\(([^\s,()]+), ([^\s,()]+), ([^\s,()]+), ([^\s,()]+)\)$/;
 const DURATION_RE = /^"duration": ([^\s,]+),$/;
 const TEXTURE_RE = /^"texture": SubResource\("([^"]+)"\)$/;
 const LOOP_RE = /^"loop": (true|false),$/;
@@ -151,10 +154,17 @@ export function parseTres(text: string): TresFile {
       if (!Number.isInteger(v)) fail(rn, `region number not an integer: '${raw}'`);
       return v;
     });
+    // margin carries the pivot (godot.ts pivotMargin) — fractional pivots make
+    // fractional margins, so unlike region it is NOT constrained to integers
+    const [ml, mn] = take();
+    const mm = MARGIN_RE.exec(ml);
+    if (mm === null) fail(mn, `malformed margin line: '${ml}'`);
+    const mnums = mm.slice(1, 5).map((raw) => finiteNum(raw, mn, 'margin number'));
     subResources.push({
       id: sm[1],
       atlasExtId: am[1],
       region: { x: nums[0], y: nums[1], w: nums[2], h: nums[3] },
+      margin: { x: mnums[0], y: mnums[1], w: mnums[2], h: mnums[3] },
     });
     expectBlank();
   }
@@ -227,8 +237,9 @@ export function parseTres(text: string): TresFile {
 /**
  * Check a parsed .tres against the manifest it claims to project:
  * load_steps arithmetic, ext_resources <-> lit pages, deterministic ids,
- * every region == its frame's atlas rect, and one animation per
- * (clipId, direction) with matching names, frame counts and refs.
+ * every region == its frame's atlas rect, every frame ANCHORED on its recorded
+ * pivot, and one animation per (clipId, direction) with matching names, frame
+ * counts and refs.
  */
 export function validateTres(parsed: TresFile, manifest: BakeManifest): void {
   const err = (msg: string): never => {
@@ -282,6 +293,28 @@ export function validateTres(parsed: TresFile, manifest: BakeManifest): void {
     const wantPage = atlasPageName('lit', a.pageIndex);
     if (page !== wantPage) {
       err(`${sub.id} references page '${page}' != frame's lit page '${wantPage}'`);
+    }
+    // THE ANCHOR. Godot draws an AtlasTexture at `region.size + margin.size`
+    // with the region `margin.position` inside it, and AnimatedSprite2D centres
+    // that box on the node origin (`centered` defaults to true) — so the origin
+    // sits at this cell-local pixel. It must be the pivot the bake recorded, or
+    // every frame draws off its own feet.
+    const m = sub.margin;
+    if (m.x < 0 || m.y < 0 || m.x > m.w || m.y > m.h) {
+      err(
+        `${sub.id} margin (${m.x}, ${m.y}, ${m.w}, ${m.h}) puts the region outside its own ` +
+          'texture box (0 <= position <= size per axis), so Godot would clip the frame',
+      );
+    }
+    const anchor = { x: (r.w + m.w) / 2 - m.x, y: (r.h + m.h) / 2 - m.y };
+    // exact for integer pivots (every real bake); the slack only absorbs ULP
+    // drift in the float arithmetic a fractional pivot would introduce
+    if (Math.abs(anchor.x - f.pivotPx.x) > 1e-6 || Math.abs(anchor.y - f.pivotPx.y) > 1e-6) {
+      err(
+        `${sub.id} anchors at (${anchor.x}, ${anchor.y}) but frame ` +
+          `${f.clipId}/d${f.direction}/f${f.frame} recorded pivot ` +
+          `(${f.pivotPx.x}, ${f.pivotPx.y})`,
+      );
     }
   }
 

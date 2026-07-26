@@ -9,6 +9,15 @@
  * order (clipId, direction, frame); one animation per (clipId, direction)
  * named `<clipId>_d<DD>`. Never reads the clock, never projects volatile
  * fields (byte-stability doctrine, packages/pack/contracts.ts).
+ *
+ * PIVOT: every frame's `margin` re-centres its AtlasTexture on the recorded
+ * `pivotPx`, so `AnimatedSprite2D.centered` — TRUE by default — anchors the
+ * node origin on the character's feet rather than the middle of the cell. See
+ * pivotMargin() for the Godot 4 semantics this leans on. SpriteFrames is a
+ * Resource, so it cannot carry the node-level `offset`/`centered` that would
+ * be the other way to say this; baking the pivot into each AtlasTexture keeps
+ * the .tres self-contained (drop it on any AnimatedSprite2D and it is right)
+ * and is PER FRAME, so a bake whose pivot differs per direction still lands.
  */
 import type { FrameRecord } from '@spritebook/schema';
 import { atlasPageName, type Exporter, frameIdKey } from '../pack/contracts.ts';
@@ -32,10 +41,35 @@ function godotFloat(n: number): string {
 }
 
 /**
+ * The `AtlasTexture.margin` that moves a frame's ANCHOR onto its recorded
+ * pivot, given the cell extent `size` and the pivot coordinate `pivot` on one
+ * axis (both in px, cell-local).
+ *
+ * Godot 4 (scene/resources/atlas_texture.cpp): an AtlasTexture reports
+ * `region.size + margin.size` as its size and draws the region `margin.position`
+ * inside that box. AnimatedSprite2D draws the whole reported size at `-size/2`
+ * when `centered` (its default), so the cell pixel at `pivot` lands at
+ *   margin.position + pivot - (region.size + margin.size) / 2
+ * and the node origin sits on the pivot exactly when that is zero. Padding the
+ * side AWAY from the pivot by twice its distance from the centre solves it:
+ * `size - 2*pivot` px of leading pad when the pivot is above/left of centre,
+ * `2*pivot - size` px of trailing pad otherwise. The pad is transparent — it
+ * enlarges the drawn quad, never the atlas page, and never the sampled region
+ * (position <= size keeps the region strictly inside the box, so no pixel is
+ * clipped). For an integer pivot the box is even-sized, so the sprite still
+ * lands on whole pixels.
+ */
+function pivotMargin(size: number, pivot: number): { position: number; size: number } {
+  const lead = size - 2 * pivot;
+  return { position: Math.max(0, lead), size: Math.abs(lead) };
+}
+
+/**
  * Export `<characterId>.tres` + the lit pages into outDir; returns the written
  * paths, sorted. Throws (never writes garbage) on manifests this projection
  * cannot represent: no lit pages, no frames, dangling page references,
- * duplicate page indices, unsafe clip ids, or a non-positive fps.
+ * duplicate page indices, unsafe clip ids, a non-finite pivot, or a
+ * non-positive fps.
  */
 export const exportGodot: Exporter = async (manifest, bakeDir, outDir, opts) => {
   if (!Number.isFinite(opts.fps) || opts.fps <= 0) {
@@ -75,10 +109,19 @@ export const exportGodot: Exporter = async (manifest, bakeDir, outDir, opts) => 
           'which has no lit page in the manifest',
       );
     }
+    if (!Number.isFinite(f.pivotPx.x) || !Number.isFinite(f.pivotPx.y)) {
+      throw new Error(
+        `exportGodot: frame ${frameIdKey(f)} has a non-finite pivot ` +
+          `(${f.pivotPx.x}, ${f.pivotPx.y})`,
+      );
+    }
+    const mx = pivotMargin(f.atlas.w, f.pivotPx.x);
+    const my = pivotMargin(f.atlas.h, f.pivotPx.y);
     lines.push(
       `[sub_resource type="AtlasTexture" id="AtlasTexture_${i + 1}"]`,
       `atlas = ExtResource("${extId}")`,
       `region = Rect2(${f.atlas.x}, ${f.atlas.y}, ${f.atlas.w}, ${f.atlas.h})`,
+      `margin = Rect2(${mx.position}, ${my.position}, ${mx.size}, ${my.size})`,
       '',
     );
   }
