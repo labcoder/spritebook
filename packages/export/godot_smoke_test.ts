@@ -43,6 +43,21 @@ Deno.test({
           '\tassert(names.size() == 2, "expected 2 animations, got %d" % names.size())',
           '\tassert(frames.get_frame_count("idle_d00") == 2, "idle_d00 frame count")',
           '\tassert(frames.get_frame_count("idle_d01") == 2, "idle_d01 frame count")',
+          // THE ANCHOR CHECK. godot.ts's pivotMargin, tres-parse's
+          // validateTres and godot_test's anchorOf all compute the anchor as
+          // (region.size + margin.size)/2 - margin.position: three checkers,
+          // ONE shared model of AtlasTexture.margin. If that model were
+          // inverted every character would import mis-anchored and all of our
+          // tests would still pass, because they all ask the same wrong
+          // question. This asks Godot.
+          //
+          // The fixture records pivot (8, 14) in a 16x16 cell and the exporter
+          // emits margin Rect2(0, 0, 0, 12) — verified against the real
+          // exporter, not derived here — so the drawn box is (16, 28) and its
+          // centre lands on the recorded pivot.
+          '\tvar tex: Texture2D = frames.get_frame_texture("idle_d00", 0)',
+          '\tvar sz: Vector2 = tex.get_size()',
+          '\tassert(sz == Vector2(16, 28), "anchor box: expected (16, 28), got %s" % sz)',
           '\tprint("SMOKE_OK")',
           '\tquit(0)',
           '',
