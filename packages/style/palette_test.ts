@@ -148,3 +148,60 @@ Deno.test('hysteresis: keeps prev unless the candidate improves by more than eps
   // Candidate == prev is a no-op.
   assertEquals(hysteresis(3, 3, 0.5, 0.5, 0.02), 3);
 });
+
+/** How many DISTINCT sRGB triples a palette actually offers. */
+function distinct(p: { srgb: Uint8Array; size: number }): number {
+  const seen = new Set<number>();
+  for (let i = 0; i < p.size; i++) {
+    seen.add((p.srgb[i * 3] << 16) | (p.srgb[i * 3 + 1] << 8) | p.srgb[i * 3 + 2]);
+  }
+  return seen.size;
+}
+
+Deno.test('buildAdaptivePalette: every reported entry is a DISTINCT colour', () => {
+  // The defect this pins: median cut selecting on extent alone kept halving one
+  // dense cluster into boxes whose means rounded to the same sRGB triple, so a
+  // palette reported N entries and offered far fewer. Measured on the committed
+  // fixtures before the fix: pixel-8 4 distinct of 8, painterly 7 of 32. A
+  // duplicate is a dead slot - `nearestWithDist` breaks ties with a strict `<`,
+  // so the higher index can never be selected.
+  const colors: [number, number, number][] = [];
+  // 900 samples in one tight cluster, plus a handful of far outliers: exactly
+  // the distribution that produced duplicates.
+  for (let i = 0; i < 900; i++) colors.push([120 + (i % 3), 80 + (i % 2), 60]);
+  colors.push([250, 10, 10], [10, 250, 10], [10, 10, 250], [250, 250, 250]);
+
+  for (const maxColors of [4, 6, 8, 16]) {
+    const p = buildAdaptivePalette(pool(colors), maxColors);
+    assertEquals(
+      distinct(p),
+      p.size,
+      `maxColors=${maxColors}: ${p.size} entries but only ${distinct(p)} distinct`,
+    );
+    assert(p.size <= maxColors, `maxColors=${maxColors}: size ${p.size} exceeded it`);
+  }
+});
+
+Deno.test('buildAdaptivePalette: a dense cluster does not starve the outliers', () => {
+  // Population x extent is what makes this pass: selecting on extent alone
+  // spends slots halving the cluster, and the four outliers - the only other
+  // colours in the image - never get one.
+  const colors: [number, number, number][] = [];
+  for (let i = 0; i < 2000; i++) colors.push([128, 128, 128]);
+  colors.push([255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]);
+
+  const p = buildAdaptivePalette(pool(colors), 8);
+  assertEquals(distinct(p), p.size, 'no duplicates');
+  // 5 real colours exist; the palette must find them rather than 8 shades of grey
+  assert(p.size >= 5, `expected the 4 outliers plus the cluster, got ${p.size} entries`);
+});
+
+Deno.test('buildAdaptivePalette: a flat source reports its honest ceiling', () => {
+  // Three distinct colours cannot make an 8-entry palette, and padding with
+  // duplicates would be reporting slots the sprite can never use.
+  const colors: [number, number, number][] = [];
+  for (let i = 0; i < 300; i++) colors.push([200, 40, 40], [40, 200, 40], [40, 40, 200]);
+  const p = buildAdaptivePalette(pool(colors), 8);
+  assertEquals(p.size, 3, 'exactly the colours that exist');
+  assertEquals(distinct(p), 3);
+});

@@ -122,13 +122,47 @@ Deno.test('styleFromAovs is deterministic (byte-identical sprites + metrics)', a
   }
 });
 
-Deno.test('painterly (area-average) produces a larger continuous-ish palette', async () => {
+Deno.test('painterly: a bigger budget never shrinks the palette, and no entry is dead', async () => {
+  // This replaces an assertion that compared paletteHex.LENGTH against
+  // pixel-8's maxColors. That passed while 25 of painterly's 32 entries were
+  // duplicates of each other: it asserted the padding, not the palette. Entry
+  // count was never the thing worth checking, because `nearestWithDist` breaks
+  // ties with a strict `<`, so a duplicate entry can never be selected.
   const out = await Deno.makeTempDir();
+  const out8 = await Deno.makeTempDir();
   try {
-    const r = await styleFromAovs(SRC, CAM, PAINTERLY, out);
-    assertEquals(r.superSample, 4);
-    assert(r.paletteHex.length > PIXEL_8.quantize!.maxColors, 'painterly palette is larger');
+    const painterly = await styleFromAovs(SRC, CAM, PAINTERLY, out);
+    const pixel = await styleFromAovs(SRC, CAM, PIXEL_8, out8);
+    assertEquals(painterly.superSample, 4);
+
+    // every reported entry is a colour the sprite can actually be painted with
+    assertEquals(
+      new Set(painterly.paletteHex).size,
+      painterly.paletteHex.length,
+      'painterly reports no duplicate palette entries',
+    );
+    assertEquals(
+      new Set(pixel.paletteHex).size,
+      pixel.paletteHex.length,
+      'pixel-8 reports no duplicate palette entries',
+    );
+
+    // the larger budget can only ever help
+    assert(
+      painterly.paletteHex.length >= pixel.paletteHex.length,
+      `painterly (${painterly.paletteHex.length}) must not be smaller than ` +
+        `pixel-8 (${pixel.paletteHex.length})`,
+    );
+    assert(
+      painterly.paletteHex.length <= PAINTERLY.quantize!.maxColors,
+      'and never exceeds its own budget',
+    );
+    // On THIS fixture both saturate: the lit AOV of a flat-shaded box holds
+    // exactly 8 distinct colours, so 8 is the ceiling for any maxColors >= 8.
+    // A palette larger than the source would be invented colour.
+    assertEquals(painterly.paletteHex.length, 8, "the fixture's own distinct-colour ceiling");
   } finally {
     await Deno.remove(out, { recursive: true });
+    await Deno.remove(out8, { recursive: true });
   }
 });

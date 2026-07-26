@@ -6,13 +6,17 @@
  * Determinism is a pipeline law (AGENTS.md invariant 8; skill: "same inputs ->
  * identical palette assignment, byte for byte"). Median cut uses a fixed split
  * rule with no RNG:
- *   1. split the box with the largest OKLab axis-range (extent); ties -> lowest
- *      box index;
+ *   1. split the box with the largest POPULATION x EXTENT; ties -> lowest box
+ *      index. Weighting by population is what keeps a slot from being spent on
+ *      three stray pixels while the dense spread cluster stays one colour;
  *   2. split along that box's longest axis; ties -> lowest axis (L < a < b);
  *   3. partition at the COUNT median of a stable sort keyed on (axis value, then
  *      sample index) — both halves are non-empty, and the order is fixed.
- * The final palette order is the box order after all splits (a split replaces
- * its box in place with {left, right}). Same pooledLab -> byte-identical Palette.
+ * Splitting continues until the boxes contribute `maxColors` DISTINCT sRGB
+ * triples (not merely `maxColors` boxes — two boxes can round to one colour,
+ * and the duplicate is a slot the sprite can never use). The final palette order
+ * is the box order after all splits, deduped. Same pooledLab -> byte-identical
+ * Palette.
  *
  * The palette is built ONCE per character over the OKLab of every opaque pixel
  * pooled across all frames (skill: per-frame palettes guarantee flicker). Both
@@ -59,10 +63,53 @@ function longestAxis(
   return { axis: bestAxis, extent: bestExtent };
 }
 
+/** The sRGB of a box's mean OKLab — the colour that box contributes. */
+function boxColor(pooledLab: Float32Array, members: number[]): [number, number, number] {
+  let sumL = 0;
+  let sumA = 0;
+  let sumB = 0;
+  for (const idx of members) {
+    sumL += pooledLab[idx * 3];
+    sumA += pooledLab[idx * 3 + 1];
+    sumB += pooledLab[idx * 3 + 2];
+  }
+  const n = members.length;
+  return oklabToSrgb([sumL / n, sumA / n, sumB / n]);
+}
+
+/**
+ * How many boxes contribute a DISTINCT sRGB triple. This — not the box count —
+ * is the palette a sprite is actually painted with: `nearestWithDist` breaks
+ * ties with a strict `<`, so a duplicate entry can never be selected and is a
+ * dead slot.
+ */
+function distinctCount(colors: [number, number, number][]): number {
+  const seen = new Set<number>();
+  for (const [r, g, b] of colors) seen.add((r << 16) | (g << 8) | b);
+  return seen.size;
+}
+
+/**
+ * Bound on how far past `maxColors` the box count may go while chasing distinct
+ * colours. Splitting always terminates on its own (every box eventually holds a
+ * single sample), but "eventually" is one box per pooled pixel, so the search
+ * needs a ceiling. Reaching it means the pool genuinely cannot fill the
+ * palette, and the honest smaller palette is the right answer.
+ */
+const BOX_BUDGET = 8;
+
 /**
  * Median-cut adaptive palette. `pooledLab` is K*3 OKLab samples (all opaque
  * pixels pooled across every frame). Returns a palette of at most `maxColors`
- * entries; each entry is the sRGB of its box's mean OKLab.
+ * entries, every one of them DISTINCT.
+ *
+ * Splitting is driven by the distinct-colour count rather than the box count,
+ * because those two are not the same thing and the difference was shipping:
+ * `pixel-8` advertised eight tones and painted with four, `painterly`
+ * thirty-two and painted with seven. A box selected on extent alone can be two
+ * outliers around a dense cluster, and halving it at the count median yields
+ * two boxes whose means round to the SAME sRGB triple — a split that costs a
+ * palette slot and buys no colour.
  */
 export function buildAdaptivePalette(pooledLab: Float32Array, maxColors: number): Palette {
   const k = Math.floor(pooledLab.length / 3);
@@ -71,15 +118,22 @@ export function buildAdaptivePalette(pooledLab: Float32Array, maxColors: number)
   const first: number[] = [];
   for (let i = 0; i < k; i++) first.push(i);
   const boxes: number[][] = [first];
+  const colors: [number, number, number][] = [boxColor(pooledLab, first)];
+  const ceiling = Math.max(maxColors, maxColors * BOX_BUDGET);
 
-  while (boxes.length < maxColors) {
-    // Pick the splittable box with the largest extent; ties -> lowest index.
+  while (distinctCount(colors) < maxColors && boxes.length < ceiling) {
+    // Pick by POPULATION x EXTENT, not extent alone: a wide box holding three
+    // stray pixels moves almost nothing, while the dense spread cluster is
+    // where a new tone actually comes from. Ties -> lowest box index, so the
+    // choice stays deterministic (AGENTS.md invariant 8).
     let target = -1;
-    let targetExtent = 0;
+    let best = 0;
     for (let i = 0; i < boxes.length; i++) {
+      if (boxes[i].length < 2) continue; // a single sample cannot be split
       const { extent } = longestAxis(pooledLab, boxes[i]);
-      if (extent > targetExtent) {
-        targetExtent = extent;
+      const score = extent * boxes[i].length;
+      if (score > best) {
+        best = score;
         target = i;
       }
     }
@@ -92,27 +146,25 @@ export function buildAdaptivePalette(pooledLab: Float32Array, maxColors: number)
       return dv !== 0 ? dv : p - q; // total order -> stable regardless of engine
     });
     const mid = sorted.length >> 1; // floor(n/2), in [1, n-1] for n >= 2
-    boxes.splice(target, 1, sorted.slice(0, mid), sorted.slice(mid));
+    const left = sorted.slice(0, mid);
+    const right = sorted.slice(mid);
+    boxes.splice(target, 1, left, right);
+    colors.splice(target, 1, boxColor(pooledLab, left), boxColor(pooledLab, right));
   }
 
-  const srgb = new Uint8Array(boxes.length * 3);
-  for (let i = 0; i < boxes.length; i++) {
-    const members = boxes[i];
-    let sumL = 0;
-    let sumA = 0;
-    let sumB = 0;
-    for (const idx of members) {
-      sumL += pooledLab[idx * 3];
-      sumA += pooledLab[idx * 3 + 1];
-      sumB += pooledLab[idx * 3 + 2];
-    }
-    const n = members.length;
-    const [r, g, b] = oklabToSrgb([sumL / n, sumA / n, sumB / n]);
-    srgb[i * 3] = r;
-    srgb[i * 3 + 1] = g;
-    srgb[i * 3 + 2] = b;
+  // Emit the DISTINCT colours in box order, capped. Reporting a duplicate
+  // would be reporting a slot the sprite can never use — `paletteHex` feeds
+  // palette.json and the membership check, so it has to be the truth.
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const [r, g, b] of colors) {
+    const key = (r << 16) | (g << 8) | b;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r, g, b);
+    if (seen.size === maxColors) break;
   }
-  return paletteFromSrgb(srgb);
+  return paletteFromSrgb(Uint8Array.from(out));
 }
 
 const HEX_RE = /^#?([0-9a-fA-F]{6})$/;
