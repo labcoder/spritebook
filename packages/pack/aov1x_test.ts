@@ -15,21 +15,40 @@ function makeAov(width: number, height: number): AovImage {
   };
 }
 
-Deno.test('aov1x: albedo is the s*s area average per channel, alpha included, half rounds up', () => {
+Deno.test('aov1x: albedo colour is weighted by coverage; alpha is the area mean', () => {
+  // Half the subpixels are UNCOVERED (alpha 0). This previously expected
+  // [8, 10, 1, 128] — the plain mean of r over all sixteen, including the eight
+  // that were never drawn. That is the defect: transparent black dragged every
+  // partial-coverage texel toward zero. Only the covered half (r = 8..15) has
+  // any colour to contribute, and its weighted mean is 12.
   const aov = makeAov(4, 4);
   for (let i = 0; i < 16; i++) {
-    aov.albedo[i * 4] = i; // r: 0..15 -> mean 7.5 -> 8
+    aov.albedo[i * 4] = i; // r: covered half is 8..15 -> 12
     aov.albedo[i * 4 + 1] = 10; // g: constant -> 10
-    aov.albedo[i * 4 + 2] = i < 8 ? 0 : 1; // b: mean 0.5 -> 1
-    aov.albedo[i * 4 + 3] = i < 8 ? 0 : 255; // a: mean 127.5 -> 128
+    aov.albedo[i * 4 + 2] = i < 8 ? 0 : 1; // b: covered half is 1 -> 1
+    aov.albedo[i * 4 + 3] = i < 8 ? 0 : 255; // a: area mean 127.5 -> 128
   }
   const out = aov1x(aov, 4);
   assertEquals(out.albedo.w, 1);
   assertEquals(out.albedo.h, 1);
-  assertEquals([...out.albedo.rgba!], [8, 10, 1, 128]);
+  assertEquals([...out.albedo.rgba!], [12, 10, 1, 128]);
+});
+
+Deno.test('aov1x: a fully covered block is unchanged by the coverage weighting', () => {
+  // The reason only silhouette edges move: when every alpha is 255 the weight
+  // factors out of numerator and denominator exactly.
+  const aov = makeAov(2, 2);
+  [10, 20, 30, 40].forEach((v, i) => {
+    aov.albedo[i * 4] = v;
+    aov.albedo[i * 4 + 3] = 255;
+  });
+  assertEquals([...aov1x(aov, 2).albedo.rgba!], [25, 0, 0, 255]);
 });
 
 Deno.test("aov1x: albedo rounding is round-half-up, not banker's or truncation", () => {
+  // Fully covered blocks, so this exercises rounding rather than coverage.
+  // (It previously left alpha at 0, which now means "nothing was drawn here" —
+  // the colour of an uncovered block is not a rounding question.)
   // 2x2 blocks (s=2, area 4): sums 1, 2, 3 -> means 0.25, 0.5, 0.75 -> 0, 1, 1
   const cases: Array<[number[], number]> = [
     [[1, 0, 0, 0], 0],
@@ -38,7 +57,10 @@ Deno.test("aov1x: albedo rounding is round-half-up, not banker's or truncation",
   ];
   for (const [values, expected] of cases) {
     const aov = makeAov(2, 2);
-    values.forEach((v, i) => (aov.albedo[i * 4] = v));
+    values.forEach((v, i) => {
+      aov.albedo[i * 4] = v;
+      aov.albedo[i * 4 + 3] = 255;
+    });
     assertEquals(aov1x(aov, 2).albedo.rgba![0], expected, `block ${values} -> ${expected}`);
   }
 });
@@ -66,6 +88,7 @@ Deno.test('aov1x: center-tap lands per block, not per image (8x4, s=4 -> 2x1)', 
   for (let x = 0; x < 8; x++) {
     for (let y = 0; y < 4; y++) {
       aov.albedo[(y * 8 + x) * 4] = x < 4 ? 4 : 8; // r averages 4 then 8
+      aov.albedo[(y * 8 + x) * 4 + 3] = 255; // covered, so the colour counts
     }
   }
   const out = aov1x(aov, 4);

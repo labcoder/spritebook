@@ -58,23 +58,32 @@ export function aov1x(aov: AovImage, s: number): Aov1xCells {
       const baseY = oy * s;
       const baseX = ox * s;
 
-      // albedo: per-channel area average, alpha included
+      // albedo: colour weighted BY coverage, alpha as the area mean. Summing
+      // r,g,b over cleared (0,0,0,0) subpixels and dividing by the full area
+      // mixes transparent black into every edge texel — the same defect
+      // style/downsample.ts carried, and it lands here on the shipped 1x
+      // albedo pages. A fully covered block is unchanged (the weight factors
+      // out); only partial-coverage edges move.
       let r = 0, g = 0, b = 0, a = 0;
       for (let dy = 0; dy < s; dy++) {
         let idx = ((baseY + dy) * width + baseX) * 4;
         for (let dx = 0; dx < s; dx++) {
-          r += aov.albedo[idx];
-          g += aov.albedo[idx + 1];
-          b += aov.albedo[idx + 2];
-          a += aov.albedo[idx + 3];
+          const w8 = aov.albedo[idx + 3];
+          r += aov.albedo[idx] * w8;
+          g += aov.albedo[idx + 1] * w8;
+          b += aov.albedo[idx + 2] * w8;
+          a += w8;
           idx += 4;
         }
       }
       const o = (oy * w + ox) * 4;
-      albedo[o] = ((r + half) / area) | 0;
-      albedo[o + 1] = ((g + half) / area) | 0;
-      albedo[o + 2] = ((b + half) / area) | 0;
-      albedo[o + 3] = ((a + half) / area) | 0;
+      if (a > 0) {
+        const bias = a >> 1;
+        albedo[o] = ((r + bias) / a) | 0;
+        albedo[o + 1] = ((g + bias) / a) | 0;
+        albedo[o + 2] = ((b + bias) / a) | 0;
+        albedo[o + 3] = ((a + half) / area) | 0;
+      } // else: nothing covered, leave (0,0,0,0)
 
       // normal / depth / mask: the center subpixel, untouched
       const tap = (baseY + c) * width + baseX + c;
