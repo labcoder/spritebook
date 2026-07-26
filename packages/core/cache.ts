@@ -41,7 +41,14 @@ export async function deriveCacheKeyInputs(
     canonicalMeshSha256: manifest.canonicalMesh.gltfSha256,
     rigStateHash: await sha256Hex(canonicalJson(manifest.rig)),
     clipBindingHash: await sha256Hex(canonicalJson(manifest.animationSet ?? [])),
-    cameraPresetHash: await sha256Hex(canonicalJson(resolved.cameraPreset)),
+    // mirroring folds into the camera hash, exactly as pack/bake.ts does it:
+    // a mirrored bake renders half the directions and flips the rest, so it
+    // produces DIFFERENT pixels from an unmirrored one. Hashing the preset
+    // alone let the two trade cache entries - `mirroring` is per character,
+    // so this derivation is the only place that can see it.
+    cameraPresetHash: await sha256Hex(
+      canonicalJson({ camera: resolved.cameraPreset, mirroring: manifest.mirroring.enabled }),
+    ),
     stylePresetHash: await sha256Hex(canonicalJson(resolved.stylePreset)),
     rendererVersion: resolved.rendererVersion,
     backend: {
@@ -109,7 +116,20 @@ export class DiskCacheStore implements CacheStore {
     }
   }
   async put(key: string, value: string): Promise<void> {
-    await Deno.writeTextFile(this.#path(key), value);
+    // tmp + rename, the same discipline pack/cache.ts's BlobCache uses: a plain
+    // write can be interrupted, and a torn value is not detected on the way
+    // back out - `has()` returns true and `get()` returns a prefix, so the
+    // caller reports a cache HIT and parses garbage. Rename is atomic, so an
+    // entry either exists whole or not at all.
+    const final = this.#path(key);
+    const tmp = `${final}.${crypto.randomUUID()}.tmp`;
+    try {
+      await Deno.writeTextFile(tmp, value);
+      await Deno.rename(tmp, final);
+    } catch (err) {
+      await Deno.remove(tmp).catch(() => {});
+      throw err;
+    }
   }
   async keys(): Promise<string[]> {
     const out: string[] = [];

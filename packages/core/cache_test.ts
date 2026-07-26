@@ -134,3 +134,44 @@ Deno.test('deriveCacheKeyInputs refuses manifests missing structural stages', as
   }
   assert(threw);
 });
+
+Deno.test('deriveCacheKeyInputs: mirroring moves the key', async () => {
+  // Mirroring renders half the directions and flips the rest, so it produces
+  // DIFFERENT pixels. Before this, two manifests differing only in
+  // mirroring.enabled hashed identically and could trade cache entries -
+  // pack/bake.ts documents and fixes the same hole downstream, but this
+  // manifest-bound derivation never got it.
+  const base = await fixtureManifest();
+  const resolved = { cameraPreset: {}, stylePreset: {}, rendererVersion: '0.1.0' };
+  const off = await deriveCacheKeyInputs(
+    { ...base, mirroring: { enabled: false } },
+    resolved,
+  );
+  const on = await deriveCacheKeyInputs(
+    { ...base, mirroring: { enabled: true } },
+    resolved,
+  );
+  assert(
+    off.cameraPresetHash !== on.cameraPresetHash,
+    'a mirrored bake must not share a camera hash with an unmirrored one',
+  );
+});
+
+Deno.test('DiskCacheStore.put is atomic: no torn value is ever served as a hit', async () => {
+  // A plain writeTextFile can be interrupted, and nothing downstream detects a
+  // truncated entry: has() -> true, get() -> a prefix, and the caller reports a
+  // cache HIT and parses garbage.
+  const dir = await Deno.makeTempDir();
+  try {
+    const store = new DiskCacheStore(dir);
+    const key = 'a'.repeat(64); // keys are sha256 hex
+    await store.put(key, JSON.stringify({ pixels: 'complete' }));
+    // no stray temp files survive a successful write
+    const leftovers: string[] = [];
+    for await (const e of Deno.readDir(dir)) if (e.name.includes('.tmp')) leftovers.push(e.name);
+    assertEquals(leftovers, [], 'the temp file is renamed, not left behind');
+    assertEquals(await store.get(key), JSON.stringify({ pixels: 'complete' }));
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
