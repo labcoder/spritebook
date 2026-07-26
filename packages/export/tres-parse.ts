@@ -239,7 +239,7 @@ export function parseTres(text: string): TresFile {
  * load_steps arithmetic, ext_resources <-> lit pages, deterministic ids,
  * every region == its frame's atlas rect, every frame ANCHORED on its recorded
  * pivot, and one animation per (clipId, direction) with matching names, frame
- * counts and refs.
+ * counts, refs, and per-clip loop/speed.
  */
 export function validateTres(parsed: TresFile, manifest: BakeManifest): void {
   const err = (msg: string): never => {
@@ -333,11 +333,24 @@ export function validateTres(parsed: TresFile, manifest: BakeManifest): void {
       `animation count ${parsed.animations.length} != clip-direction group count ${groups.length}`,
     );
   }
+  // per-clip timing, when the bake recorded it (`clips` is optional)
+  const timingByClip = new Map((manifest.clips ?? []).map((c) => [c.clipId, c]));
+
   for (const [gi, g] of groups.entries()) {
     const anim = parsed.animations[gi];
     const wantName = `${g.clipId}_d${String(g.direction).padStart(2, '0')}`;
     if (anim.name !== wantName) err(`animation[${gi}] name '${anim.name}' != '${wantName}'`);
-    if (anim.loop !== true) err(`animation '${anim.name}' must loop`);
+    const timing = timingByClip.get(g.clipId);
+    // THE MANIFEST decides whether a clip loops. This used to demand `loop ===
+    // true` of every animation, which made a death clip's endless restart the
+    // spec instead of the bug. Absent timing keeps the documented fallback.
+    const wantLoop = timing?.loop ?? true;
+    if (anim.loop !== wantLoop) {
+      err(`animation '${anim.name}' loop=${anim.loop}, but the manifest says ${wantLoop}`);
+    }
+    if (timing !== undefined && anim.speed !== timing.fps) {
+      err(`animation '${anim.name}' speed ${anim.speed} != clip '${g.clipId}' fps ${timing.fps}`);
+    }
     if (!(anim.speed > 0)) err(`animation '${anim.name}' speed ${anim.speed} must be > 0`);
     if (anim.frames.length !== g.subIndices.length) {
       err(

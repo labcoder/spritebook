@@ -68,9 +68,11 @@ const EXPECTED_TRES = [
   '"duration": 1.0,',
   '"texture": SubResource("AtlasTexture_2")',
   '}],',
+  // loop + speed come from the fixture's `clips` entry (loop, fps 2), NOT from
+  // opts.fps (8) — one --fps used to flatten every clip onto one rate
   '"loop": true,',
   '"name": &"idle_d00",',
-  '"speed": 8.0',
+  '"speed": 2.0',
   '}, {',
   '"frames": [{',
   '"duration": 1.0,',
@@ -81,7 +83,7 @@ const EXPECTED_TRES = [
   '}],',
   '"loop": true,',
   '"name": &"idle_d01",',
-  '"speed": 8.0',
+  '"speed": 2.0',
   '}]',
 ].join('\n') + '\n';
 
@@ -105,7 +107,9 @@ Deno.test('exportGodot: fixture projects to a parseable, manifest-valid SpriteFr
       'AtlasTexture_4',
     ]);
     assertEquals(parsed.animations.map((a) => a.name), ['idle_d00', 'idle_d01']);
-    assertEquals(parsed.animations.map((a) => a.speed), [DEFAULT_FPS, DEFAULT_FPS]);
+    // the fixture clip records fps 2; this used to assert DEFAULT_FPS for both,
+    // i.e. it asserted that --fps had flattened every clip onto one rate
+    assertEquals(parsed.animations.map((a) => a.speed), [2, 2]);
     assertEquals(parsed.animations.map((a) => a.frames.length), [2, 2]);
   } finally {
     await Deno.remove(out, { recursive: true });
@@ -125,7 +129,7 @@ Deno.test('exportGodot: .tres bytes match the specced Godot 4 shape exactly', as
     assertStringIncludes(text, 'region = Rect2(16, 0, 16, 16)');
     assertStringIncludes(text, 'margin = Rect2(0, 0, 0, 12)');
     assertStringIncludes(text, 'load_steps=6');
-    assertStringIncludes(text, '"speed": 8.0');
+    assertStringIncludes(text, '"speed": 2.0'); // the clip's fps, not opts.fps
     assert(!text.includes('uid='), 'uid must be omitted for byte-stability');
     assert(!text.includes('\r'), 'LF line endings only');
     assert(text.endsWith('}]\n'), 'ends with the closed animations array + newline');
@@ -213,6 +217,85 @@ Deno.test('exportGodot: pivots on either side of the cell centre both land', asy
       { x: 0, y: 0, w: 0, h: 0 },
       'a dead-centre pivot needs no pad at all',
     );
+  } finally {
+    await Deno.remove(out, { recursive: true });
+  }
+});
+
+Deno.test('exportGodot: a held clip stops on its last frame, at its own rate', async () => {
+  // `bake --clips death01:8!hold` then `export --targets godot` used to produce
+  // a death animation that restarted forever, at whatever --fps said
+  const plain = structuredClone(await fixtureManifest());
+  plain.clips = [{ clipId: 'idle', frames: 2, speed: 1, holdLast: true, loop: false, fps: 12 }];
+  const manifest = parseWith(BakeManifestSchema, plain, 'held-clip manifest');
+  const out = await Deno.makeTempDir({ prefix: 'sb-godot-hold-' });
+  try {
+    await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
+    const text = await Deno.readTextFile(`${out}/fixture-char.tres`);
+    const parsed = parseTres(text);
+    validateTres(parsed, manifest);
+    assertEquals(parsed.animations.map((a) => a.loop), [false, false], 'holdLast must not loop');
+    assertEquals(parsed.animations.map((a) => a.speed), [12, 12], 'the clip rate, not opts.fps');
+    assertStringIncludes(text, '"loop": false,');
+    assert(!text.includes('"loop": true,'), 'no animation may loop against the manifest');
+  } finally {
+    await Deno.remove(out, { recursive: true });
+  }
+});
+
+Deno.test('exportGodot: two clips keep two different rates', async () => {
+  // `--clips walk-loop:8,idle-loop:4` used to give both animations one speed
+  const plain = structuredClone(await fixtureManifest());
+  for (const direction of [0, 1]) {
+    plain.frames.push({
+      clipId: 'death01',
+      direction,
+      frame: 0,
+      pivotPx: { x: 8, y: 14 },
+      atlas: { pageIndex: 0, x: direction * 16, y: 16, w: 16, h: 16 },
+      cacheHit: false,
+    });
+  }
+  plain.clips = [
+    { clipId: 'death01', frames: 1, speed: 1, holdLast: true, loop: false, fps: 12 },
+    { clipId: 'idle', frames: 2, speed: 1, holdLast: false, loop: true, fps: 2 },
+  ];
+  const manifest = parseWith(BakeManifestSchema, plain, 'two-clip manifest');
+  const out = await Deno.makeTempDir({ prefix: 'sb-godot-2clip-' });
+  try {
+    await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
+    const text = await Deno.readTextFile(`${out}/fixture-char.tres`);
+    const parsed = parseTres(text);
+    validateTres(parsed, manifest);
+    assertEquals(
+      parsed.animations.map((a) => [a.name, a.loop, a.speed]),
+      [
+        ['death01_d00', false, 12],
+        ['death01_d01', false, 12],
+        ['idle_d00', true, 2],
+        ['idle_d01', true, 2],
+      ],
+      'per-clip loop and rate, both differing from opts.fps',
+    );
+    assert(!text.includes(`"speed": ${DEFAULT_FPS}.0`), 'opts.fps must not reach a timed clip');
+  } finally {
+    await Deno.remove(out, { recursive: true });
+  }
+});
+
+Deno.test('exportGodot: a bake with no clips falls back to opts.fps and loops', async () => {
+  // `clips` is optional, so every already-baked directory must still export
+  const plain = structuredClone(await fixtureManifest());
+  delete plain.clips;
+  const manifest = parseWith(BakeManifestSchema, plain, 'legacy idle manifest');
+  assertEquals(manifest.clips, undefined, 'the legacy shape really has no timing');
+  const out = await Deno.makeTempDir({ prefix: 'sb-godot-legacy-' });
+  try {
+    await exportGodot(manifest, FIXTURE_DIR, out, { fps: 24 });
+    const parsed = parseTres(await Deno.readTextFile(`${out}/fixture-char.tres`));
+    validateTres(parsed, manifest); // must not throw on the fallback
+    assertEquals(parsed.animations.map((a) => a.speed), [24, 24]);
+    assertEquals(parsed.animations.map((a) => a.loop), [true, true]);
   } finally {
     await Deno.remove(out, { recursive: true });
   }

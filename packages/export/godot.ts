@@ -18,6 +18,11 @@
  * be the other way to say this; baking the pivot into each AtlasTexture keeps
  * the .tres self-contained (drop it on any AnimatedSprite2D and it is right)
  * and is PER FRAME, so a bake whose pivot differs per direction still lands.
+ *
+ * TIMING: each animation's `loop` and `speed` come from that clip's entry in
+ * `BakeManifest.clips`, so a `!hold` death clip stops on its last frame and
+ * clips of different lengths keep their own rates. `clips` is optional; a bake
+ * without it falls back to opts.fps and an endless loop.
  */
 import type { FrameRecord } from '@spritebook/schema';
 import { atlasPageName, type Exporter, frameIdKey } from '../pack/contracts.ts';
@@ -136,6 +141,11 @@ export const exportGodot: Exporter = async (manifest, bakeDir, outDir, opts) => 
       groups.push({ clipId: f.clipId, direction: f.direction, subIndices: [i] });
     }
   }
+  // Per-clip timing when the bake recorded it. `clips` is optional — a legacy
+  // idle bake has none — so an absent clip keeps the old behaviour: opts.fps
+  // and an endless loop. ClipTiming.fps is schema-guaranteed finite-positive.
+  const timingByClip = new Map((manifest.clips ?? []).map((c) => [c.clipId, c]));
+
   lines.push('[resource]', 'animations = [{');
   for (const [gi, g] of groups.entries()) {
     lines.push('"frames": [{');
@@ -143,8 +153,12 @@ export const exportGodot: Exporter = async (manifest, bakeDir, outDir, opts) => 
       lines.push('"duration": 1.0,', `"texture": SubResource("AtlasTexture_${subIndex + 1}")`);
       lines.push(j < g.subIndices.length - 1 ? '}, {' : '}],');
     }
-    lines.push('"loop": true,', `"name": &"${g.clipId}_d${pad2(g.direction)}",`);
-    lines.push(`"speed": ${godotFloat(opts.fps)}`);
+    const timing = timingByClip.get(g.clipId);
+    lines.push(
+      `"loop": ${timing?.loop ?? true},`,
+      `"name": &"${g.clipId}_d${pad2(g.direction)}",`,
+    );
+    lines.push(`"speed": ${godotFloat(timing?.fps ?? opts.fps)}`);
     lines.push(gi < groups.length - 1 ? '}, {' : '}]');
   }
 
