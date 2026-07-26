@@ -20,6 +20,7 @@ import type {
   ClipTiming,
   JobEvent,
   RenderPass,
+  RigState,
   StylePreset,
 } from '@spritebook/schema';
 import { canonicalJson, RENDER_PASSES } from '@spritebook/schema';
@@ -93,6 +94,12 @@ export interface BakeJobSpec {
    * cache key (buildCacheInputs).
    */
   mirroring?: boolean;
+  /**
+   * The two recipe facts a glb cannot state: which rig this character is on and
+   * which backend produced it. Present when the bake has a character to ask
+   * (`bake --workspace`); absent for a bake of a bare file, which has neither.
+   */
+  provenance?: BakeProvenance;
 }
 
 export interface ClipBindingSpec extends SampleSpec {
@@ -123,11 +130,28 @@ async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
 }
 
 /**
- * The full bake recipe: model bytes + presets + the idle clip stub + sentinels.
+ * Where a bake's rig and backend facts come from when there IS a character to
+ * ask. Absent means there is not one — see the sentinels in `buildCacheInputs`.
+ */
+export interface BakeProvenance {
+  /** the character's RigState, hashed here rather than by the caller */
+  rig?: RigState;
+  /** the generation backend that produced the picked mesh, and its params */
+  backend?: { modelId: string; version: string; params: Record<string, unknown> };
+}
+
+/**
+ * The full bake recipe: model bytes + presets + clips + provenance.
  * `renderSig` is renderSignature() from @spritebook/render — pipeline version
  * composed with the adapter-identity hash (D-023), so the same recipe on a
  * different adapter is a different recipe (driver-version-only updates are a
  * known gap; see render/diagnostics.ts).
+ *
+ * `provenance` carries the two facts this function cannot read off a glb: which
+ * rig the character is on, and which backend produced it. They arrive from the
+ * manifest when a bake has one (`bake --workspace`), and are ABSENT for a bake
+ * of a bare file, which genuinely has neither — see where the sentinels are
+ * written for what absence is taken to mean.
  */
 export async function buildCacheInputs(
   spec: Pick<
@@ -142,6 +166,7 @@ export async function buildCacheInputs(
     | 'mirroring'
   >,
   renderSig: string,
+  provenance: BakeProvenance = {},
 ): Promise<CacheKeyInputs> {
   const modelBytes = await Deno.readFile(spec.modelPath);
   // clip CONTENT is a cache input (invariant 3): the binding spec alone would
@@ -170,9 +195,14 @@ export async function buildCacheInputs(
   return {
     characterId: spec.characterId,
     canonicalMeshSha256: await sha256OfBytes(modelBytes),
-    // pre-rig sentinel: the rig stage lands with Track B (P3); until then the
-    // skin is whatever the canonical glb carries, keyed as such
-    rigStateHash: await sha256Hex(canonicalJson({ track: 'source-skin' })),
+    // The character's rig when there is a character, and otherwise a sentinel
+    // meaning NO RECORDED RIG — the skin is whatever this glb carries, keyed as
+    // such. That is the honest answer for `bake --model x.glb`, which has no
+    // manifest to ask; it used to be the answer for every bake, under a comment
+    // saying the rig stage "lands with Track B", which it did in P3.
+    rigStateHash: await sha256Hex(
+      canonicalJson(provenance.rig ?? { track: 'source-skin' }),
+    ),
     clipBindingHash: await sha256Hex(clipBindings),
     // D-011, mirroring edition: mirroring changes the PIXELS (half the
     // directions become flips, and the adaptive palette pools over fewer
@@ -188,11 +218,16 @@ export async function buildCacheInputs(
     ),
     stylePresetHash: await sha256Hex(canonicalJson(spec.style)),
     rendererVersion: renderSig,
-    // no generation backend in the T3 path: the mesh comes in from the border
+    // The backend that made this character, when one did. `source-mesh@0` is
+    // the sentinel for NOT GENERATED HERE — a mesh that came in through the
+    // importer border — which is the truth for a bare-file bake and was a lie
+    // for every other one: BakeManifest.inputs is a committed record, and "re-
+    // run exactly this" cannot be honoured from a manifest that reports the
+    // wrong backend for the model it baked.
     backend: {
-      modelId: 'source-mesh',
-      version: '0',
-      paramsHash: await sha256Hex(canonicalJson({})),
+      modelId: provenance.backend?.modelId ?? 'source-mesh',
+      version: provenance.backend?.version ?? '0',
+      paramsHash: await sha256Hex(canonicalJson(provenance.backend?.params ?? {})),
     },
   } as CacheKeyInputs;
 }
@@ -580,7 +615,7 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
         seen.add(c.clipId);
       }
     }
-    const inputs = await buildCacheInputs(spec, await renderSignature());
+    const inputs = await buildCacheInputs(spec, await renderSignature(), spec.provenance);
     const bake = await bakeKey(inputs);
     const bakeDir = `${spec.outRoot}/bake-${bake.slice(0, 8)}`;
     await Deno.mkdir(bakeDir, { recursive: true });

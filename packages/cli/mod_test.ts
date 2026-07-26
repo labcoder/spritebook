@@ -1,7 +1,7 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
 import { CAMERA_PRESETS, ManifestJournal } from '@spritebook/core';
-import { bakeSpecFromFlags, mergeAnimationSet, mirroringFor, runCli } from './mod.ts';
+import { bakeSpecFromFlags, mergeAnimationSet, mirroringFor, provenanceOf, runCli } from './mod.ts';
 
 const now = () => '2026-07-12T00:00:00Z';
 const target = { kind: 'character', id: 'brave-knight' } as const;
@@ -455,6 +455,72 @@ Deno.test('clips from another pack are refused, not resolved against this one', 
     await Deno.remove(ws, { recursive: true });
   }
 });
+
+Deno.test("a workspace bake keys on the character's real rig and backend", async () => {
+  // The two facts a glb cannot state. Under the old sentinels a bake manifest
+  // recorded `source-mesh@0` for a character a named backend actually made, so
+  // its `inputs` block - the record "re-run exactly this" depends on - named
+  // the wrong producer.
+  const ws = await Deno.makeTempDir({ prefix: 'sb-prov-' });
+  try {
+    const { appendGenerationResult, createWorkspace, pickResult, setRigState } = await import(
+      '@spritebook/core'
+    );
+    await createWorkspace({
+      workspace: ws,
+      characterId: 'brave-knight',
+      displayName: 'Brave Knight',
+      source: { kind: 'image', originalFilename: 'k.png', sha256: 'a'.repeat(64) },
+      now,
+    });
+    // a bare workspace has neither, and says so
+    assertEquals(await provenanceFor(ws), undefined);
+
+    await appendGenerationResult(ws, {
+      id: 'r1',
+      backend: { modelId: 'trellis2', version: '4b' },
+      params: { quality: 'high' },
+      seed: 42,
+      startedAt: now(),
+      wallTimeS: 92.5,
+      output: { gltfSha256: 'b'.repeat(64), tris: 14318, kind: 'mesh' },
+      discarded: false,
+    }, { now });
+    await pickResult(ws, 'r1', { heightM: 1.81, texturedBy: 'backend', now });
+    const picked = await provenanceFor(ws);
+    assertEquals(picked?.backend, {
+      modelId: 'trellis2',
+      version: '4b',
+      params: { quality: 'high' },
+    });
+    assertEquals(picked?.rig, undefined, 'a picked mesh has no rig yet, and does not pretend to');
+
+    await setRigState(ws, {
+      track: 'B',
+      skeletonProfile: 'generic',
+      jointCount: 52,
+      jointEdits: [],
+      orientationFixes: [],
+      accepted: true,
+    }, { now });
+    const rigged = await provenanceFor(ws);
+    assertEquals(rigged?.rig?.jointCount, 52);
+    assertEquals(rigged?.backend?.modelId, 'trellis2', 'and the backend came along');
+  } finally {
+    await Deno.remove(ws, { recursive: true });
+  }
+});
+
+/** What `bake --workspace` would hand the recipe for this character. */
+async function provenanceFor(ws: string) {
+  const { readWorkspace } = await import('@spritebook/core');
+  return bakeSpecFromFlags(['bake'], {
+    model: 'm.glb',
+    character: 'c',
+    out: 'o',
+    provenance: provenanceOf(await readWorkspace(ws)),
+  }).provenance;
+}
 
 Deno.test('a look naming a preset that does not exist says which one, and where from', async () => {
   const ws = await Deno.makeTempDir({ prefix: 'sb-look-' });

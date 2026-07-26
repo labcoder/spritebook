@@ -38,7 +38,7 @@ import {
   workspacePaths,
 } from '@spritebook/core';
 import { DEFAULT_STYLE_PRESET_ID, PRESETS, resolveStyle } from '@spritebook/style';
-import type { BakeJobSpec, ClipBindingSpec } from '@spritebook/pack';
+import type { BakeJobSpec, BakeProvenance, ClipBindingSpec } from '@spritebook/pack';
 import { BUNDLED_PACK, runBakeJob } from '@spritebook/pack';
 import { runExportJob } from '@spritebook/export';
 
@@ -300,6 +300,44 @@ export interface BakeResolution {
   animationSet?: ClipBinding[];
   /** the character's stored D-008 choice, when baking from a workspace */
   mirroring?: boolean;
+  /** the character's rig and backend, when baking from a workspace */
+  provenance?: BakeProvenance;
+}
+
+/**
+ * The two recipe facts a glb cannot state, read off the character.
+ *
+ * Both were hardcoded sentinels in `buildCacheInputs` — `{track:'source-skin'}`
+ * and `source-mesh@0` — under comments saying the rig stage "lands with Track B"
+ * and there is "no generation backend in the T3 path". Both of those worlds
+ * ended in P3. What the sentinels cost is truth in a committed artifact:
+ * `BakeManifest.inputs` is the record of what a bake ran on, and "re-run exactly
+ * this" cannot be honoured from one that names the wrong backend.
+ *
+ * Each half is independent, because a character can have a rig and no picked
+ * result (`rig` works on a bare glb) or a picked result and no rig yet.
+ */
+export function provenanceOf(manifest?: CharacterManifest): BakeProvenance | undefined {
+  if (!manifest) return undefined;
+  const picked = manifest.generation.results.find(
+    (r) => r.id === manifest.generation.pickedResultId,
+  );
+  const out: BakeProvenance = {
+    ...(manifest.rig ? { rig: manifest.rig } : {}),
+    ...(picked
+      ? {
+        backend: {
+          modelId: picked.backend.modelId,
+          version: picked.backend.version,
+          params: picked.params,
+        },
+      }
+      : {}),
+  };
+  // nothing to say is not the same as saying nothing: an empty object would
+  // still be `provenance` present, and the sentinels are what "no recorded rig,
+  // not generated here" is spelled as
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /**
@@ -331,6 +369,7 @@ export function bakeSpecFromFlags(args: string[], resolved: BakeResolution): Bak
     clips: clipsFor(args, resolved.animationSet),
     packDir: flag(args, 'pack'),
     mirroring: mirroringFor(args, resolved.mirroring),
+    provenance: resolved.provenance,
   };
 }
 
@@ -1295,6 +1334,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         look,
         animationSet: stored,
         mirroring: manifest?.mirroring.enabled,
+        provenance: provenanceOf(manifest),
       });
     } catch (err) {
       return fail(bakeId, 'bad-args', err instanceof Error ? err.message : String(err));
