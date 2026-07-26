@@ -28,7 +28,13 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { BakeManifestSchema, canonicalJson, parseWith } from '@spritebook/schema';
 import type { BakeManifest } from '@spritebook/schema';
-import { createWorkspace, readWorkspace, recordBake, workspacePaths } from '@spritebook/core';
+import {
+  createWorkspace,
+  readWorkspace,
+  recordBake,
+  sha256Hex,
+  workspacePaths,
+} from '@spritebook/core';
 import { tryGetGpu } from '../render/gpu.ts';
 import { runCli } from './mod.ts';
 
@@ -320,6 +326,61 @@ Deno.test('acceptance: a workspace bake reproduces the last one exactly', async 
         'and nothing about it was recorded, because it cannot be',
       );
     });
+  } finally {
+    await Deno.remove(raw, { recursive: true });
+  }
+});
+
+Deno.test('acceptance: the bake manifest records the backend that really made it', async () => {
+  // Found by self-review: every other acceptance here uses a workspace with no
+  // rig and no picked result, so `provenanceOf` returns undefined and the whole
+  // manifest -> spec -> recipe -> BakeManifest.inputs path went unexercised.
+  // `inputs` is a COMMITTED record - it is what "re-run exactly this" reads -
+  // and it used to say `source-mesh@0` for a character a named backend made.
+  if (!(await tryGetGpu())) return;
+  const raw = await Deno.makeTempDir({ prefix: 'sb-prov-e2e-' });
+  const dir = raw.replaceAll('\\', '/');
+  try {
+    await character(dir);
+    const { appendGenerationResult, pickResult, setRigState } = await import('@spritebook/core');
+    await appendGenerationResult(dir, {
+      id: 'r1',
+      backend: { modelId: 'trellis2', version: '4b' },
+      params: { quality: 'high' },
+      seed: 42,
+      startedAt: NOW(),
+      wallTimeS: 92.5,
+      output: { gltfSha256: 'b'.repeat(64), tris: 14318, kind: 'mesh' },
+      discarded: false,
+    }, { now: NOW });
+    await pickResult(dir, 'r1', { heightM: 1.81, texturedBy: 'backend', now: NOW });
+    await setRigState(dir, {
+      track: 'B',
+      skeletonProfile: 'generic',
+      jointCount: 52,
+      jointEdits: [],
+      orientationFixes: [],
+      accepted: true,
+    }, { now: NOW });
+
+    const c = collector();
+    assertEquals(
+      await runCli(
+        ['bake', '--workspace', dir, '--directions', '2', '--cell', '48', '--json'],
+        c.io,
+      ),
+      0,
+      c.err.join('\n'),
+    );
+    const manifest = await readWorkspace(dir);
+    const baked = await bakeManifest(dir, manifest.lastBakeId!);
+    assertEquals(baked.inputs.backend.modelId, 'trellis2', 'not the source-mesh sentinel');
+    assertEquals(baked.inputs.backend.version, '4b');
+    assertEquals(
+      baked.inputs.rigStateHash,
+      await sha256Hex(canonicalJson(manifest.rig)),
+      'and the rig it is actually on',
+    );
   } finally {
     await Deno.remove(raw, { recursive: true });
   }

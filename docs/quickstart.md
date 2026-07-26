@@ -49,10 +49,10 @@ Healthy output shows the product and render-pipeline versions, your adapter, the
 ```
 SpriteBook 0.1.0-alpha.1
 deno 2.9.2 - v8 14.9.207.2-rusty - windows-x86_64
-render pipeline spritebook-render@0.1.0
+render pipeline spritebook-render@0.4.0
 backend env: DENO_WEBGPU_BACKEND=(unset - wgpu default)
 adapter: NVIDIA GeForce RTX 3090 (vendor 4318, device 8708)
-render signature: spritebook-render@0.1.0#b490bb6b
+render signature: spritebook-render@0.4.0#<adapter>
 features: (none)
 limits: maxColorAttachments=8 maxColorAttachmentBytesPerSample=32 maxTextureDimension2D=8192 maxBufferSize=268435456
 render probe: OK (checksum 5f70bf18a0860070)
@@ -74,12 +74,17 @@ started
 [2/4] pack
 [3/4] write
 [4/4] manifest
-bake-manifest: bakes/bake-7f23852b/manifest.json
-bake-dir: bakes/bake-7f23852b
+bake-manifest: bakes/bake-<id>/manifest.json
+bake-dir: bakes/bake-<id>
 done in 4.17s
 ```
 
-The bake lands in a content-addressed directory, `bakes/bake-<id>/`:
+The bake lands in a content-addressed directory, `bakes/bake-<id>/`. The id is the first 8 hex of
+the recipe hash, and the recipe includes the render signature above — which is composed with an
+identity hash of your GPU adapter (D-023). So the same model and flags give you the same id every
+time on one machine, and a different one on a machine with a different adapter. That is deliberate:
+two adapters can rasterize the same scene differently, and sharing a cache entry between them would
+serve pixels that were never rendered from this recipe here.
 
 | File                                                                             | What it is                                                                                                     |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
