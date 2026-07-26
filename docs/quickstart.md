@@ -152,7 +152,14 @@ hysteresis), so frames do not shimmer in motion.
 | `--padding <px>`     | `6`        | transparent padding inside each cell                            |
 | `--cache <dir>`      | (off)      | input-hash frame cache; the bake always writes through when set |
 | `--only-invalidated` | (off)      | serve unchanged frames from the cache (all-or-none per bake)    |
+| `--mirror`           | (off)      | produce the back-half directions by flipping the front half     |
 | `--json`             | (off)      | NDJSON job events on stdout                                     |
+
+`--mirror` renders only the directions that cannot be derived (5 of 8) and makes the rest horizontal
+flips of their partner, cutting render, style and cache work by ~37%. It is **off by default and
+never inferred from geometry**: for anyone asymmetric the saving is a lie — a tattoo changes arms, a
+prosthetic swaps sides, text reads backwards. The bake warns for the whole run when it is on, and
+each mirrored frame is marked in the manifest with the direction it was flipped from.
 
 ### `spritebook export`
 

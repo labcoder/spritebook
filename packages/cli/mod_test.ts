@@ -1,7 +1,8 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
 import { ManifestJournal } from '@spritebook/core';
-import { runCli } from './mod.ts';
+import { PRESETS } from '@spritebook/style';
+import { bakeSpecFromFlags, runCli } from './mod.ts';
 
 const now = () => '2026-07-12T00:00:00Z';
 const target = { kind: 'character', id: 'brave-knight' } as const;
@@ -113,6 +114,30 @@ Deno.test('bake --clips arg validation fails fast, before any GPU work', async (
     assertEquals(e.code, 'bad-args', args.join(' '));
     assert(e.message.includes(needle), `${args.join(' ')}: ${e.message}`);
   }
+});
+
+Deno.test('bake --mirror reaches the spec, so D-008 is reachable at all', () => {
+  const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
+  const resolved = { model: 'm.glb', character: 'c', out: 'o', style: PRESETS['pixel-8'] };
+
+  // the entire defect in one assertion: BakeJobSpec.mirroring existed, the
+  // whole mirror path was implemented and tested, and NO flag set this field -
+  // so `bake --mirror` ran a full unmirrored bake and reported `done`
+  assertEquals(bakeSpecFromFlags([...base, '--mirror'], resolved).mirroring, true);
+  assertEquals(
+    bakeSpecFromFlags(base, resolved).mirroring,
+    false,
+    'D-008 is opt-in and never inferred',
+  );
+
+  // the flag must not disturb the rest of the surface it shares a verb with
+  const spec = bakeSpecFromFlags(
+    [...base, '--mirror', '--frames', '4', '--directions', '4', '--only-invalidated'],
+    resolved,
+  );
+  assertEquals(spec.frames, 4);
+  assertEquals(spec.camera.directions, 4);
+  assertEquals(spec.onlyInvalidated, true);
 });
 
 Deno.test('anim --list finds the bundled pack; --tag filters; --json is one document', async () => {

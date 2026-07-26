@@ -16,9 +16,10 @@ import {
   ManifestPatchSchema,
   parseWith,
 } from '@spritebook/schema';
-import type { CameraPreset, JointEdit, OrientationFix } from '@spritebook/schema';
+import type { CameraPreset, JointEdit, OrientationFix, StylePreset } from '@spritebook/schema';
 import { applyPatchOps, encodeEvent } from '@spritebook/core';
 import { PRESETS } from '@spritebook/style';
+import type { BakeJobSpec } from '@spritebook/pack';
 import { runBakeJob } from '@spritebook/pack';
 import { runExportJob } from '@spritebook/export';
 
@@ -179,6 +180,36 @@ function cameraFromFlags(args: string[]): CameraPreset {
     paddingPx: intFlag(args, 'padding', 6),
     pivot: 'feet-baseline',
     orthographic: true,
+  };
+}
+
+/**
+ * The `bake` verb's flag surface as a BakeJobSpec. Exported because it is the
+ * only way to test the wiring without a GPU, and untestable wiring is how
+ * `--mirror` went missing: D-008 mirroring was implemented, tested and
+ * documented in @spritebook/pack while no flag anywhere reached it.
+ */
+export function bakeSpecFromFlags(
+  args: string[],
+  resolved: { model: string; character: string; out: string; style: StylePreset },
+): BakeJobSpec {
+  const clips = flag(args, 'clips');
+  return {
+    jobId: 'bake',
+    characterId: resolved.character,
+    modelPath: resolved.model,
+    camera: cameraFromFlags(args),
+    style: resolved.style,
+    frames: intFlag(args, 'frames', 6),
+    outRoot: resolved.out,
+    cacheDir: flag(args, 'cache'),
+    onlyInvalidated: args.includes('--only-invalidated'),
+    clips: clips ? parseClips(clips) : undefined,
+    packDir: flag(args, 'pack'),
+    // D-008 is opt-in and NEVER inferred (schema/roster.ts): the saving is a
+    // lie for anyone asymmetric, so it costs an explicit flag and the bake
+    // warns while it runs.
+    mirroring: args.includes('--mirror'),
   };
 }
 
@@ -873,19 +904,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     }
     try {
       return await pump(
-        runBakeJob({
-          jobId: 'bake',
-          characterId: character,
-          modelPath: model,
-          camera: cameraFromFlags(args),
-          style,
-          frames: intFlag(args, 'frames', 6),
-          outRoot: out,
-          cacheDir: flag(args, 'cache'),
-          onlyInvalidated: args.includes('--only-invalidated'),
-          clips: flag(args, 'clips') ? parseClips(flag(args, 'clips')!) : undefined,
-          packDir: flag(args, 'pack'),
-        }),
+        runBakeJob(bakeSpecFromFlags(args, { model, character, out, style })),
         emit,
       );
     } catch (err) {
