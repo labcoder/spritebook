@@ -60,9 +60,9 @@ function godotFloat(n: number): string {
  * `size - 2*pivot` px of leading pad when the pivot is above/left of centre,
  * `2*pivot - size` px of trailing pad otherwise. The pad is transparent — it
  * enlarges the drawn quad, never the atlas page, and never the sampled region
- * (position <= size keeps the region strictly inside the box, so no pixel is
- * clipped). For an integer pivot the box is even-sized, so the sprite still
- * lands on whole pixels.
+ * (0 <= position <= size keeps the region within the box — Godot intersects the
+ * two and would otherwise crop the frame). For an integer pivot the box is
+ * even-sized, so the sprite still lands on whole pixels.
  */
 function pivotMargin(size: number, pivot: number): { position: number; size: number } {
   const lead = size - 2 * pivot;
