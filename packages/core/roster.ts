@@ -24,6 +24,7 @@ import {
   CharacterManifestSchema,
   MANIFEST_FILE,
   ManifestPatchSchema,
+  migrateCharacterManifest,
   parseWith,
 } from '@spritebook/schema';
 import { ManifestJournal } from './journal.ts';
@@ -181,7 +182,9 @@ async function copyTree(from: string, to: string, skipTop: Set<string>): Promise
 }
 
 async function readJournalState(paths: { manifest: string; journal: string; cursor: string }) {
-  const doc = JSON.parse(await Deno.readTextFile(paths.manifest)) as Record<string, unknown>;
+  // migrated at the read, for the reason receipts.ts's copy of this spells out:
+  // `doc` becomes the ManifestJournal, and journal.canonicalBytes is written
+  const doc = migrateCharacterManifest(JSON.parse(await Deno.readTextFile(paths.manifest)));
   const text = await Deno.readTextFile(paths.journal).catch(() => '');
   const patches = text
     .split('\n')

@@ -145,6 +145,63 @@ Deno.test('readWorkspace names the path when there is no workspace there', async
   });
 });
 
+/** A v2 workspace on disk: what a build before D-029 left behind. */
+async function writeV2Workspace(dir: string): Promise<void> {
+  const paths = workspacePaths(dir);
+  await Deno.mkdir(dir, { recursive: true });
+  await Deno.writeTextFile(
+    paths.manifest,
+    JSON.stringify({
+      schemaVersion: 2,
+      id: 'brave-knight',
+      displayName: 'Brave Knight',
+      createdAt: NOW(),
+      source: { kind: 'image', originalFilename: 'knight.png', sha256: SHA_A },
+      preflight: {
+        at: NOW(),
+        checks: [{ id: 'cutout', status: 'ok', message: 'Background removed cleanly' }],
+      },
+      generation: { results: [] },
+      mirroring: { enabled: false },
+    }),
+  );
+  await Deno.writeTextFile(paths.journal, '');
+  await Deno.writeTextFile(paths.cursor, '0');
+}
+
+Deno.test('readWorkspace upgrades an older manifest instead of refusing it', async () => {
+  // The gate this closes: `schemaVersion: z.literal(3)` rejects a v2 document
+  // outright, so before the loaders migrated, bumping the version turned every
+  // existing workspace into "that directory is not a SpriteBook workspace".
+  // migrateCharacterManifest has existed since P1-T2 with no production caller.
+  await withTempDir(async (dir) => {
+    await writeV2Workspace(dir);
+    const manifest = await readWorkspace(dir);
+    assertEquals(manifest.schemaVersion, CHARACTER_SCHEMA_VERSION);
+    assertEquals(manifest.displayName, 'Brave Knight', 'the rest of the document survives');
+    assert(!('preflight' in manifest), 'v3 drops the manifest copy of the report');
+  });
+});
+
+Deno.test('reading an old workspace does not rewrite it; the first WRITE does', async () => {
+  // Upgrade-on-write. A read that silently rewrote the file would mutate a
+  // workspace the user only looked at - and would do it outside the journal,
+  // which is the one thing law 7 forbids.
+  await withTempDir(async (dir) => {
+    await writeV2Workspace(dir);
+    const before = await Deno.readTextFile(workspacePaths(dir).manifest);
+    await readWorkspace(dir);
+    assertEquals(await Deno.readTextFile(workspacePaths(dir).manifest), before, 'untouched');
+
+    const { renameCharacter } = await import('./roster.ts');
+    await renameCharacter(dir, 'Sir Bravery', { now: NOW });
+    const after = JSON.parse(await Deno.readTextFile(workspacePaths(dir).manifest));
+    assertEquals(after.schemaVersion, CHARACTER_SCHEMA_VERSION, 'persisted at the new version');
+    assertEquals(after.preflight, undefined);
+    assertEquals(after.displayName, 'Sir Bravery');
+  });
+});
+
 Deno.test('storeSourceImage is content-addressed and idempotent', async () => {
   await withTempDir(async (dir) => {
     await newCharacter(dir);

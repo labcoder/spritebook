@@ -54,6 +54,7 @@ import {
   CharacterManifestSchema,
   GenerationResultSchema,
   ManifestPatchSchema,
+  migrateCharacterManifest,
   parseWith,
 } from '@spritebook/schema';
 import { ManifestJournal } from './journal.ts';
@@ -381,7 +382,14 @@ async function readJournalState(paths: WorkspacePaths): Promise<JournalState> {
         `workspace.`,
     );
   }
-  const doc = JSON.parse(text) as Record<string, unknown>;
+  // The raw document is migrated HERE rather than after validation, because
+  // everything downstream reads `doc`: the ManifestJournal is constructed from
+  // it, and `journal.canonicalBytes` is what lands back on disk. Migrating only
+  // the validated copy would journal a patch against a v3 document and then
+  // write out the v2 one. So the first write after an upgrade persists v3 —
+  // upgrade-on-write, and undo returns to the migrated state rather than
+  // resurrecting a schema this build no longer accepts.
+  const doc = migrateCharacterManifest(JSON.parse(text));
   const journalText = await Deno.readTextFile(paths.journal).catch(() => '');
   const patches = journalText
     .split('\n')

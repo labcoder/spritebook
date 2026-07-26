@@ -15,6 +15,7 @@ import {
   ExportTargetIdSchema,
   type JobEvent,
   ManifestPatchSchema,
+  migrateCharacterManifest,
   parseWith,
 } from '@spritebook/schema';
 import type { CameraPreset, JointEdit, OrientationFix, StylePreset } from '@spritebook/schema';
@@ -45,7 +46,11 @@ function files(manifestPath: string): JournalFiles {
 }
 
 async function readJournal(f: JournalFiles) {
-  const doc = JSON.parse(await Deno.readTextFile(f.manifest)) as Record<string, unknown>;
+  // upgraded at the read, like every other manifest loader: `undo` on a
+  // workspace from an older build would otherwise apply an inverse to a v2
+  // document and then be refused by manifestFault for being v2 — a verb whose
+  // whole promise is "put it back", failing on documents that are merely old
+  const doc = migrateCharacterManifest(JSON.parse(await Deno.readTextFile(f.manifest)));
   const journalText = await Deno.readTextFile(f.journal).catch(() => '');
   const patches = journalText
     .split('\n')

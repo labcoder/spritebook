@@ -38,6 +38,7 @@ import {
   CharacterIdSchema,
   CharacterManifestSchema,
   MANIFEST_FILE,
+  migrateCharacterManifest,
   parseWith,
   RAW_MODEL,
   RESULT_PREFLIGHT,
@@ -184,7 +185,14 @@ export async function readWorkspace(workspace: string): Promise<CharacterManifes
       `"${manifest}" is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-  return parseWith(CharacterManifestSchema, doc, `CharacterManifest at "${manifest}"`);
+  // upgrade BEFORE validating: `schemaVersion: z.literal(3)` rejects a v2
+  // document outright, so without this a workspace created by an older build
+  // stops opening entirely — the migration table existed but nothing called it
+  return parseWith(
+    CharacterManifestSchema,
+    migrateCharacterManifest(doc),
+    `CharacterManifest at "${manifest}"`,
+  );
 }
 
 export interface StoredSource {

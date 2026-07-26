@@ -2,13 +2,23 @@
  * Schema versioning + migrations. Persisted documents (CharacterManifest,
  * Project, BakeManifest) carry `schemaVersion`.
  *
- * NOT WIRED UP YET. The intent is that loaders call migrate* before validating,
- * but nothing does: core/workspace.ts and core/receipts.ts parse straight
- * against the schema, and `schemaVersion: z.literal(SCHEMA_VERSION)` rejects an
- * older document outright rather than upgrading it. BakeManifest has no
- * migration table at all. So this machinery is exercised only by its own tests
- * — real enough to build on, but do not read the presence of `migrateX` as
- * evidence that old documents load.
+ * ## Who calls this
+ *
+ * Every loader that turns manifest JSON into a document, at the point of
+ * JSON.parse and before any validation: `readWorkspace`, and the three copies
+ * of `readJournalState` (core/receipts.ts, core/roster.ts, cli/mod.ts). The
+ * order matters — those three hand the RAW object to ManifestJournal and write
+ * `journal.canonicalBytes` back, so migrating a validated copy instead would
+ * journal a patch against the new shape and then persist the old one.
+ *
+ * The consequence is upgrade-on-write: reading an old workspace does not
+ * rewrite it, but the first mutation persists the current version, and `undo`
+ * returns to the migrated state rather than resurrecting a schema this build
+ * no longer accepts.
+ *
+ * BakeManifest still has no migration table. It is a derived artifact — a bake
+ * dir can be rebuilt from the manifest that produced it — so the version gate
+ * refusing an old one is the honest answer rather than a gap.
  *
  * ## Why CharacterManifest versions on its own
  *
