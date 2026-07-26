@@ -7,8 +7,13 @@
  *  - immutable identity paths can never be patched (`/id`, `/characterId`,
  *    `/createdAt`, `/bakeId`, `/schemaVersion`)
  *  - `value` is required for add/replace and forbidden for remove
- *  - the inverse must have exactly one op per forward op (add<->remove,
- *    replace<->replace under RFC-6902 subset)
+ *  - the inverse must have exactly one op per forward op. The pairing depends
+ *    on the SITE, not just the verb: `add` inverts to `remove` when it created
+ *    a key, and to `replace` with the old value when it overwrote one (core's
+ *    journal.ts decides this against the pre-patch document). `remove` inverts
+ *    to `add`, `replace` to `replace`. (This note used to say the pairing was
+ *    simply add<->remove / replace<->replace, which silently lost the old value
+ *    whenever an `add` overwrote an existing key.)
  */
 import { z } from 'zod';
 import { IsoTimeSchema } from './identity.ts';

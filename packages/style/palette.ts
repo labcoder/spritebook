@@ -214,9 +214,13 @@ export function nearestIndex(palette: Palette, lab: Lab): number {
 /**
  * Palette hysteresis: keep the previous frame's index unless the new candidate
  * improves perceptual distance by more than `eps` (kills single-pixel
- * oscillation on gradients — skill temporal toolkit). Distances are SQUARED
- * OKLab; `prevDist` is the current pixel's distance to `palette[prevIndex]`,
- * `candDist` is `nearestWithDist(...).dist`. No history (prevIndex < 0) -> cand.
+ * oscillation on gradients — skill temporal toolkit).
+ *
+ * The distances are whatever the CALLER measures in, and `eps` must match them.
+ * quantize.ts passes LINEAR OKLab (it square-roots `nearestWithDist`'s squared
+ * output on purpose, D-021) so that `prevDist - candDist > eps` is a true
+ * linear-improvement test; this doc used to say the distances were squared,
+ * which contradicted the only caller. No history (prevIndex < 0) -> cand.
  */
 export function hysteresis(
   prevIndex: number,

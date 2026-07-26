@@ -80,7 +80,12 @@ export interface FramingResult {
    * direction. Feeds FrameRecord.pivotPx (schema) at pack time.
    */
   pivotPx: { x: number; y: number };
-  /** 1 / preset.pixelsPerMeter — one world meter is always pixelsPerMeter px */
+  /**
+   * 1 / preset.pixelsPerMeter. One world metre is always pixelsPerMeter px
+   * HORIZONTALLY; vertically the ortho camera foreshortens by cos(elevation)
+   * (measured 0.112 px/m at 89.9 degrees). camera.ts carries the full caveat —
+   * this line used to state the horizontal case as if it held on both axes.
+   */
   metersPerPixel: number;
 }
 

@@ -45,6 +45,11 @@ export type RenderPass = z.output<typeof RenderPassSchema>;
 export const StylePresetBaseSchema = z
   .strictObject({
     id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+    /**
+     * UNREAD by the pipeline. Behaviour comes entirely from
+     * `temporal.clusterVote` + `quantize`; nothing branches on this. Kept as
+     * the preset's human label and for the GUI's preset picker.
+     */
     mode: z.enum(['cel', 'pixel', 'painterly']),
     ramp: z.strictObject({
       stops: z.int().min(2).max(8),
@@ -74,8 +79,19 @@ export const StylePresetBaseSchema = z
       superSample: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
       clusterVote: z.boolean(),
       paletteHysteresisEps: z.number().nonnegative(),
+      /**
+       * UNREAD. camera.ts snaps the pivot onto the texel lattice
+       * unconditionally, so `false` renders byte-identically to `true`. Unlike
+       * `ramp` this was never documented as carried-but-unapplied; either wire
+       * it to the snap or drop it.
+       */
       texelSnap: z.boolean(),
     }),
+    /**
+     * UNREAD beyond the "must include lit" refinement below: the renderer
+     * always writes all five AOVs and readAov always reads all five, so
+     * `passes: ['lit']` buys nothing today.
+     */
     passes: z.array(RenderPassSchema).min(1),
     alpha: z.strictObject({
       mode: z.enum(['1bit', 'soft']),

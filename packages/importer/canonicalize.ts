@@ -5,9 +5,13 @@
  * (VRM 0.x rotated 180°), feet at Y=0, uniform rescale to declared height.
  * No quantize — canonical assets are the lossless source of truth.
  *
- * Normalization is skin-aware: uniform scale s and Y-offset are baked through
- * vertex positions, node translations, AND inverse bind matrices
- * (IBM' = IBM · S⁻¹ · T⁻¹), keeping joint_world · IBM ≈ I — tested invariant.
+ * Normalization is skin-aware and lives entirely in the TRANSFORMS: uniform
+ * scale s and Y-offset go onto the scene's root-node matrices, and every
+ * inverse bind matrix becomes IBM · N⁻¹, keeping joint_world · IBM ≈ I — tested
+ * invariant. VERTEX POSITIONS ARE NEVER TOUCHED (applyNormalization says so at
+ * its definition, and this header used to claim the opposite). That is the only
+ * formulation that is exact for skins, and it is why a consumer must compose
+ * node transforms to see the normalized character.
  */
 import { Document, type Node } from '@gltf-transform/core';
 import { getBounds } from '@gltf-transform/core';
@@ -275,7 +279,11 @@ export async function canonicalize(
     message: rotate
       ? 'VRM 0.x source rotated 180° to face +Z'
       : 'Source orientation kept (+Z forward assumed)',
-    ...(rotate ? { fixApplied: '180° yaw baked into geometry and bind matrices' } : {}),
+    // NOT 'baked into geometry': applyNormalization writes the yaw onto the
+    // scene's ROOT NODE matrices and leaves every vertex untouched. This
+    // string rides into preflight.json and the warn stream, so a user reading
+    // it would go looking for rotated vertices that do not exist.
+    ...(rotate ? { fixApplied: '180° yaw applied to the root node transform' } : {}),
   });
   notes.push({
     id: 'scale',

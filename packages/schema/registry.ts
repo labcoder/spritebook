@@ -190,7 +190,12 @@ export type AnimationPack = z.output<typeof AnimationPackSchema>;
 export const ProjectPinsSchema = z.strictObject({
   models: z.record(z.string(), z.string()),
   packs: z.record(z.string(), z.string()),
-  /** participates in every cache key (D-011) */
+  /**
+   * The renderer build this project pins. NOTE: nothing reads it today — cache
+   * keys carry `renderSignature()` (render/diagnostics.ts), which composes
+   * RENDERER_VERSION with the adapter identity, and no code path consults this
+   * field. It is a declared pin without an enforcer.
+   */
   rendererVersion: z.string().min(1),
 });
 export type ProjectPins = z.output<typeof ProjectPinsSchema>;

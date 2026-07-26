@@ -44,8 +44,10 @@ interface DecodedNormals {
 /**
  * Decode the normal AOV to unit vectors: n = (byte/255)*2 - 1 per channel (alpha
  * skipped), then normalized so dot(n_a, n_b) is a true cosine against normalThreshold.
- * Near-zero vectors (empty texels encode ~0) stay at zero; creases are only ever
- * evaluated between opaque texels, whose normals are well-formed.
+ * An empty texel is byte (0,0,0,0), which decodes to (-1,-1,-1) and normalizes
+ * to (-0.577, -0.577, -0.577) — NOT zero, as this note used to claim. That is
+ * harmless only because creases are evaluated between OPAQUE texels, whose
+ * normals are well-formed, so an empty texel is never a side of a comparison.
  */
 function decodeNormals(aov: AovImage): DecodedNormals {
   const n = aov.width * aov.height;

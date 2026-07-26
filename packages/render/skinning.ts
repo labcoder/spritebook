@@ -738,7 +738,7 @@ export function posedBoundsFromPoses(
 /**
  * Union AABB of the SKINNED vertices over frames [0, frames) — the stable
  * per-clip bounds the framing solver must use so near/far bracketing and the
- * padding fit hold for the animated pose, not just the bind pose (a rotating or
+ * bracketing hold for the animated pose, not just the bind pose (a rotating or
  * moving silhouette sweeps outside the bind AABB). CPU mirror of the vertex
  * shader's skin blend; deterministic.
  */

@@ -1,7 +1,14 @@
 /**
  * Schema versioning + migrations. Persisted documents (CharacterManifest,
- * Project, BakeManifest) carry `schemaVersion`; loaders call migrate* before
- * validating, so old manifests upgrade transparently and deterministically.
+ * Project, BakeManifest) carry `schemaVersion`.
+ *
+ * NOT WIRED UP YET. The intent is that loaders call migrate* before validating,
+ * but nothing does: core/workspace.ts and core/receipts.ts parse straight
+ * against the schema, and `schemaVersion: z.literal(SCHEMA_VERSION)` rejects an
+ * older document outright rather than upgrading it. BakeManifest has no
+ * migration table at all. So this machinery is exercised only by its own tests
+ * — real enough to build on, but do not read the presence of `migrateX` as
+ * evidence that old documents load.
  *
  * History:
  *  v1 — hypothetical pre-D-008 shape: CharacterManifest had no `mirroring`
