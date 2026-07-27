@@ -8,15 +8,31 @@ gated behind manual approval this spike could not grant itself.
 
 ## What was proven
 
-| | |
-|---|---|
-| Wheels-only Windows install | **Yes.** Zero compilation. Five community CUDA extensions install from vendored `.whl` files and all five import against a live CUDA context. |
-| Runs on a 3090 | **Yes.** All three sampling stages complete: sparse structure → shape SLat → texture SLat. |
-| Peak VRAM, `512` | **2.89 GiB** reserved (2.65 allocated) |
-| Peak VRAM, `1024_cascade` (default) | **3.11 GiB** reserved (2.66 allocated) |
-| Headroom | ~7×. Nowhere near the 22.79 GiB free. |
-| Wall time | load 81 s, run 65 s (`1024_cascade`) |
-| Output density | 175,305 occupied voxels, 176,019 verts, 357,420 faces — real work, not an empty scene |
+**Update 2026-07-27, second pass:** DINOv3 access was already granted on the maintainer's account.
+My first check was an ANONYMOUS curl with no auth header, so its 401 said nothing about their
+access — my error, not their account. With the token the repo returns 200 and the pipeline runs for
+real. The numbers below are from that real run; the stub figures are kept underneath because the
+gap between them is the interesting part.
+
+| | Real DINOv3 | Stubbed conditioning |
+|---|---|---|
+| Wheels-only Windows install | **Yes.** Zero compilation; all five extensions import against a live CUDA context. | — |
+| Runs on a 3090 | **Yes**, all three sampling stages | yes |
+| Peak VRAM, `1024_cascade` | **9.26 GiB** reserved (5.74 alloc) | 3.11 GiB |
+| Peak VRAM, `512` | not measured | 2.89 GiB |
+| Wall time | load 82 s, run 73 s, render 7 s, glb 33 s | load 81 s, run 65 s |
+| Structure | **4,789,987 voxels · 4.80 M verts · 10.33 M faces** | 175 k voxels · 176 k verts |
+| GLB out | 21,142,280 bytes | — |
+| Headroom | 2.5× — 9.26 of 22.79 GiB free | — |
+
+**The stub understated peak VRAM by 3×**, exactly as its own caveat warned: peak scales with
+occupied voxels, and a real conditioning tensor produces a 27× denser structure. Anyone quoting the
+3 GiB figure would have been wrong. 9.26 GiB is the number that matters, and it still fits with
+room to spare — an 8 GiB card would not, a 12 GiB card would.
+
+**Output quality: good, and eyeballed rather than asserted.** `view_00` reproduces the input's pot,
+leaf arrangement and flower colours; `view_04` (the unseen back) is a coherent complete object with
+properly modelled rose geometry. Renders are in `out/<name>_<type>/`.
 
 ## Why the official README says 24 GB and we measured 3
 
@@ -74,6 +90,13 @@ Notes that cost time:
 - **`ATTN_BACKEND=xformers` is required.** Sparse attention supports only `xformers`, `flash_attn`
   and `flash_attn_3` — there is no SDPA fallback, and flash-attn needs a compiler. xformers ships a
   PyPI wheel for torch 2.8.0+cu128, so this stays wheels-only.
+- **transformers 5.x moved the DINOv3 encoder blocks** from `model.layer` to `model.model.layer`,
+  and TRELLIS.2 reaches for the old path — `AttributeError: 'DINOv3ViTModel' object has no
+  attribute 'layer'`. `run_probe_real.py` shims it; a production adapter should PIN transformers
+  rather than reach into it, and finding that pin is a task of its own.
+- **OpenCV 5.0 ships without EXR decode**, so `cv2.imread` on the bundled `assets/hdri/*.exr`
+  returns empty and `cvtColor` dies on it. The probe synthesizes a gradient envmap instead, which
+  also drops an image-codec dependency. Only affects the preview render, not generation.
 - `o_voxel` imports `cv2`; install `opencv-python-headless` or it fails at import.
 - `expandable_segments` is unsupported on Windows — harmless warning.
 - The wheels are **cp311/cp312 only**. The machine's system Python is 3.14, so the env must pin its
@@ -87,11 +110,25 @@ TRELLIS.2, CuMesh and FlexGEMM. `wheels.lock.json` pins each by sha256 against r
 from a URL that can move under us. For a shipped app they should be mirrored to our own storage and
 installed through the registry's existing hash gate, exactly as model weights already are.
 
+## What the catalog already knew
+
+`packages/registry/catalog/models.json` has carried a `trellis2-4b` entry since P3-T2, with 22
+pinned files, a `paramsSchema` (pipelineType / steps / seed / guidanceStrength), defaults, and
+notes that ALREADY name the DINOv3 manual gate and ALREADY explain that RMBG-2.0 is skipped in
+favour of our own Apache-2.0 u2net prep. That analysis was right the first time and this spike
+mostly confirmed it.
+
+One line in those notes is now wrong and needs replacing: *"ENV SPIKE VERDICT 2026-07-19 (D-028):
+NOT installable under the wheels-only law today."* It is installable. The entry also has no
+`minVramGb`, and 9.26 GiB measured is the number to put there.
+
 ## Still unknown
 
-- **Output quality.** Nothing here evaluated a real generation.
-- **Real-image VRAM and time.** A real conditioning tensor changes the sparse structure, and peak
-  scales with occupied voxels. 175k voxels is a healthy structure, so 3 GiB is a credible estimate
-  rather than a floor — but it is an estimate until DINOv3 is unblocked.
-- **The 81 s load** is 16 GB read from disk per stage. Worth measuring whether a warm sidecar
+- **A CHARACTER.** The verified image is a potted plant from the model's own examples. Sprite work
+  is humanoid, and nothing here says how it handles one — that is the next thing to look at, with
+  our own reference art.
+- **512 at real conditioning.** Only `1024_cascade` was measured for real; the 512 tier's true peak
+  is still unmeasured and matters for smaller cards.
+- **The 82 s load** is 16 GB read from disk per stage. Worth measuring whether a warm sidecar
   amortises it, since our sidecar is a long-lived process.
+- **The transformers pin.** The shim works; the version that needs no shim is unidentified.
