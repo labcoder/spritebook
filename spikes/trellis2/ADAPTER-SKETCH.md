@@ -101,7 +101,7 @@ PARAMS_SCHEMA = {
         "outDir":         {"type": "string", "minLength": 1},
         "modelDir":       {"type": "string", "minLength": 1},
         "seed":           {"type": "integer", "minimum": 0},
-        "pipelineType":   {"type": "string", "enum": ["512", "1024", "1024_cascade"]},
+        "pipelineType":   {"type": "string", "enum": ["512", "1024", "1024_cascade"]},  # default "512"
         "steps":          {"type": "integer", "minimum": 1, "maximum": 50},
         "guidanceStrength": {"type": "number", "minimum": 0, "maximum": 20},
         "lowVram":        {"type": "boolean"},
@@ -136,27 +136,48 @@ landed on the same seed value across two different images, which is either coinc
 hint that some seeds are globally worse. The ladder (`seed`, `seed+1`, `seed+2`) sidesteps it either
 way, since consecutive seeds give unrelated RNG states.
 
-## Tiers: mixed shape-1024 / texture-512 works, and looks best
+## Tiers: mixed is REJECTED — my n=2 result was luck
 
-`run()` couples the two, but the branch can be re-implemented with the 512 texture model against a
-1024 shape latent. It runs, and on both seeds tried it beat `1024_cascade`'s own texture while
-keeping its geometry:
+The earlier two-seed test suggested mixed shape-1024/texture-512 beat `1024_cascade`. Eight seeds on
+both references says the opposite, and says it clearly.
 
-| seed | 512 both | 1024_cascade both | MIXED shape1024/tex512 |
-|---|---|---|---|
-| 7 | 0.4070 | 0.1040 | 0.1819 |
-| 1234 | 0.4539 | 0.3080 | **0.5921** |
+| combo | collapses |
+|---|---|
+| `512` | **2 / 16** |
+| mixed | **5 / 16** |
 
-Voxels track the shape tier exactly (1.85 M for both 1024 variants vs 0.45 M at 512), so the
-geometry really is the 1024 one. **n=2, and mean base_color is a proxy for quality rather than
-quality itself** — this needs a wider sweep and eyeballing before it becomes the default. But it is
-viable, and it is the combination worth testing next.
+Mixed is ~2.5x more likely to collapse, and it introduces failures on seeds `512` handles fine
+(0 and 7). On means, `512` wins 11 of 16 head-to-head. Side by side (`out/wide/COMPARE_*.png`) the
+mixed row is uniformly darker and muddier even where it does not formally collapse.
+
+The two seeds I first tried, 7 and 1234, happened to be among mixed's better ones. **That is the
+second time in this investigation a sample of two pointed the wrong way** — the first was seed 42
+convincing me flat 2D art was unsupported. Same lesson twice: n=2 on a stochastic pipeline is not
+evidence, it is an anecdote.
+
+**`512` stays the default.** `1024_cascade` remains available for geometry when texture is going to
+be replaced anyway.
+
+## Seed changes texture QUALITY, not just pass/fail
+
+Worth more than the retry loop, product-wise. Across eight seeds at `512` the successful outputs
+range from bright and faithful (seed 0, mean 0.72 — teal hair, salmon top, blue skirt all correct)
+to muted and washed (seed 777, mean 0.15). Both "work"; a user would clearly prefer one.
+
+SpriteBook already has the mechanism for this: `spritebook gen` produces results and
+`spritebook pick --result` chooses between them. **Generating 2-3 seeds and letting the user pick is
+the honest product answer**, with the collapse detector quietly dropping any that came back black.
+The retry loop below is the floor, not the ceiling.
 
 ## Open questions this sketch does not settle
 
-- **Whether the mixed tier should be the default**, on evidence wider than two seeds and judged by
-  eye rather than by a mean.
-- **Whether some seeds are globally bad.** Both failures were seed 42, on two different images.
+- **Whether some seeds are globally bad.** Every `512` failure across 56 runs was seed 42, on two
+  different images. Either a coincidence that survived two sweeps, or something real about that RNG
+  state. The seed ladder sidesteps it either way.
+- **Whether the collapse is out-of-distribution art.** The three extra characters (0/8 each) are
+  TRELLIS.2's OWN examples, so they are in-distribution and probably curated. That the two EXTERNAL
+  references are the only ones that fail is suggestive, not conclusive. Genuinely external art in
+  other styles would settle it.
 - **Whether the pipeline stays resident between jobs.** The 82 s load dominates a single character
   and vanishes across a roster. The sidecar is long-lived, so caching is natural, but it holds
   ~16 GB of host RAM and that is a real cost to declare.
