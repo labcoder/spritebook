@@ -164,31 +164,53 @@ shoulder and elbow joints. The **face survives with real relief**: eyes, nose an
 rather than painted. Belt buckle, skirt pocket, leg warmers and laced high-tops all come through.
 Silhouettes are clean from all eight directions.
 
-## Texture: FAILS on flat 2D art, and this is the headline
+## Texture: I GOT THIS WRONG — it is the SEED, not the art style
 
-`base_color` collapses to nothing. Measured on the mesh attributes, before any export:
+**Retracted.** This section previously claimed "the texture stage fails on flat 2D art", with a
+measured table behind it. That conclusion was wrong, and the way it was wrong is worth more than the
+conclusion was: **every run in it used `seed=42`.** My controls varied the SUBJECT (plant, witch)
+while holding the seed fixed, so they could not distinguish "art style" from "seed" — they were
+never controls for the thing I blamed.
 
-| subject | art style | base_color mean | max |
+Sweeping seeds at 512:
+
+| subject | seed 42 | seed 7 | seed 1234 |
 |---|---|---|---|
-| plant (their example) | rendered 3D | 0.630 | 1.005 |
-| witch (their example, a CHARACTER) | rendered 3D | 0.180 | 1.036 |
-| **bulma** | **flat cel-shaded 2D** | **0.0006** | **0.0097** |
+| bulma-front | **0.0000 BLACK** | 0.4070 ok | 0.4539 ok |
+| bulma-iso | **0.0006 BLACK** | 0.2481 ok | 0.3185 ok |
+| witch (control) | 0.1801 ok | 0.2827 ok | 0.1808 ok |
 
-A mean of 0.0006 with a MAXIMUM of 0.0097 is not a dark texture, it is no texture. Reproducible at
-512 and 1024_cascade, on both input angles, with and without `preprocess_image`. The witch control
-matters: characters are fine, so this is about the ART STYLE, not the subject.
+Seed 42 is a dead end for BOTH Bulma references and fine for the witch. Nothing about the art style
+is broken.
 
-Ruled out, each by measurement rather than argument: the GLB exporter (the plant's GLB texture is
-mean 0.73 through the same code path), the input (the preprocessed image the model actually
-receives is a perfect full-colour cutout — saved as `out/bulma-front-preprocessed.png`), the cutout
-(transparent-region RGB matches their examples), and preprocessing (`preprocess_image=True` gives
-the same black).
+### What actually happens, measured
 
-**Consequence for SpriteBook, and it is a good one:** treat TRELLIS.2 as GEOMETRY-ONLY for 2D
-character art and let the texture substage paint it. That substage already exists — P3-T2's detail
-reprojection projects the source image onto the picked mesh — and it is exactly the right tool,
-because for a sprite the source illustration IS the intended appearance. The catalog models this
-with `outputs.texture`.
+The texture decoder emits in [-1, 1] and the pipeline maps it with `* 0.5 + 0.5`. In the failing
+runs it emits **mean -0.9988, std 0.0008** — a CONSTANT pinned at the bottom of its range, not noise
+and not a dark texture.
+
+The latent going INTO that decoder is healthy: `tex_slat` mean +0.30, std 3.59 for the black run,
+against +0.37/+0.64 and std 2.9-3.6 for runs that worked. So the sampler produced something with
+entirely normal statistics that the decoder nonetheless collapsed. Whatever the mechanism, it is
+seed-dependent and it saturates rather than degrades.
+
+### 512 textures more reliably than 1024_cascade
+
+At `1024_cascade` with a good seed (7), base_color comes back at 0.1040 — skin, bow and eyes are
+present but the clothing is crushed toward black. At `512` the same input gives 0.41-0.45 and the
+render shows teal hair, red bow, salmon shirt, navy skirt, purple leg warmers and teal shoes: the
+full palette, a little desaturated. **For 2D character art, 512 is the better texture tier** even
+though 1024_cascade is the better geometry tier.
+
+### What this means for the adapter
+
+Not "geometry-only". The backend can texture this art, but it needs:
+- **seed retries with a black-output detector.** `base_color.max() < 0.05` is an unambiguous
+  signature — a real texture always has SOME bright texel — so the adapter can detect the collapse
+  and re-sample on the next seed rather than shipping a black character. SpriteBook already records
+  the seed in every `GenerationResult`, so a retry stays reproducible.
+- **the option to texture at 512 while shaping at 1024**, since the two tiers disagree about which
+  is better.
 
 ## Which input angle to recommend
 
