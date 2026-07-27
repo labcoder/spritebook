@@ -42,8 +42,10 @@ which is exactly the 2.65 GiB allocated we measured. The 24 GB figure is the all
 ~16 GB of weights on the card at once, plus activations.
 
 So `dependencies.md`'s "16 GB VRAM" and D-028's "≥24 GiB" were both describing the wrong
-configuration. The number that matters for us is **~3 GiB**, and it puts TRELLIS.2 within reach of
-an 8 GB consumer card, not just a 3090.
+configuration. The measured peaks are **9.26 GiB** (a dense plant) and **5.22 GiB** (a character),
+so the catalog gate is set to **12 GiB** — the smallest card with genuine headroom once the desktop
+takes its ~1.2 GiB. Not the ~3 GiB the stubbed probe suggested; see the second spike below for why
+that figure was wrong.
 
 ## The blocker that is not about hardware
 
@@ -132,3 +134,74 @@ NOT installable under the wheels-only law today."* It is installable. The entry 
 - **The 82 s load** is 16 GB read from disk per stage. Worth measuring whether a warm sidecar
   amortises it, since our sidecar is a long-lived process.
 - **The transformers pin.** The shim works; the version that needs no shim is unidentified.
+
+---
+
+# Second spike, 2026-07-27: a real character
+
+Two references of the same character, chroma-keyed from a green screen with despill: `bulma-front`
+(straight-on T-pose) and `bulma-iso` (same pose, slightly rotated). Four runs through ONE loaded
+pipeline, plus controls.
+
+## Numbers
+
+| image | type | peak GiB | run s | glb s | voxels | faces |
+|---|---|---|---|---|---|---|
+| front | 512 | 3.01 | 62.6 | 11.3 | 463,545 | 1,038,238 |
+| front | 1024_cascade | 4.45 | 64.8 | 16.7 | 1,803,504 | 3,757,648 |
+| iso | 512 | 3.25 | 21.9 | 11.7 | 535,057 | 1,412,638 |
+| iso | 1024_cascade | 5.22 | 39.7 | 17.1 | 2,062,584 | 4,308,804 |
+
+A character costs **less** VRAM than the plant (9.26 GiB) — 5.22 GiB at the heaviest. The 82 s load
+happens ONCE for a long-lived process; per character is then ~40-80 s of sampling plus ~11-17 s of
+GLB export.
+
+## Geometry: good, and riggable
+
+Judged on normals, which are lighting-independent. Limbs **separate cleanly** — both arms fully
+detached from the torso with fingers resolved on both hands, which is what Track B needs to place
+shoulder and elbow joints. The **face survives with real relief**: eyes, nose and bangs are modelled
+rather than painted. Belt buckle, skirt pocket, leg warmers and laced high-tops all come through.
+Silhouettes are clean from all eight directions.
+
+## Texture: FAILS on flat 2D art, and this is the headline
+
+`base_color` collapses to nothing. Measured on the mesh attributes, before any export:
+
+| subject | art style | base_color mean | max |
+|---|---|---|---|
+| plant (their example) | rendered 3D | 0.630 | 1.005 |
+| witch (their example, a CHARACTER) | rendered 3D | 0.180 | 1.036 |
+| **bulma** | **flat cel-shaded 2D** | **0.0006** | **0.0097** |
+
+A mean of 0.0006 with a MAXIMUM of 0.0097 is not a dark texture, it is no texture. Reproducible at
+512 and 1024_cascade, on both input angles, with and without `preprocess_image`. The witch control
+matters: characters are fine, so this is about the ART STYLE, not the subject.
+
+Ruled out, each by measurement rather than argument: the GLB exporter (the plant's GLB texture is
+mean 0.73 through the same code path), the input (the preprocessed image the model actually
+receives is a perfect full-colour cutout — saved as `out/bulma-front-preprocessed.png`), the cutout
+(transparent-region RGB matches their examples), and preprocessing (`preprocess_image=True` gives
+the same black).
+
+**Consequence for SpriteBook, and it is a good one:** treat TRELLIS.2 as GEOMETRY-ONLY for 2D
+character art and let the texture substage paint it. That substage already exists — P3-T2's detail
+reprojection projects the source image onto the picked mesh — and it is exactly the right tool,
+because for a sprite the source illustration IS the intended appearance. The catalog models this
+with `outputs.texture`.
+
+## Which input angle to recommend
+
+**Straight-on.** Both produce good bodies, but the iso reference's face comes back closer to a
+smooth blob with faint eye indentations, while the straight-on reference keeps modelled eyes and a
+nose. The iso version also produces ~14% more voxels without a quality gain. Guidance for users:
+face the camera square-on.
+
+## Catalog updated
+
+`minVramGb: 12`, not the 9.26 measured. A gate that admits a machine which then OOMs is worse than
+no gate: a 10 GiB card has ~8.8 GiB free once Windows takes its ~1.2 GiB (24.0 total vs 22.79 free,
+observed here), so 10 would pass and fail. 12 is the smallest card that genuinely fits.
+`lowVram` joins `paramsSchema` defaulting true — it is the single reason peak is ~9 GiB and not
+~24. The stale "NOT installable under the wheels-only law" verdict is gone, and the texture limit
+is recorded in its place.
