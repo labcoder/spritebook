@@ -145,6 +145,20 @@ function intFlag(args: string[], name: string, fallback: number): number {
   return n;
 }
 
+/** A seed: a NON-NEGATIVE integer, which is not the same rule as `intFlag`'s.
+ *
+ * `--seed 0` was refused as "must be a positive integer" by every verb that
+ * takes one, while `GenAdapterParamsSchema` says `nonnegative()` and the
+ * catalog's own default seed IS 0. A user reproducing a documented run could
+ * not type the seed it names. */
+function seedFlag(args: string[], fallback: number): number {
+  const n = numFlag(args, 'seed', fallback);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(`--seed must be a non-negative integer (got ${n})`);
+  }
+  return n;
+}
+
 /** Human-readable rendering of an event stream; returns 1 if an error passed. */
 async function pump(
   events: AsyncIterable<JobEvent>,
@@ -749,7 +763,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
             jobId: 'retexture',
             workspace,
             resultId,
-            seed: flag(args, 'seed') !== undefined ? intFlag(args, 'seed', 0) : nextSeed,
+            seed: seedFlag(args, nextSeed),
             params: parseAdjust(flag(args, 'adjust')),
             modelId: flag(args, 'model'),
             version: flag(args, 'model-version'),
@@ -772,7 +786,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       let image = flag(args, 'image');
       let params = parseAdjust(flag(args, 'adjust'));
       let modelId = flag(args, 'model') ?? 'fixture-gen';
-      let seed = flag(args, 'seed') !== undefined ? intFlag(args, 'seed', 0) : undefined;
+      let seed = flag(args, 'seed') !== undefined ? seedFlag(args, 0) : undefined;
 
       // --more-like rN: reuse that receipt's backend and params, vary the seed.
       // The new seed is max(existing)+1 - deterministic given the manifest, and
@@ -1060,7 +1074,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           sidecarDir,
           modelDir: registry.versionDir(root, backend, installed.version),
           backend,
-          seed: flag(args, 'seed') !== undefined ? intFlag(args, 'seed', 0) : 0,
+          seed: seedFlag(args, 0),
           orientationFixes: fixes,
           edits,
           rerunWithHints,

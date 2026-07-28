@@ -214,6 +214,34 @@ Deno.test('bake --clips arg validation fails fast, before any GPU work', async (
   }
 });
 
+Deno.test('--seed 0 is a seed, not a bad argument', async () => {
+  // Found by running `retexture --seed 0` for real: every verb taking a seed
+  // ran it through the POSITIVE-integer helper, so 0 was refused as
+  // "must be a positive integer" — while GenAdapterParamsSchema says
+  // nonnegative() and the catalog's own default seed is literally 0. A user
+  // reproducing a documented run could not type the seed it names.
+  const zero = ['retexture', '--workspace', 'nope', '--result', 'r1', '--seed', '0', '--json'];
+  const c = collector();
+  await runCli(zero, c.io);
+  const first = JSON.parse(c.out[c.out.length - 1]);
+  assert(
+    !(first.t === 'error' && String(first.message).includes('positive integer')),
+    `--seed 0 must survive parsing: ${JSON.stringify(first)}`,
+  );
+
+  // and the rule that IS right still holds, with a message that states it.
+  // `gen` because it parses its seed before touching disk, so the refusal here
+  // is the parse and not a missing workspace.
+  for (const bad of ['-1', '1.5']) {
+    const c2 = collector();
+    const args = ['gen', '--workspace', 'nope', '--character', 'c', '--image', 'i.png', '--seed'];
+    assertEquals(await runCli([...args, bad, '--json'], c2.io), 1, bad);
+    const e = JSON.parse(c2.out[c2.out.length - 1]);
+    assertEquals(e.code, 'bad-args', bad);
+    assert(e.message.includes('non-negative integer'), `${bad}: ${e.message}`);
+  }
+});
+
 Deno.test('mirroring: the flags beat the stored choice, which beats off', () => {
   const on = ['bake', '--mirror'];
   const off = ['bake', '--no-mirror'];
