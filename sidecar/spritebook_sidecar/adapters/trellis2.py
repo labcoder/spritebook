@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -282,6 +283,41 @@ def _prepare_runtime() -> None:
     _shim_dinov3()
 
 
+def reset_vram_stats() -> None:
+    """Zero torch's peak counters, if there is a CUDA device to zero them on."""
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+    except Exception:  # noqa: BLE001 - measurement must never fail a good run
+        pass
+
+
+def vram_peaks() -> dict[str, float]:
+    """Peak VRAM since the last reset, in GiB. Empty when there is no CUDA.
+
+    RESERVED is the number that matters for "will this fit": it is what the
+    caching allocator took from the driver, and it is what another process sees
+    missing. ALLOCATED is what the tensors actually used, and the gap between
+    them is fragmentation. Reporting only one of them has misled us before -
+    the first VRAM probe understated the real peak 3x.
+    """
+    try:
+        import torch
+
+        if not torch.cuda.is_available():
+            return {}
+        torch.cuda.synchronize()
+        gib = 1024**3
+        return {
+            "peakVramReservedGb": round(torch.cuda.max_memory_reserved() / gib, 2),
+            "peakVramAllocatedGb": round(torch.cuda.max_memory_allocated() / gib, 2),
+        }
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _require_rgba(image_path: Path) -> Any:
     from PIL import Image
 
@@ -451,10 +487,20 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     image = _require_rgba(image_path)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Load and work are timed SEPARATELY because they scale differently: the
+    # load is ~100 s of reading 16 GB off disk and is paid once per process,
+    # while the work is per character. Reporting one total would make a
+    # long-lived sidecar look no cheaper than a fresh one per job.
+    reset_vram_stats()
+    load_t0 = time.perf_counter()
     pipeline = _load_pipeline(model_dir, bool(p["lowVram"]))
+    load_seconds = round(time.perf_counter() - load_t0, 2)
+
+    run_t0 = time.perf_counter()
     mesh, used_seed, tried = generate_with_retries(
         pipeline, image, seed, budget, str(p["pipelineType"]), emit
     )
+    run_seconds = round(time.perf_counter() - run_t0, 2)
 
     out_path = (out_dir / RAW_MODEL).resolve()
     _export_glb(mesh, out_path, int(p["textureSize"]), int(p["decimationTarget"]))
@@ -473,6 +519,9 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
                 "effectiveSeed": used_seed,
                 "seedsTried": tried,
                 "pipelineType": str(p["pipelineType"]),
+                "loadSeconds": load_seconds,
+                "runSeconds": run_seconds,
+                **vram_peaks(),
             },
             indent=2,
         )

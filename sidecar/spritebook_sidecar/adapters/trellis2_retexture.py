@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +55,9 @@ from .trellis2 import (
     _ensure_importable,
     _prepare_runtime,
     kind_for_mean,
+    reset_vram_stats,
     sample_with_retries,
+    vram_peaks,
 )
 
 RETEXTURE_ADAPTER_VERSION = "0.1.0"
@@ -267,7 +270,15 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
         )
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # separately timed for the same reason as gen: the load is per process, the
+    # work is per character, and the whole argument for a long-lived sidecar
+    # lives in the gap between them
+    reset_vram_stats()
+    load_t0 = time.perf_counter()
     pipeline = _load_pipeline(Path(str(p["modelDir"])), bool(p["lowVram"]))
+    load_seconds = round(time.perf_counter() - load_t0, 2)
+
+    run_t0 = time.perf_counter()
     out, used_seed, tried = retexture_with_retries(
         pipeline,
         source,
@@ -278,6 +289,7 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
         int(p["textureSize"]),
         emit,
     )
+    run_seconds = round(time.perf_counter() - run_t0, 2)
     textured = as_mesh(out)
 
     # The guard, not a correction. If this trips, the backend changed under us
@@ -310,6 +322,9 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
                 # what the caller needs to know before trusting an existing rig
                 "topologyPreserved": not unwrapped,
                 "frameShift": round(shift, 6),
+                "loadSeconds": load_seconds,
+                "runSeconds": run_seconds,
+                **vram_peaks(),
             },
             indent=2,
         )
