@@ -16,6 +16,7 @@ import {
   versionCan,
   versionCapabilities,
 } from '@spritebook/schema';
+import { validateParams } from '@spritebook/core';
 import { loadCatalog } from './mod.ts';
 import { toyEntry, toyVersion } from './_testutil.ts';
 
@@ -50,10 +51,36 @@ Deno.test('trellis2 retextures with a bigger seed ladder than it generates with'
   // right for one operation and wrong for the other does not belong where it
   // reads as applying to both.
   assertEquals(v.defaults.textureRetries, undefined);
-  // everything genuinely shared still is
-  assertEquals(defaultsFor(v, 'retexture').lowVram, v.defaults.lowVram);
+  // everything genuinely shared still is, and `lowVram` is really there to
+  // share - an assertion that both sides are undefined would prove nothing
+  assertEquals(v.defaults.lowVram, true);
+  assertEquals(defaultsFor(v, 'retexture').lowVram, true);
+  assertEquals(defaultsFor(v, 'gen3d').lowVram, true);
   assertEquals(defaultsFor(v, 'retexture').resolution, 512);
   assertEquals(defaultsFor(v, 'gen3d').resolution, undefined);
+});
+
+Deno.test('every entry can actually RUN every operation it declares', async () => {
+  // The test that was missing, and the break it missed: `trellis2-4b` declared
+  // retexture, carried `resolution` and `textureRetries` as operation defaults,
+  // and had a `paramsSchema` with `additionalProperties: false` that listed
+  // neither. Both of its operations were rejected core-side before a process
+  // could be spawned - by the entry's own schema, against the entry's own
+  // defaults. Declaring a capability is not the same as being able to do it.
+  const cat = await loadCatalog();
+  for (const m of cat.models) {
+    for (const v of m.versions) {
+      for (const op of versionCapabilities(m.kind, v)) {
+        const params = defaultsFor(v, op);
+        const check = validateParams(v.paramsSchema, params);
+        assert(
+          check.ok,
+          `${m.id}@${v.version} cannot run "${op}": its own paramsSchema rejects its own ` +
+            `defaults ${JSON.stringify(params)} - ${check.ok ? '' : check.errors.join('; ')}`,
+        );
+      }
+    }
+  }
 });
 
 Deno.test('defaults for an operation the version cannot do are refused', () => {
