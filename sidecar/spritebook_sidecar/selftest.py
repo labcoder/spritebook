@@ -145,7 +145,7 @@ def test_handshake(port: int) -> None:
     ids = [a["id"] for a in hs["adapters"]]
     ok(
         ids == ["echo", "rembg", "pose-check", "fixture-gen", "trellis2",
-                "texture-substage", "unirig"],
+                "trellis2-retexture", "texture-substage", "unirig"],
         f"every adapter announced, in registration order: {ids}",
     )
     for a in hs["adapters"]:
@@ -155,7 +155,11 @@ def test_handshake(port: int) -> None:
             <= {"id", "kind", "version", "paramsSchema", "defaults", "description"},
             f"adapter {a['id']} matches SidecarAdapterSchema keys",
         )
-        ok(a["kind"] in {"imageprep", "gen3d", "rig", "test"}, f"adapter {a['id']} kind valid")
+        # mirrors SidecarAdapterSchema: a registry Capability, plus 'test'
+        ok(
+            a["kind"] in {"imageprep", "gen3d", "rig", "retexture", "test"},
+            f"adapter {a['id']} kind valid",
+        )
         ok(isinstance(a["paramsSchema"], dict) and isinstance(a["defaults"], dict),
            f"adapter {a['id']} schema/defaults are objects")
     by_id = {a["id"]: a for a in hs["adapters"]}
@@ -1117,6 +1121,175 @@ def test_trellis2_registered() -> None:
     reg = build_registry()
     ok("trellis2" in reg, "trellis2 is in the adapter registry")
     ok(reg["trellis2"].kind == "gen3d", "declared as gen3d")
+    ok("trellis2-retexture" in reg, "the retexture adapter is registered too")
+    ok(reg["trellis2-retexture"].kind == "retexture", "declared as retexture")
+    # a verb resolves by KIND, so the kind is the load-bearing field: it is what
+    # a second texturing backend would declare to be found in trellis2's place
+    kinds = [a.kind for a in reg.values()]
+    ok(kinds.count("retexture") == 1, f"exactly one retexture adapter today: {kinds}")
+
+
+# --- trellis2 retexture ---------------------------------------------------------
+
+
+class _FakeVisual:
+    def __init__(self, mean: float | None, uv: object | None) -> None:
+        self.uv = uv
+        self.material = None if mean is None else _FakeMaterial(mean)
+
+
+class _FakeMaterial:
+    def __init__(self, mean: float) -> None:
+        self.baseColorTexture = _FakeImage(mean)
+
+
+class _FakeImage:
+    """Stands in for a PIL atlas: `.convert('RGB')` into a uint8 array."""
+
+    def __init__(self, mean: float) -> None:
+        self._mean = mean
+
+    def convert(self, mode: str):  # noqa: ANN201
+        return np.full((4, 4, 3), round(self._mean * 255), dtype=np.uint8)
+
+
+class _FakeTexturedMesh:
+    def __init__(self, mean: float | None = 0.42, bounds=None, uv: object = "present") -> None:
+        self.visual = _FakeVisual(mean, uv)
+        self.bounds = bounds if bounds is not None else [[-0.4, -0.5, -0.1], [0.4, 0.5, 0.1]]
+        self.exported: list[str] = []
+
+    def export(self, path: str) -> None:
+        self.exported.append(path)
+
+
+def test_retexture_collapse_and_ladder() -> None:
+    from .adapters import trellis2_retexture as rt
+
+    # the atlas mean is read off the BAKED texture, not off PBR attributes -
+    # this path has no `.attrs` at all - but lands on the same [0, 1] scale
+    ok(abs(rt.atlas_mean(_FakeTexturedMesh(0.5)) - 0.5) < 0.01, "atlas mean is [0, 1]")
+    ok(rt.atlas_mean(_FakeTexturedMesh(None)) == 0.0, "no texture at all reads as empty")
+
+    # BOTH modes, on the retexture path: black was found in generation, white
+    # was found HERE (seed 2026, mean 0.9987)
+    for mean, kind in ((0.0824, "black"), (0.9987, "white"), (0.5714, None)):
+        got = t2_kind(rt.atlas_mean(_FakeTexturedMesh(mean)))
+        ok(got == kind, f"atlas mean {mean} reads as {kind}, got {got}")
+
+    calls: list[int] = []
+
+    class _Pipe:
+        def __init__(self, bad: dict[int, float]) -> None:
+            self.bad = bad
+
+        def run(self, mesh, image, seed, resolution, texture_size, preprocess_image):  # noqa: ANN001
+            calls.append(seed)
+            return _FakeTexturedMesh(self.bad.get(seed, 0.42))
+
+    # the measured failures on one mesh: 7 black, 2026 white. The ladder must
+    # climb past both without caring which it hit.
+    emit = _RecordingEmitter()
+    pipe = _Pipe({7: 0.0064, 8: 0.9987})
+    out, used, tried = rt.retexture_with_retries(
+        pipe, object(), object(), 7, 5, 512, 2048, emit
+    )
+    ok((used, tried) == (9, [7, 8, 9]), f"climbed past black AND white, got {tried}")
+    ok(calls == [7, 8, 9], f"the pipeline saw exactly those seeds: {calls}")
+    kinds = [m.split("a ")[1].split(" texture")[0] for _, m in emit.warns]
+    ok(kinds == ["black", "white"], f"each warning named its own end: {kinds}")
+    ok(rt.atlas_mean(out) > 0.1, "the returned mesh is the healthy one")
+
+    # exhausted: refuse rather than write a blank character, and say so in the
+    # terms of THIS operation - the input mesh survives, so a retry is cheap
+    doomed = _Pipe({n: 0.0 for n in range(100, 110)})
+    try:
+        rt.retexture_with_retries(doomed, object(), object(), 100, 2, 512, 2048, _RecordingEmitter())
+        ok(False, "an exhausted budget must raise")
+    except AdapterError as err:
+        ok(err.code == "texture-collapsed", f"refusal code, got {err.code}")
+        ok("100, 101, 102" in err.message, f"names every seed: {err.message}")
+        ok("input mesh is untouched" in err.message, "the remedy suits retexture")
+        ok(err.retryable, "another seed might work")
+
+
+def t2_kind(mean: float) -> str | None:
+    from .adapters import trellis2 as t2
+
+    return t2.kind_for_mean(mean)
+
+
+def test_retexture_frame_guard() -> None:
+    from .adapters import trellis2_retexture as rt
+
+    src = _FakeTexturedMesh()
+    # what the spike actually measured: bounds move ~0.1% of extent across seeds
+    settled = _FakeTexturedMesh(bounds=[[-0.4001, -0.4999, -0.1], [0.3999, 0.5001, 0.1]])
+    ok(rt.frame_shift(src, settled) < rt.FRAME_TOLERANCE, "measured drift passes")
+
+    # the two failures worth catching. An un-inverted axis swap permutes the
+    # per-axis extents of anything that is not a cube...
+    swapped = _FakeTexturedMesh(bounds=[[-0.4, -0.1, -0.5], [0.4, 0.1, 0.5]])
+    ok(rt.frame_shift(src, swapped) > rt.FRAME_TOLERANCE, "an axis swap is caught")
+    # ...and a rescale is caught whenever the input was not already unit-sized
+    scaled = _FakeTexturedMesh(bounds=[[-0.8, -1.0, -0.2], [0.8, 1.0, 0.2]])
+    ok(rt.frame_shift(src, scaled) > rt.FRAME_TOLERANCE, "a rescale is caught")
+    # a pure translation moves no extent at all, so the centre term is what sees it
+    moved = _FakeTexturedMesh(bounds=[[-0.3, -0.4, 0.0], [0.5, 0.6, 0.2]])
+    ok(rt.frame_shift(src, moved) > rt.FRAME_TOLERANCE, "a translation is caught")
+
+    try:
+        rt.frame_shift(_FakeTexturedMesh(bounds=[[0, 0, 0], [0, 0, 0]]), src)
+        ok(False, "a zero-extent input must be refused, not divided by")
+    except AdapterError as err:
+        ok(err.code == "bad-input", f"bad-input, got {err.code}")
+
+
+def test_retexture_params_and_uv() -> None:
+    from .adapters import trellis2_retexture as rt
+
+    p = validate_params(rt.PARAMS_SCHEMA, {
+        "meshPath": "m.glb", "imagePath": "a.png", "outDir": "o", "modelDir": "m", "seed": 0,
+    }, rt.DEFAULTS)
+    # 5, not gen's 2: the same decoder collapses on 37.5% of seeds here against
+    # ~5% there, and 2 retries would leave a 5.3% residual
+    ok(p["textureRetries"] == 5, f"the longer ladder is the default: {p['textureRetries']}")
+    ok(p["resolution"] == 512, "512: half the VRAM, two-thirds the time, no quality cost")
+
+    for bad in ({"resolution": 2048}, {"textureRetries": 13}, {"nope": 1}):
+        try:
+            validate_params(rt.PARAMS_SCHEMA, {
+                "meshPath": "m.glb", "imagePath": "a.png", "outDir": "o",
+                "modelDir": "m", "seed": 0, **bad,
+            }, rt.DEFAULTS)
+            ok(False, f"should have refused {bad}")
+        except AdapterError as err:
+            ok(err.code == "bad-params", f"bad-params for {bad}, got {err.code}")
+    # a mesh is required: this operation has nothing to repaint without one
+    try:
+        validate_params(rt.PARAMS_SCHEMA, {
+            "imagePath": "a.png", "outDir": "o", "modelDir": "m", "seed": 0,
+        }, rt.DEFAULTS)
+        ok(False, "meshPath is required")
+    except AdapterError as err:
+        ok(err.code == "bad-params", f"bad-params, got {err.code}")
+
+    # UVs decide whether topology survives, so the answer is detected, not assumed
+    ok(rt.has_uv(_FakeTexturedMesh()), "a mesh carrying UVs is recognised")
+    ok(not rt.has_uv(_FakeTexturedMesh(uv=None)), "and one without them is too")
+
+    # a multi-part scene is refused by name rather than silently repainting one part
+    class _Scene:
+        def __init__(self, n: int) -> None:
+            self.geometry = {f"g{i}": _FakeTexturedMesh() for i in range(n)}
+
+    ok(rt.as_mesh(_Scene(1)) is not None, "a single-geometry scene unwraps")
+    try:
+        rt.as_mesh(_Scene(3))
+        ok(False, "a 3-part scene must be refused")
+    except AdapterError as err:
+        ok(err.code == "bad-input", f"bad-input, got {err.code}")
+        ok("found 3" in err.message, f"names the count: {err.message}")
 
 
 def main() -> int:
@@ -1147,6 +1320,9 @@ def main() -> int:
             test_trellis2_retry_ladder()
             test_trellis2_params_and_input(tmp)
             test_trellis2_registered()
+            test_retexture_collapse_and_ladder()
+            test_retexture_frame_guard()
+            test_retexture_params_and_uv()
             test_unirig_params()
             test_unirig_validation()
             test_unirig_naming()

@@ -113,7 +113,7 @@ def validate_params(
 @dataclass(frozen=True)
 class Adapter:
     id: str
-    kind: str  # 'imageprep' | 'gen3d' | 'rig' | 'test' (sidecar.ts SidecarAdapterSchema)
+    kind: str  # a registry Capability, or 'test' (sidecar.ts SidecarAdapterSchema)
     version: str
     params_schema: dict[str, Any]
     defaults: dict[str, Any]
@@ -143,6 +143,7 @@ def build_registry() -> dict[str, Adapter]:
         rembg_cutout,
         texture_substage,
         trellis2,
+        trellis2_retexture,
         unirig,
     )
 
@@ -152,6 +153,7 @@ def build_registry() -> dict[str, Adapter]:
         pose_check.ADAPTER,
         fixture_gen.ADAPTER,
         trellis2.ADAPTER,
+        trellis2_retexture.ADAPTER,
         texture_substage.ADAPTER,
         unirig.ADAPTER,
     ]

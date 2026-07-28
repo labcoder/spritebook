@@ -34,7 +34,7 @@
  */
 import { z } from 'zod';
 import { JobIdSchema } from './identity.ts';
-import { JsonSchemaSchema } from './registry.ts';
+import { CapabilitySchema, JsonSchemaSchema } from './registry.ts';
 
 /** Bumped on any breaking change to endpoints, shapes, or semantics above. */
 export const SIDECAR_CONTRACT_VERSION = 1;
@@ -52,11 +52,13 @@ export const SidecarListeningSchema = z.strictObject({
 });
 export type SidecarListening = z.output<typeof SidecarListeningSchema>;
 
-/** One runnable adapter as announced by the handshake. `kind` matches the
- * registry's ModelEntry kinds, plus 'test' for the built-in echo adapter. */
+/** One runnable adapter as announced by the handshake. `kind` is a registry
+ * Capability plus 'test' for the built-in echo adapter — derived from
+ * `CapabilitySchema` rather than restated, because the last time these two
+ * lists were written out separately they disagreed. */
 export const SidecarAdapterSchema = z.strictObject({
   id: slug,
-  kind: z.enum(['imageprep', 'gen3d', 'rig', 'test']),
+  kind: z.enum([...CapabilitySchema.options, 'test']),
   version: z.string().min(1),
   /** validates job params core-side AND drives GUI option forms (D-009) */
   paramsSchema: JsonSchemaSchema,
