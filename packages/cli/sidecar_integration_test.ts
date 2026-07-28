@@ -55,6 +55,7 @@ Deno.test('real sidecar: spawn via uv, handshake roster, echo end-to-end', async
       [
         'echo',
         'fixture-gen',
+        'fixture-retexture',
         'pose-check',
         'rembg',
         'texture-substage',

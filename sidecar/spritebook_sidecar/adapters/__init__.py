@@ -139,6 +139,7 @@ def build_registry() -> dict[str, Adapter]:
     from . import (
         echo,
         fixture_gen,
+        fixture_retexture,
         pose_check,
         rembg_cutout,
         texture_substage,
@@ -152,6 +153,7 @@ def build_registry() -> dict[str, Adapter]:
         rembg_cutout.ADAPTER,
         pose_check.ADAPTER,
         fixture_gen.ADAPTER,
+        fixture_retexture.ADAPTER,
         trellis2.ADAPTER,
         trellis2_retexture.ADAPTER,
         texture_substage.ADAPTER,

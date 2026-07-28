@@ -144,8 +144,8 @@ def test_handshake(port: int) -> None:
     )
     ids = [a["id"] for a in hs["adapters"]]
     ok(
-        ids == ["echo", "rembg", "pose-check", "fixture-gen", "trellis2",
-                "trellis2-retexture", "texture-substage", "unirig"],
+        ids == ["echo", "rembg", "pose-check", "fixture-gen", "fixture-retexture",
+                "trellis2", "trellis2-retexture", "texture-substage", "unirig"],
         f"every adapter announced, in registration order: {ids}",
     )
     for a in hs["adapters"]:
@@ -1126,7 +1126,7 @@ def test_trellis2_registered() -> None:
     # a verb resolves by KIND, so the kind is the load-bearing field: it is what
     # a second texturing backend would declare to be found in trellis2's place
     kinds = [a.kind for a in reg.values()]
-    ok(kinds.count("retexture") == 1, f"exactly one retexture adapter today: {kinds}")
+    ok(kinds.count("retexture") == 2, f"the real one and the GPU-free stand-in: {kinds}")
 
 
 # --- trellis2 retexture ---------------------------------------------------------
