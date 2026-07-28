@@ -534,7 +534,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'sidecar',
     'models-dir',
   ],
-  prep: ['image', 'out', 'sidecar', 'models-dir'],
+  prep: ['image', 'out', 'sidecar', 'models-dir', 'catalog'],
   models: ['models-dir', 'catalog', 'installed', 'accept-license', 'territory', 'from'],
   doctor: [],
 };
@@ -1510,7 +1510,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       'unknown-verb',
       `Unknown verb "${
         verb ?? ''
-      }" - available: prep, gen, pick, rig, identity, clone, rename, models, anim, bake, export, doctor, undo, redo (--version)`,
+      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, models, anim, bake, export, doctor, undo, redo (--version)`,
     );
   }
 

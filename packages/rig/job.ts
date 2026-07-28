@@ -174,6 +174,11 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
     }
 
     session = new SidecarSession({ sidecarDir: opts.sidecarDir });
+    // The catalog id doubling as the adapter id, which `gen` and `prep` stopped
+    // assuming: `adapterFor` is the general answer, and this job cannot ask it
+    // because it takes a pre-resolved modelDir and never sees the catalog. It
+    // is correct for unirig, whose two names match. A rig backend whose names
+    // differ has to thread the version through first.
     const backend = opts.backend ?? 'unirig';
     for await (
       const e of session.run({

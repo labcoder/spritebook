@@ -17,9 +17,10 @@
  *
  * **The CANONICAL mesh goes in, not `raw.glb`.** Canonical is the blessed
  * geometry every downstream stage consumes and the one the user judged when
- * they decided they liked it. It also makes the adapter's frame check
- * meaningful: canonical is metre-scaled, so a backend that forgot to undo its
- * own unit-box normalisation is caught rather than shrugged at.
+ * they decided they liked it. Note it is not necessarily metre-scaled — the
+ * border only rescales when a `declaredHeightM` was given — but it IS grounded
+ * (feet at Y=0), which is enough to make the adapter's frame check see a
+ * backend that recentred on the origin and forgot to put it back.
  *
  * **The output goes through THE BORDER again.** Same rule as `gen`: nothing
  * becomes a result without being canonicalized, because the receipt pins
@@ -67,6 +68,7 @@ import {
 } from '@spritebook/registry';
 import { importToCanonical } from '@spritebook/importer';
 import { describeMesh, readEffectiveSeed, sha256Hex } from './gen.ts';
+import { heightOf } from './pick.ts';
 
 const RETEXTURE: Capability = 'retexture';
 
@@ -119,9 +121,10 @@ export function retextureBackends(
  * Repaint one result. Emits the same JobEvent stream `gen` does, so the CLI,
  * the GUI and `--json` consumers need nothing new to read it.
  *
- * Failure codes: no-such-result, no-parent-mesh, no-backend, not-installed,
- * platform-unsupported, vram-insufficient, invalid-params, backend-failed,
- * no-mesh, border-failed.
+ * Failure codes: no-such-result, no-parent-mesh, no-source-image, no-backend,
+ * not-installed, platform-unsupported, vram-insufficient, invalid-params,
+ * backend-unavailable, backend-failed, no-mesh, border-failed, and
+ * retexture-failed for anything unclassified.
  */
 export async function* runRetextureJob(
   opts: RetextureJobOptions,
@@ -145,20 +148,33 @@ export async function* runRetextureJob(
         `No result "${opts.resultId}" in this workspace - it has: ${ids || '(none)'}`,
       );
     }
+    // `resultPaths` is stricter than the manifest: it wants `r<n>`, while the
+    // manifest admits any slug because fixtures and imports have always used
+    // them. Refuse by name rather than surfacing a raw schema error.
+    if (!/^r[1-9][0-9]*$/.test(parent.id)) {
+      throw new RetextureFail(
+        'no-such-result',
+        `Result "${parent.id}" does not follow the r1, r2, ... layout, so this workspace has ` +
+          `no directory for it to read or write. Only results \`gen\` created can be repainted.`,
+      );
+    }
     const parentPaths = resultPaths(opts.workspace, parent.id);
-    await Deno.stat(parentPaths.model).catch(() => {
+    const parentBytes = await Deno.readFile(parentPaths.model).catch(() => {
       throw new RetextureFail(
         'no-parent-mesh',
         `Result "${parent.id}" has no canonical mesh at ${parentPaths.model}, so there is ` +
           `nothing to repaint. The receipt survives a deleted file; the mesh does not.`,
       );
     });
+    const parentHeightM = await heightOf(parentBytes);
     // the SOURCE image conditions the texture, exactly as it did for `gen` —
     // repainting from a different reference is a different feature
     const imagePath = sourceImagePath(opts.workspace, manifest);
     await Deno.stat(imagePath).catch(() => {
+      // its OWN code: a `--json` consumer branching on this cannot fix a
+      // missing source image the way it would fix a missing mesh
       throw new RetextureFail(
-        'no-parent-mesh',
+        'no-source-image',
         `The workspace's source image is missing at ${imagePath} - the texture is conditioned ` +
           `on it, so retexturing cannot proceed without it.`,
       );
@@ -185,11 +201,27 @@ export async function* runRetextureJob(
     const pool = opts.modelId ? candidates.filter((c) => c.entry.id === opts.modelId) : candidates;
 
     const root = opts.modelsRoot ?? defaultModelsRoot();
+    // Resolve what is INSTALLED per entry, then match it against that entry's
+    // capable versions. The other order — walk capable versions and ask
+    // `resolveInstalled` about each — asks the same question once per version
+    // and, worse, misses the case where the newest installed version cannot
+    // retexture while an older installed one can: `resolveInstalled` answers
+    // "the highest installed", which is not "the highest installed that can do
+    // this", so the job would refuse with "install it" for something already
+    // installed.
     let chosen: { entry: ModelEntry; version: ModelVersion; installedVersion: string } | undefined;
-    for (const c of pool) {
-      const installed = await resolveInstalled(root, c.entry.id, opts.version);
-      if (installed && installed.version === c.version.version) {
-        chosen = { entry: c.entry, version: c.version, installedVersion: installed.version };
+    for (const entryId of [...new Set(pool.map((c) => c.entry.id))]) {
+      const installed = await resolveInstalled(root, entryId, opts.version);
+      if (!installed) continue;
+      const match = pool.find((c) =>
+        c.entry.id === entryId && c.version.version === installed.version
+      );
+      if (match) {
+        chosen = {
+          entry: match.entry,
+          version: match.version,
+          installedVersion: installed.version,
+        };
         break;
       }
     }
@@ -298,10 +330,14 @@ export async function* runRetextureJob(
     try {
       const imported = await importToCanonical({
         input: rawPath,
+        // the PARENT's own height, measured, not the manifest's
+        // `canonicalMesh.heightM` — that is whichever result was PICKED, and
+        // repainting r2 while r1 is picked would silently rescale the child to
+        // a different mesh's size while its receipt claims it kept r2's shape
         ...(opts.declaredHeightM !== undefined
           ? { declaredHeightM: opts.declaredHeightM }
-          : manifest.canonicalMesh
-          ? { declaredHeightM: manifest.canonicalMesh.heightM }
+          : parentHeightM > 0
+          ? { declaredHeightM: parentHeightM }
           : {}),
       });
       canonical = { bytes: imported.bytes, report: imported.report };

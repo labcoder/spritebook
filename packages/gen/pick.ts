@@ -56,7 +56,7 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 }
 
 /** Standing height in metres from the mesh's Y extent (the D-012 convention). */
-async function heightOf(bytes: Uint8Array): Promise<number> {
+export async function heightOf(bytes: Uint8Array): Promise<number> {
   const doc = await new NodeIO().readBinary(bytes);
   let min = Infinity, max = -Infinity;
   for (const mesh of doc.getRoot().listMeshes()) {
