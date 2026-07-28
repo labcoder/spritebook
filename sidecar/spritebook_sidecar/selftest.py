@@ -957,14 +957,20 @@ def test_shutdown(port: int, server_thread: threading.Thread) -> None:
 
 
 class _FakeMesh:
-    """Just enough mesh for the collapse detector: (N, 6) PBR attributes."""
+    """Just enough mesh for the quality gate: (N, 6) PBR attributes.
 
-    def __init__(self, base_color: float) -> None:
+    `metallic` is its own argument because it is its own failure - the measured
+    correlation with base colour is +0.06, so a fake that ties them together
+    would make one test look like it covers both.
+    """
+
+    def __init__(self, base_color: float, metallic: float = 0.0) -> None:
         attrs = np.zeros((64, 6), dtype=np.float32)
         attrs[:, 0:3] = base_color
-        # metallic/roughness/alpha stay non-zero so a detector reading the WHOLE
+        attrs[:, 3] = metallic
+        # roughness/alpha stay non-zero so a detector reading the WHOLE
         # attribute block instead of columns 0..2 would pass a collapsed mesh
-        attrs[:, 3:6] = 0.6
+        attrs[:, 4:6] = 0.6
         self.attrs = attrs
 
 
@@ -975,16 +981,21 @@ class _FakePipeline:
     0.9987 the white one seen in retexture. The ladder must climb past both.
     """
 
-    def __init__(self, bad: set[int], bad_mean: float = 0.0006) -> None:
+    def __init__(self, bad: set[int], bad_mean: float = 0.0006, bad_metal: float = 0.0) -> None:
         self.bad = bad
         self.bad_mean = bad_mean
+        self.bad_metal = bad_metal
         self.seeds_seen: list[int] = []
         self.preprocess_flags: list[bool] = []
+        self.sampler_params: list[dict] = []
 
-    def run(self, image, seed, pipeline_type, preprocess_image):  # noqa: ANN001
+    def run(self, image, seed, pipeline_type, preprocess_image, **kw):  # noqa: ANN001
         self.seeds_seen.append(seed)
         self.preprocess_flags.append(preprocess_image)
-        return [_FakeMesh(self.bad_mean if seed in self.bad else 0.42)]
+        self.sampler_params.append(kw)
+        if seed in self.bad:
+            return [_FakeMesh(self.bad_mean, self.bad_metal)]
+        return [_FakeMesh(0.42)]
 
 
 class _RecordingEmitter:
@@ -1036,6 +1047,44 @@ def test_trellis2_collapse_detector() -> None:
     ok(t2.collapsed(stray.attrs), "stray bright texels do not rescue a collapsed mesh")
 
 
+def test_trellis2_metal_gate() -> None:
+    from .adapters import trellis2 as t2
+
+    ok(t2.METAL_TEXEL_FRACTION == 0.60, "the measured-and-argued threshold")
+
+    # THE failure the base-colour check cannot see. Measured on bulma: 68% of
+    # runs came back majority metal, and 9 of 22 had a HEALTHY base colour, so
+    # the collapse check passed every one of them.
+    healthy_but_metal = _FakeMesh(0.667, metallic=1.0)
+    ok(t2.collapse_kind(healthy_but_metal.attrs) is None, "base colour looks fine...")
+    ok(
+        t2.quality_fault(0.667, t2.metal_fraction_from_attrs(healthy_but_metal.attrs))
+        is not None,
+        "...and the gate still rejects it",
+    )
+
+    # the real numbers on both sides of the valley
+    ok(t2.quality_fault(0.42, 0.000) is None, "r1, the good generation, passes")
+    ok(t2.quality_fault(0.702, 0.017) is None, "TRELLIS.2's own flower example passes")
+    for frac in (0.851, 0.903, 0.916, 0.953, 0.972, 0.990, 1.000):
+        ok(t2.quality_fault(0.42, frac) is not None, f"{frac:.0%} metal is rejected")
+
+    # a character in plate armour is legitimately part metal, and the threshold
+    # is deliberately above that rather than at the bottom of the empty valley
+    ok(t2.quality_fault(0.42, 0.55) is None, "an armoured character is not a failure")
+
+    # the message says WHICH check failed - two faults sharing one sentence
+    # would describe neither
+    ok("chrome" in t2.quality_fault(0.42, 0.99), "the metal fault names its symptom")
+    ok("no content" in t2.quality_fault(0.0006, 0.0), "the collapse fault names its own")
+    # base colour is checked first, so a mesh failing BOTH reports the cheaper one
+    ok("no content" in t2.quality_fault(0.0006, 0.99), "one fault reported, not two")
+
+    # absent is not a metal claim: a decoder that emits no metallic channel at
+    # all must not be read as emitting zeros OR ones
+    ok(t2.metal_fraction([]) == 0.0, "an empty channel reads as no metal")
+
+
 def test_trellis2_retry_ladder() -> None:
     from .adapters import trellis2 as t2
 
@@ -1047,7 +1096,14 @@ def test_trellis2_retry_ladder() -> None:
     ok(tried == [42, 43], f"deterministic ladder, got {tried}")
     ok(pipe.seeds_seen == [42, 43], "the pipeline saw exactly those seeds")
     ok(all(pipe.preprocess_flags), "preprocess_image=True so BiRefNet is never built")
-    ok([c for c, _ in emit.warns] == ["texture-collapsed"], "warned once, on the bad seed")
+    # these three were declared, validated and recorded in the receipt while
+    # never reaching the pipeline: `--adjust guidanceStrength=12` did nothing
+    sp = pipe.sampler_params[0]
+    ok(sp["shape_slat_sampler_params"]["guidance_strength"] == 7.5, "shape guidance arrives")
+    ok(sp["sparse_structure_sampler_params"]["steps"] == 12, "steps arrive")
+    ok(sp["tex_slat_sampler_params"]["guidance_strength"] == 1.0,
+       "generation keeps upstream's texture guidance - its sweep has not been run")
+    ok([c for c, _ in emit.warns] == ["texture-rejected"], "warned once, on the bad seed")
     ok(not t2.collapsed(mesh.attrs), "the returned mesh is the healthy one")
 
     # the WHITE mode climbs the same ladder, and the warning says which end it
@@ -1073,8 +1129,9 @@ def test_trellis2_retry_ladder() -> None:
         t2.generate_with_retries(doomed, object(), 1, 2, "512", emit3)
         ok(False, "exhausted budget must raise")
     except AdapterError as err:
-        ok(err.code == "texture-collapsed", f"refusal code, got {err.code}")
-        ok("1, 2, 3" in err.message, f"names every seed tried: {err.message}")
+        ok(err.code == "texture-rejected", f"refusal code, got {err.code}")
+        for n in (1, 2, 3):
+            ok(f"seed {n}:" in err.message, f"names seed {n}: {err.message}")
         ok(err.retryable, "a different seed might work, so it is retryable")
     ok(len(doomed.seeds_seen) == 3, "tried budget+1 times, not more")
 
@@ -1186,14 +1243,18 @@ def test_trellis2_registered() -> None:
 
 
 class _FakeVisual:
-    def __init__(self, mean: float | None, uv: object | None) -> None:
+    def __init__(self, mean: float | None, uv: object | None, metallic: float | None) -> None:
         self.uv = uv
-        self.material = None if mean is None else _FakeMaterial(mean)
+        self.material = None if mean is None else _FakeMaterial(mean, metallic)
 
 
 class _FakeMaterial:
-    def __init__(self, mean: float) -> None:
+    def __init__(self, mean: float, metallic: float | None) -> None:
         self.baseColorTexture = _FakeImage(mean)
+        # absent unless asked for: a mesh with no metallicRoughness texture is
+        # making no metal claim, and must not read as one
+        if metallic is not None:
+            self.metallicRoughnessTexture = _FakeMRImage(metallic)
 
 
 class _FakeImage:
@@ -1206,9 +1267,27 @@ class _FakeImage:
         return np.full((4, 4, 3), round(self._mean * 255), dtype=np.uint8)
 
 
+class _FakeMRImage:
+    """glTF packs roughness in GREEN and metallic in BLUE (trellis2_texturing:351).
+
+    Red stays 0 exactly as the real writer leaves it, so a reader that grabs the
+    wrong channel measures 0 metal and fails loudly rather than passing quietly.
+    """
+
+    def __init__(self, metallic: float) -> None:
+        self._metallic = metallic
+
+    def convert(self, mode: str):  # noqa: ANN201
+        a = np.zeros((4, 4, 3), dtype=np.uint8)
+        a[:, :, 1] = 153                                  # roughness 0.6
+        a[:, :, 2] = round(self._metallic * 255)
+        return a
+
+
 class _FakeTexturedMesh:
-    def __init__(self, mean: float | None = 0.42, bounds=None, uv: object = "present") -> None:
-        self.visual = _FakeVisual(mean, uv)
+    def __init__(self, mean: float | None = 0.42, bounds=None, uv: object = "present",
+                 metallic: float | None = None) -> None:
+        self.visual = _FakeVisual(mean, uv, metallic)
         self.bounds = bounds if bounds is not None else [[-0.4, -0.5, -0.1], [0.4, 0.5, 0.1]]
         self.exported: list[str] = []
 
@@ -1236,8 +1315,9 @@ def test_retexture_collapse_and_ladder() -> None:
         def __init__(self, bad: dict[int, float]) -> None:
             self.bad = bad
 
-        def run(self, mesh, image, seed, resolution, texture_size, preprocess_image):  # noqa: ANN001
+        def run(self, mesh, image, seed, resolution, texture_size, preprocess_image, **kw):  # noqa: ANN001
             calls.append(seed)
+            self.kw = kw
             return _FakeTexturedMesh(self.bad.get(seed, 0.42))
 
     # the measured failures on one mesh: 7 black, 2026 white. The ladder must
@@ -1249,9 +1329,24 @@ def test_retexture_collapse_and_ladder() -> None:
     )
     ok((used, tried) == (9, [7, 8, 9]), f"climbed past black AND white, got {tried}")
     ok(calls == [7, 8, 9], f"the pipeline saw exactly those seeds: {calls}")
-    kinds = [m.split("a ")[1].split(" texture")[0] for _, m in emit.warns]
-    ok(kinds == ["black", "white"], f"each warning named its own end: {kinds}")
+    ok("a black texture" in emit.warns[0][1], f"named the dark end: {emit.warns[0][1]}")
+    ok("a white texture" in emit.warns[1][1], f"named the bright end: {emit.warns[1][1]}")
     ok(rt.atlas_mean(out) > 0.1, "the returned mesh is the healthy one")
+
+    # the metal fault climbs the SAME ladder: a healthy base colour is not a
+    # pass, which is exactly the case that shipped before this gate existed
+    class _MetalPipe:
+        def run(self, mesh, image, seed, resolution, texture_size, preprocess_image, **kw):  # noqa: ANN001
+            return _FakeTexturedMesh(0.667, metallic=1.0 if seed < 3 else 0.0)
+
+    emitm = _RecordingEmitter()
+    _, usedm, triedm = rt.retexture_with_retries(
+        _MetalPipe(), object(), object(), 1, 5, 512, 2048, emitm
+    )
+    ok((usedm, triedm) == (3, [1, 2, 3]), f"climbed past the chrome seeds, got {triedm}")
+    ok("all-metal" in emitm.warns[0][1], f"named the fault: {emitm.warns[0][1]}")
+    ok(rt.atlas_metal_fraction(_FakeTexturedMesh(0.4, metallic=1.0)) == 1.0, "reads BLUE")
+    ok(rt.atlas_metal_fraction(_FakeTexturedMesh(0.4)) == 0.0, "no map, no metal claim")
 
     # exhausted: refuse rather than write a blank character, and say so in the
     # terms of THIS operation - the input mesh survives, so a retry is cheap
@@ -1260,8 +1355,9 @@ def test_retexture_collapse_and_ladder() -> None:
         rt.retexture_with_retries(doomed, object(), object(), 100, 2, 512, 2048, _RecordingEmitter())
         ok(False, "an exhausted budget must raise")
     except AdapterError as err:
-        ok(err.code == "texture-collapsed", f"refusal code, got {err.code}")
-        ok("100, 101, 102" in err.message, f"names every seed: {err.message}")
+        ok(err.code == "texture-rejected", f"refusal code, got {err.code}")
+        for n in (100, 101, 102):
+            ok(f"seed {n}:" in err.message, f"names seed {n}: {err.message}")
         ok("input mesh is untouched" in err.message, "the remedy suits retexture")
         ok(err.retryable, "another seed might work")
 
@@ -1370,6 +1466,7 @@ def main() -> int:
             test_rembg_model_missing(tmp)
             test_scene_geometry(tmp)
             test_trellis2_collapse_detector()
+            test_trellis2_metal_gate()
             test_trellis2_retry_ladder()
             test_trellis2_params_and_input(tmp)
             test_trellis2_code_dir(tmp)

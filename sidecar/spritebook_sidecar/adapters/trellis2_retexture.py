@@ -54,7 +54,8 @@ from .trellis2 import (
     RAW_MODEL,
     _ensure_importable,
     _prepare_runtime,
-    kind_for_mean,
+    metal_fraction,
+    quality_fault,
     reset_vram_stats,
     sample_with_retries,
     vram_peaks,
@@ -89,6 +90,10 @@ PARAMS_SCHEMA: dict[str, Any] = {
         # 512 costs 3.3 GiB and 16.5 s against 1024's 6.9 GiB and 25 s, and the
         # spike saw no quality advantage to 1024 on the meshes tried
         "resolution": {"type": "integer", "enum": [512, 1024]},
+        # THE knob the guidance sweep found. Upstream ships 1.0, which the CFG
+        # mixin short-circuits to no guidance at all - the only stage in either
+        # pipeline that gets none, while shape and structure get 7.5.
+        "textureGuidance": {"type": "number", "minimum": 1, "maximum": 20},
         "textureSize": {"type": "integer", "enum": [1024, 2048, 4096]},
         # catalog data, and 5 here against gen's 2 - see the module docstring
         "textureRetries": {"type": "integer", "minimum": 0, "maximum": 12},
@@ -99,6 +104,12 @@ PARAMS_SCHEMA: dict[str, Any] = {
 
 DEFAULTS: dict[str, Any] = {
     "resolution": 512,
+    # 7.5, not upstream's 1.0. Measured over 4 strengths x 4 seeds on one mesh:
+    # base-colour saturation rose 0.170 -> 0.290 against a source of 0.326,
+    # monotonically, with no oversaturation and no measurable cost (15 s/run at
+    # every strength, because texture sampling is ~2 s of that). It does NOT fix
+    # the metal misclassification - that stayed at 0.92 across all 16 runs.
+    "textureGuidance": 7.5,
     "textureSize": 2048,
     "textureRetries": 5,
     "lowVram": True,
@@ -166,6 +177,27 @@ def atlas_mean(mesh: Any) -> float:
     return float(np.asarray(image.convert("RGB"), dtype=np.float32).mean() / 255.0)
 
 
+def atlas_metal_fraction(mesh: Any) -> float:
+    """Fraction of the baked metallic channel above 0.5.
+
+    glTF packs metallic in BLUE and roughness in green of one texture, which is
+    what `postprocess_mesh` writes (`trellis2_texturing.py:351`). Only texels the
+    atlas actually paints are counted — the empty margin between UV islands is
+    black and would otherwise dilute the reading toward "not metal".
+
+    A mesh with no such texture reads as 0.0: absent is not a metal claim.
+    """
+    import numpy as np
+
+    material = getattr(getattr(mesh, "visual", None), "material", None)
+    image = getattr(material, "metallicRoughnessTexture", None)
+    if image is None:
+        return 0.0
+    a = np.asarray(image.convert("RGB"), dtype=np.float32) / 255.0
+    lit = a.sum(-1) > 0.02
+    return 0.0 if not lit.any() else metal_fraction(a[:, :, 2][lit])
+
+
 def _load_mesh(mesh_path: Path) -> Any:
     import trimesh
 
@@ -230,10 +262,11 @@ def retexture_with_retries(
     resolution: int,
     texture_size: int,
     emit: Emitter,
+    texture_guidance: float = 7.5,
 ) -> tuple[Any, int, list[int]]:
     """The shared ladder, wired to the texturing pipeline."""
 
-    def sample(used: int) -> tuple[Any, float]:
+    def sample(used: int) -> tuple[Any, str | None]:
         out = pipeline.run(
             mesh,
             image,
@@ -241,8 +274,10 @@ def retexture_with_retries(
             resolution=int(resolution),
             texture_size=int(texture_size),
             preprocess_image=True,
+            tex_slat_sampler_params={"guidance_strength": float(texture_guidance)},
         )
-        return out, atlas_mean(as_mesh(out))
+        painted = as_mesh(out)
+        return out, quality_fault(atlas_mean(painted), atlas_metal_fraction(painted))
 
     return sample_with_retries(
         sample, seed, budget, emit, "retexture", RETEXTURE_REMEDY
@@ -288,6 +323,7 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
         int(p["resolution"]),
         int(p["textureSize"]),
         emit,
+        texture_guidance=float(p["textureGuidance"]),
     )
     run_seconds = round(time.perf_counter() - run_t0, 2)
     textured = as_mesh(out)
@@ -319,6 +355,7 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
                 "effectiveSeed": used_seed,
                 "seedsTried": tried,
                 "resolution": int(p["resolution"]),
+                "textureGuidance": float(p["textureGuidance"]),
                 # what the caller needs to know before trusting an existing rig
                 "topologyPreserved": not unwrapped,
                 "frameShift": round(shift, 6),
@@ -335,8 +372,9 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     if used_seed != seed:
         emit.warn(
             "seed-changed",
-            f"the requested seed {seed} produced a texture with no content; this was "
-            f"painted with seed {used_seed}, which is what the receipt records.",
+            f"the requested seed {seed} produced material the quality gate rejected; this "
+            f"was painted with seed {used_seed}, which is what the receipt records. The "
+            f"warnings above say what was wrong with each seed that was skipped.",
         )
     emit.artifact(GEN_ARTIFACT_META, str(meta_path))
     emit.artifact(GEN_ARTIFACT_MESH, str(out_path))

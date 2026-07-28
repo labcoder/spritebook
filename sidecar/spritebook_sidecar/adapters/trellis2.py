@@ -75,6 +75,23 @@ TRELLIS2_ADAPTER_VERSION = "0.1.0"
 COLLAPSE_MEAN_LOW = 0.10
 COLLAPSE_MEAN_HIGH = 0.95
 
+# A SECOND failure the base-colour check cannot see: the model decides the whole
+# character is made of metal. Measured on bulma, 68% of runs came back majority
+# metal, against 1.7% of texels for TRELLIS.2's own flower example — and 9 of 22
+# of them had a perfectly healthy base colour, so they sailed through the
+# collapse check. In a metal workflow base colour is specular reflectance and
+# there is no diffuse albedo at all, which is why those characters read as
+# washed-out chrome in any PBR viewer.
+#
+# The threshold is the FRACTION of lit texels above 0.5, not the mean, and it is
+# set high on purpose. Observed failures cluster at 85-100% while good runs sit
+# at 0-1.7%, so the empty valley is enormous and almost any cut works on this
+# evidence. 0.60 is chosen for a case the evidence does NOT contain: a character
+# in plate armour is legitimately part metal, and no real character — face,
+# hair, leather, cloth — is 60% of its surface. The one observed failure below
+# this line (31% metal) had a base colour of 0.044 and is caught as a collapse.
+METAL_TEXEL_FRACTION = 0.60
+
 GEN_ARTIFACT_MESH = "mesh-raw"
 GEN_ARTIFACT_META = "gen-meta"
 RAW_MODEL = "raw.glb"
@@ -93,7 +110,13 @@ PARAMS_SCHEMA: dict[str, Any] = {
         # on every reference tried. 1024_cascade stays available for geometry.
         "pipelineType": {"type": "string", "enum": ["512", "1024", "1024_cascade"]},
         "steps": {"type": "integer", "minimum": 1, "maximum": 50},
+        # drives SHAPE (sparse structure + shape SLat). Declared but never passed
+        # until the guidance sweep needed the texture equivalent and found it dead.
         "guidanceStrength": {"type": "number", "minimum": 0, "maximum": 20},
+        # drives the TEXTURE sampler, which upstream ships at 1.0 - a value the
+        # CFG mixin short-circuits to no guidance at all. See generate_with_retries
+        # for why generation keeps that default and retexture does not.
+        "textureGuidance": {"type": "number", "minimum": 1, "maximum": 20},
         # loads each model for its stage and offloads after: the reason peak
         # VRAM is ~9 GiB rather than the ~24 the upstream README quotes
         "lowVram": {"type": "boolean"},
@@ -115,6 +138,7 @@ DEFAULTS: dict[str, Any] = {
     "pipelineType": "512",
     "steps": 12,
     "guidanceStrength": 7.5,
+    "textureGuidance": 1.0,
     "lowVram": True,
     # the FALLBACK only. The catalog's operationDefaults normally supplies this,
     # per operation, because the collapse rate is not one number.
@@ -159,6 +183,38 @@ def collapse_kind(attrs: Any) -> str | None:
     return kind_for_mean(base_color_mean(attrs))
 
 
+def metal_fraction(metallic: Any) -> float:
+    """Fraction of a metallic channel above 0.5, on any [0, 1] array."""
+    import numpy as np
+
+    a = np.asarray(metallic, dtype=np.float32)
+    return 0.0 if a.size == 0 else float((a > 0.5).mean())
+
+
+def metal_fraction_from_attrs(attrs: Any) -> float:
+    """The gen path's metallic: column 3 of the decoded PBR attributes."""
+    return metal_fraction(attrs[:, 3])
+
+
+def quality_fault(mean: float, metal: float) -> str | None:
+    """The whole verdict on one sampled texture, or None when it is usable.
+
+    Two INDEPENDENT failures — measured correlation between them is +0.06, so
+    neither implies the other and a gate that checks one passes half of what it
+    should. Base colour is checked first only because it is the cheaper signal;
+    the order carries no meaning beyond which sentence the user reads.
+    """
+    kind = kind_for_mean(mean)
+    if kind is not None:
+        return f"a {kind} texture with no content (mean base colour {mean:.4f})"
+    if metal > METAL_TEXEL_FRACTION:
+        return (
+            f"an all-metal material ({metal:.0%} of the surface), which has no diffuse "
+            f"colour at all and renders as chrome"
+        )
+    return None
+
+
 def collapsed(attrs: Any) -> bool:
     """Did the texture decoder collapse, at either end? See the constants."""
     return collapse_kind(attrs) is not None
@@ -193,6 +249,15 @@ def _ensure_importable() -> None:
     """
     import importlib.util
     import sys
+
+    # Set HERE, not at the call site: `trellis2.modules.sparse` reads
+    # ATTN_BACKEND at IMPORT time and defaults to flash_attn, which cannot be
+    # installed under the wheels-only law. Anything that imports trellis2
+    # without going through `_load_pipeline` — a spike script, a future
+    # adapter — otherwise dies with `No module named 'flash_attn'` deep inside
+    # an attention forward, minutes into a run.
+    os.environ.setdefault("ATTN_BACKEND", "xformers")
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
     if importlib.util.find_spec("trellis2") is not None:
         return
@@ -344,10 +409,7 @@ def _load_pipeline(model_dir: Path, low_vram: bool) -> Any:
     Module-level so tests can substitute it: everything above this line is pure
     and everything below needs 16 GB of weights and a CUDA device.
     """
-    # before importing trellis2: the backend is read at import time
-    os.environ.setdefault("ATTN_BACKEND", "xformers")
-    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-    _ensure_importable()
+    _ensure_importable()  # also sets ATTN_BACKEND, which is read at import time
     try:
         from trellis2.pipelines import Trellis2ImageTo3DPipeline
     except ImportError as err:
@@ -410,7 +472,7 @@ GEN_REMEDY = (
 
 
 def sample_with_retries(
-    sample: Callable[[int], tuple[Any, float]],
+    sample: Callable[[int], tuple[Any, str | None]],
     seed: int,
     budget: int,
     emit: Emitter,
@@ -423,36 +485,37 @@ def sample_with_retries(
     a receipt naming the effective seed reproduces exactly. Separated from `run`
     because this is the part worth testing without a GPU.
 
-    `sample(seed) -> (result, mean base colour)` is a callable rather than a
+    `sample(seed) -> (result, fault or None)` is a callable rather than a
     pipeline because generation and retexture call different pipelines with
-    different signatures and read the base colour from different places — but it
-    is ONE decoder failing ONE way, so it deserves one ladder, one warning shape
-    and one refusal rather than two that drift.
+    different signatures and read the material from different places — but it is
+    ONE decoder failing, so it deserves one ladder, one warning shape and one
+    refusal rather than two that drift. The FAULT is a sentence, not a code:
+    the sampler knows which check failed and by how much, and the ladder only
+    needs to repeat it.
     """
     tried: list[int] = []
+    faults: list[str] = []
     for attempt in range(budget + 1):
         used = seed + attempt
         emit.progress(f"{step}:seed{used}", attempt + 1, budget + 1)
-        result, mean = sample(used)
+        result, fault = sample(used)
         tried.append(used)
-        kind = kind_for_mean(mean)
-        if kind is None:
+        if fault is None:
             return result, used, tried
+        faults.append(f"seed {used}: {fault}")
         emit.warn(
-            "texture-collapsed",
-            f"seed {used} produced a {kind} texture with no content (mean base colour "
-            f"{mean:.4f}) - a known TRELLIS.2 failure that depends on the image, the "
-            f"mesh and the seed together, not on the seed alone. Retrying on seed "
-            f"{used + 1}.",
+            "texture-rejected",
+            f"seed {used} produced {fault} - a known TRELLIS.2 failure that depends on "
+            f"the image, the mesh and the seed together, not on the seed alone. "
+            f"Retrying on seed {used + 1}.",
         )
 
-    # Every seed collapsed. Shipping a blank character silently is the one thing
-    # this ladder exists to prevent, so this is a refusal, not a fallback.
+    # Every seed failed. Shipping a blank or chrome character silently is the one
+    # thing this ladder exists to prevent, so this is a refusal, not a fallback.
     raise AdapterError(
-        "texture-collapsed",
-        f"all {budget + 1} seeds ({', '.join(map(str, tried))}) produced a texture "
-        f"with no content. Re-run with a different --seed, or raise textureRetries. "
-        f"{remedy}",
+        "texture-rejected",
+        f"all {budget + 1} seeds produced unusable material - {'; '.join(faults)}. "
+        f"Re-run with a different --seed, or raise textureRetries. {remedy}",
         True,
     )
 
@@ -464,14 +527,46 @@ def generate_with_retries(
     budget: int,
     pipeline_type: str,
     emit: Emitter,
+    steps: int = 12,
+    guidance: float = 7.5,
+    texture_guidance: float = 1.0,
 ) -> tuple[Any, int, list[int]]:
-    """The ladder, wired to the image-to-3D pipeline."""
+    """The ladder, wired to the image-to-3D pipeline.
 
-    def sample(used: int) -> tuple[Any, float]:
+    `steps` and `guidance` drive the SHAPE — sparse structure and shape SLat,
+    the two stages that decide what the character looks like. They were declared
+    in the params schema, validated, and recorded in the receipt without ever
+    reaching the pipeline, so `--adjust guidanceStrength=12` was accepted and did
+    nothing; they are passed now.
+
+    `texture_guidance` is separate because the texture sampler is separate, and
+    upstream ships it at 1.0 — which the CFG mixin short-circuits to "no guidance
+    at all". It stays at that default HERE: the sweep that justifies raising it
+    was run on the retexture path, and generation already produces faithful
+    colour on the one subject measured (saturation 0.293 against a source 0.326).
+    Changing an unswept default on the strength of a different path's evidence is
+    the mistake this file has made before.
+    """
+
+    def sample(used: int) -> tuple[Any, str | None]:
         mesh = pipeline.run(
-            image, seed=used, pipeline_type=pipeline_type, preprocess_image=True
+            image,
+            seed=used,
+            pipeline_type=pipeline_type,
+            preprocess_image=True,
+            sparse_structure_sampler_params={
+                "steps": int(steps),
+                "guidance_strength": float(guidance),
+            },
+            shape_slat_sampler_params={
+                "steps": int(steps),
+                "guidance_strength": float(guidance),
+            },
+            tex_slat_sampler_params={"guidance_strength": float(texture_guidance)},
         )[0]
-        return mesh, base_color_mean(mesh.attrs)
+        return mesh, quality_fault(
+            base_color_mean(mesh.attrs), metal_fraction_from_attrs(mesh.attrs)
+        )
 
     return sample_with_retries(sample, seed, budget, emit, "generate", GEN_REMEDY)
 
@@ -498,7 +593,15 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
 
     run_t0 = time.perf_counter()
     mesh, used_seed, tried = generate_with_retries(
-        pipeline, image, seed, budget, str(p["pipelineType"]), emit
+        pipeline,
+        image,
+        seed,
+        budget,
+        str(p["pipelineType"]),
+        emit,
+        steps=int(p["steps"]),
+        guidance=float(p["guidanceStrength"]),
+        texture_guidance=float(p["textureGuidance"]),
     )
     run_seconds = round(time.perf_counter() - run_t0, 2)
 
@@ -532,8 +635,9 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     if used_seed != seed:
         emit.warn(
             "seed-changed",
-            f"the requested seed {seed} produced a texture with no content; this was "
-            f"generated with seed {used_seed}, which is what the receipt records.",
+            f"the requested seed {seed} produced material the quality gate rejected; this "
+            f"was generated with seed {used_seed}, which is what the receipt records. The "
+            f"warnings above say what was wrong with each seed that was skipped.",
         )
     emit.artifact(GEN_ARTIFACT_META, str(meta_path))
     emit.artifact(GEN_ARTIFACT_MESH, str(out_path))
