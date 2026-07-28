@@ -16,6 +16,7 @@
  */
 import {
   type CharacterId,
+  defaultsFor,
   type GenerationResult,
   type GenJobSpec,
   type JobEvent,
@@ -158,8 +159,11 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
       yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
     }
 
-    // 3. params validated against the CATALOG entry's schema, before spawning
-    const params = { ...version.defaults, ...opts.params, seed: opts.seed };
+    // 3. params validated against the CATALOG entry's schema, before spawning.
+    // `defaultsFor`, not `version.defaults`: a parameter can differ per
+    // operation on one model (trellis2's seed-retry budget is 2 here and 5 for
+    // retexture, because the same decoder fails 7x more often there).
+    const params = { ...defaultsFor(version, 'gen3d'), ...opts.params, seed: opts.seed };
     const check = validateParams(version.paramsSchema, params);
     if (!check.ok) {
       throw new GenFail(

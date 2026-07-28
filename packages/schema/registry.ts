@@ -33,6 +33,17 @@ export const PlatformSchema = z.enum([
 ]);
 export type Platform = z.output<typeof PlatformSchema>;
 
+/** What a backend can be ASKED to do. The first three mirror `ModelEntry.kind`;
+ * `retexture` is the first operation that is not a kind of its own, because it
+ * is the same model doing a second thing (mesh + image -> mesh) rather than a
+ * different model.
+ *
+ * Verbs resolve a backend by asking who declares the capability, never by name:
+ * `retexture` finds trellis2 because trellis2 says it can retexture, so a second
+ * texturing backend drops in as catalog data with no code change (D-009). */
+export const CapabilitySchema = z.enum(['gen3d', 'rig', 'imageprep', 'retexture']);
+export type Capability = z.output<typeof CapabilitySchema>;
+
 /** One weight file: where it lives inside the install dir, where it comes
  * from, and the exact content pin. The path grammar forbids traversal by
  * construction (each segment starts alphanumeric — no '..', no absolute, no
@@ -62,6 +73,22 @@ export const ModelVersionSchema = z.strictObject({
   minVramGb: z.number().positive().optional(),
   paramsSchema: JsonSchemaSchema,
   defaults: z.record(z.string(), z.unknown()),
+  /** Everything this version can do. Absent means "the entry's `kind`, and only
+   * that" — the common case, so most entries stay as they were. */
+  capabilities: z.array(CapabilitySchema).min(1).optional(),
+  /** Defaults that apply to ONE operation, layered over `defaults`.
+   *
+   * They exist because the same parameter can need a different value per
+   * operation on the same model: trellis2's texture decoder collapses on ~5% of
+   * seeds when generating and 37.5% when retexturing, so a single shared
+   * `textureRetries` is wrong for one of them whichever value it takes. The
+   * budget is catalog data for the same reason the model is — the next backend
+   * has its own rate and must not have to argue with ours.
+   *
+   * `partialRecord`, not `record`: an enum-keyed `z.record` is EXHAUSTIVE in
+   * zod 4 and would demand a block for every capability that exists. */
+  operationDefaults: z.partialRecord(CapabilitySchema, z.record(z.string(), z.unknown()))
+    .optional(),
   /** what a gen3d backend emits; geometry-only triggers the texture substage.
    * Required for gen3d entries (refined below), absent for rig/imageprep. */
   outputs: z.strictObject({
@@ -76,6 +103,30 @@ export type ModelVersion = z.output<typeof ModelVersionSchema>;
 /** Total install size of a version — derived, never stored twice. */
 export function versionDiskBytes(v: ModelVersion): number {
   return v.files.reduce((n, f) => n + f.bytes, 0);
+}
+
+/** Everything this version can be asked to do, entry `kind` included.
+ *
+ * The kind is always in the set even when `capabilities` lists it too, so a
+ * caller never has to check both fields — that double check is exactly where a
+ * backend gets silently skipped. */
+export function versionCapabilities(kind: ModelEntry['kind'], v: ModelVersion): Set<Capability> {
+  return new Set<Capability>([kind, ...(v.capabilities ?? [])]);
+}
+
+export function versionCan(
+  kind: ModelEntry['kind'],
+  v: ModelVersion,
+  op: Capability,
+): boolean {
+  return versionCapabilities(kind, v).has(op);
+}
+
+/** The defaults to run `op` with: the version's own, with the operation's
+ * overrides on top. Callers pass this straight to the sidecar, so a parameter
+ * that differs per operation differs in exactly one place — the catalog. */
+export function defaultsFor(v: ModelVersion, op: Capability): Record<string, unknown> {
+  return { ...v.defaults, ...(v.operationDefaults?.[op] ?? {}) };
 }
 
 export const ModelEntrySchema = z.strictObject({
@@ -93,6 +144,19 @@ export const ModelEntrySchema = z.strictObject({
         path: ['versions', i, 'outputs'],
         message: 'gen3d entries must declare outputs (texture:false triggers the substage)',
       });
+    }
+    // Defaults for an operation the backend never claims to do are dead data
+    // that READS as configuration — the failure is a user setting a retry
+    // budget under the wrong key and watching nothing change.
+    const can = versionCapabilities(entry.kind, v);
+    for (const op of Object.keys(v.operationDefaults ?? {})) {
+      if (!can.has(op as Capability)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['versions', i, 'operationDefaults', op],
+          message: `defaults for "${op}", which this version does not declare it can do`,
+        });
+      }
     }
     const seen = new Set<string>();
     for (const [j, f] of v.files.entries()) {
