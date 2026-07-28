@@ -1117,6 +1117,59 @@ def test_trellis2_params_and_input(tmp: Path) -> None:
     ok(t2._require_rgba(rgba).mode == "RGBA", "an RGBA input is accepted")
 
 
+def test_trellis2_code_dir(tmp: Path) -> None:
+    from .adapters import trellis2 as t2
+
+    # the env override wins, so a checkout can live anywhere
+    os.environ[t2.CODE_DIR_ENV] = str(tmp / "elsewhere")
+    try:
+        ok(t2._code_dir() == tmp / "elsewhere", "the env override wins")
+    finally:
+        os.environ.pop(t2.CODE_DIR_ENV, None)
+
+    # and without it, the repo's own checkout path - relative to THIS file, not
+    # to the process cwd, which is whatever core happened to spawn us in
+    default = t2._code_dir()
+    ok(default.name == "code" and default.parent.name == "trellis2",
+       f"defaults into the repo checkout: {default}")
+    ok(default.is_absolute(), "absolute, so the cwd cannot move it")
+
+    # a missing checkout refuses with BOTH fixes named: the clone and the extra.
+    # They are different problems and a user hitting one should not be told
+    # about the other alone.
+    os.environ[t2.CODE_DIR_ENV] = str(tmp / "nothing-here")
+    try:
+        t2._ensure_importable()
+        ok(False, "a missing checkout must refuse")
+    except AdapterError as err:
+        ok(err.code == "backend-unavailable", f"backend-unavailable, got {err.code}")
+        ok("git clone" in err.message, "names the clone")
+        ok("--extra trellis2" in err.message, "and the dependency extra")
+    finally:
+        os.environ.pop(t2.CODE_DIR_ENV, None)
+
+
+def test_trellis2_rembg_is_refused() -> None:
+    from .adapters import trellis2 as t2
+
+    # The gated model must never be CONSTRUCTED - `BiRefNet.__init__` calls
+    # from_pretrained('briaai/RMBG-2.0', trust_remote_code=True) eagerly, which
+    # is both a gated download and remote code execution.
+    stub = t2._RefusedRembg(model_name="briaai/RMBG-2.0")
+    ok(stub.cuda() is stub and stub.cpu() is stub, "the stub survives the load's device dance")
+    ok(stub.to("cuda") is stub, "and .to()")
+
+    # calling it means an image arrived without alpha; that is a refusal naming
+    # our own prep, not a silent fetch of someone else's matting model
+    try:
+        stub(object())
+        ok(False, "calling the stub must refuse")
+    except AdapterError as err:
+        ok(err.code == "bad-input", f"bad-input, got {err.code}")
+        ok("spritebook prep" in err.message, "names the fix")
+        ok("briaai/RMBG-2.0" in err.message, "and what it refused to fetch")
+
+
 def test_trellis2_registered() -> None:
     reg = build_registry()
     ok("trellis2" in reg, "trellis2 is in the adapter registry")
@@ -1319,6 +1372,8 @@ def main() -> int:
             test_trellis2_collapse_detector()
             test_trellis2_retry_ladder()
             test_trellis2_params_and_input(tmp)
+            test_trellis2_code_dir(tmp)
+            test_trellis2_rembg_is_refused()
             test_trellis2_registered()
             test_retexture_collapse_and_ladder()
             test_retexture_frame_guard()

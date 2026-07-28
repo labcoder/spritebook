@@ -51,6 +51,8 @@ from .trellis2 import (
     GEN_ARTIFACT_META,
     META_FILE,
     RAW_MODEL,
+    _ensure_importable,
+    _prepare_runtime,
     kind_for_mean,
     sample_with_retries,
 )
@@ -179,14 +181,19 @@ def _load_pipeline(model_dir: Path, low_vram: bool) -> Any:
     """Build the texturing pipeline. Module-level so tests can substitute it."""
     os.environ.setdefault("ATTN_BACKEND", "xformers")
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    _ensure_importable()
     try:
         from trellis2.pipelines import Trellis2TexturingPipeline
     except ImportError as err:
         raise AdapterError(
             "backend-unavailable",
-            f"The trellis2 package is not importable in the sidecar environment: {err}.",
+            f"The trellis2 package is not importable in the sidecar environment: {err}. "
+            "Run `uv sync --project sidecar --extra trellis2`.",
         ) from err
 
+    # the texturing pipeline builds the same eager rembg model and uses the same
+    # DINOv3 conditioner, so it needs the same two patches before loading
+    _prepare_runtime()
     try:
         pipeline = Trellis2TexturingPipeline.from_pretrained(
             str(model_dir), config_file="texturing_pipeline.json"

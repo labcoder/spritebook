@@ -19,12 +19,18 @@ black. Healthy output spans mean 0.147..0.723 — including a deliberately dark
 subject at 0.18 — so 0.10 sits in an empty valley between the populations. A
 max-based check passes an unusable character, which is worse than no check.
 
-**Never construct BiRefNet.** `pipeline.preprocess_image()` calls rembg only
-when the input has NO alpha. Feeding it the cut-out RGBA our own Apache-2.0
-u2net prep already produces means the gated, non-commercially-licensed
-`briaai/RMBG-2.0` is never touched. This is why `preprocess_image=True` is
-correct and `preprocess_image=False` is not: the latter also skips the
-crop-and-premultiply the model expects, and produces markedly worse output.
+**Never construct BiRefNet — and it takes a patch, not just good manners.**
+This used to say the gated `briaai/RMBG-2.0` was never touched because
+`preprocess_image()` only calls rembg when the input has no alpha, which is
+true of the CALL and false of the CONSTRUCTION. `from_pretrained` builds the
+rembg model eagerly while loading the pipeline
+(`trellis2_image_to_3d.py:105`), and `BiRefNet.__init__` immediately runs
+`AutoModelForImageSegmentation.from_pretrained('briaai/RMBG-2.0',
+trust_remote_code=True)` — a gated download AND arbitrary code from the hub,
+before anyone has passed an image. `_stub_rembg` replaces the class before the
+load so neither happens. Feeding cut-out RGBA is still right for a second
+reason: `preprocess_image=False` skips the crop-and-premultiply the model
+expects and produces markedly worse output.
 
 **`ATTN_BACKEND=xformers` is required**, set before trellis2 is imported. Sparse
 attention supports only xformers and flash-attn, with no SDPA fallback, and
@@ -34,6 +40,16 @@ flash-attn cannot be installed under the wheels-only law.
 image conditioner and cannot be auto-installed; a human must request access from
 Meta. We refuse with that sentence rather than letting a 403 surface eighty
 seconds into a model load.
+
+**transformers 5.x moved the DINOv3 encoder blocks** from `model.layer` to
+`model.model.layer`, and TRELLIS.2 reaches for the old path. `_shim_dinov3`
+rewrites `extract_features` to accept either layout. The pin
+(`transformers==5.14.1`, sidecar's `trellis2` extra) is what makes this a known
+pair rather than a moving target.
+
+**The `trellis2` package is imported from a CHECKOUT, not installed.** Upstream
+ships no packaging metadata, so there is no wheel and `uv` cannot manage it. See
+`_code_dir`.
 """
 
 from __future__ import annotations
@@ -147,6 +163,125 @@ def collapsed(attrs: Any) -> bool:
     return collapse_kind(attrs) is not None
 
 
+CODE_DIR_ENV = "SPRITEBOOK_TRELLIS2_CODE"
+
+
+def _code_dir() -> Path:
+    """Where the `trellis2` SOURCE lives, since it cannot be installed.
+
+    Upstream ships no packaging metadata — no `pyproject.toml`, no `setup.py` —
+    so the extra installs the dependencies and this finds the package itself.
+    `SPRITEBOOK_TRELLIS2_CODE` wins; otherwise the repo's own checkout path.
+
+    INTERIM. The registry manages weights by hash and should manage backend code
+    the same way; until it does, this is a documented path rather than a
+    surprise. Nothing else in the sidecar reaches outside its own directory.
+    """
+    override = os.environ.get(CODE_DIR_ENV)
+    if override:
+        return Path(override)
+    # .../sidecar/spritebook_sidecar/adapters/trellis2.py -> repo root
+    return Path(__file__).resolve().parents[3] / "spikes" / "trellis2" / "code"
+
+
+def _ensure_importable() -> None:
+    """Put the checkout on `sys.path`, unless trellis2 is already importable.
+
+    The short-circuit matters: a future packaged trellis2 must win over a stale
+    checkout sitting beside it, not lose to one.
+    """
+    import importlib.util
+    import sys
+
+    if importlib.util.find_spec("trellis2") is not None:
+        return
+    code = _code_dir()
+    if not (code / "trellis2").is_dir():
+        raise AdapterError(
+            "backend-unavailable",
+            f"The TRELLIS.2 source is not at '{code}'. It ships no packaging metadata, so it is "
+            f"used from a checkout: `git clone --depth 1 "
+            f"https://github.com/microsoft/TRELLIS.2.git {code}`, or set {CODE_DIR_ENV} to where "
+            f"it already is. The Python dependencies are separate: "
+            f"`uv sync --project sidecar --extra trellis2`.",
+        )
+    if str(code) not in sys.path:
+        sys.path.insert(0, str(code))
+
+
+class _RefusedRembg:
+    """Stands in for BiRefNet so the gated model is never built, or run.
+
+    Construction is a no-op; a CALL is a refusal rather than a silent pass,
+    because reaching it would mean an image arrived without alpha and the answer
+    is to run our own prep, not to quietly fetch someone else's matting model.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def to(self, device: str) -> "_RefusedRembg":
+        return self
+
+    def cuda(self) -> "_RefusedRembg":
+        return self
+
+    def cpu(self) -> "_RefusedRembg":
+        return self
+
+    def __call__(self, image: Any) -> Any:
+        raise AdapterError(
+            "bad-input",
+            "TRELLIS.2 tried to remove the background itself, which means the image reached it "
+            "without alpha. SpriteBook does its own cut-out (rembg-u2net, Apache-2.0); the "
+            "backend's matting model is briaai/RMBG-2.0, which is gated, non-commercial, and "
+            "loads remote code. Run `spritebook prep` on the source image first.",
+        )
+
+
+def _stub_rembg() -> None:
+    """Replace BiRefNet BEFORE `from_pretrained`. See the module docstring.
+
+    `trellis2.pipelines.rembg` star-exports the class, and both pipelines reach
+    it with `getattr(rembg, args['rembg_model']['name'])`, so replacing the one
+    module attribute covers both.
+    """
+    from trellis2.pipelines import rembg as rembg_mod
+
+    rembg_mod.BiRefNet = _RefusedRembg
+
+
+def _shim_dinov3() -> None:
+    """Teach `extract_features` about the transformers-5 block move.
+
+    Reads `model.layer` when it exists and `model.model.layer` when it does not,
+    so this works against either layout rather than trading one hard-coded path
+    for another.
+    """
+    import torch.nn.functional as F
+
+    from trellis2.modules import image_feature_extractor as ife
+
+    def extract_features(self: Any, image: Any) -> Any:
+        image = image.to(self.model.embeddings.patch_embeddings.weight.dtype)
+        h = self.model.embeddings(image, bool_masked_pos=None)
+        pos = self.model.rope_embeddings(image)
+        blocks = getattr(self.model, "layer", None)
+        if blocks is None:
+            blocks = self.model.model.layer
+        for blk in blocks:
+            h = blk(h, position_embeddings=pos)
+        return F.layer_norm(h, h.shape[-1:])
+
+    ife.DinoV3FeatureExtractor.extract_features = extract_features
+
+
+def _prepare_runtime() -> None:
+    """Everything that must happen between importing trellis2 and loading it."""
+    _stub_rembg()
+    _shim_dinov3()
+
+
 def _require_rgba(image_path: Path) -> Any:
     from PIL import Image
 
@@ -176,16 +311,19 @@ def _load_pipeline(model_dir: Path, low_vram: bool) -> Any:
     # before importing trellis2: the backend is read at import time
     os.environ.setdefault("ATTN_BACKEND", "xformers")
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    _ensure_importable()
     try:
         from trellis2.pipelines import Trellis2ImageTo3DPipeline
     except ImportError as err:
         raise AdapterError(
             "backend-unavailable",
             f"The trellis2 package is not importable in the sidecar environment: {err}. "
-            "It needs torch 2.8+cu128, xformers, and the five prebuilt CUDA extension "
-            "wheels (cumesh, flex_gemm, nvdiffrast, nvdiffrec_render, o_voxel).",
+            "Its dependencies are an optional extra - `uv sync --project sidecar --extra "
+            "trellis2` installs torch 2.8+cu128, xformers, and the five prebuilt CUDA "
+            "extension wheels (cumesh, flex_gemm, nvdiffrast, nvdiffrec_render, o_voxel).",
         ) from err
 
+    _prepare_runtime()
     try:
         pipeline = Trellis2ImageTo3DPipeline.from_pretrained(str(model_dir))
     except Exception as err:  # noqa: BLE001
