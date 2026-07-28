@@ -39,6 +39,12 @@ SPRITEBOOK_SIDECAR_TOKEN=<per-session token>  uv run --project sidecar spriteboo
 | `rembg`      | `imageprep` | 2.0.77  | `imagePath`, `outDir`, `modelDir` (+ optional `model` ∈ {`u2net`}) | progress `load`/`infer`/`encode`; artifact `cutout` (`<outDir>/cutout.png`, RGBA); artifact `preflight` (`<outDir>/preflight.json`); warn `cutout-noop` when alpha is all-opaque; error `empty-cutout` when alpha is all-zero; error `model-missing` when the weight is absent. |
 | `pose-check` | `imageprep` | 1.0.0   | `imagePath` (an RGBA cutout), `outDir`                             | progress `analyze`; artifact `preflight` (`<outDir>/preflight.json`) — the same pose heuristic v1, standalone.                                                                                                                                                                  |
 
+The rest of the roster, in announcement order after those three: `fixture-gen` (`gen3d`) and
+`fixture-retexture` (`retexture`) — deterministic, weightless stand-ins the test suite runs on;
+`trellis2` (`gen3d`) and `trellis2-retexture` (`retexture`) — the real backend, which needs the
+optional stack below; `texture-substage` (`imageprep`); and `unirig` (`rig`). `GET /handshake` is
+always the authoritative list.
+
 Pose heuristic v1 constants (documented in `spritebook_sidecar/adapters/pose_check.py`): arm band
 rows `[0.20, 0.45)` of the alpha bbox height, torso band `[0.45, 0.70)`, spread ratio `1.35` (widest
 arm-band row extent vs median torso-band row extent), coverage ok range `[5%, 95%]`, minimum short
@@ -59,6 +65,45 @@ transitive `pymatting → numba` edge to a wheel-bearing release: without the fl
 walks numba back to 0.53.x, a 3.6–3.9-era sdist that cannot build on 3.11 (and source builds violate
 the sidecar-vram "prebuilt wheels only" law). The HTTP server itself is Python stdlib only — no
 FastAPI/uvicorn/requests.
+
+## The `trellis2` extra (optional, ~4 GB, Windows + CUDA)
+
+The TRELLIS.2 image-to-3D stack is an **optional dependency group**, so a machine with no GPU
+installs the base project and still gets a fully working sidecar — every adapter except `trellis2`
+and `trellis2-retexture`, including the `fixture-*` pair the whole test suite runs on. That is
+verified, not assumed: a base-only sync passes all self-test checks with no torch installed.
+
+```
+python spikes/trellis2/fetch_wheels.py --verify   # the pin, checked BEFORE install
+uv sync --project sidecar --extra trellis2
+```
+
+Verify the wheels first and mean it. The five CUDA extensions (`cumesh`, `flex_gemm`, `nvdiffrast`,
+`nvdiffrec_render`, `o_voxel`) are community builds by a single maintainer, fetched from a
+`raw.githubusercontent` URL that can move at any time. They are vendored under
+`spikes/trellis2/wheels/` and pinned by sha256 in `wheels.lock.json`; `uv` installs them from those
+verified bytes by path.
+
+Two more things this stack needs, neither of which `uv` can supply:
+
+- **The `trellis2` package itself has no packaging metadata upstream** — it is imported from a
+  source checkout, not installed. Clone it and point the adapter at it:
+  `git clone --depth 1 https://github.com/microsoft/TRELLIS.2.git spikes/trellis2/code`, or set
+  `SPRITEBOOK_TRELLIS2_CODE` to wherever it lives.
+- **DINOv3 is a manual gate.** `facebook/dinov3-vitl16-pretrain-lvd1689m` is the image conditioner
+  and access is granted per person by Meta, so it cannot be installed through the registry. Request
+  it on the model's page, then `huggingface-cli login`. Meta's licence permits commercial use and
+  redistribution; the price is an attribution — **"Built with DINOv3"** must appear in the product's
+  UI, docs or about page.
+
+Pins are the combination measured to work in `spikes/trellis2/REPORT.md`, not the newest compatible
+set: torch 2.8.0+cu128, torchvision 0.23.0, xformers 0.0.32.post2, transformers 5.14.1. `xformers`
+is not optional — sparse attention supports only xformers and flash-attn, and flash-attn needs a
+compiler. `transformers` is pinned because 5.x moved the DINOv3 encoder blocks and the adapter shims
+the move; an unpinned upgrade would walk away from the shim silently.
+
+`requires-python` is `>=3.11,<3.12` because of this extra: the extension wheels are cp311-only and
+`uv` solves the lock across the whole declared range.
 
 ## rembg model-path mechanism (verified against the pinned 2.0.77 source)
 

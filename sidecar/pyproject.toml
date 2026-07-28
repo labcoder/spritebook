@@ -2,13 +2,90 @@
 name = "spritebook-sidecar"
 version = "0.1.0"
 description = "SpriteBook local Python sidecar: model adapters over localhost NDJSON (P3-T2)"
-requires-python = ">=3.11"
+# Upper bound because of the `trellis2` extra: its five CUDA extension wheels
+# are cp311-only, and uv solves the lock for the WHOLE requires-python range —
+# so `>=3.11` would ask it to find cp312/cp313 builds that do not exist. The
+# app already pins 3.11 in .python-version; this makes the lock agree.
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "rembg==2.0.77",
     "onnxruntime==1.27.0",
     "numpy==2.4.6",
     "pillow==12.3.0",
 ]
+
+[project.optional-dependencies]
+# The TRELLIS.2 image-to-3D stack: ~4 GB, CUDA-only, and OPTIONAL on purpose.
+# A machine with no GPU installs the base project and gets a fully working
+# sidecar — every adapter except `trellis2` and `trellis2-retexture`, including
+# the `fixture-*` pair the test suite runs on. Install it with:
+#
+#     uv sync --project sidecar --extra trellis2
+#
+# Every entry carries `sys_platform == 'win32'` because the extension wheels are
+# win_amd64 builds. macOS and Linux still resolve and lock this project; the
+# extra is simply empty there. Linux CUDA is a real target and will need its own
+# wheels — see docs/platform-support.md.
+#
+# The pins are the combination MEASURED to work in spikes/trellis2/REPORT.md,
+# not a guess at the newest compatible set. `transformers` in particular is
+# pinned because 5.x moved the DINOv3 encoder blocks and the adapter shims the
+# move; an unpinned upgrade would silently walk away from the shim.
+trellis2 = [
+    "torch==2.8.0 ; sys_platform == 'win32'",
+    "torchvision==0.23.0 ; sys_platform == 'win32'",
+    # sparse attention supports ONLY xformers and flash-attn, and flash-attn
+    # needs a compiler (the wheels-only law) — so this is not optional
+    "xformers==0.0.32.post2 ; sys_platform == 'win32'",
+    "transformers==5.14.1 ; sys_platform == 'win32'",
+    # the five prebuilt CUDA extensions, sha256-pinned in
+    # spikes/trellis2/wheels/wheels.lock.json and resolved from disk below
+    "cumesh==1.0 ; sys_platform == 'win32'",
+    "flex-gemm==0.0.1 ; sys_platform == 'win32'",
+    "nvdiffrast==0.4.0 ; sys_platform == 'win32'",
+    "nvdiffrec-render==0.0.0 ; sys_platform == 'win32'",
+    "o-voxel==0.0.1 ; sys_platform == 'win32'",
+    "utils3d ; sys_platform == 'win32'",
+    # upstream's support set (setup.sh). `opencv-python-headless` is not
+    # decoration: o_voxel imports cv2 at module scope.
+    "easydict ; sys_platform == 'win32'",
+    "imageio ; sys_platform == 'win32'",
+    "imageio-ffmpeg ; sys_platform == 'win32'",
+    "kornia ; sys_platform == 'win32'",
+    "lpips ; sys_platform == 'win32'",
+    "ninja ; sys_platform == 'win32'",
+    "opencv-python-headless ; sys_platform == 'win32'",
+    "pandas ; sys_platform == 'win32'",
+    "safetensors ; sys_platform == 'win32'",
+    "tensorboard ; sys_platform == 'win32'",
+    "timm ; sys_platform == 'win32'",
+    "trimesh ; sys_platform == 'win32'",
+    "zstandard ; sys_platform == 'win32'",
+]
+
+# `explicit = true` keeps every OTHER package off this index: only the three
+# packages named in [tool.uv.sources] are fetched from it, so the base
+# dependencies still resolve from PyPI.
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+xformers = { index = "pytorch-cu128" }
+# Vendored, and verified before install: these are community builds from a
+# single maintainer's raw.githubusercontent URL that can move under us, so the
+# bytes are pinned by sha256 and checked with
+# `python spikes/trellis2/fetch_wheels.py --verify` BEFORE `uv sync`.
+cumesh = { path = "../spikes/trellis2/wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" }
+flex-gemm = { path = "../spikes/trellis2/wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" }
+nvdiffrast = { path = "../spikes/trellis2/wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" }
+nvdiffrec-render = { path = "../spikes/trellis2/wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" }
+o-voxel = { path = "../spikes/trellis2/wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" }
+# no PyPI release; the pin is the commit
+utils3d = { git = "https://github.com/EasternJournalist/utils3d.git", rev = "9a4eb15e4021b67b12c460c7057d642626897ec8" }
 
 [tool.uv]
 # rembg -> pymatting -> numba: without this floor the resolver walks numba back
