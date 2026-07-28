@@ -15,6 +15,7 @@
  * GUI will render forms from; the adapter's is what the code actually runs.
  */
 import {
+  adapterFor,
   type CharacterId,
   defaultsFor,
   type GenerationResult,
@@ -63,13 +64,13 @@ class GenFail extends Error {
   }
 }
 
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** Triangle count + texture resolution of canonical bytes, for the receipt. */
-async function describeMesh(
+export async function describeMesh(
   bytes: Uint8Array,
 ): Promise<{ tris: number; textureRes?: number }> {
   const doc = await new NodeIO().readBinary(bytes);
@@ -202,7 +203,9 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     for await (
       const e of session.run({
         jobId: `${opts.jobId}-gen` as JobEvent['jobId'],
-        kind: entry.id, // catalog id IS the adapter id (one name for one backend)
+        // catalog data: `trellis2-4b` is run by the `trellis2` adapter, and the
+        // two names have never matched
+        kind: adapterFor(entry.id, version, 'gen3d'),
         params: {
           ...params,
           imagePath: stored.storedPath,

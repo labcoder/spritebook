@@ -89,6 +89,21 @@ export const ModelVersionSchema = z.strictObject({
    * zod 4 and would demand a block for every capability that exists. */
   operationDefaults: z.partialRecord(CapabilitySchema, z.record(z.string(), z.unknown()))
     .optional(),
+  /** Which SIDECAR ADAPTER runs each operation.
+   *
+   * "The catalog id is the adapter id" was the rule, and it was never true:
+   * `trellis2-4b` is run by `trellis2` and `rembg-u2net` by `rembg`, so `gen`
+   * asked the sidecar for an adapter that does not exist and `prep` worked only
+   * because it hardcoded the name. Two operations on one model make the rule
+   * unfixable anyway — trellis2-4b needs `trellis2` for gen3d and
+   * `trellis2-retexture` for retexture, and one entry id cannot be both.
+   *
+   * Absent falls back to the entry id, which is correct for `unirig` and
+   * `fixture-gen`. */
+  adapters: z.partialRecord(
+    CapabilitySchema,
+    z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'adapter id slug'),
+  ).optional(),
   /** what a gen3d backend emits; geometry-only triggers the texture substage.
    * Required for gen3d entries (refined below), absent for rig/imageprep. */
   outputs: z.strictObject({
@@ -129,6 +144,11 @@ export function defaultsFor(v: ModelVersion, op: Capability): Record<string, unk
   return { ...v.defaults, ...(v.operationDefaults?.[op] ?? {}) };
 }
 
+/** The sidecar adapter that runs `op` for this version. */
+export function adapterFor(entryId: string, v: ModelVersion, op: Capability): string {
+  return v.adapters?.[op] ?? entryId;
+}
+
 export const ModelEntrySchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
   kind: z.enum(['gen3d', 'rig', 'imageprep']),
@@ -149,13 +169,15 @@ export const ModelEntrySchema = z.strictObject({
     // that READS as configuration — the failure is a user setting a retry
     // budget under the wrong key and watching nothing change.
     const can = versionCapabilities(entry.kind, v);
-    for (const op of Object.keys(v.operationDefaults ?? {})) {
-      if (!can.has(op as Capability)) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['versions', i, 'operationDefaults', op],
-          message: `defaults for "${op}", which this version does not declare it can do`,
-        });
+    for (const field of ['operationDefaults', 'adapters'] as const) {
+      for (const op of Object.keys(v[field] ?? {})) {
+        if (!can.has(op as Capability)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['versions', i, field, op],
+            message: `${field} for "${op}", which this version does not declare it can do`,
+          });
+        }
       }
     }
     const seen = new Set<string>();

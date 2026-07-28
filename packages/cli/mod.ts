@@ -20,6 +20,7 @@
  *   <manifest>.journal.cursor     how many patches are currently applied
  */
 import {
+  adapterFor,
   BakeManifestSchema,
   canonicalJson,
   CharacterManifestSchema,
@@ -497,6 +498,19 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'catalog',
   ],
   pick: ['workspace', 'out', 'result', 'reproject', 'image', 'sidecar'],
+  retexture: [
+    'workspace',
+    'out',
+    'result',
+    'seed',
+    'adjust',
+    'model',
+    'model-version',
+    'height',
+    'sidecar',
+    'models-dir',
+    'catalog',
+  ],
   identity: ['workspace', 'decals', 'attachments', 'bone-mask', 'body'],
   rename: ['workspace', 'name'],
   clone: ['workspace', 'to', 'id', 'name'],
@@ -675,8 +689,8 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     }
   }
 
-  if (verb === 'gen' || verb === 'pick') {
-    const { runGenJob, runPickJob } = await import('@spritebook/gen');
+  if (verb === 'gen' || verb === 'pick' || verb === 'retexture') {
+    const { runGenJob, runPickJob, runRetextureJob } = await import('@spritebook/gen');
     const { readWorkspace, sourceImagePath } = await import('@spritebook/core');
     const workspace = flag(args, 'workspace') ?? flag(args, 'out');
     if (!workspace) {
@@ -711,6 +725,40 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
             resultId,
             reproject: args.includes('--reproject'),
             imagePath: flag(args, 'image'),
+          }),
+          emit,
+        );
+      }
+
+      if (verb === 'retexture') {
+        const resultId = flag(args, 'result');
+        if (!resultId) {
+          return fail(
+            'retexture' as JobEvent['jobId'],
+            'missing-arg',
+            '--result <rN> is required - the result whose mesh you want to keep',
+          );
+        }
+        // The seed defaults to one PAST the highest already recorded, so a bare
+        // `retexture --result r1` twice gives two different textures instead of
+        // the same one twice. Repeating is what `--seed` is for.
+        const manifest = await readWorkspace(workspace);
+        const nextSeed = Math.max(0, ...manifest.generation.results.map((r) => r.seed)) + 1;
+        return await pump(
+          runRetextureJob({
+            jobId: 'retexture',
+            workspace,
+            resultId,
+            seed: flag(args, 'seed') !== undefined ? intFlag(args, 'seed', 0) : nextSeed,
+            params: parseAdjust(flag(args, 'adjust')),
+            modelId: flag(args, 'model'),
+            version: flag(args, 'model-version'),
+            declaredHeightM: flag(args, 'height') !== undefined
+              ? numFlag(args, 'height', 1.7)
+              : undefined,
+            sidecarDir: sidecarDir(),
+            modelsRoot: flag(args, 'models-dir'),
+            catalogPath: flag(args, 'catalog'),
           }),
           emit,
         );
@@ -1058,6 +1106,15 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         );
       }
       const modelDir = registry.versionDir(root, 'rembg-u2net', installed.version);
+      // the adapter name came from the catalog once `gen`'s copy of this
+      // assumption turned out to be wrong; `prep` only worked because it
+      // hardcoded the right answer
+      const prepCatalog = await registry.loadCatalog(flag(args, 'catalog'));
+      const prepEntry = prepCatalog.models.find((m) => m.id === 'rembg-u2net');
+      const prepVersion = prepEntry?.versions.find((v) => v.version === installed.version);
+      const prepAdapter = prepVersion
+        ? adapterFor('rembg-u2net', prepVersion, 'imageprep')
+        : 'rembg';
       let sidecarDir = flag(args, 'sidecar') ?? Deno.env.get('SPRITEBOOK_SIDECAR_DIR');
       if (!sidecarDir) {
         const repoSidecar = decodeURIComponent(
@@ -1080,7 +1137,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         return await pump(
           session.run({
             jobId: 'prep' as JobEvent['jobId'],
-            kind: 'rembg',
+            kind: prepAdapter,
             params: { imagePath: image, outDir: out, modelDir },
           }),
           emit,

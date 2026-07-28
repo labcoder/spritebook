@@ -26,7 +26,8 @@ function backendsFor(models: ModelEntry[], op: Capability): string[] {
 
 Deno.test('a verb resolves its backend by capability, not by name', async () => {
   const cat = await loadCatalog();
-  assertEquals(backendsFor(cat.models, 'retexture'), ['trellis2-4b']);
+  // the real backend and the weightless stand-in that makes the path testable
+  assertEquals(backendsFor(cat.models, 'retexture'), ['trellis2-4b', 'fixture-gen']);
   // and the same lookup finds generators, so one mechanism serves every verb
   assert(backendsFor(cat.models, 'gen3d').includes('trellis2-4b'));
   assertEquals(backendsFor(cat.models, 'rig'), ['unirig']);
