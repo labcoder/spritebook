@@ -144,8 +144,9 @@ def test_handshake(port: int) -> None:
     )
     ids = [a["id"] for a in hs["adapters"]]
     ok(
-        ids == ["echo", "rembg", "pose-check", "fixture-gen", "texture-substage", "unirig"],
-        f"the six adapters announced: {ids}",
+        ids == ["echo", "rembg", "pose-check", "fixture-gen", "trellis2",
+                "texture-substage", "unirig"],
+        f"every adapter announced, in registration order: {ids}",
     )
     for a in hs["adapters"]:
         ok(
@@ -948,6 +949,149 @@ def test_shutdown(port: int, server_thread: threading.Thread) -> None:
     ok(not server_thread.is_alive(), "server loop exited after /shutdown")
 
 
+# --- trellis2 ------------------------------------------------------------------
+
+
+class _FakeMesh:
+    """Just enough mesh for the collapse detector: (N, 6) PBR attributes."""
+
+    def __init__(self, base_color: float) -> None:
+        attrs = np.zeros((64, 6), dtype=np.float32)
+        attrs[:, 0:3] = base_color
+        # metallic/roughness/alpha stay non-zero so a detector reading the WHOLE
+        # attribute block instead of columns 0..2 would pass a collapsed mesh
+        attrs[:, 3:6] = 0.6
+        self.attrs = attrs
+
+
+class _FakePipeline:
+    """Returns a collapsed mesh for the seeds in `bad`, a healthy one otherwise."""
+
+    def __init__(self, bad: set[int]) -> None:
+        self.bad = bad
+        self.seeds_seen: list[int] = []
+        self.preprocess_flags: list[bool] = []
+
+    def run(self, image, seed, pipeline_type, preprocess_image):  # noqa: ANN001
+        self.seeds_seen.append(seed)
+        self.preprocess_flags.append(preprocess_image)
+        return [_FakeMesh(0.0006 if seed in self.bad else 0.42)]
+
+
+class _RecordingEmitter:
+    job_id = "selftest-trellis2"
+
+    def __init__(self) -> None:
+        self.warns: list[tuple[str, str]] = []
+        self.steps: list[str] = []
+        self.artifacts: list[tuple[str, str]] = []
+
+    def progress(self, step: str, done: int, total: int) -> None:
+        self.steps.append(step)
+
+    def artifact(self, kind: str, path: str) -> None:
+        self.artifacts.append((kind, path))
+
+    def warn(self, code: str, message: str) -> None:
+        self.warns.append((code, message))
+
+
+def test_trellis2_collapse_detector() -> None:
+    from .adapters import trellis2 as t2
+
+    # The threshold is a measured valley, not a taste: healthy output spans
+    # 0.147..0.723 including a deliberately dark subject at 0.18, and the two
+    # observed failures sat at 0.0415 and 0.0006.
+    ok(t2.COLLAPSE_MEAN == 0.10, "collapse threshold is the measured 0.10")
+    ok(t2.collapsed(_FakeMesh(0.0006).attrs), "hard collapse detected")
+    ok(t2.collapsed(_FakeMesh(0.0415).attrs), "the SOFT failure is detected too")
+    ok(not t2.collapsed(_FakeMesh(0.1473).attrs), "worst healthy run passes")
+    ok(not t2.collapsed(_FakeMesh(0.18).attrs), "a legitimately dark subject passes")
+
+    # THE bug this detector was rewritten to avoid: a run whose mean is 0.0415
+    # had max 0.9856 from stray texels, so a max-based check passed an unusable
+    # character. Reading columns 0..2 rather than the whole block matters too.
+    stray = _FakeMesh(0.0415)
+    stray.attrs[0, 0:3] = 0.9856
+    ok(t2.collapsed(stray.attrs), "stray bright texels do not rescue a collapsed mesh")
+
+
+def test_trellis2_retry_ladder() -> None:
+    from .adapters import trellis2 as t2
+
+    # first seed collapses, second is fine
+    pipe = _FakePipeline(bad={42})
+    emit = _RecordingEmitter()
+    mesh, used, tried = t2.generate_with_retries(pipe, object(), 42, 2, "512", emit)
+    ok(used == 43, f"retried onto the next seed, got {used}")
+    ok(tried == [42, 43], f"deterministic ladder, got {tried}")
+    ok(pipe.seeds_seen == [42, 43], "the pipeline saw exactly those seeds")
+    ok(all(pipe.preprocess_flags), "preprocess_image=True so BiRefNet is never built")
+    ok([c for c, _ in emit.warns] == ["texture-collapsed"], "warned once, on the bad seed")
+    ok(not t2.collapsed(mesh.attrs), "the returned mesh is the healthy one")
+
+    # a healthy first seed does not retry at all
+    clean = _FakePipeline(bad=set())
+    emit2 = _RecordingEmitter()
+    _, used2, tried2 = t2.generate_with_retries(clean, object(), 7, 2, "512", emit2)
+    ok((used2, tried2) == (7, [7]), "no retry when the first seed is good")
+    ok(emit2.warns == [], "and no warning")
+
+    # budget exhausted -> refuse, do NOT ship a black character
+    doomed = _FakePipeline(bad={1, 2, 3})
+    emit3 = _RecordingEmitter()
+    try:
+        t2.generate_with_retries(doomed, object(), 1, 2, "512", emit3)
+        ok(False, "exhausted budget must raise")
+    except AdapterError as err:
+        ok(err.code == "texture-collapsed", f"refusal code, got {err.code}")
+        ok("1, 2, 3" in err.message, f"names every seed tried: {err.message}")
+        ok(err.retryable, "a different seed might work, so it is retryable")
+    ok(len(doomed.seeds_seen) == 3, "tried budget+1 times, not more")
+
+
+def test_trellis2_params_and_input(tmp: Path) -> None:
+    from .adapters import trellis2 as t2
+
+    p = validate_params(t2.PARAMS_SCHEMA, {
+        "imagePath": "a.png", "outDir": "o", "modelDir": "m", "seed": 0,
+    }, t2.DEFAULTS)
+    ok(p["pipelineType"] == "512", "512 is the default tier, on measured evidence")
+    ok(p["textureRetries"] == 2, "two retries takes residual failure to ~0.01%")
+    ok(p["lowVram"] is True, "low VRAM on: the reason peak is ~9 GiB not ~24")
+
+    for bad in ({"pipelineType": "1536_cascade"}, {"textureRetries": 9}, {"nope": 1}):
+        try:
+            validate_params(t2.PARAMS_SCHEMA, {
+                "imagePath": "a.png", "outDir": "o", "modelDir": "m", "seed": 0, **bad,
+            }, t2.DEFAULTS)
+            ok(False, f"should have refused {bad}")
+        except AdapterError as err:
+            ok(err.code == "bad-params", f"bad-params for {bad}, got {err.code}")
+
+    # an RGB image is refused by NAME, and the message says which stage produces
+    # alpha - because that alpha is also what keeps the gated RMBG-2.0 unused
+    from PIL import Image
+
+    rgb = tmp / "rgb.png"
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(rgb)
+    try:
+        t2._require_rgba(rgb)
+        ok(False, "an RGB input must be refused")
+    except AdapterError as err:
+        ok(err.code == "bad-input", f"bad-input, got {err.code}")
+        ok("rembg-u2net" in err.message, "names the stage that produces the alpha")
+    rgba = tmp / "rgba.png"
+    Image.new("RGBA", (8, 8), (10, 20, 30, 255)).save(rgba)
+    ok(t2._require_rgba(rgba).mode == "RGBA", "an RGBA input is accepted")
+
+
+def test_trellis2_registered() -> None:
+    reg = build_registry()
+    ok("trellis2" in reg, "trellis2 is in the adapter registry")
+    ok(reg["trellis2"].kind == "gen3d", "declared as gen3d")
+
+
 def main() -> int:
     os.environ.pop("U2NET_HOME", None)  # prove we never rely on it
     server = build_server(0, TOKEN, build_registry())
@@ -972,6 +1116,10 @@ def main() -> int:
             test_fixture_gen_over_http(port, tmp)
             test_rembg_model_missing(tmp)
             test_scene_geometry(tmp)
+            test_trellis2_collapse_detector()
+            test_trellis2_retry_ladder()
+            test_trellis2_params_and_input(tmp)
+            test_trellis2_registered()
             test_unirig_params()
             test_unirig_validation()
             test_unirig_naming()
