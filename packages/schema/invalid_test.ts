@@ -9,6 +9,7 @@ import { CharacterIdSchema } from './identity.ts';
 import { CacheKeyInputsSchema } from './cache.ts';
 import { JsonPatchOpSchema, ManifestPatchSchema } from './patch.ts';
 import { CameraOverridesSchema, StylePresetSchema } from './project.ts';
+import { CharacterManifestSchema } from './character.ts';
 import { JobEventSchema } from './jobs.ts';
 import { migrateCharacterManifest } from './migrate.ts';
 
@@ -194,6 +195,43 @@ Deno.test('CameraOverrides cannot rename the preset it refines', () => {
   // `cli-e30x8` was.
   expectFailure(CameraOverridesSchema, { id: 'my-camera' }, 'CameraOverrides', 'id');
   expectFailure(CameraOverridesSchema, { elevation: 30 }, 'CameraOverrides', 'elevation');
+});
+
+Deno.test('a result cannot derive from a parent that is not there', async () => {
+  const fixture = JSON.parse(
+    await Deno.readTextFile(new URL('./fixtures/valid/character-manifest.json', import.meta.url)),
+  ) as { generation: { results: { id: string; derivedFrom?: string }[] } };
+  const withResults = (results: unknown[]) => ({
+    ...fixture,
+    generation: { ...fixture.generation, results },
+  });
+  const [r1, r2] = fixture.generation.results;
+  assert(r2.derivedFrom === r1.id, 'the fixture exercises lineage');
+
+  // dangling: it READS as an answer and is not one. Results are append-only, so
+  // a live reference can only be orphaned by something writing the file by hand.
+  expectFailure(
+    CharacterManifestSchema,
+    withResults([r1, { ...r2, derivedFrom: 'r9' }]),
+    'CharacterManifest',
+    'derivedFrom',
+    'not in this manifest',
+  );
+  expectFailure(
+    CharacterManifestSchema,
+    withResults([r1, { ...r2, derivedFrom: r2.id }]),
+    'CharacterManifest',
+    'derives from itself',
+  );
+  // a DISCARDED parent is still a parent: receipts are history, not a live set,
+  // and the lineage of a result you rejected is the useful part of the record
+  parseWith(
+    CharacterManifestSchema,
+    withResults([{ ...r1, discarded: true }, r2]),
+    'CharacterManifest',
+  );
+  // and having no parent at all stays the ordinary case
+  parseWith(CharacterManifestSchema, withResults([r1]), 'CharacterManifest');
 });
 
 Deno.test('JobEvent rejects unknown discriminants and bad timestamps', () => {

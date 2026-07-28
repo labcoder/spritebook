@@ -151,6 +151,18 @@ const characterManifest = parseWith(CharacterManifestSchema, {
       wallTimeS: 92.5,
       output: { gltfSha256: sha('2'), tris: 14318, textureRes: 1024, kind: 'mesh' },
       discarded: false,
+    }, {
+      // r1 repainted: same geometry, new atlas. Here so the fixture exercises
+      // lineage rather than leaving `derivedFrom` untested in the golden.
+      id: 'r2',
+      backend: { modelId: 'pixal3d', version: '1.2' },
+      params: { quality: 'high' },
+      seed: 43,
+      startedAt: T0,
+      wallTimeS: 17.2,
+      output: { gltfSha256: sha('4'), tris: 14318, textureRes: 1024, kind: 'mesh' },
+      discarded: false,
+      derivedFrom: 'r1',
     }],
     pickedResultId: 'r1',
   },

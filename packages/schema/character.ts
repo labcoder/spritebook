@@ -34,9 +34,14 @@ export const PreflightReportSchema = z.strictObject({
 });
 export type PreflightReport = z.output<typeof PreflightReportSchema>;
 
+/** A result id as it appears inside the manifest. Looser than gen.ts's
+ * `ResultIdSchema` (`r1`, `r2`, …) because fixtures and imports have always
+ * used slugs here; one const so `id` and `derivedFrom` cannot drift apart. */
+const resultIdLike = z.string().regex(/^[a-z0-9][a-z0-9-]*$/);
+
 /** Pre-canonical working set: every generation attempt is a receipt. */
 export const GenerationResultSchema = z.strictObject({
-  id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+  id: resultIdLike,
   backend: z.strictObject({ modelId: z.string().min(1), version: z.string().min(1) }),
   /** validated against the backend's paramsSchema by core at job time */
   params: z.record(z.string(), z.unknown()),
@@ -51,6 +56,17 @@ export const GenerationResultSchema = z.strictObject({
     kind: z.enum(['mesh', 'gaussians']),
   }),
   discarded: z.boolean(),
+  /** The result this one came FROM, when it was not generated from an image.
+   *
+   * `retexture` writes it: the new result shares its parent's geometry and
+   * differs only in paint. Without it a roster is a flat list in which "r3 is
+   * r1 repainted" is invisible, so a user comparing two results cannot tell
+   * whether the silhouette changed or only the colour — and picking either one
+   * looks like an equally fresh choice.
+   *
+   * Optional because most results have no parent, and absent stays the honest
+   * default for every backend that only generates. */
+  derivedFrom: resultIdLike.optional(),
 });
 export type GenerationResult = z.output<typeof GenerationResultSchema>;
 
@@ -162,5 +178,25 @@ export const CharacterManifestSchema = z.strictObject({
    * undo takes the whole bake back rather than half of it. `cloneCharacter`
    * drops it: a copy has baked nothing. */
   lastBakeId: BakeIdSchema.optional(),
+}).superRefine((m, ctx) => {
+  // A parent that is not in the list is worse than no lineage recorded: it
+  // reads as an answer and is not one. Results are append-only — a discarded
+  // parent keeps its id and its files — so a live reference can never be
+  // orphaned by ordinary use, and one that IS orphaned means something wrote
+  // the manifest by hand.
+  const ids = new Set(m.generation.results.map((r) => r.id));
+  for (const [i, r] of m.generation.results.entries()) {
+    if (r.derivedFrom === undefined) continue;
+    const path = ['generation', 'results', i, 'derivedFrom'];
+    if (r.derivedFrom === r.id) {
+      ctx.addIssue({ code: 'custom', path, message: `result "${r.id}" derives from itself` });
+    } else if (!ids.has(r.derivedFrom)) {
+      ctx.addIssue({
+        code: 'custom',
+        path,
+        message: `result "${r.id}" derives from "${r.derivedFrom}", which is not in this manifest`,
+      });
+    }
+  }
 });
 export type CharacterManifest = z.output<typeof CharacterManifestSchema>;
