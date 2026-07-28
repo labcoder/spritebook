@@ -194,6 +194,7 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     // 5. the backend, through the sidecar
     session = new SidecarSession({ sidecarDir: opts.sidecarDir });
     let sawMesh = false;
+    let metaPath: string | undefined;
     for await (
       const e of session.run({
         jobId: `${opts.jobId}-gen` as JobEvent['jobId'],
@@ -225,6 +226,11 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
         );
       }
       if (e.t === 'artifact' && e.kind === 'mesh-raw') sawMesh = true;
+      // An adapter that retried announces the seed it ACTUALLY used. Recording
+      // the requested one instead would make "re-run exactly this" reproduce
+      // the failure rather than the result — trellis2 re-samples past a
+      // seed-dependent black texture, so the two genuinely differ.
+      if (e.t === 'artifact' && e.kind === 'gen-meta') metaPath = e.path;
       // forward the backend's progress/warns under this job's id
       if (e.t === 'progress') {
         yield {
@@ -280,11 +286,14 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     if (described.tris < 1) {
       throw new GenFail('border-failed', 'The canonical mesh has no triangles');
     }
+    // the seed the adapter settled on, when it told us; otherwise the one asked for
+    const effectiveSeed = await readEffectiveSeed(metaPath, opts.seed);
+
     const receipt: GenerationResult = {
       id: resultId,
       backend: { modelId: entry.id, version: installed.version },
       params,
-      seed: opts.seed,
+      seed: effectiveSeed,
       startedAt,
       wallTimeS: Number(((performance.now() - t0) / 1000).toFixed(3)),
       output: {
@@ -324,5 +333,28 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     };
   } finally {
     await session?.dispose();
+  }
+}
+
+/**
+ * The seed an adapter actually generated with, from its `gen-meta` artifact.
+ *
+ * Optional by design: only backends that can re-sample emit it, and a missing,
+ * unreadable or malformed file falls back to the requested seed rather than
+ * failing a generation that has already produced a mesh. A wrong seed in a
+ * receipt is bad; throwing away a good mesh over bookkeeping is worse — the
+ * same rule `rig` follows when its recording step fails.
+ */
+export async function readEffectiveSeed(
+  metaPath: string | undefined,
+  requested: number,
+): Promise<number> {
+  if (metaPath === undefined) return requested;
+  try {
+    const doc = JSON.parse(await Deno.readTextFile(metaPath)) as { effectiveSeed?: unknown };
+    const seed = doc.effectiveSeed;
+    return typeof seed === 'number' && Number.isInteger(seed) && seed >= 0 ? seed : requested;
+  } catch {
+    return requested;
   }
 }
