@@ -4,11 +4,13 @@ Everything unusual in here is a measured finding from spikes/trellis2, not a
 precaution. In particular:
 
 **The texture stage collapses on some seeds.** For a given image certain seeds
-make the texture decoder emit a CONSTANT at the bottom of its [-1, 1] range,
-which becomes a pure black base colour while the geometry is fine. Measured over
-56 runs: ~5% of seeds on external character art, 0% on the model's own examples,
-and every failure landed on seed 42. So the adapter DETECTS it and retries on
-the next seed rather than shipping a black character.
+make the texture decoder emit a CONSTANT — pinned at one end of its [-1, 1]
+range — so the base colour carries no content at all while the geometry is
+fine. It saturates at EITHER end: black (generation, seed 42, mean 0.0006) or
+white (retexture, seed 2026, mean 0.9987). Measured over 56 generation runs:
+~5% of seeds on external character art, 0% on the model's own examples. So the
+adapter DETECTS it and retries on the next seed rather than shipping a blank
+character.
 
 **Detect with the MEAN, not the max.** One failure had `max` 0.9856 from a
 handful of stray texels while its mean was 0.0415 and its baked texture was
@@ -44,9 +46,15 @@ from . import Adapter, AdapterError, Emitter, validate_params
 
 TRELLIS2_ADAPTER_VERSION = "0.1.0"
 
-# Mean base colour below this is a collapse, not a dark character. See the
-# module docstring: the threshold is a valley in measured data, not a taste.
-COLLAPSE_MEAN = 0.10
+# A collapsed texture has NO CONTENT, and the decoder can reach that at either
+# end of its [-1, 1] range. Black was found first (generation, seed 42, mean
+# 0.0006); white turned up in the retexture spike (seed 2026, mean 0.9987) and
+# would have sailed past a one-sided check to bake a featureless white
+# silhouette. Both bounds are valleys in measured data, not tastes: across the
+# generation sweeps healthy output spanned 0.147..0.723, including a
+# deliberately dark subject at 0.18 and a bright one at 0.72.
+COLLAPSE_MEAN_LOW = 0.10
+COLLAPSE_MEAN_HIGH = 0.95
 
 GEN_ARTIFACT_MESH = "mesh-raw"
 GEN_ARTIFACT_META = "gen-meta"
@@ -70,7 +78,12 @@ PARAMS_SCHEMA: dict[str, Any] = {
         # loads each model for its stage and offloads after: the reason peak
         # VRAM is ~9 GiB rather than the ~24 the upstream README quotes
         "lowVram": {"type": "boolean"},
-        "textureRetries": {"type": "integer", "minimum": 0, "maximum": 8},
+        # The BUDGET is catalog data, not a constant here: the collapse rate is a
+        # property of the backend and the operation, and it differs by 7x
+        # between generating (5% per seed) and retexturing (37.5%). A second
+        # backend will bring its own rate, and it should not have to argue with
+        # a number compiled into ours.
+        "textureRetries": {"type": "integer", "minimum": 0, "maximum": 12},
         "textureSize": {"type": "integer", "enum": [1024, 2048, 4096]},
         # raw output is 3-10 M faces, far past what a sprite bake needs or what
         # UniRig wants to rig
@@ -84,6 +97,8 @@ DEFAULTS: dict[str, Any] = {
     "steps": 12,
     "guidanceStrength": 7.5,
     "lowVram": True,
+    # the FALLBACK only. The catalog's operationDefaults normally supplies this,
+    # per operation, because the collapse rate is not one number.
     "textureRetries": 2,
     "textureSize": 2048,
     "decimationTarget": 200000,
@@ -100,9 +115,25 @@ def base_color_mean(attrs: Any) -> float:
     return float(attrs[:, 0:3].mean())
 
 
+def collapse_kind(attrs: Any) -> str | None:
+    """`"black"`, `"white"`, or None when the texture has content.
+
+    Named rather than boolean because the two ends are worth telling apart in a
+    warning: a user who sees "white" and a user who sees "black" are looking at
+    different-looking characters, and lumping them together makes the message
+    describe neither.
+    """
+    mean = base_color_mean(attrs)
+    if mean < COLLAPSE_MEAN_LOW:
+        return "black"
+    if mean > COLLAPSE_MEAN_HIGH:
+        return "white"
+    return None
+
+
 def collapsed(attrs: Any) -> bool:
-    """Did the texture decoder collapse? See the module docstring for why mean."""
-    return base_color_mean(attrs) < COLLAPSE_MEAN
+    """Did the texture decoder collapse, at either end? See the constants."""
+    return collapse_kind(attrs) is not None
 
 
 def _require_rgba(image_path: Path) -> Any:
@@ -209,22 +240,23 @@ def generate_with_retries(
             image, seed=used, pipeline_type=pipeline_type, preprocess_image=True
         )[0]
         tried.append(used)
-        if not collapsed(mesh.attrs):
+        kind = collapse_kind(mesh.attrs)
+        if kind is None:
             return mesh, used, tried
         emit.warn(
             "texture-collapsed",
-            f"seed {used} produced a black texture (mean base colour "
-            f"{base_color_mean(mesh.attrs):.4f}, below {COLLAPSE_MEAN}) - a known "
-            f"TRELLIS.2 failure that is specific to the seed, not the image. "
-            f"Retrying on seed {used + 1}.",
+            f"seed {used} produced a {kind} texture with no content (mean base colour "
+            f"{base_color_mean(mesh.attrs):.4f}) - a known TRELLIS.2 failure that "
+            f"depends on the image, the mesh and the seed together, not on the seed "
+            f"alone. Retrying on seed {used + 1}.",
         )
 
     # Every seed collapsed. Shipping a black character silently is the one thing
     # this adapter exists to prevent, so this is a refusal, not a fallback.
     raise AdapterError(
         "texture-collapsed",
-        f"all {budget + 1} seeds ({', '.join(map(str, tried))}) produced a black "
-        f"texture. Re-run with a different --seed, or raise textureRetries. The "
+        f"all {budget + 1} seeds ({', '.join(map(str, tried))}) produced a texture "
+        f"with no content. Re-run with a different --seed, or raise textureRetries. The "
         f"geometry is unaffected - a geometry-only run plus the texture substage is "
         f"the other way through.",
         True,

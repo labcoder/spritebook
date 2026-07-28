@@ -965,17 +965,22 @@ class _FakeMesh:
 
 
 class _FakePipeline:
-    """Returns a collapsed mesh for the seeds in `bad`, a healthy one otherwise."""
+    """Returns a collapsed mesh for the seeds in `bad`, a healthy one otherwise.
 
-    def __init__(self, bad: set[int]) -> None:
+    `bad_mean` picks WHICH collapse: 0.0006 is the black one seen in generation,
+    0.9987 the white one seen in retexture. The ladder must climb past both.
+    """
+
+    def __init__(self, bad: set[int], bad_mean: float = 0.0006) -> None:
         self.bad = bad
+        self.bad_mean = bad_mean
         self.seeds_seen: list[int] = []
         self.preprocess_flags: list[bool] = []
 
     def run(self, image, seed, pipeline_type, preprocess_image):  # noqa: ANN001
         self.seeds_seen.append(seed)
         self.preprocess_flags.append(preprocess_image)
-        return [_FakeMesh(0.0006 if seed in self.bad else 0.42)]
+        return [_FakeMesh(self.bad_mean if seed in self.bad else 0.42)]
 
 
 class _RecordingEmitter:
@@ -999,14 +1004,25 @@ class _RecordingEmitter:
 def test_trellis2_collapse_detector() -> None:
     from .adapters import trellis2 as t2
 
-    # The threshold is a measured valley, not a taste: healthy output spans
-    # 0.147..0.723 including a deliberately dark subject at 0.18, and the two
-    # observed failures sat at 0.0415 and 0.0006.
-    ok(t2.COLLAPSE_MEAN == 0.10, "collapse threshold is the measured 0.10")
+    # Both thresholds are measured valleys, not tastes: healthy output spans
+    # 0.147..0.723 including a deliberately dark subject at 0.18, while the
+    # failures sat at 0.0415, 0.0006 (black) and 0.9987 (white).
+    ok(t2.COLLAPSE_MEAN_LOW == 0.10, "low threshold is the measured 0.10")
+    ok(t2.COLLAPSE_MEAN_HIGH == 0.95, "high threshold is the measured 0.95")
     ok(t2.collapsed(_FakeMesh(0.0006).attrs), "hard collapse detected")
     ok(t2.collapsed(_FakeMesh(0.0415).attrs), "the SOFT failure is detected too")
     ok(not t2.collapsed(_FakeMesh(0.1473).attrs), "worst healthy run passes")
     ok(not t2.collapsed(_FakeMesh(0.18).attrs), "a legitimately dark subject passes")
+
+    # THE retexture spike's second failure mode. A one-sided detector passed
+    # seed 2026's pure-white atlas, which bakes a featureless silhouette that
+    # is no more usable than a black one.
+    ok(t2.collapsed(_FakeMesh(0.9987).attrs), "white saturation is a collapse too")
+    ok(t2.collapse_kind(_FakeMesh(0.9987).attrs) == "white", "and it is named white")
+    ok(t2.collapse_kind(_FakeMesh(0.0006).attrs) == "black", "the dark end is named black")
+    ok(t2.collapse_kind(_FakeMesh(0.42).attrs) is None, "healthy output has no kind")
+    # the bright end of the healthy range must not be swept up with it
+    ok(not t2.collapsed(_FakeMesh(0.723).attrs), "the brightest healthy run passes")
 
     # THE bug this detector was rewritten to avoid: a run whose mean is 0.0415
     # had max 0.9856 from stray texels, so a max-based check passed an unusable
@@ -1029,6 +1045,15 @@ def test_trellis2_retry_ladder() -> None:
     ok(all(pipe.preprocess_flags), "preprocess_image=True so BiRefNet is never built")
     ok([c for c, _ in emit.warns] == ["texture-collapsed"], "warned once, on the bad seed")
     ok(not t2.collapsed(mesh.attrs), "the returned mesh is the healthy one")
+
+    # the WHITE mode climbs the same ladder, and the warning says which end it
+    # hit - "your character came out white" and "came out black" are different
+    # bug reports, and one message covering both describes neither
+    white = _FakePipeline(bad={9}, bad_mean=0.9987)
+    emitw = _RecordingEmitter()
+    _, usedw, triedw = t2.generate_with_retries(white, object(), 9, 2, "512", emitw)
+    ok((usedw, triedw) == (10, [9, 10]), f"retried past the white seed, got {triedw}")
+    ok("white" in emitw.warns[0][1], f"the warning names the end: {emitw.warns[0][1]}")
 
     # a healthy first seed does not retry at all
     clean = _FakePipeline(bad=set())
@@ -1060,7 +1085,9 @@ def test_trellis2_params_and_input(tmp: Path) -> None:
     ok(p["textureRetries"] == 2, "two retries takes residual failure to ~0.01%")
     ok(p["lowVram"] is True, "low VRAM on: the reason peak is ~9 GiB not ~24")
 
-    for bad in ({"pipelineType": "1536_cascade"}, {"textureRetries": 9}, {"nope": 1}):
+    # 12 is the ceiling because retexture, at a 37.5% per-seed rate, needs a
+    # bigger ladder than generation's 2 - the value itself is catalog data
+    for bad in ({"pipelineType": "1536_cascade"}, {"textureRetries": 13}, {"nope": 1}):
         try:
             validate_params(t2.PARAMS_SCHEMA, {
                 "imagePath": "a.png", "outDir": "o", "modelDir": "m", "seed": 0, **bad,
