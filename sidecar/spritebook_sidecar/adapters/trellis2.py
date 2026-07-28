@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -115,20 +116,29 @@ def base_color_mean(attrs: Any) -> float:
     return float(attrs[:, 0:3].mean())
 
 
-def collapse_kind(attrs: Any) -> str | None:
+def kind_for_mean(mean: float) -> str | None:
     """`"black"`, `"white"`, or None when the texture has content.
 
     Named rather than boolean because the two ends are worth telling apart in a
     warning: a user who sees "white" and a user who sees "black" are looking at
     different-looking characters, and lumping them together makes the message
     describe neither.
+
+    Takes the MEAN rather than a mesh because the two paths reach it
+    differently: generation reads decoded PBR attributes, retexture reads a
+    baked atlas image. Same decoder, same failure, same [0, 1] scale — so the
+    thresholds are shared and there is one place to change them.
     """
-    mean = base_color_mean(attrs)
     if mean < COLLAPSE_MEAN_LOW:
         return "black"
     if mean > COLLAPSE_MEAN_HIGH:
         return "white"
     return None
+
+
+def collapse_kind(attrs: Any) -> str | None:
+    """`kind_for_mean` for a decoded mesh's PBR attributes (the gen path)."""
+    return kind_for_mean(base_color_mean(attrs))
 
 
 def collapsed(attrs: Any) -> bool:
@@ -218,6 +228,60 @@ def _export_glb(mesh: Any, out_path: Path, texture_size: int, decimation: int) -
     glb.export(str(out_path))
 
 
+GEN_REMEDY = (
+    "The geometry is unaffected - a geometry-only run plus the texture substage is "
+    "the other way through."
+)
+
+
+def sample_with_retries(
+    sample: Callable[[int], tuple[Any, float]],
+    seed: int,
+    budget: int,
+    emit: Emitter,
+    step: str,
+    remedy: str,
+) -> tuple[Any, int, list[int]]:
+    """Climb seeds until the texture is not collapsed. -> (result, seed used, tried).
+
+    A deterministic ladder (`seed`, `seed+1`, ...) rather than random retries, so
+    a receipt naming the effective seed reproduces exactly. Separated from `run`
+    because this is the part worth testing without a GPU.
+
+    `sample(seed) -> (result, mean base colour)` is a callable rather than a
+    pipeline because generation and retexture call different pipelines with
+    different signatures and read the base colour from different places — but it
+    is ONE decoder failing ONE way, so it deserves one ladder, one warning shape
+    and one refusal rather than two that drift.
+    """
+    tried: list[int] = []
+    for attempt in range(budget + 1):
+        used = seed + attempt
+        emit.progress(f"{step}:seed{used}", attempt + 1, budget + 1)
+        result, mean = sample(used)
+        tried.append(used)
+        kind = kind_for_mean(mean)
+        if kind is None:
+            return result, used, tried
+        emit.warn(
+            "texture-collapsed",
+            f"seed {used} produced a {kind} texture with no content (mean base colour "
+            f"{mean:.4f}) - a known TRELLIS.2 failure that depends on the image, the "
+            f"mesh and the seed together, not on the seed alone. Retrying on seed "
+            f"{used + 1}.",
+        )
+
+    # Every seed collapsed. Shipping a blank character silently is the one thing
+    # this ladder exists to prevent, so this is a refusal, not a fallback.
+    raise AdapterError(
+        "texture-collapsed",
+        f"all {budget + 1} seeds ({', '.join(map(str, tried))}) produced a texture "
+        f"with no content. Re-run with a different --seed, or raise textureRetries. "
+        f"{remedy}",
+        True,
+    )
+
+
 def generate_with_retries(
     pipeline: Any,
     image: Any,
@@ -226,41 +290,15 @@ def generate_with_retries(
     pipeline_type: str,
     emit: Emitter,
 ) -> tuple[Any, int, list[int]]:
-    """Sample until the texture is not collapsed. Returns (mesh, seed used, tried).
+    """The ladder, wired to the image-to-3D pipeline."""
 
-    A deterministic ladder (`seed`, `seed+1`, ...) rather than random retries, so
-    a receipt naming the effective seed reproduces exactly. Separated from `run`
-    because this is the part worth testing without a GPU.
-    """
-    tried: list[int] = []
-    for attempt in range(budget + 1):
-        used = seed + attempt
-        emit.progress(f"generate:seed{used}", attempt + 1, budget + 1)
+    def sample(used: int) -> tuple[Any, float]:
         mesh = pipeline.run(
             image, seed=used, pipeline_type=pipeline_type, preprocess_image=True
         )[0]
-        tried.append(used)
-        kind = collapse_kind(mesh.attrs)
-        if kind is None:
-            return mesh, used, tried
-        emit.warn(
-            "texture-collapsed",
-            f"seed {used} produced a {kind} texture with no content (mean base colour "
-            f"{base_color_mean(mesh.attrs):.4f}) - a known TRELLIS.2 failure that "
-            f"depends on the image, the mesh and the seed together, not on the seed "
-            f"alone. Retrying on seed {used + 1}.",
-        )
+        return mesh, base_color_mean(mesh.attrs)
 
-    # Every seed collapsed. Shipping a black character silently is the one thing
-    # this adapter exists to prevent, so this is a refusal, not a fallback.
-    raise AdapterError(
-        "texture-collapsed",
-        f"all {budget + 1} seeds ({', '.join(map(str, tried))}) produced a texture "
-        f"with no content. Re-run with a different --seed, or raise textureRetries. The "
-        f"geometry is unaffected - a geometry-only run plus the texture substage is "
-        f"the other way through.",
-        True,
-    )
+    return sample_with_retries(sample, seed, budget, emit, "generate", GEN_REMEDY)
 
 
 def run(params: dict[str, Any], emit: Emitter) -> None:
@@ -306,7 +344,7 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     if used_seed != seed:
         emit.warn(
             "seed-changed",
-            f"the requested seed {seed} produced a black texture; this result was "
+            f"the requested seed {seed} produced a texture with no content; this was "
             f"generated with seed {used_seed}, which is what the receipt records.",
         )
     emit.artifact(GEN_ARTIFACT_META, str(meta_path))
