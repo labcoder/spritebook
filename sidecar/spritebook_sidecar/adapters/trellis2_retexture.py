@@ -62,10 +62,14 @@ RETEXTURE_ADAPTER_VERSION = "0.1.0"
 # failures worth catching: an un-inverted axis swap (which permutes the per-axis
 # extents of any character that is not a cube) and a rescale to the unit box.
 #
-# HONEST LIMIT: a rescale is only visible when the input is not already ~unit
-# sized. `raw.glb` arrives in the model's own [-0.5, 0.5] space, so on that input
-# this guard catches the swap but not the scale. It is a tripwire for a backend
-# change, not a proof of correctness.
+# HONEST LIMITS, both worth knowing before trusting it. A rescale is only
+# visible when the input is not already ~unit sized, so a mesh still in the
+# model's own [-0.5, 0.5] space hides it. And the CENTRE term does most of the
+# work on the input core actually sends: canonical meshes are grounded at Y=0,
+# so a backend that recentred on the bbox and forgot to put it back moves the
+# centre by half the height. The number was calibrated against 0.1% of measured
+# drift on an origin-centred spike mesh. It is a tripwire for a backend change,
+# not a proof of correctness.
 FRAME_TOLERANCE = 0.02
 
 PARAMS_SCHEMA: dict[str, Any] = {

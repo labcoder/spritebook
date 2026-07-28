@@ -7,8 +7,9 @@ precaution. In particular:
 make the texture decoder emit a CONSTANT — pinned at one end of its [-1, 1]
 range — so the base colour carries no content at all while the geometry is
 fine. It saturates at EITHER end: black (generation, seed 42, mean 0.0006) or
-white (retexture, seed 2026, mean 0.9987). Measured over 56 generation runs:
-~5% of seeds on external character art, 0% on the model's own examples. So the
+white (retexture, seed 2026, mean 0.9987). Measured over the 40-run seed
+sweep: 2 of 40 on external character art (both at seed 42, on two different
+references), 0 on the model's own examples - ~5% per seed. So the
 adapter DETECTS it and retries on the next seed rather than shipping a blank
 character.
 

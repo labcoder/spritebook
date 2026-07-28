@@ -58,6 +58,16 @@ async function collect(it: AsyncIterable<JobEvent>): Promise<JobEvent[]> {
   return out;
 }
 
+/** [min, max] of one axis over an interleaved XYZ position array. */
+function extent(positions: Float32Array, axis: number): [number, number] {
+  let lo = Infinity, hi = -Infinity;
+  for (let i = axis; i < positions.length; i += 3) {
+    lo = Math.min(lo, positions[i]);
+    hi = Math.max(hi, positions[i]);
+  }
+  return [lo, hi];
+}
+
 /** Positions and the base-colour texture bytes of a canonical glb. */
 async function meshAndPaint(path: string) {
   const doc = await new NodeIO().read(path);
@@ -139,13 +149,31 @@ Deno.test('ACCEPTANCE: the surface survives, the paint changes, the parent is na
     assertEquals(events.at(-1)?.t, 'done');
 
     const after = await meshAndPaint(`${f.workspace}/results/r2/model.glb`);
-    // THE claim, both halves of it
-    assertEquals(after.positions.length, before.positions.length, 'vertex count held');
+
+    // THE SHARED CONTRACT: the surface does not move. Bounds rather than
+    // per-vertex equality, because that is all the real backend promises - it
+    // re-encodes and returns ~1.5% more vertices with the faces reordered.
+    for (const axis of [0, 1, 2]) {
+      const [lo0, hi0] = extent(before.positions, axis);
+      const [lo1, hi1] = extent(after.positions, axis);
+      const span = hi0 - lo0;
+      assert(span > 0, `axis ${axis} has extent`);
+      assert(
+        Math.abs(lo1 - lo0) / span < 0.01 && Math.abs(hi1 - hi0) / span < 0.01,
+        `axis ${axis} moved: [${lo0},${hi0}] -> [${lo1},${hi1}]`,
+      );
+    }
+
+    // FIXTURE-STRENGTH, and only true here: `fixture-retexture` writes the
+    // input's vertex buffer straight back, so it can be compared elementwise.
+    // The real backend would fail this, which is why it is labelled.
+    assertEquals(after.positions.length, before.positions.length, 'the stand-in keeps the buffer');
     let maxDelta = 0;
     for (let i = 0; i < before.positions.length; i++) {
       maxDelta = Math.max(maxDelta, Math.abs(after.positions[i] - before.positions[i]));
     }
     assert(maxDelta < 1e-5, `geometry moved by ${maxDelta}`);
+
     assert(before.texture && after.texture, 'both results carry a base-colour texture');
     assertNotEquals(
       [...before.texture].join(','),

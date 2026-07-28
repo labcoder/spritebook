@@ -13,9 +13,10 @@ the same seed reproduces.
 
 That difference from the real backend is deliberate and worth naming: TRELLIS.2
 re-encodes the mesh and hands back the same SURFACE with a different vertex
-buffer, while this hands back the same buffer. A test that pins byte-identical
-topology would therefore pass here and fail against the real backend - so the
-tests pin what BOTH promise: the surface, the bounds and the parentage.
+buffer (~1.5% more vertices, faces reordered), while this hands back the same
+buffer. So a test written against this adapter can assert more than the feature
+promises, and `retexture_test.ts` says out loud which of its assertions are
+fixture-strength and which are the shared contract.
 """
 
 from __future__ import annotations
@@ -56,10 +57,15 @@ DEFAULTS: dict[str, Any] = {"textureSize": 512}
 def hue_rotate(rgb: np.ndarray, turns: float) -> np.ndarray:
     """Rotate hue by `turns` of a full circle, in place-safe float space.
 
-    The YIQ rotation matrix rather than a round trip through HSV: it is three
-    matrix multiplies, it is exactly reversible, and it leaves luminance alone -
-    so the silhouette's shading survives and only the colour moves, which is
-    what "same mesh, new paint" should look like.
+    The YIQ rotation matrix rather than a round trip through HSV: one matrix
+    multiply, and in float space it moves chroma while leaving luma alone.
+
+    In THIS function it does not, quite: the result is clipped to [0, 255] and
+    cast to uint8, which is a lossy step the rotation itself is not. Measured on
+    the test's own palette, luma moves by up to 11/255 and a rotate-and-return
+    is off by as much as 77/255. That is fine for a fixture whose job is to look
+    different per seed and reproduce per seed, but it is not a colour-managed
+    transform and nothing should be built on top of it.
     """
     angle = 2.0 * math.pi * turns
     cos_a, sin_a = math.cos(angle), math.sin(angle)

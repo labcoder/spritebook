@@ -51,7 +51,7 @@ Eight seeds at `resolution=512`:
 | 1234     | 0.3332     | ok                  |
 | **2026** | **0.9987** | **saturated WHITE** |
 
-**37.5% per-seed failure**, against 5% for full generation across 40 runs. Retexturing fails roughly
+**37.5% per-seed failure**, against 5% for full generation (2 of 40 runs). Retexturing fails roughly
 seven times more often than generating from scratch.
 
 **A new failure mode:** seed 2026 returns a pure white atlas — the decoder saturating at the TOP of
@@ -59,11 +59,11 @@ its range rather than the bottom. `COLLAPSE_MEAN = 0.10` as written would pass i
 would bake as a featureless white silhouette. **The detector has to be two-sided.** A texture with
 mean > 0.95 has no content either.
 
-**And it resolves an open question from the earlier sweep.** Seed 42 was the only failure across 40
-generation runs, on two different images, which looked like it might be a globally bad seed. Here 42
-is fine and 7 and 777 fail — while 7 was fine in generation. So the failure is an interaction
-between a specific image, mesh and seed, not a property of the seed. The ladder handles it either
-way.
+**And it resolves an open question from the earlier sweep.** Seed 42 was the only failing SEED
+across 40 generation runs - it failed twice, on two different images - which looked like it might be
+a globally bad seed. Here 42 is fine and 7 and 777 fail — while 7 was fine in generation. So the
+failure is an interaction between a specific image, mesh and seed, not a property of the seed. The
+ladder handles it either way.
 
 ## Cost
 
@@ -100,7 +100,7 @@ and it should be built for that reason rather than for speed.
 
 - **One mesh, one image.** 8 seeds on a single character. The rate could differ per subject, as it
   did for generation.
-- **Whether the white saturation appears in full generation too.** Nothing in the 56 generation runs
+- **Whether the white saturation appears in full generation too.** Nothing in the 40 generation runs
   hit it, but nothing was looking for it either — the detector was one-sided.
 - **Whether a retexture of a retexture drifts.** Each pass re-splits UV seams and reorders faces;
   the surface held for one pass, and nobody has run two.
