@@ -21,18 +21,18 @@ JobEmitter and raises `AdapterError` on failure.
 
 My first draft of this used `base_color.max() < 0.05`. **The 40-run sweep proved that wrong**: it
 catches only one of the two real failures. `bulma-front` at seed 42 came back with `max 0.9856` — a
-handful of bright texels — while its `mean` was 0.0415 and the baked GLB texture was black
-(mean 0.003). A detector that passes an unusable character is worse than none.
+handful of bright texels — while its `mean` was 0.0415 and the baked GLB texture was black (mean
+0.003). A detector that passes an unusable character is worse than none.
 
 The sweep gives the threshold empirically rather than by taste:
 
-| | mean |
-|---|---|
-| worst FAILURE | 0.0415 (`bulma-front`, seed 42) |
-| hard collapse | 0.0006 (`bulma-iso`, seed 42) |
-| **worst HEALTHY** | **0.1473** (`bulma-iso`, seed 777) |
-| legitimately dark control (witch) | 0.18 – 0.28 |
-| brightest | 0.7229 |
+|                                   | mean                               |
+| --------------------------------- | ---------------------------------- |
+| worst FAILURE                     | 0.0415 (`bulma-front`, seed 42)    |
+| hard collapse                     | 0.0006 (`bulma-iso`, seed 42)      |
+| **worst HEALTHY**                 | **0.1473** (`bulma-iso`, seed 777) |
+| legitimately dark control (witch) | 0.18 – 0.28                        |
+| brightest                         | 0.7229                             |
 
 `0.10` sits in the gap: 2.4× above the worst failure, 1.5× below the worst healthy result. Not a
 tuned knob — a valley with nothing in it across 40 runs.
@@ -122,13 +122,13 @@ Measured failure rate is **5% per seed on character art** (2 of 40 runs unusable
 collapse). Both failures were seed 42; the witch and plant never failed on any of the ten seeds.
 
 | retries | attempts | residual failure |
-|---|---|---|
-| 1 | 2 | 0.25% |
-| **2** | **3** | **0.0125%** |
-| 3 | 4 | 0.0006% |
+| ------- | -------- | ---------------- |
+| 1       | 2        | 0.25%            |
+| **2**   | **3**    | **0.0125%**      |
+| 3       | 4        | 0.0006%          |
 
-`textureRetries` defaults to **2**. At 21 s per 512 attempt the expected cost of retrying is about
-1 second amortised, so this is close to free — and crucially it means **the texture substage is not
+`textureRetries` defaults to **2**. At 21 s per 512 attempt the expected cost of retrying is about 1
+second amortised, so this is close to free — and crucially it means **the texture substage is not
 needed as a rescue**. It stays an optional quality upgrade, not a dependency.
 
 Caveat worth keeping: independence across seeds is assumed, not proven. Both observed failures
@@ -141,13 +141,13 @@ way, since consecutive seeds give unrelated RNG states.
 The earlier two-seed test suggested mixed shape-1024/texture-512 beat `1024_cascade`. Eight seeds on
 both references says the opposite, and says it clearly.
 
-| combo | collapses |
-|---|---|
+| combo | collapses  |
+| ----- | ---------- |
 | `512` | **2 / 16** |
 | mixed | **5 / 16** |
 
-Mixed is ~2.5x more likely to collapse, and it introduces failures on seeds `512` handles fine
-(0 and 7). On means, `512` wins 11 of 16 head-to-head. Side by side (`out/wide/COMPARE_*.png`) the
+Mixed is ~2.5x more likely to collapse, and it introduces failures on seeds `512` handles fine (0
+and 7). On means, `512` wins 11 of 16 head-to-head. Side by side (`out/wide/COMPARE_*.png`) the
 mixed row is uniformly darker and muddier even where it does not formally collapse.
 
 The two seeds I first tried, 7 and 1234, happened to be among mixed's better ones. **That is the
@@ -179,5 +179,5 @@ The retry loop below is the floor, not the ceiling.
   references are the only ones that fail is suggestive, not conclusive. Genuinely external art in
   other styles would settle it.
 - **Whether the pipeline stays resident between jobs.** The 82 s load dominates a single character
-  and vanishes across a roster. The sidecar is long-lived, so caching is natural, but it holds
-  ~16 GB of host RAM and that is a real cost to declare.
+  and vanishes across a roster. The sidecar is long-lived, so caching is natural, but it holds ~16
+  GB of host RAM and that is a real cost to declare.

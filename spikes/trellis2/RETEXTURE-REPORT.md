@@ -7,13 +7,13 @@ is what decides how this feature should be built.
 
 ## Geometry: preserved
 
-| | |
-|---|---|
-| surface deviation vs input | **mean 2.7e-4, max 9.7e-4 — 0.027% of model extent** |
-| faces | 199,959 → 199,959, **identical count** |
-| bounds | `[-0.439,-0.501,-0.113]..[0.439,0.501,0.113]` → `[-0.438,-0.5,-0.113]..[0.438,0.5,0.113]` |
-| area / volume | −0.33% / −0.4% |
-| vertices | 168,239 → 170,763 (+1.5%) |
+|                            |                                                                                           |
+| -------------------------- | ----------------------------------------------------------------------------------------- |
+| surface deviation vs input | **mean 2.7e-4, max 9.7e-4 — 0.027% of model extent**                                      |
+| faces                      | 199,959 → 199,959, **identical count**                                                    |
+| bounds                     | `[-0.439,-0.501,-0.113]..[0.439,0.501,0.113]` → `[-0.438,-0.5,-0.113]..[0.438,0.5,0.113]` |
+| area / volume              | −0.33% / −0.4%                                                                            |
+| vertices                   | 168,239 → 170,763 (+1.5%)                                                                 |
 
 The surface is the same to within a thousandth of the model's extent — sub-millimetre on a 1.8 m
 character — and consistently so across seeds. The vertex growth is UV-seam splitting and the faces
@@ -40,15 +40,15 @@ backend — but it belongs as a guard, not as a correction.
 
 Eight seeds at `resolution=512`:
 
-| seed | mean | |
-|---|---|---|
-| 0 | 0.5714 | ok |
-| 1 | 0.2685 | ok |
-| **7** | **0.0824** | **collapsed black** |
-| 42 | 0.1145 | ok (marginal) |
-| 123 | 0.1994 | ok |
-| **777** | **0.0064** | **collapsed black** |
-| 1234 | 0.3332 | ok |
+| seed     | mean       |                     |
+| -------- | ---------- | ------------------- |
+| 0        | 0.5714     | ok                  |
+| 1        | 0.2685     | ok                  |
+| **7**    | **0.0824** | **collapsed black** |
+| 42       | 0.1145     | ok (marginal)       |
+| 123      | 0.1994     | ok                  |
+| **777**  | **0.0064** | **collapsed black** |
+| 1234     | 0.3332     | ok                  |
 | **2026** | **0.9987** | **saturated WHITE** |
 
 **37.5% per-seed failure**, against 5% for full generation across 40 runs. Retexturing fails roughly
@@ -67,10 +67,10 @@ way.
 
 ## Cost
 
-| resolution | peak VRAM | per seed |
-|---|---|---|
-| 1024 | 6.9 GiB | 25 s |
-| **512** | **3.3 GiB** | **16.5 s** |
+| resolution | peak VRAM   | per seed   |
+| ---------- | ----------- | ---------- |
+| 1024       | 6.9 GiB     | 25 s       |
+| **512**    | **3.3 GiB** | **16.5 s** |
 
 Roughly half the VRAM and two-thirds the time of a full generation, because sparse-structure and
 shape sampling are skipped entirely. 512 is also cheaper here for the same reason it was there.
@@ -79,11 +79,11 @@ shape sampling are skipped entirely. 512 is also cheaper here for the same reaso
 
 **The retry budget cannot be 2.** At 37.5%:
 
-| retries | attempts | residual | worst-case wall time |
-|---|---|---|---|
-| 2 | 3 | 5.3% | 50 s |
-| 4 | 5 | 0.74% | 83 s |
-| **5** | **6** | **0.28%** | **99 s** |
+| retries | attempts | residual  | worst-case wall time |
+| ------- | -------- | --------- | -------------------- |
+| 2       | 3        | 5.3%      | 50 s                 |
+| 4       | 5        | 0.74%     | 83 s                 |
+| **5**   | **6**    | **0.28%** | **99 s**             |
 
 `textureRetries` should default to **5** for retexture and stay at **2** for generation. They are
 different failure rates and deserve different budgets — which argues for the budget living in the
