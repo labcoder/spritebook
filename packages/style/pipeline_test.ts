@@ -62,10 +62,14 @@ Deno.test('palette membership: every opaque pixel of a pixel style is a palette 
 });
 
 Deno.test('flicker is within each preset budget on the idle loop', async () => {
-  // measured post-review: pixel-8 0.054%, cel-2 0.054%, painterly 0.689%. Tight
-  // regression guards (~2x measured); ALL now clear the roadmap 1.2% target —
-  // painterly included — after the hysteresis dimensional fix (H1).
-  const budget: Record<string, number> = { 'pixel-8': 0.15, 'cel-2': 0.15, 'painterly': 1.0 };
+  // Tight regression guards at ~2x MEASURED, not the roadmap 1.2% target - all
+  // presets clear that with room. Measured: cel-2 0.054%, painterly 0.689%,
+  // and pixel-8 0.273% since its stroke went to half a pixel: a 2-texel Sx
+  // stroke sits at the cluster-vote margin, so an edge pixel can swing between
+  // outline and surface with subpixel motion. That is the accepted price of an
+  // outline that no longer swallows slim characters; the old 0.054% belongs to
+  // the 1 px stroke and is not coming back with this preset.
+  const budget: Record<string, number> = { 'pixel-8': 0.55, 'cel-2': 0.15, 'painterly': 1.0 };
   for (const [id, preset] of Object.entries(PRESETS)) {
     const out = await Deno.makeTempDir();
     try {
@@ -81,7 +85,7 @@ Deno.test('flicker is within each preset budget on the idle loop', async () => {
 });
 
 Deno.test('outline-exceeds-padding QA flag fires only when width > padding', async () => {
-  // padding is 6; PIXEL_8 outline width 1 -> no flag
+  // padding is 6; PIXEL_8 outline width 0.5 -> no flag
   const clean = await Deno.makeTempDir();
   try {
     const r = await styleFromAovs(SRC, CAM, PIXEL_8, clean);

@@ -47,7 +47,14 @@ export const PIXEL_8: StylePreset = parseWith(StylePresetSchema, {
     dither: { kind: 'ordered', matrix: 4, strength: 0.5 },
   },
   outline: {
-    widthPx: 1,
+    // Half a pixel, not one. The stroke is drawn at Sx (superSample 4, so 2
+    // texels) and downsamples to a partial pixel — the only way to thin it at
+    // small cells. At 1.0 a slim generated character was MOSTLY outline: a
+    // 1 px inward stroke from both sides of a 3 px limb is 2/3 of the limb,
+    // measured at 67% of bulma's body at 64 px against 41% at 0.5. Picked from
+    // renders (spikes/trellis2/out/p3-exit/outline_options.png), not numbers.
+    // cel-2 keeps 1.0: its look leans on the heavier line.
+    widthPx: 0.5,
     normalThreshold: 0.5,
     depthThresholdScaled: 0.15,
     colorFrom: 'palette-dark',
