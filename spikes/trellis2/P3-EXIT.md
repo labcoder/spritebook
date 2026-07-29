@@ -99,11 +99,31 @@ That single defect produces the tiny sprite, the black lit pass, the 48 clipped 
 `heightM: 0.99999` in the manifest. It is invisible on any unrigged mesh, which is every fixture the
 suite renders.
 
-**The fix is a design decision, not a patch.** The candidates: bake the transform into vertex
-positions and inverse-bind matrices at the border so it cannot be ignored; have `rig` fold the
-ancestor transform into the joint hierarchy; or have the renderer walk above the skeleton root. The
-first matches what "canonical" is supposed to mean — the scale belongs in the data, not in a node
-the spec entitles readers to skip — but it touches D-012 and is not mine to choose alone.
+### Fixed: the scale moved into the vertices
+
+The border now bakes N into POSITION (with NORMAL and TANGENT taking the rotation only), so the
+canonical mesh carries its scale where nothing downstream is entitled to ignore it. It declines to
+bake, leaving the old node path, for an existing skin, a transformed mesh node, or morph targets -
+three cases it cannot prove equivalent.
+
+Re-run end to end with `--height 1.65`:
+
+    POSITION min/max Y: 0.0 .. 1.65     <- the scale is in the DATA
+    nodes: world(scale=None), geometry_0(scale=None)
+
+|                           | before      | after        |
+| ------------------------- | ----------- | ------------ |
+| silhouette extent in cell | y 44..63    | **y 11..60** |
+| clipped frames            | **48 / 48** | **0**        |
+| covered texels            | 170         | **569**      |
+
+**`silhouette-clipped` no longer fires.** Before, the legs were simply absent - the character was
+cut off at the waist on every frame. After, the whole figure is present and grounded.
+
+What did NOT change is the darkness: the shipped lit is mean 0.137 with 67% of the character still a
+single palette entry. At 49 px a slim character's limbs are 2-3 px wide and an outline claims most
+of them - the same effect measured at 128 px drops it to 38%. That is a style question (outline
+width against cell size for slim subjects), not the bug that was fixed here.
 
 ## Verdict
 
