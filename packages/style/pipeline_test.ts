@@ -9,7 +9,7 @@ import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { CameraPreset } from '@spritebook/schema';
 import { parseWith, StylePresetSchema } from '@spritebook/schema';
 import { styleFromAovs } from './pipeline.ts';
-import { CEL_2, PAINTERLY, PIXEL_8, PRESETS } from './presets.ts';
+import { CEL_2, PAINTERLY, PIXEL, PRESETS } from './presets.ts';
 import { srgbToHex } from './oklab.ts';
 import type { AovSource } from './contracts.ts';
 
@@ -34,13 +34,13 @@ const fn = (d: number, f: number) =>
   `d${String(d).padStart(2, '0')}_f${String(f).padStart(3, '0')}.png`;
 
 Deno.test('presets load and validate', () => {
-  assertEquals(Object.keys(PRESETS).sort(), ['cel-2', 'painterly', 'pixel-8']);
+  assertEquals(Object.keys(PRESETS).sort(), ['cel-2', 'painterly', 'pixel']);
 });
 
 Deno.test('palette membership: every opaque pixel of a pixel style is a palette color', async () => {
   const out = await Deno.makeTempDir();
   try {
-    const r = await styleFromAovs(SRC, CAM, PIXEL_8, out);
+    const r = await styleFromAovs(SRC, CAM, PIXEL, out);
     const palette = new Set(r.paletteHex);
     let checked = 0;
     for (let d = 0; d < SRC.directions; d++) {
@@ -64,12 +64,13 @@ Deno.test('palette membership: every opaque pixel of a pixel style is a palette 
 Deno.test('flicker is within each preset budget on the idle loop', async () => {
   // Tight regression guards at ~2x MEASURED, not the roadmap 1.2% target - all
   // presets clear that with room. Measured: cel-2 0.054%, painterly 0.689%,
-  // and pixel-8 0.273% since its stroke went to half a pixel: a 2-texel Sx
+  // and pixel 0.420% at 16 colours (0.273% at the 8 it used to ship) since its
+  // stroke went to half a pixel: a 2-texel Sx
   // stroke sits at the cluster-vote margin, so an edge pixel can swing between
   // outline and surface with subpixel motion. That is the accepted price of an
   // outline that no longer swallows slim characters; the old 0.054% belongs to
   // the 1 px stroke and is not coming back with this preset.
-  const budget: Record<string, number> = { 'pixel-8': 0.55, 'cel-2': 0.15, 'painterly': 1.0 };
+  const budget: Record<string, number> = { 'pixel': 0.55, 'cel-2': 0.15, 'painterly': 1.0 };
   for (const [id, preset] of Object.entries(PRESETS)) {
     const out = await Deno.makeTempDir();
     try {
@@ -85,10 +86,10 @@ Deno.test('flicker is within each preset budget on the idle loop', async () => {
 });
 
 Deno.test('outline-exceeds-padding QA flag fires only when width > padding', async () => {
-  // padding is 6; PIXEL_8 outline width 0.5 -> no flag
+  // padding is 6; PIXEL outline width 0.5 -> no flag
   const clean = await Deno.makeTempDir();
   try {
-    const r = await styleFromAovs(SRC, CAM, PIXEL_8, clean);
+    const r = await styleFromAovs(SRC, CAM, PIXEL, clean);
     assert(!r.flags.some((f) => f.code === 'outline-exceeds-padding'), 'no flag at width 1');
   } finally {
     await Deno.remove(clean, { recursive: true });
@@ -96,7 +97,7 @@ Deno.test('outline-exceeds-padding QA flag fires only when width > padding', asy
   // width 8 > padding 6 -> flag with sourceStage 'look' + frameRefs
   const wide = await Deno.makeTempDir();
   try {
-    const preset = { ...PIXEL_8, outline: { ...PIXEL_8.outline!, widthPx: 8 } };
+    const preset = { ...PIXEL, outline: { ...PIXEL.outline!, widthPx: 8 } };
     const r = await styleFromAovs(SRC, CAM, preset, wide);
     const flag = r.flags.find((f) => f.code === 'outline-exceeds-padding');
     assert(flag, 'flag raised at width 8');
@@ -129,7 +130,7 @@ Deno.test('styleFromAovs is deterministic (byte-identical sprites + metrics)', a
 
 Deno.test('painterly: a bigger budget never shrinks the palette, and no entry is dead', async () => {
   // This replaces an assertion that compared paletteHex.LENGTH against
-  // pixel-8's maxColors. That passed while 25 of painterly's 32 entries were
+  // pixel's maxColors. That passed while 25 of painterly's 32 entries were
   // duplicates of each other: it asserted the padding, not the palette. Entry
   // count was never the thing worth checking, because `nearestWithDist` breaks
   // ties with a strict `<`, so a duplicate entry can never be selected.
@@ -137,7 +138,7 @@ Deno.test('painterly: a bigger budget never shrinks the palette, and no entry is
   const out8 = await Deno.makeTempDir();
   try {
     const painterly = await styleFromAovs(SRC, CAM, PAINTERLY, out);
-    const pixel = await styleFromAovs(SRC, CAM, PIXEL_8, out8);
+    const pixel = await styleFromAovs(SRC, CAM, PIXEL, out8);
     assertEquals(painterly.superSample, 4);
 
     // every reported entry is a colour the sprite can actually be painted with
@@ -149,14 +150,14 @@ Deno.test('painterly: a bigger budget never shrinks the palette, and no entry is
     assertEquals(
       new Set(pixel.paletteHex).size,
       pixel.paletteHex.length,
-      'pixel-8 reports no duplicate palette entries',
+      'pixel reports no duplicate palette entries',
     );
 
     // the larger budget can only ever help
     assert(
       painterly.paletteHex.length >= pixel.paletteHex.length,
       `painterly (${painterly.paletteHex.length}) must not be smaller than ` +
-        `pixel-8 (${pixel.paletteHex.length})`,
+        `pixel (${pixel.paletteHex.length})`,
     );
     assert(
       painterly.paletteHex.length <= PAINTERLY.quantize!.maxColors,
@@ -177,7 +178,7 @@ Deno.test('cluster-vote without a palette is refused, not silently blank', () =>
   // quantize wrote 64x64 sprites with opaque=0 and reported flickerPct 0.000 —
   // a perfect stability score for an image containing nothing.
   // the schema refuses it outright, so the state cannot even be persisted
-  const bad = { ...PIXEL_8, id: 'blank-maker', quantize: undefined };
+  const bad = { ...PIXEL, id: 'blank-maker', quantize: undefined };
   assertThrows(() => parseWith(StylePresetSchema, bad, 'StylePreset'), Error, 'clusterVote');
 });
 
@@ -187,7 +188,7 @@ Deno.test('cluster-vote with an empty palette refuses at runtime too', async () 
   // success.
   const out = await Deno.makeTempDir();
   try {
-    const bad = { ...PIXEL_8, id: 'blank-maker', quantize: undefined } as unknown as typeof PIXEL_8;
+    const bad = { ...PIXEL, id: 'blank-maker', quantize: undefined } as unknown as typeof PIXEL;
     const err = await assertRejects(() => styleFromAovs(SRC, CAM, bad, out), Error);
     assert(
       /clusterVote needs a palette/.test(err.message) && /blank/.test(err.message),
@@ -264,8 +265,8 @@ Deno.test('silhouette-clipped fires when the character runs out of cell', async 
     const outCut = await Deno.makeTempDir();
     const outFits = await Deno.makeTempDir();
     try {
-      const clipped = await styleFromAovs(src(cut), cam, PIXEL_8, outCut);
-      const ok = await styleFromAovs(src(fits), cam, PIXEL_8, outFits);
+      const clipped = await styleFromAovs(src(cut), cam, PIXEL, outCut);
+      const ok = await styleFromAovs(src(fits), cam, PIXEL, outFits);
 
       assertEquals(
         ok.flags.find((f) => f.code === 'silhouette-clipped'),
@@ -329,7 +330,7 @@ Deno.test('the bottom edge is a grounding fault, and is not blamed on the camera
     const outB = await Deno.makeTempDir();
     const outW = await Deno.makeTempDir();
     try {
-      const b = (await styleFromAovs(src(below), cam, PIXEL_8, outB)).flags
+      const b = (await styleFromAovs(src(below), cam, PIXEL, outB)).flags
         .find((f) => f.code === 'silhouette-clipped');
       assert(b, 'a body below the baseline still raises the flag');
       assert(/rig --feet-ground/.test(b!.message), `it names the knob: ${b!.message}`);
@@ -344,7 +345,7 @@ Deno.test('the bottom edge is a grounding fault, and is not blamed on the camera
 
       // the other half: a genuine overflow keeps the camera advice, because
       // there it is the right answer
-      const w = (await styleFromAovs(src(wide), cam, PIXEL_8, outW)).flags
+      const w = (await styleFromAovs(src(wide), cam, PIXEL, outW)).flags
         .find((f) => f.code === 'silhouette-clipped');
       assert(w, 'an over-wide character raises the flag');
       assert(
@@ -375,7 +376,7 @@ Deno.test('bottom clipping on a CENTER pivot is framing, because Y=0 is not pinn
     const f = (await styleFromAovs(
       { framesDir: dir, directions: 1, frames: 1, width: sx, height: sx },
       cam,
-      PIXEL_8,
+      PIXEL,
       out,
     )).flags.find((fl) => fl.code === 'silhouette-clipped');
     assert(f, 'still flagged');

@@ -36,13 +36,36 @@ export const CEL_2: StylePreset = parseWith(StylePresetSchema, {
   alpha: { mode: '1bit', cutoff: 0.5, bleedPx: 2 },
 }, 'StylePreset cel-2');
 
-/** pixel: small adaptive palette + ordered dither + 1-bit alpha (the full stack). */
-export const PIXEL_8: StylePreset = parseWith(StylePresetSchema, {
-  id: 'pixel-8',
+/**
+ * pixel: adaptive palette + ordered dither + 1-bit alpha (the full stack).
+ *
+ * SIXTEEN colours, and the name deliberately does not say a number any more.
+ * It used to be `pixel-8`, and 8 turned out to be the reason generated
+ * characters looked muddy: median cut allocates by POPULATION, so on bulma the
+ * skin and top (59% of covered texels) took five of the eight entries and the
+ * hair and skirt shared the remainder. The colour was in the lit pass the whole
+ * time — 9,895 distinct — and quantization was throwing it away.
+ *
+ * Measured across three subjects at matched on-screen size
+ * (spikes/trellis2/COLOUR-REPORT.md):
+ *
+ *   bulma     8 -> olive hair, black skirt;  16 -> pink top, green hair, navy skirt
+ *   mermaid   8 -> six teals and two greys, no figure visible at all
+ *             16 -> skin tones appear and the body separates from the hair
+ *   princess  8 -> readable;  16 -> the same, finer gradations (no second hue to find)
+ *
+ * So 16 is a large win on two subjects and a null on the third, never a
+ * regression. Flicker on the golden fixture goes 0.273% -> 0.420%, still inside
+ * the 0.55% regression guard and well inside the roadmap's 1.2% target.
+ *
+ * The count is not a ceiling either way: `bake --colors <n>` takes 2..256.
+ */
+export const PIXEL: StylePreset = parseWith(StylePresetSchema, {
+  id: 'pixel',
   mode: 'pixel',
   quantize: {
     palette: 'adaptive',
-    maxColors: 8,
+    maxColors: 16,
     space: 'oklab',
     dither: { kind: 'ordered', matrix: 4, strength: 0.5 },
   },
@@ -62,7 +85,7 @@ export const PIXEL_8: StylePreset = parseWith(StylePresetSchema, {
   temporal: { superSample: 4, clusterVote: true, paletteHysteresisEps: 0.02, texelSnap: true },
   passes: [...ALL_PASSES],
   alpha: { mode: '1bit', cutoff: 0.5, bleedPx: 2 },
-}, 'StylePreset pixel-8');
+}, 'StylePreset pixel');
 
 /** painterly: larger palette, area-average downsample, soft alpha, no hard outline. */
 export const PAINTERLY: StylePreset = parseWith(StylePresetSchema, {
@@ -81,12 +104,64 @@ export const PAINTERLY: StylePreset = parseWith(StylePresetSchema, {
 
 export const PRESETS: Record<string, StylePreset> = {
   'cel-2': CEL_2,
-  'pixel-8': PIXEL_8,
+  'pixel': PIXEL,
   'painterly': PAINTERLY,
 };
 
 /** What `resolveStyle` falls back to, and what `bake --style` defaults to. */
-export const DEFAULT_STYLE_PRESET_ID = 'pixel-8';
+export const DEFAULT_STYLE_PRESET_ID = 'pixel';
+
+/**
+ * Retired preset ids and what they resolve to now.
+ *
+ * A style id is not an internal detail: `CharacterManifest.look.stylePresetId`
+ * records it, and every character baked before a rename carries the old string
+ * on disk. Without this map that manifest throws on load — which is not a
+ * hypothetical. `lineless-princess` still carries `pixel-8-both`, from a set of
+ * experimental presets that were removed when the outline spike ended, and it
+ * has been unloadable ever since.
+ *
+ * Aliasing rather than keeping the old presets alive is deliberate: two entries
+ * that differ only in palette size would both need maintaining, and the ids the
+ * spike minted (`-both`, `-span`, `-thin`) described experiments whose answers
+ * are now folded into `pixel` itself. What the user gets is the current preset
+ * plus a warn that says which id moved and where, so a manifest silently baking
+ * a DIFFERENT look than its id once meant is impossible.
+ *
+ * A retired id keeps working forever from here; this map only grows.
+ */
+export const STYLE_ALIASES: Record<string, string> = {
+  // pixel-8 -> pixel, when 8 colours became 16 (spikes/trellis2/COLOUR-REPORT.md)
+  'pixel-8': 'pixel',
+  // the outline spike's experimental trio; their findings are in `pixel`'s
+  // widthPx 0.5 and the optional minSpanPx
+  'pixel-8-thin': 'pixel',
+  'pixel-8-span': 'pixel',
+  'pixel-8-both': 'pixel',
+};
+
+/**
+ * The warn a retired id earns, or undefined for a live one.
+ *
+ * Separate from `resolveStyle` because resolution returns a style and has no
+ * channel for a message; the CLI emits this next to the warns it already emits,
+ * and a caller that does not care simply never asks.
+ */
+export function styleAliasNote(presetId: string): string | undefined {
+  const to = STYLE_ALIASES[presetId];
+  if (to === undefined) return undefined;
+  return `style "${presetId}" no longer exists and resolved to "${to}". ` +
+    `Presets are recorded in the character's look, so an id from an earlier version keeps ` +
+    `working - but "${to}" is not byte-identical to what "${presetId}" used to produce. ` +
+    `Check this bake before shipping it, and pass \`--style <id>\` to choose deliberately ` +
+    `(available: ${Object.keys(PRESETS).sort().join(', ')}).`;
+}
+
+/** The live id `presetId` names, following one alias hop. Unknown ids pass through
+ * unchanged so `resolveStyle` is the single place that refuses them. */
+export function canonicalStyleId(presetId: string = DEFAULT_STYLE_PRESET_ID): string {
+  return STYLE_ALIASES[presetId] ?? presetId;
+}
 
 /**
  * Resolve a preset id and optional overrides into the style a bake runs with —
@@ -111,14 +186,22 @@ export function resolveStyle(
   presetId: string = DEFAULT_STYLE_PRESET_ID,
   overrides?: StyleOverrides,
 ): StylePreset {
+  // a retired id resolves rather than throwing (STYLE_ALIASES); the caller asks
+  // `styleAliasNote` for the warning that goes with it
+  const id = canonicalStyleId(presetId);
   // Object.hasOwn, not a bare index: `--style __proto__` would otherwise find
   // Object.prototype and die later as a confusing TypeError (m7)
-  if (!Object.hasOwn(PRESETS, presetId)) {
+  if (!Object.hasOwn(PRESETS, id)) {
     throw new Error(
-      `Unknown style "${presetId}" - available: ${Object.keys(PRESETS).sort().join(', ')}`,
+      `Unknown style "${presetId}" - available: ${Object.keys(PRESETS).sort().join(', ')}` +
+        `${
+          Object.keys(STYLE_ALIASES).length > 0
+            ? ` (retired ids that still resolve: ${Object.keys(STYLE_ALIASES).sort().join(', ')})`
+            : ''
+        }`,
     );
   }
-  const base = PRESETS[presetId];
+  const base = PRESETS[id];
   if (overrides === undefined) return base;
   // an explicit `undefined` means "not overridden", not "unset" — erasing a
   // required field through the spread would fail with a baffling message

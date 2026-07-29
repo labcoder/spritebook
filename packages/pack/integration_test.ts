@@ -14,7 +14,7 @@ import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { decode as decodePng } from 'fast-png';
 import type { BakeManifest, CameraPreset, JobEvent, StylePreset } from '@spritebook/schema';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
-import { PIXEL_8 } from '@spritebook/style';
+import { PIXEL } from '@spritebook/style';
 import { renderSignature, runRenderJob } from '@spritebook/render';
 import { tryGetGpu } from '../render/gpu.ts';
 import { exportGodot, parseTres, runExportJob, validateTres } from '@spritebook/export';
@@ -48,7 +48,7 @@ async function bake(
       characterId: 'asym',
       modelPath: GLB,
       camera: CAM,
-      style: over.style ?? PIXEL_8,
+      style: over.style ?? PIXEL,
       frames: FRAMES,
       outRoot,
       cacheDir: over.cacheDir,
@@ -157,7 +157,7 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
           characterId: 'asym',
           modelPath: GLB,
           camera: CAM,
-          style: PIXEL_8,
+          style: PIXEL,
           frames: FRAMES,
         }, sig);
         assertEquals(
@@ -175,8 +175,8 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
         );
 
         const wider: StylePreset = {
-          ...PIXEL_8,
-          outline: { ...PIXEL_8.outline!, widthPx: 2 },
+          ...PIXEL,
+          outline: { ...PIXEL.outline!, widthPx: 2 },
         };
         const newInputs = await buildCacheInputs({
           characterId: 'asym',

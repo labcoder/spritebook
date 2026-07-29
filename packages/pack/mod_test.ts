@@ -6,7 +6,7 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { JobEventSchema } from '@spritebook/schema';
 import type { CameraPreset } from '@spritebook/schema';
-import { PIXEL_8 } from '@spritebook/style';
+import { PIXEL } from '@spritebook/style';
 import { runBakeJob } from './mod.ts';
 
 const CAM: CameraPreset = {
@@ -31,7 +31,7 @@ Deno.test('bake seam: a missing model becomes an error EVENT, not a throw', asyn
         characterId: 'nope',
         modelPath: `${out}/does-not-exist.glb`,
         camera: CAM,
-        style: PIXEL_8,
+        style: PIXEL,
         frames: 2,
         outRoot: out,
       })

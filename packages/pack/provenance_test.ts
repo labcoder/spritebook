@@ -15,7 +15,7 @@ import { assert, assertEquals } from 'jsr:@std/assert@1';
 import type { CameraPreset, RigState } from '@spritebook/schema';
 import { canonicalJson } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
-import { PIXEL_8 } from '@spritebook/style';
+import { PIXEL } from '@spritebook/style';
 import { type BakeProvenance, buildCacheInputs } from './bake.ts';
 
 const MODEL = new URL('../anim/fixtures/humanoid-normal.glb', import.meta.url).pathname.replace(
@@ -35,7 +35,7 @@ const CAM: CameraPreset = {
 };
 const SIG = 'test-signature';
 
-const spec = { characterId: 'c', modelPath: MODEL, camera: CAM, style: PIXEL_8, frames: 2 };
+const spec = { characterId: 'c', modelPath: MODEL, camera: CAM, style: PIXEL, frames: 2 };
 
 const RIG: RigState = {
   track: 'B',

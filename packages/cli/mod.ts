@@ -51,7 +51,14 @@ import {
   resolveCamera,
   workspacePaths,
 } from '@spritebook/core';
-import { DEFAULT_STYLE_PRESET_ID, PRESETS, resolveStyle } from '@spritebook/style';
+import {
+  canonicalStyleId,
+  DEFAULT_STYLE_PRESET_ID,
+  PRESETS,
+  resolveStyle,
+  STYLE_ALIASES,
+  styleAliasNote,
+} from '@spritebook/style';
 import type { BakeJobSpec, BakeProvenance, ClipBindingSpec } from '@spritebook/pack';
 import { BUNDLED_PACK, runBakeJob } from '@spritebook/pack';
 import { runExportJob } from '@spritebook/export';
@@ -303,7 +310,8 @@ function styleOverridesFromFlags(args: string[], base: StylePreset): StyleOverri
     if (base.quantize === undefined) {
       throw new Error(
         `--colors has nothing to set on style "${base.id}": it does not quantize at all, so it ` +
-          `has no palette. Pick a style that does (pixel-8, cel-2, painterly) or drop the flag.`,
+          `has no palette. Pick a style that does (${Object.keys(PRESETS).sort().join(', ')}) ` +
+          `or drop the flag.`,
       );
     }
     // the schema's own bound, restated so the message names the flag the user
@@ -1564,18 +1572,26 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       );
     }
     const look = manifest?.look;
+    // The id as ASKED FOR, then the live preset it names. A character baked
+    // before a rename carries the old string in its look, so `asked` is what
+    // the user (or their manifest) said and `styleId` is what runs — every
+    // lookup below has to use the canonical one or an alias would die on
+    // `PRESETS[undefined]`.
+    const asked = stylePresetIdFor(args, look);
+    const styleId = canonicalStyleId(asked);
     // Object.hasOwn: `--style __proto__` must be unknown-style, not a
     // prototype-chain hit that dies later as a confusing TypeError (m7)
-    const styleId = stylePresetIdFor(args, look);
     if (!Object.hasOwn(PRESETS, styleId)) {
       return fail(
         bakeId,
         'unknown-style',
-        `Unknown style "${styleId}"${
+        `Unknown style "${asked}"${
           flag(args, 'style') === undefined ? " (from the character's look)" : ''
-        } - available: ${Object.keys(PRESETS).sort().join(', ')}`,
+        } - available: ${Object.keys(PRESETS).sort().join(', ')}` +
+          ` (retired ids that still resolve: ${Object.keys(STYLE_ALIASES).sort().join(', ')})`,
       );
     }
+    const aliasNote = styleAliasNote(asked);
     const cameraId = cameraPresetIdFor(args, look);
     if (!Object.hasOwn(CAMERA_PRESETS, cameraId)) {
       return fail(
@@ -1689,6 +1705,22 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           `\`spritebook rig --edits <patch.json>\` or \`--rerun-with-hints\`, or - if you have ` +
           `looked and the sprites are fine - record that with \`spritebook rig --workspace ` +
           `<dir> --accept\`. Baking continues; this is a warning, not a refusal.`,
+      };
+      emit(w, `warn [${w.code}]: ${w.message}`);
+    }
+    // A retired style id resolved rather than failing, and says so. Emitted here
+    // rather than thrown from resolveStyle because resolution returns a style
+    // and has no channel for a message — and because a manifest carrying an old
+    // id is a normal thing to own, not an error to fix.
+    if (aliasNote !== undefined) {
+      const w: JobEvent = {
+        t: 'warn',
+        jobId: bakeId,
+        at: now(),
+        code: 'style-alias',
+        message: `${aliasNote}${
+          flag(args, 'style') === undefined ? " The id came from the character's look." : ''
+        }`,
       };
       emit(w, `warn [${w.code}]: ${w.message}`);
     }

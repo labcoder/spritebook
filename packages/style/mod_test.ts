@@ -8,7 +8,7 @@ import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { JobEventSchema } from '@spritebook/schema';
 import type { CameraPreset } from '@spritebook/schema';
 import { runStyleJob } from './mod.ts';
-import { PIXEL_8 } from './presets.ts';
+import { PIXEL } from './presets.ts';
 
 const GLB = new URL('./fixtures/asymmetric.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -45,7 +45,7 @@ Deno.test('style seam: renders + styles end-to-end, files + events only', async 
         jobId: 'sj-1',
         modelPath: GLB,
         camera: CAM,
-        style: PIXEL_8,
+        style: PIXEL,
         frames: 4,
         outDir: out,
       })
@@ -70,7 +70,7 @@ Deno.test('style seam: renders + styles end-to-end, files + events only', async 
     }
 
     const result = JSON.parse(await Deno.readTextFile(`${out}/style-result.json`));
-    assertEquals(result.stylePresetId, 'pixel-8');
+    assertEquals(result.stylePresetId, 'pixel');
     // median cut yields <= maxColors (fewer if the fixture has fewer clusters)
     assert(
       result.paletteHex.length > 0 && result.paletteHex.length <= 8,

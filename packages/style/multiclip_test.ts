@@ -8,8 +8,9 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { CameraPreset } from '@spritebook/schema';
+import { parseWith, StylePresetSchema } from '@spritebook/schema';
 import { styleClipsFromAovs, styleFromAovs } from './pipeline.ts';
-import { PIXEL_8 } from './presets.ts';
+import { PIXEL } from './presets.ts';
 import { srgbToHex } from './oklab.ts';
 import { aovFileName } from './contracts.ts';
 import type { ClipAovSource } from './pipeline.ts';
@@ -92,8 +93,21 @@ Deno.test('styleClipsFromAovs pools ONE palette across clips (observable)', asyn
       ...size,
     };
 
+    // A SCARCE palette, deliberately. The discriminator below is "clip A looks
+    // different when clip B is in the pool", and that is only observable while
+    // the budget BINDS: clip B is a channel rotation of clip A, so pooled the
+    // two hold ~16 distinct colours, and a 16-entry palette simply takes all of
+    // them - clip A then styles identically whether or not B was there, and the
+    // test passes vacuously. It nearly did: `pixel` went from 8 colours to 16
+    // and this assertion started failing, which is the only reason anyone
+    // noticed it had been resting on the default's size.
+    const scarce = parseWith(StylePresetSchema, {
+      ...PIXEL,
+      quantize: { ...PIXEL.quantize!, maxColors: 6 },
+    }, 'StylePreset scarce');
+
     const jointOut = `${root}/joint`;
-    const joint = await styleClipsFromAovs([a, bSrc], CAM, PIXEL_8, jointOut);
+    const joint = await styleClipsFromAovs([a, bSrc], CAM, scarce, jointOut);
 
     // honest multi-clip accounting (review F8)
     assertEquals(joint.frames, FRAME_N * 2, 'frames = per-direction total across clips');
@@ -116,7 +130,7 @@ Deno.test('styleClipsFromAovs pools ONE palette across clips (observable)', asyn
     const solo = await styleFromAovs(
       { framesDir: FRAMES, directions: DIRS, frames: FRAME_N, ...size },
       CAM,
-      PIXEL_8,
+      scarce,
       soloOut,
     );
     const aJoint = await Deno.readFile(`${joint.styledDir}/a/d00_f000.png`);
@@ -141,8 +155,8 @@ Deno.test('styleClipsFromAovs is deterministic across runs', async () => {
       width: 256,
       height: 256,
     };
-    const r1 = await styleClipsFromAovs([src], CAM, PIXEL_8, `${root}/one`);
-    const r2 = await styleClipsFromAovs([src], CAM, PIXEL_8, `${root}/two`);
+    const r1 = await styleClipsFromAovs([src], CAM, PIXEL, `${root}/one`);
+    const r2 = await styleClipsFromAovs([src], CAM, PIXEL, `${root}/two`);
     assertEquals(r1.paletteHex, r2.paletteHex);
     assertEquals(
       await Deno.readFile(`${r1.styledDir}/a/d00_f000.png`),

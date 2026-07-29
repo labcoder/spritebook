@@ -7,7 +7,7 @@
  */
 import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import type { CameraPreset } from '@spritebook/schema';
-import { PIXEL_8 } from '@spritebook/style';
+import { PIXEL } from '@spritebook/style';
 import { buildCacheInputs } from './bake.ts';
 
 const MODEL = new URL('../anim/fixtures/humanoid-normal.glb', import.meta.url).pathname.replace(
@@ -37,7 +37,7 @@ function spec(packDir: string, over: Record<string, unknown> = {}) {
     characterId: 'c',
     modelPath: MODEL,
     camera: CAM,
-    style: PIXEL_8,
+    style: PIXEL,
     frames: 2,
     clips: [{ clipId: 'x', frames: 2, speed: 1, holdLast: false }],
     packDir,

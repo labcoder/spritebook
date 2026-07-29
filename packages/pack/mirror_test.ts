@@ -15,7 +15,7 @@ import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert@1';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { BakeManifest, CameraPreset, JobEvent, RenderPass } from '@spritebook/schema';
 import { BakeManifestSchema, parseWith, renderedDirections } from '@spritebook/schema';
-import { PIXEL_8 } from '@spritebook/style';
+import { PIXEL } from '@spritebook/style';
 import { tryGetGpu } from '../render/gpu.ts';
 import { type CellPlane, frameIdKey, PAGE_KIND } from './contracts.ts';
 import { assertRenderedPrefix, flipCellPng, flipPlaneH, mirrorPlan } from './mirror.ts';
@@ -172,7 +172,7 @@ Deno.test('cache: mirroring is part of the recipe, so the two bakes never share'
     characterId: 'asym',
     modelPath: GLB,
     camera: CAM,
-    style: PIXEL_8,
+    style: PIXEL,
     frames: FRAMES,
   };
   const sig = 'test-render-sig@0';
@@ -208,7 +208,7 @@ async function bake(
       characterId: 'asym',
       modelPath: GLB,
       camera: CAM,
-      style: PIXEL_8,
+      style: PIXEL,
       frames: FRAMES,
       outRoot,
       mirroring,

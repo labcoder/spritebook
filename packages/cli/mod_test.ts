@@ -337,7 +337,7 @@ Deno.test('the bake defaults are the standard-30 preset, field for field', () =>
     canonicalJson(bakeSpecFromFlags(['bake'], RESOLVED).camera),
     canonicalJson(CAMERA_PRESETS['standard-30']),
   );
-  assertEquals(bakeSpecFromFlags(['bake'], RESOLVED).style.id, 'pixel-8');
+  assertEquals(bakeSpecFromFlags(['bake'], RESOLVED).style.id, 'pixel');
 });
 
 Deno.test('an explicit flag beats the stored look; silence defers to it', () => {
@@ -801,12 +801,12 @@ Deno.test('--colors sets the palette size, and only the palette size', () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
   const resolved = { model: 'm.glb', character: 'c', out: 'o' };
 
-  // pixel-8 is a DEFAULT, not a ceiling: the pipeline reads quantize.maxColors
-  // and the schema allows 2..256, but no flag reached it, so the only way to
-  // ask for more colours was hand-editing look.overrides in character.json -
-  // and because resolveStyle merges shallow, that meant restating palette,
-  // space and dither too.
-  assertEquals(bakeSpecFromFlags(base, resolved).style.quantize?.maxColors, 8);
+  // the preset's own count is a DEFAULT, not a ceiling: the pipeline reads
+  // quantize.maxColors and the schema allows 2..256, but no flag reached it, so
+  // the only way to ask for a different palette was hand-editing look.overrides
+  // in character.json - and because resolveStyle merges shallow, that meant
+  // restating palette, space and dither too.
+  assertEquals(bakeSpecFromFlags(base, resolved).style.quantize?.maxColors, 16);
   const wide = bakeSpecFromFlags([...base, '--colors', '32'], resolved).style;
   assertEquals(wide.quantize?.maxColors, 32);
 
@@ -818,7 +818,7 @@ Deno.test('--colors sets the palette size, and only the palette size', () => {
   assertEquals(wide.quantize?.space, plain.quantize?.space);
   assertEquals(wide.outline, plain.outline, 'and nothing outside quantize moves');
   assertEquals(wide.temporal, plain.temporal);
-  assertEquals(wide.id, 'pixel-8', 'the preset it refines is still named');
+  assertEquals(wide.id, 'pixel', 'the preset it refines is still named');
 });
 
 Deno.test('--colors refines what the CHARACTER stored, not the bare preset', () => {
@@ -902,7 +902,7 @@ Deno.test('--cell takes WxH, because cellPx always had two numbers', () => {
   }
 });
 
-Deno.test('the palette size reaches the CACHE KEY, so two sizes cannot collide', async () => {
+Deno.test('the palette size reaches the CACHE KEY, so two sizes cannot collide', () => {
   // `stylePresetHash` is sha256(canonicalJson(spec.style)) — the whole resolved
   // style, so `quantize.maxColors` is in it by construction. Pinned anyway,
   // because the flag is new and the property it needs is not "the hash exists"
@@ -917,9 +917,9 @@ Deno.test('the palette size reaches the CACHE KEY, so two sizes cannot collide',
   assertNotEquals(at('8'), at('16'));
   assertEquals(at('16'), at('16'), 'and the same request is the same key');
   assertEquals(
-    at('8'),
+    at('16'),
     canonicalJson(bakeSpecFromFlags(base, resolved).style),
-    'asking for the preset value is the preset, so returning to 8 reuses its frames',
+    "asking for the preset's own count is the preset, so returning to it reuses its frames",
   );
 
   // the same for the cell, which also grew a shape it did not have

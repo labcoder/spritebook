@@ -21,7 +21,7 @@ import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { decode as decodePng } from 'fast-png';
 import type { BakeManifest, CameraPreset, JobEvent } from '@spritebook/schema';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
-import { PIXEL_8 } from '@spritebook/style';
+import { PIXEL } from '@spritebook/style';
 import { tryGetGpu } from '../render/gpu.ts';
 import { runBakeJob } from './mod.ts';
 
@@ -56,7 +56,7 @@ async function bake(outRoot: string, mirroring: boolean): Promise<Baked> {
       characterId: 'one-armed',
       modelPath: MODEL,
       camera: CAM,
-      style: PIXEL_8,
+      style: PIXEL,
       frames: 1,
       outRoot,
       mirroring,

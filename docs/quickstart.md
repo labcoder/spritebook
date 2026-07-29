@@ -64,7 +64,7 @@ see Troubleshooting below.
 ## 4. Bake
 
 ```
-./spritebook bake --model sample/asymmetric.glb --character hero --out bakes --style pixel-8 --directions 8 --frames 6
+./spritebook bake --model sample/asymmetric.glb --character hero --out bakes --style pixel --directions 8 --frames 6
 ```
 
 ```
@@ -145,11 +145,29 @@ you need it, and the TexturePacker and strips exports carry it too.
 | Style       | Look                           | Palette                  | Dither      | Outline | Alpha |
 | ----------- | ------------------------------ | ------------------------ | ----------- | ------- | ----- |
 | `cel-2`     | flat cel tones                 | adaptive, max 6 (OKLab)  | none        | 1 px    | 1-bit |
-| `pixel-8`   | classic pixel art              | adaptive, max 8 (OKLab)  | 4x4 ordered | 1 px    | 1-bit |
+| `pixel`     | classic pixel art              | adaptive, max 16 (OKLab) | 4x4 ordered | 0.5 px  | 1-bit |
 | `painterly` | soft edges, larger tonal range | adaptive, max 32 (OKLab) | none        | none    | soft  |
 
 All three render supersampled and downsample with temporal stabilization (texel snapping, palette
 hysteresis), so frames do not shimmer in motion.
+
+The palette size is a starting point, not a ceiling — `--colors <n>` takes 2 to 256 and refines
+whichever style you picked.
+
+### Retired style ids
+
+A style id is recorded in the character's `look`, so a character baked by an earlier version keeps
+the id it was baked with. Retired ids still resolve, with a warning naming the replacement:
+
+| Retired        | Resolves to | Why                                                      |
+| -------------- | ----------- | -------------------------------------------------------- |
+| `pixel-8`      | `pixel`     | 8 colours became 16; the name no longer states a count   |
+| `pixel-8-thin` | `pixel`     | outline experiments, now folded into `pixel`'s `widthPx` |
+| `pixel-8-span` | `pixel`     | as above                                                 |
+| `pixel-8-both` | `pixel`     | as above                                                 |
+
+The replacement is not byte-identical to what the retired id produced, so check the first bake. The
+next bake records the live id, and the warning stops.
 
 ## Flag reference
 
@@ -162,7 +180,7 @@ hysteresis), so frames do not shimmer in motion.
 | `--character <id>`   | (required)    | immutable character slug; binds cache keys                      |
 | `--out <dir>`        | (required)    | bakes land at `<dir>/bake-<id>`                                 |
 | `--camera <id>`      | `standard-30` | `low-15`, `two-to-one`, `standard-30`, or `isometric`           |
-| `--style <id>`       | `pixel-8`     | `cel-2`, `pixel-8`, or `painterly`                              |
+| `--style <id>`       | `pixel`       | `cel-2`, `pixel` (16 colours), or `painterly`                   |
 | `--directions <n>`   | `8`           | `2`, `4`, `8`, or `16`                                          |
 | `--frames <n>`       | `6`           | frames of the built-in idle pose (positive integer)             |
 | `--clips <spec>`     | (idle)        | `clip:frames[@speed][!hold][,...]` — bake real clips instead    |

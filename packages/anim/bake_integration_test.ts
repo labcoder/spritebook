@@ -9,7 +9,7 @@
  */
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
-import { PIXEL_8 } from '@spritebook/style';
+import { PIXEL } from '@spritebook/style';
 import { tryGetGpu } from '../render/gpu.ts';
 import { runBakeJob } from '@spritebook/pack';
 import type { CameraPreset, JobEvent } from '@spritebook/schema';
@@ -39,7 +39,7 @@ Deno.test('acceptance: multi-clip bake — exact counts, clip ids, previews', as
         characterId: 'walker',
         modelPath: MODEL,
         camera: CAM,
-        style: PIXEL_8,
+        style: PIXEL,
         frames: 4, // legacy field; clips below own their frame counts
         outRoot: root,
         clips: [
@@ -118,9 +118,16 @@ Deno.test('acceptance: multi-clip bake — exact counts, clip ids, previews', as
     await Deno.stat(`${bakeDir}/contact-walk-loop.gif`);
     await Deno.stat(`${bakeDir}/contact-idle-loop.gif`);
 
-    // one palette across BOTH clips (the per-character palette law)
+    // one palette across BOTH clips (the per-character palette law). Bounded by
+    // the PRESET's own budget, not a literal: this said `<= 8` and was really
+    // asserting what pixel's maxColors happened to be, so raising it to 16 broke
+    // a test that has nothing to do with palette size.
     const styleResult = JSON.parse(await Deno.readTextFile(`${bakeDir}/style-result.json`));
-    assert(styleResult.paletteHex.length <= 8 && styleResult.paletteHex.length > 0);
+    assert(
+      styleResult.paletteHex.length <= PIXEL.quantize!.maxColors &&
+        styleResult.paletteHex.length > 0,
+      `one pooled palette within budget, got ${styleResult.paletteHex.length}`,
+    );
   } finally {
     await Deno.remove(root, { recursive: true });
   }

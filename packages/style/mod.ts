@@ -13,12 +13,15 @@ import { styleFromAovs } from './pipeline.ts';
 export { styleClipsFromAovs, styleFromAovs } from './pipeline.ts';
 export type { ClipAovSource } from './pipeline.ts';
 export {
+  canonicalStyleId,
   CEL_2,
   DEFAULT_STYLE_PRESET_ID,
   PAINTERLY,
-  PIXEL_8,
+  PIXEL,
   PRESETS,
   resolveStyle,
+  STYLE_ALIASES,
+  styleAliasNote,
 } from './presets.ts';
 // pure AOV utilities, re-exported for the pack stage (bake composes render ->
 // style -> pack via files; pack reads the same Sx AOVs to build 1x AOV pages)

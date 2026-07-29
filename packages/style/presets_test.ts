@@ -1,5 +1,14 @@
-import { assertEquals, assertStrictEquals, assertThrows } from 'jsr:@std/assert@1';
-import { DEFAULT_STYLE_PRESET_ID, PAINTERLY, PIXEL_8, PRESETS, resolveStyle } from './presets.ts';
+import { assert, assertEquals, assertStrictEquals, assertThrows } from 'jsr:@std/assert@1';
+import {
+  canonicalStyleId,
+  DEFAULT_STYLE_PRESET_ID,
+  PAINTERLY,
+  PIXEL,
+  PRESETS,
+  resolveStyle,
+  STYLE_ALIASES,
+  styleAliasNote,
+} from './presets.ts';
 
 Deno.test('every preset is keyed by its own id', () => {
   for (const [key, preset] of Object.entries(PRESETS)) {
@@ -8,15 +17,61 @@ Deno.test('every preset is keyed by its own id', () => {
 });
 
 Deno.test('resolveStyle with no arguments is the default preset', () => {
-  assertStrictEquals(resolveStyle(), PIXEL_8);
-  assertStrictEquals(resolveStyle(DEFAULT_STYLE_PRESET_ID, undefined), PIXEL_8);
+  assertStrictEquals(resolveStyle(), PIXEL);
+  assertStrictEquals(resolveStyle(DEFAULT_STYLE_PRESET_ID, undefined), PIXEL);
 });
 
-Deno.test('an unknown style id names the ones that exist', () => {
-  const err = assertThrows(() => resolveStyle('pixel-16'), Error);
-  assertEquals(err.message, 'Unknown style "pixel-16" - available: cel-2, painterly, pixel-8');
+Deno.test('an unknown style id names the ones that exist, and the retired ones', () => {
+  const err = assertThrows(() => resolveStyle('pixel-24'), Error);
+  assertEquals(
+    err.message,
+    'Unknown style "pixel-24" - available: cel-2, painterly, pixel ' +
+      '(retired ids that still resolve: pixel-8, pixel-8-both, pixel-8-span, pixel-8-thin)',
+  );
   assertThrows(() => resolveStyle('__proto__'), Error, 'Unknown style');
   assertThrows(() => resolveStyle('constructor'), Error, 'Unknown style');
+});
+
+Deno.test('a RETIRED id resolves to its replacement instead of throwing', () => {
+  // A style id is on disk: CharacterManifest.look.stylePresetId records it, so
+  // every character baked before a rename carries the old string. Throwing made
+  // that manifest unloadable - not hypothetical, `lineless-princess` has
+  // carried `pixel-8-both` since the outline spike's presets were removed.
+  for (const old of Object.keys(STYLE_ALIASES)) {
+    assertStrictEquals(resolveStyle(old), PIXEL, `${old} resolves`);
+    assertEquals(canonicalStyleId(old), 'pixel');
+  }
+  // overrides still apply through the hop, and the id records where it LANDED
+  const refined = resolveStyle('pixel-8', {
+    quantize: { palette: 'adaptive', maxColors: 4, space: 'oklab', dither: { kind: 'none' } },
+  });
+  assertEquals(refined.id, 'pixel', 'the manifest self-heals to the live id on write-back');
+  assertEquals(refined.quantize?.maxColors, 4);
+});
+
+Deno.test('a retired id earns a warning that names the replacement', () => {
+  const note = styleAliasNote('pixel-8');
+  assert(note, 'a retired id has a note');
+  assert(note.includes('"pixel-8"') && note.includes('"pixel"'), note);
+  assert(
+    note.includes('not byte-identical'),
+    `it must not imply the look is unchanged - 8 colours became 16: ${note}`,
+  );
+  assertEquals(styleAliasNote('pixel'), undefined, 'a live id has nothing to say');
+  assertEquals(styleAliasNote('nonsense'), undefined, 'and neither has an unknown one');
+  assertEquals(
+    canonicalStyleId('nonsense'),
+    'nonsense',
+    'unknown ids pass through to resolveStyle',
+  );
+});
+
+Deno.test('every alias points at a preset that actually exists', () => {
+  // an alias to a typo would turn a helpful redirect into a worse error
+  for (const [from, to] of Object.entries(STYLE_ALIASES)) {
+    assertEquals(Object.hasOwn(PRESETS, to), true, `${from} -> ${to}, which must be live`);
+    assertEquals(Object.hasOwn(PRESETS, from), false, `${from} must not also be a live preset`);
+  }
 });
 
 Deno.test('overrides refine a preset and keep its id', () => {
@@ -65,8 +120,8 @@ Deno.test('overrides cannot remove a field, only replace one', () => {
   // pins the refusal itself) — is unreachable through overrides, and this is
   // why: `undefined` is filtered out as "not overridden", so no override can
   // strip the `quantize` off a preset that has one. All three presets do.
-  const stripped = resolveStyle('pixel-8', { quantize: undefined });
-  assertEquals(stripped.quantize, PIXEL_8.quantize, 'quantize survives the attempt');
+  const stripped = resolveStyle('pixel', { quantize: undefined });
+  assertEquals(stripped.quantize, PIXEL.quantize, 'quantize survives the attempt');
 });
 
 Deno.test('the error names the preset the overrides were applied to', () => {
