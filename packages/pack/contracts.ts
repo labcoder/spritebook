@@ -109,6 +109,9 @@ export function atlasPageName(pass: RenderPass, pageIndex: number): string {
 // Center-tap = the (s/2, s/2) subpixel of each s x s block (deterministic).
 // ---------------------------------------------------------------------------
 export interface Aov1xCells {
+  /** the renderer's LIT output before the style stage touches it — debug only,
+   * never packed into a shipped page (see DEBUG_RAW_LIT_ENV in bake.ts) */
+  lit: CellPlane;
   albedo: CellPlane;
   normal: CellPlane;
   depth: CellPlane;

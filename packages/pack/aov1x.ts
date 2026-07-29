@@ -37,6 +37,7 @@ export function aov1x(aov: AovImage, s: number): Aov1xCells {
       `Sx dims ${width}x${height} must both be divisible by supersample factor ${s}`,
     );
   }
+  assertLength('lit', aov.lit.length, width * height * 4);
   assertLength('albedo', aov.albedo.length, width * height * 4);
   assertLength('normal', aov.normal.length, width * height * 4);
   assertLength('depth', aov.depth.length, width * height);
@@ -48,6 +49,12 @@ export function aov1x(aov: AovImage, s: number): Aov1xCells {
   const half = area >> 1; // round-half-up bias; exact for even area, no .5 ties for odd
   const c = s >> 1; // center-tap offset floor(s/2)
 
+  // The PRE-STYLE lit plane, reduced exactly like albedo because it is the same
+  // kind of thing: an rgba8 colour with alpha as coverage. The bake never ships
+  // it — the style stage owns the lit cell — but a bake that cannot show what
+  // the renderer produced before styling cannot tell a lighting bug from a
+  // palette bug, which is exactly where the P3 exit measurement got stuck.
+  const lit = new Uint8Array(w * h * 4);
   const albedo = new Uint8Array(w * h * 4);
   const normal = new Uint8Array(w * h * 4);
   const depth = new Uint16Array(w * h);
@@ -64,26 +71,28 @@ export function aov1x(aov: AovImage, s: number): Aov1xCells {
       // style/downsample.ts carried, and it lands here on the shipped 1x
       // albedo pages. A fully covered block is unchanged (the weight factors
       // out); only partial-coverage edges move.
-      let r = 0, g = 0, b = 0, a = 0;
-      for (let dy = 0; dy < s; dy++) {
-        let idx = ((baseY + dy) * width + baseX) * 4;
-        for (let dx = 0; dx < s; dx++) {
-          const w8 = aov.albedo[idx + 3];
-          r += aov.albedo[idx] * w8;
-          g += aov.albedo[idx + 1] * w8;
-          b += aov.albedo[idx + 2] * w8;
-          a += w8;
-          idx += 4;
-        }
-      }
       const o = (oy * w + ox) * 4;
-      if (a > 0) {
-        const bias = a >> 1;
-        albedo[o] = ((r + bias) / a) | 0;
-        albedo[o + 1] = ((g + bias) / a) | 0;
-        albedo[o + 2] = ((b + bias) / a) | 0;
-        albedo[o + 3] = ((a + half) / area) | 0;
-      } // else: nothing covered, leave (0,0,0,0)
+      for (const [src, dst] of [[aov.albedo, albedo], [aov.lit, lit]] as const) {
+        let r = 0, g = 0, b = 0, a = 0;
+        for (let dy = 0; dy < s; dy++) {
+          let idx = ((baseY + dy) * width + baseX) * 4;
+          for (let dx = 0; dx < s; dx++) {
+            const w8 = src[idx + 3];
+            r += src[idx] * w8;
+            g += src[idx + 1] * w8;
+            b += src[idx + 2] * w8;
+            a += w8;
+            idx += 4;
+          }
+        }
+        if (a > 0) {
+          const bias = a >> 1;
+          dst[o] = ((r + bias) / a) | 0;
+          dst[o + 1] = ((g + bias) / a) | 0;
+          dst[o + 2] = ((b + bias) / a) | 0;
+          dst[o + 3] = ((a + half) / area) | 0;
+        } // else: nothing covered, leave (0,0,0,0)
+      }
 
       // normal / depth / mask: the center subpixel, untouched
       const tap = (baseY + c) * width + baseX + c;
@@ -98,6 +107,7 @@ export function aov1x(aov: AovImage, s: number): Aov1xCells {
   }
 
   return {
+    lit: { w, h, rgba: lit },
     albedo: { w, h, rgba: albedo },
     normal: { w, h, rgba: normal },
     depth: { w, h, gray16: depth },

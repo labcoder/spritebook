@@ -152,3 +152,39 @@ Deno.test('aov1x: a mis-sized plane throws before any work', () => {
   assertThrows(() => aov1x(brokenMask, 4), RangeError, 'mask length');
   assert(aov1x(aov, 4)); // the intact image still works
 });
+
+Deno.test('aov1x: the pre-style lit plane reduces exactly like albedo', () => {
+  // The debug artifact only means anything if it is comparable to what ships.
+  // Reducing lit by a DIFFERENT rule than albedo would make the two atlases
+  // disagree for reasons that have nothing to do with the style stage - which
+  // is the one question this plane exists to answer.
+  const aov = makeAov(4, 4);
+  for (let i = 0; i < 16; i++) {
+    const covered = i >= 8;
+    for (const plane of [aov.albedo, aov.lit]) {
+      plane[i * 4] = i;
+      plane[i * 4 + 1] = 10;
+      plane[i * 4 + 2] = covered ? 1 : 0;
+      plane[i * 4 + 3] = covered ? 255 : 0;
+    }
+  }
+  const out = aov1x(aov, 4);
+  assertEquals([...out.lit.rgba!], [...out.albedo.rgba!]);
+  assertEquals([...out.lit.rgba!], [12, 10, 1, 128]);
+});
+
+Deno.test('aov1x: lit and albedo are independent planes, not one aliased twice', () => {
+  // A copy-paste that reduced albedo into both slots would pass the test above
+  // and make every debug atlas a duplicate of the shipped albedo page.
+  const aov = makeAov(2, 2);
+  for (let i = 0; i < 4; i++) {
+    aov.albedo[i * 4] = 200;
+    aov.albedo[i * 4 + 3] = 255;
+    aov.lit[i * 4] = 40; // the same silhouette, a different colour
+    aov.lit[i * 4 + 3] = 255;
+  }
+  const out = aov1x(aov, 2);
+  assertEquals(out.albedo.rgba![0], 200);
+  assertEquals(out.lit.rgba![0], 40);
+  assertNotStrictEquals(out.lit.rgba, out.albedo.rgba);
+});

@@ -124,6 +124,21 @@ export const BUNDLED_PACK = decodeURIComponent(
 const CLIP_ID = 'idle';
 const AOV_PASSES = ['albedo', 'normal', 'depth', 'mask'] as const;
 
+/** Set to write `atlas_litraw_0.png` beside the shipped pages: the renderer's LIT
+ * output BEFORE the style stage, on the same layout so the two atlases can be
+ * diffed texel for texel.
+ *
+ * Opt-in, and deliberately not a manifest atlas — it is not a product output and
+ * nothing downstream should learn to read it. It exists because the P3 exit
+ * measurement found the shipped lit atlas nearly black with a correct albedo
+ * underneath, and there was no way to tell a lighting bug from a palette bug
+ * without re-rendering by hand. */
+const DEBUG_RAW_LIT_ENV = 'SPRITEBOOK_DEBUG_RAW_LIT';
+
+function debugRawLit(): boolean {
+  return (Deno.env.get(DEBUG_RAW_LIT_ENV) ?? '') !== '';
+}
+
 async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -275,6 +290,10 @@ interface BakedCells {
   styleResult: StyleResult;
   /** frames served from cache (empty on a recompute) */
   hits: Set<string>;
+  /** pre-style lit cells, only when SPRITEBOOK_DEBUG_RAW_LIT is set. Absent on
+   * the cached path by design: the cache stores the STYLED lit, so a cache hit
+   * has nothing pre-style to hand back and inventing one would be a lie. */
+  rawLit?: Map<string, Uint8Array>;
 }
 
 /** Try to serve the ENTIRE bake from cache (all-or-none under clip-atomicity). */
@@ -480,6 +499,7 @@ async function recomputeClips(
       const cells = new Map<string, Map<string, Uint8Array>>(
         ['lit', ...AOV_PASSES].map((p) => [p, new Map<string, Uint8Array>()]),
       );
+      const rawLit = debugRawLit() ? new Map<string, Uint8Array>() : undefined;
       for (const id of grid) {
         if (plan.mirroredFrom.has(id.direction)) continue; // flipped below
         const fik = frameIdKey(id);
@@ -493,12 +513,13 @@ async function recomputeClips(
         const aov = await readAov(src.framesDir, id.direction, id.frame);
         const one = aov1x(aov, s);
         cells.get('albedo')!.set(fik, encodePagePng(one.albedo, 'rgba8'));
+        rawLit?.set(fik, encodePagePng(one.lit, 'rgba8'));
         cells.get('normal')!.set(fik, encodePagePng(one.normal, 'rgba8'));
         cells.get('depth')!.set(fik, encodePagePng(one.depth, 'gray16'));
         cells.get('mask')!.set(fik, encodePagePng(one.mask, 'gray16'));
       }
       fillMirroredCells(cells, grid, plan);
-      return { cells, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
+      return { cells, rawLit, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
     } finally {
       await Deno.remove(styleOut, { recursive: true }).catch(() => {});
     }
@@ -555,6 +576,7 @@ async function recompute(
     const cells = new Map<string, Map<string, Uint8Array>>(
       ['lit', ...AOV_PASSES].map((p) => [p, new Map<string, Uint8Array>()]),
     );
+    const rawLit = debugRawLit() ? new Map<string, Uint8Array>() : undefined;
     for (const id of grid) {
       if (plan.mirroredFrom.has(id.direction)) continue; // flipped below
       const fik = frameIdKey(id);
@@ -564,12 +586,13 @@ async function recompute(
       const aov = await readAov(src.framesDir, id.direction, id.frame);
       const one = aov1x(aov, s);
       cells.get('albedo')!.set(fik, encodePagePng(one.albedo, 'rgba8'));
+      rawLit?.set(fik, encodePagePng(one.lit, 'rgba8'));
       cells.get('normal')!.set(fik, encodePagePng(one.normal, 'rgba8'));
       cells.get('depth')!.set(fik, encodePagePng(one.depth, 'gray16'));
       cells.get('mask')!.set(fik, encodePagePng(one.mask, 'gray16'));
     }
     fillMirroredCells(cells, grid, plan);
-    return { cells, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
+    return { cells, rawLit, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
   } catch (err) {
     await cleanup();
     throw err;
@@ -711,6 +734,20 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       for (let i = 0; i < layout.pageCount; i++) {
         const page = composePage(layout, i, source, kind);
         await Deno.writeFile(`${bakeDir}/${atlasPageName(pass, i)}`, encodePagePng(page, kind));
+      }
+    }
+
+    // the debug page, on the SAME layout so it diffs texel-for-texel against
+    // atlas_lit_*. Not in the manifest: nothing downstream should read it.
+    if (baked.rawLit) {
+      const raw = new Map(
+        [...baked.rawLit].map(([k, bytes]) => [k, decodeCell(bytes, 'rgba8')]),
+      );
+      for (let i = 0; i < layout.pageCount; i++) {
+        await Deno.writeFile(
+          `${bakeDir}/atlas_litraw_${i}.png`,
+          encodePagePng(composePage(layout, i, raw, 'rgba8'), 'rgba8'),
+        );
       }
     }
 
