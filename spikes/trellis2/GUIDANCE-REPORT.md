@@ -175,6 +175,33 @@ what bulma's own image ever produced. The conditioning dominates both channels.
 
 Renders: `out/crossover_sheet.png`. Re-run with `crossover.py`.
 
+## The black-premultiply guess is wrong, and the thread is closed
+
+`preprocess_image` composites the cut-out onto BLACK, and bulma has black linework — so perhaps the
+decoder was seeing a dark subject on a dark field. Three conditions, each replicating the pipeline's
+own crop and going in with `preprocess_image=False` so the composite colour is the only variable.
+Seeds 1234 and 1235, both known-bad.
+
+| condition                             | metal      |
+| ------------------------------------- | ---------- |
+| **black** (replicates the pipeline)   | **100.0%** |
+| white background                      | 100.0%     |
+| linework lifted to a 0.35 black point | 99.5%      |
+
+**The control reproduced the failure exactly**, which is what makes the other two rows mean
+anything: the replication is faithful, so a flip would have been real. Neither flipped. Background
+colour and black linework are both irrelevant.
+
+The premise was weak on inspection too, and measuring it first would have been cheaper than running
+it: bulma's foreground has **mean luminance 0.639** — brighter than mid-grey — with only **4.5%** of
+it below 0.15. She was never a dark subject.
+
+**So the mechanism is unknown.** What is established is bounded and useful: the conditioning image
+decides it, the mesh has no influence, guidance strength does not move it, and it is not the
+background composite or the linework. That is enough to know the gate is the right response and that
+no upstream change of ours would prevent it. Anything further is a question for the model's authors,
+not a fix on this side.
+
 ### Colour, judged by eye rather than by the mean
 
 Guidance at 7.5 is right on all four. Saturation lands above source on two subjects — mermaid 0.504
@@ -187,9 +214,8 @@ Rendered comparison: `out/cross_subject_rendered.png`.
 
 ## Still unknown
 
-- **WHY a flat-line-art reference reads as metal.** The crossover proves the image is the trigger
-  and the mesh is not; it says nothing about the mechanism. `preprocess_image` premultiplies onto
-  black and bulma is full of black linework, which is a guess worth testing and nothing more.
+- **WHY a flat-line-art reference reads as metal. Unknown, and the leading guess is now dead** — see
+  below.
 - **Whether every flat-line-art reference does this**, or only this one. One image is one image.
 - **Whether the 0.60 metal threshold is right.** It has now seen exactly one subject that trips it.
   Three others sit at 0-15%, comfortably clear, so the valley holds - but no run has landed between
