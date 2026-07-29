@@ -101,3 +101,33 @@ error. Stride-aware, the sums are exactly 1.0 everywhere. The earlier `deform_di
 (its reader handles stride, which is why it matched the shipped report to 4 decimals).
 `rig-run.json`'s `unnormalizedVertices: 111174` describes pre-merge interpolation drift that the
 merge then normalizes — a misleading name for a healthy diagnostic, not a defect.
+
+## Follow-up: the split is a seed outcome, not a subject property
+
+The astro ceiling above was blamed on the subject — "this robot's hands come off". That framing was
+too strong. Re-generating the SAME image at other seeds:
+
+| workspace         | gen seed | shells | body-sized | top fractions            |
+| ----------------- | -------- | ------ | ---------- | ------------------------ |
+| robot-astro/r1    | 7        | 76     | **2**      | 60.4% / 20.0% / 4.6%     |
+| astro-100/r1      | 100      | 81     | 1          | 78.9% / 2.9% / 2.7%      |
+| astro-200/r1      | 201      | 54     | 1          | 89.8% / 1.1% / 0.8%      |
+| bulma (verb-e2e)  | 7        | 72     | 1          | 92.5% / 1.6% / 1.6%      |
+| bulma-100/r1      | 100      | 66     | 1          | 91.7% / 1.7% / 1.3%      |
+
+Two of two re-rolls fused astro into one body. So the detached hands were a property of that
+generation, not of the artwork, and the remedy is cheaper than any repair tooling: re-run `gen` and
+take the connected result. That is now recorded per result (`output.bodies`) and surfaced by both
+`gen` and `pick`.
+
+### What the existing workspaces could NOT answer
+
+The first attempt at this question surveyed bulma's r1–r5 and the cross-subject workspaces and found
+byte-identical shell distributions inside every one of them. That is not seed stability — every
+r2+ in those workspaces is a `retexture`, which by definition keeps its parent's geometry
+(`derivedFrom` says so on each receipt). Each workspace held exactly ONE generated mesh, so the
+sample size for "does the seed change the shell count" was 1 per subject until the runs above.
+
+Separately: two `gen` runs of bulma at the same seed 7 produced 72 and 73 shells. The pipeline is
+not bit-reproducible across processes on this GPU; both were 1 body, so the significant count was
+stable where the raw count was not — which is the reason the flag counts only body-sized shells.
