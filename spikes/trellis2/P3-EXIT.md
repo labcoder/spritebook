@@ -167,3 +167,83 @@ Ranked by what blocks the exit:
 
 **The one that matters: rigging discards the border's normalization.** Everything struck through
 above except the registry fix is that bug wearing different clothes.
+
+---
+
+# Re-measured 2026-07-29, after the two output blockers
+
+Same chain, same workspace (`bulma-fixed`, the one generated under the vertex-baking border).
+
+| stage  | wall  | note                                                       |
+| ------ | ----- | ---------------------------------------------------------- |
+| pick   | 1 s   |                                                            |
+| rig    | 122 s | UniRig, 52 joints, 9 flagged (was 37 before the seam rule) |
+| bake   | 5 s   | 48 frames, 8 directions, **no QA flags**                   |
+| export | 1 s   | godot                                                      |
+
+## Blocker 1: the mask atlas was never empty
+
+This report claimed "all 4096 texels of the sampled cell are alpha-1 and RGB-0". That reading was
+wrong. `atlas_mask_0.png` is a 1-channel 16-bit gray PNG, and the same file measures **8.68% covered
+(22,760 of 262,144 texels)**. Nothing was broken.
+
+What WAS wrong is that the coverage shader writes a constant 1 and the encoder stored that 1
+verbatim, so a correct mask page rendered at 0.002% brightness — a black rectangle in any viewer,
+and indistinguishable from the failure it looked like. `encodeAov` had no test at all, and the one
+render test that covered this asserted `v === 1`: it agreed with the encoder, and neither agreed
+with anyone opening the file. Coverage is now written at full scale, and the same 22,760 texels come
+back as 65535.
+
+## Blocker 2: the clipping was grounding, and it was already fixed
+
+The "all 48 frames clipped" measurement came from the `bulma-scaled` workspace. Measured now, that
+is not a framing fault:
+
+| workspace              | skinned rest Y      | on screen   | bottom edge      |
+| ---------------------- | ------------------- | ----------- | ---------------- |
+| bulma-scaled (pre-fix) | **[-0.502, 0.502]** | rows 43..63 | **48/48 frames** |
+| bulma-fixed (post-fix) | [0.000, 1.650]      | rows 10..60 | 0/48             |
+
+`bulma-scaled` was standing half underground: rigging had discarded the border's placement, leaving
+the body centred on the origin, 0.502 m = **16 px below the pivot row** at 32 px/m. That is the same
+defect fixed in `b0e212e`, so the clipping went with it — the current bake raises no flag at all.
+
+Not the pose, and not the framing. `camera.ts` pins world Y=0 onto row `cellPx.h - paddingPx` by
+construction and the model bounds never enter the vertical solve, so the framing was doing exactly
+what it promised. The residual 2 px of overshoot on the fixed workspace is the camera TILT: a ground
+point on the near edge of a 0.379 m-deep footprint projects `halfDepth·sin(30°)·32` ≈ 3 px below the
+anchor, which is what the 6 px padding is for.
+
+**The warning was the real defect.** It sent the user to `pixelsPerMeter`, which would have stopped
+the clipping by making a half-buried character smaller. It now splits by edge: bottom on a
+feet-baseline preset names grounding and `rig --feet-ground`; every other edge keeps the camera
+advice, because there it is right; a center pivot keeps it for the bottom too, since it does not pin
+Y=0 and the grounding inference is not available.
+
+### And the knob it names did not work
+
+`rig --feet-ground` composed its translation onto the mesh NODE, and these fixes run immediately
+before `applyRig` attaches a skin — after which the glTF spec says the node's transform no longer
+places the mesh. Measured: a body 1 m underground came back with a node matrix of +1 and vertices
+still at -1. Third instance of this defect class. Orientation fixes now bake into vertex data, and
+the test reads vertices rather than `worldPositions`, which is why the existing suite passed
+throughout.
+
+## What the sheet looks like
+
+Full-height, in frame, recognisably the reference: pink top, dark skirt, skin tones, 8 directions ×
+6 frames. Flicker 0.19%, palette of 8. **This is a sheet worth importing**, against the ~20 px
+near-black blob this report opened with.
+
+The honest gap is colour. The palette
+(`#030414 #091a28 #3b1428 #642c47 #484937 #98595a #c3736e #e3bbb0`) has no teal and no blue: the
+hair and skirt land as near-black and dark plum. That is the LIT pass, and it is the same
+lit-vs-albedo gap this report measured at the start (albedo 0.344 / lit 0.160) — narrowed but not
+closed by the scale fix. It is a look problem now, not a broken-pipeline problem, and it belongs to
+P4.
+
+## Still open
+
+- The colour gap above.
+- `RigState.accepted` is false, so the bake warns loudly and proceeds. 9 joints flagged, down from
+  37 — the seam rule did that, not a better rig.
