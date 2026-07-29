@@ -1,4 +1,4 @@
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert@1';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
 import { CAMERA_PRESETS, ManifestJournal } from '@spritebook/core';
 import { bakeSpecFromFlags, mergeAnimationSet, mirroringFor, provenanceOf, runCli } from './mod.ts';
@@ -900,4 +900,31 @@ Deno.test('--cell takes WxH, because cellPx always had two numbers', () => {
     }
     assert(msg.includes('--cell'), `"${bad}" is refused by name: ${msg}`);
   }
+});
+
+Deno.test('the palette size reaches the CACHE KEY, so two sizes cannot collide', async () => {
+  // `stylePresetHash` is sha256(canonicalJson(spec.style)) — the whole resolved
+  // style, so `quantize.maxColors` is in it by construction. Pinned anyway,
+  // because the flag is new and the property it needs is not "the hash exists"
+  // but "the flag changes the object being hashed": a --colors 16 bake serving
+  // an 8-colour bake's cached frames would ship the wrong sprites and report a
+  // cache hit rate that looked like a win.
+  const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
+  const resolved = { model: 'm.glb', character: 'c', out: 'o' };
+  const at = (n: string) =>
+    canonicalJson(bakeSpecFromFlags([...base, '--colors', n], resolved).style);
+
+  assertNotEquals(at('8'), at('16'));
+  assertEquals(at('16'), at('16'), 'and the same request is the same key');
+  assertEquals(
+    at('8'),
+    canonicalJson(bakeSpecFromFlags(base, resolved).style),
+    'asking for the preset value is the preset, so returning to 8 reuses its frames',
+  );
+
+  // the same for the cell, which also grew a shape it did not have
+  const cell = (v: string) =>
+    canonicalJson(bakeSpecFromFlags([...base, '--cell', v], resolved).camera);
+  assertNotEquals(cell('96x128'), cell('96'));
+  assertNotEquals(cell('96x128'), cell('128'));
 });

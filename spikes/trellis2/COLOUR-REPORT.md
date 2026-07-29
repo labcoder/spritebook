@@ -58,3 +58,64 @@ gap already documented in GUIDANCE-REPORT.md, and it is upstream of everything h
 of palette size and applies to every entry. It is why even the 24-colour sheet reads darker than the
 reference. Whether that is the light rig or the shader's sRGB handling is not established here — it
 is a separate measurement, and it was NOT the cause of the hue loss, so it was not chased.
+
+---
+
+## Does 16 hold up beyond bulma?
+
+Three subjects, matched to the SAME on-screen height so only the palette varies — bulma at 32 px/m ×
+1.65 m, mermaid and princess at 53 px/m × 1.003 m, all ≈53 px in a 64 px cell. Both cross-subject
+meshes were picked and rigged for this; neither had been baked before.
+
+| subject  | 8 colours                      | 16 colours                          | verdict        |
+| -------- | ------------------------------ | ----------------------------------- | -------------- |
+| bulma    | olive hair, black skirt, muddy | pink top, green hair, navy skirt    | **win**        |
+| mermaid  | an unreadable all-teal blob    | skin tones appear; a FIGURE appears | **bigger win** |
+| princess | brown/cream, readable          | the same, finer gradations          | neutral        |
+
+**Mermaid is the strongest case, not bulma.** Its 8-colour palette is
+`#192324 #20393d #1c4d54 #454945 #636d63 #287885 #629a98 #6ec4c1` — six teals and two greys, so hair
+and body are the same colour and there is no person in the picture. At 16 it gains `#584138` and
+`#7f614c`, and the face and torso separate from the hair.
+
+**Princess is the null result, and it is a null rather than a regression.** Both palettes are
+entirely warm neutrals; 16 adds finer skin and dress steps and no new hue, because the subject has
+no second hue to find. The "a bigger palette on a painted source just resolves noise" risk did NOT
+materialise — the 16-colour render is not noisier, it is just barely different.
+
+### Flicker
+
+| subject             | @8     | @16    |
+| ------------------- | ------ | ------ |
+| bulma               | 0.190% | 0.244% |
+| mermaid             | 0.449% | 0.552% |
+| princess            | 0.996% | 1.035% |
+| the bundled fixture | 0.273% | 0.420% |
+
+Two things worth stating precisely. The **0.55%** figure is a REGRESSION GUARD in
+`pipeline_test.ts`, pinned at ~2× the bundled fixture's measurement; it is not enforced at bake time
+and it does not describe real subjects. The product target is the roadmap's **1.2%**, and all six
+real-subject numbers are inside it. Princess sits near 1% at EIGHT colours — that is its rig and its
+foliage, not the palette.
+
+And the fixture only reaches 0.420% at 16, so **moving the default would not force the guard to be
+re-pinned** — it stays inside 0.55 on its own terms.
+
+Atlas cost: 26→28 KB (bulma), 31→34 (mermaid), 32→39 (princess).
+
+### Palette size is a cache-key input
+
+Verified end to end rather than assumed — `deriveCacheKeyInputs` hashes the whole resolved style, so
+`quantize.maxColors` is in `stylePresetHash` by construction:
+
+| flags           | style hash | camera hash | palette | cell   | cache hit |
+| --------------- | ---------- | ----------- | ------- | ------ | --------- |
+| `--colors 8`    | `f753ad93` | `52dc582d`  | 8       | 64×64  | 0%        |
+| `--colors 16`   | `1fbe173d` | `52dc582d`  | 16      | 64×64  | 0%        |
+| `--colors 8`    | `f753ad93` | `52dc582d`  | 8       | 64×64  | **100%**  |
+| `--cell 96x128` | `f753ad93` | `d119d3f0`  | 8       | 96×128 | 0%        |
+| `--colors 16`   | `1fbe173d` | `d119d3f0`  | 16      | 96×128 | 0%        |
+
+Four configurations, four bake directories, no collisions. The 100% hit on the RETURN to 8 is the
+positive half of the proof: the key is a function of the palette size, not a nonce that changes on
+every run.
