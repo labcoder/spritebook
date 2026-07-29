@@ -1421,6 +1421,26 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     } catch (err) {
       return fail(bakeId, 'bad-args', err instanceof Error ? err.message : String(err));
     }
+    // The rig's own deform check said no, and nothing has said yes since: both
+    // rig tracks write `accepted: false` and leave it "theirs to set", and no
+    // verb sets it yet. So this cannot be a refusal without dead-ending every
+    // rigged character — but the P3 exit run shipped 48 frames off a rig with
+    // 37 of 40 joints flagged and not one line said so at bake time. Loud warn.
+    if (manifest?.rig && !manifest.rig.accepted) {
+      const w: JobEvent = {
+        t: 'warn',
+        jobId: bakeId,
+        at: now(),
+        code: 'rig-unaccepted',
+        message: `this character's rig (${manifest.rig.jointCount} joints, track ` +
+          `${manifest.rig.track}) was never accepted - the deform check flagged joints when it ` +
+          `was made, and RigState.accepted is still false. The sprites will bake with that ` +
+          `skinning. Check deform-report.json in the rig output and repair with ` +
+          `\`spritebook rig --edits <patch.json>\` or \`--rerun-with-hints\`. Baking continues; ` +
+          `this is a warning, not a refusal.`,
+      };
+      emit(w, `warn [${w.code}]: ${w.message}`);
+    }
     let bakeDir: string | undefined;
     let code: number;
     try {

@@ -32,6 +32,7 @@ import {
   createWorkspace,
   readWorkspace,
   recordBake,
+  setRigState,
   sha256Hex,
   workspacePaths,
 } from '@spritebook/core';
@@ -381,6 +382,54 @@ Deno.test('acceptance: the bake manifest records the backend that really made it
       await sha256Hex(canonicalJson(manifest.rig)),
       'and the rig it is actually on',
     );
+  } finally {
+    await Deno.remove(raw, { recursive: true });
+  }
+});
+
+Deno.test('bake says so, loudly, when the rig was never accepted', async (t) => {
+  // The P3 exit run shipped 48 frames off a rig whose own deform check had
+  // flagged 37 of 40 joints and set accepted: false - and not one line said so
+  // at bake time. It cannot be a refusal: both rig tracks write accepted: false
+  // ("theirs to set") and no verb sets it yet, so refusing would dead-end every
+  // rigged character. Loud, actionable warn.
+  if (!(await tryGetGpu())) return;
+  const raw = await Deno.makeTempDir({ prefix: 'sb-rig-warn-' });
+  const dir = raw.replaceAll('\\', '/');
+  const geometry = ['--directions', '2', '--cell', '48', '--json'];
+  const rig = {
+    track: 'B' as const,
+    skeletonProfile: 'generic' as const,
+    jointCount: 40,
+    jointEdits: [],
+    orientationFixes: [],
+    accepted: false,
+  };
+  try {
+    await character(dir);
+
+    await t.step('an unaccepted rig warns before the bake starts', async () => {
+      await setRigState(dir, rig, { now: NOW });
+      const c = collector();
+      assertEquals(await runCli(['bake', '--workspace', dir, ...geometry], c.io), 0);
+      const warns = c.out.filter((l) => l.includes('"rig-unaccepted"'));
+      assertEquals(warns.length, 1, `exactly one warn: ${c.out.join('\n')}`);
+      assert(warns[0].includes('40 joints'), `names the rig: ${warns[0]}`);
+      assert(warns[0].includes('--edits'), `names the repair path: ${warns[0]}`);
+      // loud is not fatal: the bake itself must still have completed
+      assert(c.out.some((l) => l.includes('"done"')), 'the bake still ran');
+    });
+
+    await t.step('an accepted rig bakes without the warning', async () => {
+      await setRigState(dir, { ...rig, accepted: true }, { now: NOW });
+      const c = collector();
+      assertEquals(await runCli(['bake', '--workspace', dir, ...geometry], c.io), 0);
+      assertEquals(
+        c.out.filter((l) => l.includes('"rig-unaccepted"')).length,
+        0,
+        'acceptance silences it',
+      );
+    });
   } finally {
     await Deno.remove(raw, { recursive: true });
   }
