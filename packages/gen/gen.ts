@@ -46,6 +46,7 @@ import { defaultModelsRoot, detectPlatform } from '@spritebook/registry';
 import { importToCanonical } from '@spritebook/importer';
 import { NodeIO } from '@gltf-transform/core';
 import { decode as decodePng } from 'fast-png';
+import { heightOf } from './pick.ts';
 
 export interface GenJobOptions extends GenJobSpec {
   /** models root override (tests, and `--models-dir`) */
@@ -293,6 +294,30 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     if (described.tris < 1) {
       throw new GenFail('border-failed', 'The canonical mesh has no triangles');
     }
+    // A generated mesh arrives at whatever scale the backend chose - TRELLIS.2
+    // normalises its LONGEST axis to 1.0 - and the border only rescales when a
+    // declaredHeightM says what the character actually is. Everything downstream
+    // then inherits that arbitrary number: `bake` frames in pixelsPerMeter, so a
+    // 1 m character lands ~20 px tall in a 64 px cell, its outline swallows the
+    // silhouette, and the sprite ships nearly black. This is the one place that
+    // knows the height was never declared, so it is the one place that can say
+    // so. It does NOT invent a default: guessing 1.7 m would be right for a
+    // person and wrong for a chibi, a prop or a robot, and it would rescale the
+    // mesh every later stage sees on the strength of that guess.
+    if (opts.declaredHeightM === undefined) {
+      const measured = await heightOf(canonical.bytes);
+      yield {
+        t: 'warn',
+        jobId,
+        at: at(),
+        code: 'scale-undeclared',
+        message: `no --height was given, so this character kept the backend's own scale and ` +
+          `stands ${measured.toFixed(3)} m tall. That is the number every later stage believes: ` +
+          `\`bake\` frames at pixelsPerMeter, so the sprite's size in its cell follows directly ` +
+          `from it. Re-run with \`--height <metres>\` if that is not the size you meant.`,
+      };
+    }
+
     // the seed the adapter settled on, when it told us; otherwise the one asked for
     const effectiveSeed = await readEffectiveSeed(metaPath, opts.seed);
 

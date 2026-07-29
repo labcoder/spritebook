@@ -196,8 +196,10 @@ function clippedFlag(refs: QAFlag['frameRefs'], edges: Set<string>): QAFlag | nu
     frameRefs: refs.slice(0, 8),
     message: `the silhouette reaches the cell edge on ${refs.length} frame` +
       `${refs.length === 1 ? '' : 's'} (${[...edges].sort().join(', ')}). The padding budget ` +
-      'is exhausted there, so anything further out is cut. Lower pixelsPerMeter or raise ' +
-      'cellPx to give the character room.',
+      'is exhausted there, so anything further out is cut. Either the camera is too tight ' +
+      '(lower pixelsPerMeter or raise cellPx), or the MESH is not the size it claims - a ' +
+      'generated character keeps the scale its backend chose unless `gen --height` said ' +
+      'otherwise, and gen warns when nobody did.',
   };
 }
 

@@ -379,3 +379,39 @@ Deno.test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', 
     await f.cleanup();
   }
 });
+
+Deno.test('gen says so when nobody declared what size the character is', async () => {
+  if (!(await sidecarAvailable())) {
+    console.log('skip: uv or sidecar/ not available');
+    return;
+  }
+  const f = await setup();
+  try {
+    // Without --height the border does not rescale, so the mesh keeps whatever
+    // scale the backend chose. Everything downstream believes that number:
+    // `bake` frames in pixelsPerMeter, and the P3 exit measurement watched a
+    // 1 m character land ~20 px tall in a 64 px cell, where its own outline
+    // swallowed 81% of the silhouette and the sprite shipped nearly black.
+    const quiet = await collect(runGenJob(genOpts(f)));
+    const warn = quiet.find((e) => e.t === 'warn' && e.code === 'scale-undeclared');
+    assert(warn, `expected the warning; got ${quiet.filter((e) => e.t === 'warn').length} warns`);
+    const message = (warn as { message: string }).message;
+    assert(/\d+\.\d+ m tall/.test(message), `it names the measured height: ${message}`);
+    assert(/--height/.test(message), `and the flag that fixes it: ${message}`);
+
+    // ...and stays quiet when the caller DID say. A warning that fires either
+    // way trains people to ignore it.
+    const g = await setup();
+    try {
+      const told = await collect(runGenJob(genOpts(g, { declaredHeightM: 1.7 })));
+      assert(
+        !told.find((e) => e.t === 'warn' && e.code === 'scale-undeclared'),
+        'no warning when --height was given',
+      );
+    } finally {
+      await g.cleanup();
+    }
+  } finally {
+    await f.cleanup();
+  }
+});
