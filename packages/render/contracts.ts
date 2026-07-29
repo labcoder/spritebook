@@ -225,7 +225,13 @@ export const CAMERA_UNIFORM_FLOATS = 40; // 160 bytes: view(16) proj(16) params(
 /**
  * Pack the camera uniform exactly as the WGSL `Camera` struct expects:
  *   view: mat4 @0 · proj: mat4 @64 · params: vec4 @128 (x=near, y=far) ·
- *   lightDir: vec4 @144 (xyz = normalized world-space direction toward the light)
+ *   lightDir: vec4 @144 (xyz = normalized world-space direction toward the
+ *   light, w = the ambient floor)
+ *
+ * Ambient rides `lightDir.w` — a float that was already reserved and already
+ * zero — rather than being a literal in the shader. Two copies of a lighting
+ * constant is a constant that drifts, and the one in WGSL cannot be read by a
+ * test that wants to predict what the shader will compute.
  */
 export function packCamera(
   view: Float32Array,
@@ -233,6 +239,7 @@ export function packCamera(
   near: number,
   far: number,
   lightDir: readonly [number, number, number],
+  ambient: number,
 ): Float32Array {
   const d = new Float32Array(CAMERA_UNIFORM_FLOATS);
   d.set(view, 0);
@@ -243,5 +250,6 @@ export function packCamera(
   d[36] = lightDir[0] / l;
   d[37] = lightDir[1] / l;
   d[38] = lightDir[2] / l;
+  d[39] = ambient;
   return d;
 }

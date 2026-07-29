@@ -45,8 +45,29 @@ import { ReadbackPool } from './readback.ts';
 import { encodeAov } from './png.ts';
 import { buildThroughput, writeThroughput } from './throughput.ts';
 
-/** Constant world-space direction TOWARD the light (constant per-clip lighting law). */
-const LIGHT_DIR: readonly [number, number, number] = [0.4, 0.9, 0.5];
+/**
+ * THE LIGHT RIG. One key direction plus an ambient floor, constant in world
+ * space for every direction and every frame — that constancy is the per-clip
+ * lighting law, and it is why a sprite's shading does not crawl as it turns.
+ *
+ * Exported because it is measurable: `lighting_test.ts` predicts the lit AOV in
+ * closed form from these two numbers, so a change here has to be a deliberate
+ * one with a render behind it.
+ */
+export const LIGHT_DIR: readonly [number, number, number] = [0.4, 0.9, 0.5];
+
+/**
+ * The floor a surface facing away from the key still receives, in LINEAR light.
+ *
+ * Measured consequence of the pair above: the key is mostly OVERHEAD, so a
+ * surface pointing at the camera catches it at ndl 0.4527 and shades at
+ * 0.12 + 0.88*0.4527 = 0.5184 of its albedo. That costs a white camera-facing
+ * texel about 26% of its value (255 -> 189 after the sRGB encode), and it is
+ * the whole of the "every sheet reads darker than its reference" gap. Not a
+ * bug — see spikes/trellis2/LIGHTING-REPORT.md for the measurement that ruled
+ * out a double encode and a missing term.
+ */
+export const AMBIENT = 0.12;
 
 const bpp = AOV_TARGETS.map((t) => t.bpp);
 
@@ -237,7 +258,7 @@ export class Renderer {
     );
 
     const camData = framing.cameras.map((c) =>
-      packCamera(c.view, c.proj, c.near, c.far, LIGHT_DIR)
+      packCamera(c.view, c.proj, c.near, c.far, LIGHT_DIR, AMBIENT)
     );
 
     const err = await device.popErrorScope();

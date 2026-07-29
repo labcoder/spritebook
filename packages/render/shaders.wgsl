@@ -110,7 +110,9 @@ fn fs_main(in: VSOut) -> FSOut {
     discard;
   }
   let albedoLinear = base.rgb;
-  let ambient = 0.12;
+  // ambient floor rides lightDir.w (contracts.ts packCamera) so the host owns
+  // the whole rig and a test can predict this line
+  let ambient = cam.lightDir.w;
   let shaded = albedoLinear * (ambient + (1.0 - ambient) * ndl);
 
   let near = cam.params.x;
