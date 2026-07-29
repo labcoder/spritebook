@@ -180,17 +180,101 @@ function normalizationMatrices(s: number, ty: number, rotate: boolean): { n: Mat
   return { n, nInv };
 }
 
+/** Is this matrix the identity, to float tolerance? */
+function isIdentityMat4(m: ArrayLike<number>): boolean {
+  for (let i = 0; i < 16; i++) {
+    if (Math.abs(m[i] - (i % 5 === 0 ? 1 : 0)) > 1e-6) return false;
+  }
+  return true;
+}
+
 /**
- * Apply normalization N to the scene: root-node transforms become N·local and
- * every inverse bind matrix becomes IBM·N⁻¹, so world'·IBM' = I is preserved
- * exactly for skinned content and static meshes ride the same node math.
- * Vertices are never touched — a consumer composing node transforms (all glTF
- * consumers, including our renderer) sees the normalized character. The
- * skill's "bake into the mesh" ideal applies to corrective rotations left on
- * ad-hoc wrapper nodes; here N lives in the document's own roots + IBMs,
- * which is the only formulation that is exact for skins.
+ * Bake N into the VERTEX DATA, returning false when that cannot be done safely.
+ *
+ * This is the fix for the defect the P3 exit measurement found. N used to live
+ * only on the root node, and that is a promise the glTF spec lets a reader
+ * ignore: **a skinned mesh node's transform is ignored, because the skin's
+ * joints place it**. An unskinned canonical mesh is precisely the one that is
+ * about to be rigged — so `rig` would add a skin, the `world` node carrying
+ * scale and grounding would stop meaning anything, and the character silently
+ * reverted to the backend's arbitrary size, feet below the floor. It reached a
+ * 64 px sprite ~20 px tall whose own outline swallowed 81% of it.
+ *
+ * Refuses, leaving the node path to run, when:
+ *   - a SKIN exists. Then N·root with IBM·N⁻¹ is exact and the joints carry it;
+ *     baking vertices without re-deriving the bind pose would break the skin.
+ *   - a mesh node is not at identity. Baking would give `local·N·v` where the
+ *     node path gives `N·local·v`, and those differ unless they commute.
+ *   - a primitive has morph targets, whose deltas take the rotation and scale
+ *     but NOT the translation — a case with no fixture to prove it against.
+ */
+function bakeNormalizationIntoVertices(
+  doc: Document,
+  s: number,
+  ty: number,
+  rotate: boolean,
+): boolean {
+  if (doc.getRoot().listSkins().length > 0) return false;
+  const meshNodes = doc.getRoot().listNodes().filter((node) => node.getMesh() !== null);
+  if (meshNodes.some((node) => !isIdentityMat4(node.getWorldMatrix()))) return false;
+  const prims = doc.getRoot().listMeshes().flatMap((m) => m.listPrimitives());
+  if (prims.some((p) => p.listTargets().length > 0)) return false;
+
+  const r = rotate ? -1 : 1;
+  // Accessors can be SHARED between primitives; transforming one twice would
+  // square the scale on whatever they have in common.
+  const done = new Set<unknown>();
+  const apply = (
+    prim: (typeof prims)[number],
+    name: 'POSITION' | 'NORMAL' | 'TANGENT',
+    fn: (v: Float32Array, i: number) => void,
+  ) => {
+    const acc = prim.getAttribute(name);
+    if (!acc || done.has(acc)) return;
+    done.add(acc);
+    const arr = acc.getArray() as Float32Array<ArrayBuffer>;
+    const stride = acc.getElementSize();
+    for (let i = 0; i < arr.length; i += stride) fn(arr, i);
+    acc.setArray(arr);
+  };
+
+  for (const prim of prims) {
+    // N is a similarity: uniform scale s, optional 180° about Y (r = -1 flips
+    // x and z), then a Y translation.
+    apply(prim, 'POSITION', (v, i) => {
+      v[i] = r * s * v[i];
+      v[i + 1] = s * v[i + 1] + ty;
+      v[i + 2] = r * s * v[i + 2];
+    });
+    // Directions take the rotation only — a positive uniform scale does not
+    // change a normal's direction, and these stay unit length by construction.
+    apply(prim, 'NORMAL', (v, i) => {
+      v[i] = r * v[i];
+      v[i + 2] = r * v[i + 2];
+    });
+    // TANGENT is vec4; w is the bitangent SIGN and must survive untouched.
+    apply(prim, 'TANGENT', (v, i) => {
+      v[i] = r * v[i];
+      v[i + 2] = r * v[i + 2];
+    });
+  }
+  return true;
+}
+
+/**
+ * Apply normalization N to the scene.
+ *
+ * Preferred path: bake N into the vertex data, so the canonical mesh carries
+ * its scale and grounding where nothing downstream is entitled to ignore them.
+ * See `bakeNormalizationIntoVertices` for why a node transform was not enough.
+ *
+ * Fallback: root-node transforms become N·local and every inverse bind matrix
+ * becomes IBM·N⁻¹, so world'·IBM' = I is preserved exactly. That is still the
+ * only exact formulation for content that arrives already skinned, and it is
+ * correct there because the joints sit under the root that receives N.
  */
 function applyNormalization(doc: Document, s: number, ty: number, rotate: boolean): void {
+  if (bakeNormalizationIntoVertices(doc, s, ty, rotate)) return;
   const { n, nInv } = normalizationMatrices(s, ty, rotate);
   for (const root of rootNodes(doc)) {
     const local = root.getMatrix();

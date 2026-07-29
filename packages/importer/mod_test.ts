@@ -238,3 +238,72 @@ Deno.test('import executor emits canonical + preflight artifacts through the bus
     'OBJ without normals records the generated-normals fix',
   );
 });
+
+// --- the scale must survive being rigged -------------------------------------
+
+/** Y extent and floor of the raw POSITION data, ignoring every node transform. */
+function vertexSpanY(doc: Awaited<ReturnType<typeof readDoc>>): { min: number; max: number } {
+  let min = Infinity, max = -Infinity;
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const arr = prim.getAttribute('POSITION')!.getArray() as Float32Array;
+      for (let i = 1; i < arr.length; i += 3) {
+        min = Math.min(min, arr[i]);
+        max = Math.max(max, arr[i]);
+      }
+    }
+  }
+  return { min, max };
+}
+
+const readDoc = async (bytes: Uint8Array) => await (await getIO()).readBinary(bytes);
+
+Deno.test('an unskinned canonical mesh carries its scale in the VERTICES', async () => {
+  // THE regression. The scale used to live only on a `world` node, and glTF
+  // says a SKINNED mesh node's transform is ignored because the skin's joints
+  // place it. An unskinned canonical mesh is exactly the one about to be
+  // rigged, so `rig` silently reverted every generated character to its
+  // backend's arbitrary size with its feet below the floor - a 64 px sprite
+  // ~20 px tall whose own outline swallowed 81% of it. Nothing caught it
+  // because every fixture the renderer sees is unrigged.
+  const { bytes } = await importToCanonical({ input: fx('cube.obj'), declaredHeightM: 1.8 });
+  const doc = await readDoc(bytes);
+  assertEquals(doc.getRoot().listSkins().length, 0, 'fixture is unskinned');
+
+  for (const node of doc.getRoot().listNodes()) {
+    if (!node.getMesh()) continue;
+    const m = node.getWorldMatrix();
+    for (let i = 0; i < 16; i++) {
+      assert(
+        Math.abs(m[i] - (i % 5 === 0 ? 1 : 0)) < 1e-6,
+        `mesh node "${node.getName()}" still carries a transform a skinned reader would drop`,
+      );
+    }
+  }
+
+  const span = vertexSpanY(doc);
+  assert(
+    Math.abs(span.max - span.min - 1.8) < 1e-3,
+    `vertices span 1.8 m, got ${span.max - span.min}`,
+  );
+  assert(Math.abs(span.min) < 1e-3, `feet at Y=0 in the DATA, got ${span.min}`);
+});
+
+Deno.test('the canonical height survives the mesh becoming skinned', async () => {
+  // A faithful, GPU-free stand-in for `rig`: what rigging does that broke this
+  // is attach a skin, after which the spec says the mesh node's transform no
+  // longer places the mesh. If the scale is in the vertices, that is a no-op.
+  const { bytes } = await importToCanonical({ input: fx('cube.obj'), declaredHeightM: 1.8 });
+  const doc = await readDoc(bytes);
+  const before = vertexSpanY(doc);
+
+  const meshNode = doc.getRoot().listNodes().find((n) => n.getMesh() !== null)!;
+  const joint = doc.createNode('root_joint');
+  doc.getRoot().listScenes()[0].addChild(joint);
+  meshNode.setSkin(doc.createSkin('rig').addJoint(joint));
+
+  const after = vertexSpanY(doc);
+  assertEquals(after.min, before.min, 'skinning moved the floor');
+  assertEquals(after.max, before.max, 'skinning changed the height');
+  assert(Math.abs(after.max - after.min - 1.8) < 1e-3, 'still 1.8 m once skinned');
+});
