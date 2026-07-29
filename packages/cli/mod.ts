@@ -38,6 +38,8 @@ import type {
   ClipBinding,
   JointEdit,
   OrientationFix,
+  StyleOverrides,
+  StylePreset,
 } from '@spritebook/schema';
 import {
   applyPatchOps,
@@ -258,12 +260,74 @@ function cameraOverridesFromFlags(args: string[]): CameraOverrides {
     out.directions = directions as CameraPreset['directions'];
   }
   if (flag(args, 'ppm') !== undefined) out.pixelsPerMeter = intFlag(args, 'ppm', 32);
-  if (flag(args, 'cell') !== undefined) {
-    const cell = intFlag(args, 'cell', 64);
-    out.cellPx = { w: cell, h: cell };
-  }
+  if (flag(args, 'cell') !== undefined) out.cellPx = cellFromFlag(args);
   if (flag(args, 'padding') !== undefined) out.paddingPx = intFlag(args, 'padding', 6);
   return out;
+}
+
+/**
+ * `--cell 64` or `--cell 96x128`.
+ *
+ * `cellPx` has always been `{w, h}` with the two independent, and this flag has
+ * always collapsed one number into both — so a portrait or banner cell was
+ * expressible in the manifest and unreachable from the CLI. A bare number still
+ * means a square, which is what almost every sprite sheet wants.
+ */
+function cellFromFlag(args: string[]): { w: number; h: number } {
+  const raw = flag(args, 'cell');
+  if (raw === undefined) throw new Error('--cell needs a size, like 64 or 96x128');
+  const m = /^(\d+)(?:[xX](\d+))?$/.exec(raw.trim());
+  if (!m) {
+    throw new Error(`--cell must be a pixel size like 64 or 96x128 (got "${raw}")`);
+  }
+  const w = Number(m[1]);
+  const h = m[2] === undefined ? w : Number(m[2]);
+  if (w < 1 || h < 1) throw new Error(`--cell sizes must be at least 1 px (got "${raw}")`);
+  return { w, h };
+}
+
+/**
+ * The style fields a flag changes — today just the palette size.
+ *
+ * `base` is the style this character would bake with WITHOUT flags (its preset
+ * refined by whatever `look.overrides` already says), not the raw preset. That
+ * matters because `resolveStyle` merges shallow on purpose: `quantize` replaces
+ * wholesale, so building the override off the preset would silently discard a
+ * dither or a fixed palette the character had already chosen. Spreading the
+ * effective quantize keeps `--colors 16` meaning "the same style, more colours".
+ */
+function styleOverridesFromFlags(args: string[], base: StylePreset): StyleOverrides {
+  const out: StyleOverrides = {};
+  if (flag(args, 'colors') !== undefined) {
+    const maxColors = intFlag(args, 'colors', 8);
+    if (base.quantize === undefined) {
+      throw new Error(
+        `--colors has nothing to set on style "${base.id}": it does not quantize at all, so it ` +
+          `has no palette. Pick a style that does (pixel-8, cel-2, painterly) or drop the flag.`,
+      );
+    }
+    // the schema's own bound, restated so the message names the flag the user
+    // typed rather than a nested field path they never wrote
+    if (maxColors < 2 || maxColors > 256) {
+      throw new Error(`--colors must be between 2 and 256 (got ${maxColors})`);
+    }
+    out.quantize = { ...base.quantize, maxColors };
+  }
+  return out;
+}
+
+/**
+ * The fields of a resolved style that differ from its preset — the peer of
+ * `cameraOverridesOf`, so both halves of `look` record what RAN rather than
+ * what was stored before the flags were read.
+ */
+function styleOverridesOf(preset: StylePreset, resolved: StylePreset): StyleOverrides {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(resolved)) {
+    if (k === 'id') continue;
+    if (canonicalJson(v) !== canonicalJson(preset[k as keyof StylePreset])) out[k] = v;
+  }
+  return out as StyleOverrides;
 }
 
 /** `--camera` beats the character's stored look, which beats the default. */
@@ -379,6 +443,9 @@ export function provenanceOf(manifest?: CharacterManifest): BakeProvenance | und
  * could not share a single cached frame.
  */
 export function bakeSpecFromFlags(args: string[], resolved: BakeResolution): BakeJobSpec {
+  const styleId = stylePresetIdFor(args, resolved.look);
+  // the style this character carries, before any flag — the base a flag refines
+  const stored = resolveStyle(styleId, resolved.look?.overrides);
   return {
     jobId: 'bake',
     characterId: resolved.character,
@@ -387,7 +454,10 @@ export function bakeSpecFromFlags(args: string[], resolved: BakeResolution): Bak
       ...resolved.look?.cameraOverrides,
       ...cameraOverridesFromFlags(args), // an explicit flag wins over the stored look
     }),
-    style: resolveStyle(stylePresetIdFor(args, resolved.look), resolved.look?.overrides),
+    style: resolveStyle(styleId, {
+      ...resolved.look?.overrides,
+      ...styleOverridesFromFlags(args, stored), // same precedence as the camera
+    }),
     frames: intFlag(args, 'frames', 6),
     outRoot: resolved.out,
     cacheDir: flag(args, 'cache'),
@@ -485,6 +555,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'pack',
     'cell',
     'ppm',
+    'colors',
     'elevation',
     'padding',
     'cache',
@@ -1642,6 +1713,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         `BakeManifest at "${bakeDir}/manifest.json"`,
       );
       const cameraOverrides = cameraOverridesOf(CAMERA_PRESETS[cameraId], spec.camera);
+      const overrides = styleOverridesOf(PRESETS[styleId], spec.style);
       await recordBake(workspace, {
         look: {
           cameraPresetId: cameraId,
@@ -1649,9 +1721,10 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           // identical to the preset would claim a change nobody made
           ...(Object.keys(cameraOverrides).length > 0 ? { cameraOverrides } : {}),
           stylePresetId: styleId,
-          // nothing on the CLI edits a style's sub-fields, so what the manifest
-          // already carried is what this bake ran with
-          ...(look?.overrides === undefined ? {} : { overrides: look.overrides }),
+          // what this bake RAN with, on the same terms as the camera above:
+          // `--colors` edits a style sub-field now, so echoing back whatever the
+          // manifest already carried would drop the change on the next bake
+          ...(Object.keys(overrides).length > 0 ? { overrides } : {}),
         },
         animationSet: spec.clips === undefined || packId === undefined
           ? undefined

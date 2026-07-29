@@ -792,3 +792,112 @@ Deno.test('rig --auto-hints refuses honestly before any GPU work', async () => {
     await Deno.remove(empty, { recursive: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Output controls: cell size, world scale, palette size (D-029 look)
+// ---------------------------------------------------------------------------
+
+Deno.test('--colors sets the palette size, and only the palette size', () => {
+  const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
+  const resolved = { model: 'm.glb', character: 'c', out: 'o' };
+
+  // pixel-8 is a DEFAULT, not a ceiling: the pipeline reads quantize.maxColors
+  // and the schema allows 2..256, but no flag reached it, so the only way to
+  // ask for more colours was hand-editing look.overrides in character.json -
+  // and because resolveStyle merges shallow, that meant restating palette,
+  // space and dither too.
+  assertEquals(bakeSpecFromFlags(base, resolved).style.quantize?.maxColors, 8);
+  const wide = bakeSpecFromFlags([...base, '--colors', '32'], resolved).style;
+  assertEquals(wide.quantize?.maxColors, 32);
+
+  // the rest of quantize survives, which is the whole reason the override is
+  // built by spreading the effective style rather than naming fields
+  const plain = bakeSpecFromFlags(base, resolved).style;
+  assertEquals(wide.quantize?.dither, plain.quantize?.dither);
+  assertEquals(wide.quantize?.palette, plain.quantize?.palette);
+  assertEquals(wide.quantize?.space, plain.quantize?.space);
+  assertEquals(wide.outline, plain.outline, 'and nothing outside quantize moves');
+  assertEquals(wide.temporal, plain.temporal);
+  assertEquals(wide.id, 'pixel-8', 'the preset it refines is still named');
+});
+
+Deno.test('--colors refines what the CHARACTER stored, not the bare preset', () => {
+  const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
+  // a character that already chose no dithering
+  const resolved = {
+    model: 'm.glb',
+    character: 'c',
+    out: 'o',
+    look: {
+      cameraPresetId: 'standard-30',
+      stylePresetId: 'pixel-8',
+      overrides: {
+        quantize: {
+          palette: 'adaptive' as const,
+          maxColors: 8,
+          space: 'oklab' as const,
+          dither: { kind: 'none' as const },
+        },
+      },
+    },
+  };
+  const s = bakeSpecFromFlags([...base, '--colors', '24'], resolved).style;
+  assertEquals(s.quantize?.maxColors, 24);
+  assertEquals(
+    s.quantize?.dither,
+    { kind: 'none' },
+    'building the override off the preset would have silently re-enabled dither',
+  );
+});
+
+Deno.test('--colors outside the schema bound names the flag, not a nested path', () => {
+  const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
+  const resolved = { model: 'm.glb', character: 'c', out: 'o' };
+  for (const n of ['1', '257']) {
+    let msg = '';
+    try {
+      bakeSpecFromFlags([...base, '--colors', n], resolved);
+    } catch (e) {
+      msg = e instanceof Error ? e.message : String(e);
+    }
+    assert(msg.includes('--colors'), `names the flag the user typed: ${msg}`);
+    assert(msg.includes('2 and 256'), msg);
+  }
+});
+
+Deno.test('--cell takes WxH, because cellPx always had two numbers', () => {
+  const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
+  const resolved = { model: 'm.glb', character: 'c', out: 'o' };
+
+  assertEquals(bakeSpecFromFlags(base, resolved).camera.cellPx, { w: 64, h: 64 });
+  assertEquals(
+    bakeSpecFromFlags([...base, '--cell', '128'], resolved).camera.cellPx,
+    { w: 128, h: 128 },
+    'a bare number is still a square',
+  );
+  assertEquals(
+    bakeSpecFromFlags([...base, '--cell', '96x128'], resolved).camera.cellPx,
+    { w: 96, h: 128 },
+    'a portrait cell was expressible in the manifest and unreachable from the CLI',
+  );
+  assertEquals(
+    bakeSpecFromFlags([...base, '--cell', '96X128'], resolved).camera.cellPx,
+    { w: 96, h: 128 },
+  );
+
+  // the pivot follows the taller cell, which is the point of asking for one
+  assertEquals(
+    bakeSpecFromFlags([...base, '--cell', '96x128'], resolved).camera.paddingPx,
+    6,
+  );
+
+  for (const bad of ['64xx', 'x64', '64x', 'big', '64x0']) {
+    let msg = '';
+    try {
+      bakeSpecFromFlags([...base, '--cell', bad], resolved);
+    } catch (e) {
+      msg = e instanceof Error ? e.message : String(e);
+    }
+    assert(msg.includes('--cell'), `"${bad}" is refused by name: ${msg}`);
+  }
+});

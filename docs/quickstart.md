@@ -167,8 +167,9 @@ hysteresis), so frames do not shimmer in motion.
 | `--frames <n>`       | `6`           | frames of the built-in idle pose (positive integer)             |
 | `--clips <spec>`     | (idle)        | `clip:frames[@speed][!hold][,...]` — bake real clips instead    |
 | `--pack <dir>`       | (bundled)     | animation pack the `--clips` ids resolve in                     |
-| `--cell <px>`        | `64`          | square output cell size                                         |
+| `--cell <px\|WxH>`   | `64`          | output cell size; `64` is square, `96x128` is not               |
 | `--ppm <n>`          | `32`          | pixels per meter (world scale)                                  |
+| `--colors <n>`       | style's own   | palette size, 2–256; refines the style rather than replacing it |
 | `--elevation <deg>`  | `30`          | camera elevation angle                                          |
 | `--padding <px>`     | `6`           | transparent padding inside each cell                            |
 | `--cache <dir>`      | (off)         | input-hash frame cache; the bake always writes through when set |
