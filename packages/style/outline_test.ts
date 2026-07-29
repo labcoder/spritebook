@@ -206,3 +206,81 @@ Deno.test('extractOutline is deterministic (byte-identical across calls)', () =>
   const b = extractOutline(aov, p);
   assertEquals(Array.from(a), Array.from(b));
 });
+
+// --- thin subjects: sub-pixel width, and dropping the stroke on thin spans ----
+
+/** A vertical opaque bar `barW` texels wide, centred, on its OWN frame.
+ * Its own, because these cases need room for a 10 px limb at S=4 and the
+ * module-level 16x16 cannot hold one. */
+function bar(barW: number, w = 64, h = 64): AovImage {
+  const aov = blankAov(w, h);
+  const x0 = Math.floor((w - barW) / 2);
+  for (let y = 0; y < h; y++) {
+    for (let x = x0; x < x0 + barW; x++) {
+      const i = y * w + x;
+      aov.mask[i] = 1;
+      aov.depth[i] = 30000;
+      setNormal(aov, i, [0, 0, 1]);
+    }
+  }
+  return aov;
+}
+
+function strokeShare(out: Uint8Array, aov: AovImage): number {
+  let opaque = 0, stroked = 0;
+  for (let i = 0; i < out.length; i++) {
+    if (aov.mask[i] === 0) continue;
+    opaque++;
+    if (out[i]) stroked++;
+  }
+  return stroked / opaque;
+}
+
+Deno.test('outline: a fractional widthPx thins the stroke instead of rounding to 1', () => {
+  // pixel-8 shipped widthPx as an INTEGER with a floor of 1, so a 64 px cell had
+  // no thinner setting. On a slim character a 1 px inward stroke from both sides
+  // of a 3 px limb IS the limb — measured at 67% of bulma's silhouette. The
+  // render is supersampled, so a half pixel is expressible: 0.5 x S=4 is a
+  // 2-texel Sx stroke where 1.0 is 4.
+  const aov = bar(12); // 12 texels wide at S=4 == a 3 px limb at 1x
+  const full = extractOutline(aov, params({ superSample: 4, widthPx: 1 }));
+  const half = extractOutline(aov, params({ superSample: 4, widthPx: 0.5 }));
+  const fullShare = strokeShare(full, aov);
+  const halfShare = strokeShare(half, aov);
+  assertEquals(fullShare > halfShare, true, `${fullShare} should exceed ${halfShare}`);
+  // 4 texels in from each side of 12 = 8/12; 2 from each side = 4/12
+  assertEquals(Math.round(fullShare * 12), 8);
+  assertEquals(Math.round(halfShare * 12), 4);
+});
+
+Deno.test('outline: minSpanPx drops the stroke on a limb too thin to survive it', () => {
+  const thin = bar(8); // 2 px at 1x — an outline would leave no interior
+  const thick = bar(40); // 10 px at 1x — plenty of inside
+  const p = params({ superSample: 4, widthPx: 1, minSpanPx: 2 });
+
+  assertEquals(strokeShare(extractOutline(thin, p), thin), 0, 'thin bar keeps no silhouette');
+  assertEquals(
+    strokeShare(extractOutline(thick, p), thick) > 0,
+    true,
+    'a thick bar still gets its outline',
+  );
+  // and it is OPT-IN: without minSpanPx the thin bar is outlined as before
+  assertEquals(
+    strokeShare(extractOutline(thin, params({ superSample: 4, widthPx: 1 })), thin) > 0,
+    true,
+    'default behaviour is unchanged',
+  );
+});
+
+Deno.test('outline: minSpanPx spares CREASES, which are the detail that still reads', () => {
+  // A thin limb loses its silhouette but must keep interior lines — otherwise
+  // suppression trades a black limb for a featureless one.
+  const aov = bar(8);
+  for (let y = 0; y < aov.height; y++) {
+    for (let x = aov.width / 2; x < aov.width; x++) {
+      if (aov.mask[y * aov.width + x]) setNormal(aov, y * aov.width + x, [1, 0, 0]);
+    }
+  }
+  const out = extractOutline(aov, params({ superSample: 4, widthPx: 1, minSpanPx: 2 }));
+  assertEquals(strokeShare(out, aov) > 0, true, 'the crease survives on a thin span');
+});

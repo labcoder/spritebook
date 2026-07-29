@@ -189,6 +189,51 @@ function dilate(
 }
 
 /**
+ * Shrink an opaque region by `rounds` 8-connected steps: a texel survives only if
+ * every neighbour is opaque. Used to ask whether a shape has any INTERIOR left
+ * after the stroke is taken off it.
+ */
+function erode(mask: Uint16Array, rounds: number, w: number, h: number): Uint8Array {
+  const n = w * h;
+  let cur = new Uint8Array(n);
+  for (let i = 0; i < n; i++) cur[i] = mask[i] === 0 ? 0 : 1;
+  if (rounds <= 0) return cur;
+  let next = new Uint8Array(n);
+  for (let r = 0; r < rounds; r++) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (!cur[i]) {
+          next[i] = 0;
+          continue;
+        }
+        let keep = 1;
+        for (let k = 0; k < 8; k++) {
+          const xx = x + N8_DX[k];
+          const yy = y + N8_DY[k];
+          // Out of bounds counts as INSIDE. A shape that runs off the cell is
+          // one we cannot measure past the edge, and for a sprite the
+          // overwhelmingly likelier reason is that the character is LARGE —
+          // treating the border as empty would erode a cell-filling character
+          // from four sides and strip the outline off exactly the subjects that
+          // least need it stripped.
+          if (xx < 0 || xx >= w || yy < 0 || yy >= h) continue;
+          if (!cur[yy * w + xx]) {
+            keep = 0;
+            break;
+          }
+        }
+        next[i] = keep;
+      }
+    }
+    const tmp = cur;
+    cur = next;
+    next = tmp;
+  }
+  return cur;
+}
+
+/**
  * Extract the outline stroke mask at render (Sx) resolution: 1 where a stroke sits.
  * `stroke = max(1, round(widthPx * superSample))`. Silhouette and crease seeds are
  * dilated SEPARATELY (8-connected, into opaque texels only) then unioned:
@@ -203,8 +248,22 @@ export function extractOutline(aov: AovImage, p: OutlineParams): Uint8Array {
   const { width: w, height: h, mask } = aov;
   const n = w * h;
   const stroke = Math.max(1, Math.round(p.widthPx * p.superSample));
-  const sil = dilate(silhouetteEdges(aov), mask, stroke - 1, w, h);
+  let sil = dilate(silhouetteEdges(aov), mask, stroke - 1, w, h);
   const cre = dilate(creaseEdges(aov, p), mask, Math.floor((stroke - 1) / 2), w, h);
+
+  // minSpanPx: keep the silhouette stroke only where the shape survives an
+  // OPENING by the span radius. A limb thinner than that erodes to nothing, so
+  // outlining it would replace the limb rather than describe it. Creases are
+  // deliberately not filtered - an interior line on a thin arm is the detail
+  // that still reads at 64 px.
+  const span = Math.max(0, Math.round((p.minSpanPx ?? 0) * p.superSample));
+  if (span > 0) {
+    const thick = dilate(erode(mask, span, w, h), mask, span, w, h);
+    const kept = new Uint8Array(n);
+    for (let i = 0; i < n; i++) kept[i] = sil[i] & thick[i];
+    sil = kept;
+  }
+
   const out = new Uint8Array(n);
   for (let i = 0; i < n; i++) out[i] = sil[i] | cre[i];
   return out;

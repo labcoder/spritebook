@@ -86,7 +86,21 @@ export const StylePresetBaseSchema = z
       ]),
     }).optional(),
     outline: z.strictObject({
-      widthPx: z.int().min(1).max(8),
+      /** 1x stroke width. FRACTIONAL is allowed and is the only way to thin the
+       * stroke at small cells: the render is supersampled, so 0.5 with S=4 is a
+       * 2-texel Sx stroke that downsamples to a partial pixel. An integer floor
+       * of 1 meant a 64 px cell had no thinner setting available, and on a slim
+       * character a 1 px inward stroke from both sides of a 3 px limb IS the
+       * limb - measured at 67% of bulma's silhouette. */
+      widthPx: z.number().min(0.25).max(8),
+      /** Drop the SILHOUETTE stroke where the shape is too thin to survive it,
+       * keeping creases. 0 (the default) is the old unconditional behaviour.
+       *
+       * The test is a morphological opening by the stroke radius: a region that
+       * erodes to nothing has no interior left once outlined, so outlining it
+       * replaces the character rather than describing it. Creases are exempt
+       * because an interior line on a thin limb is what still reads as detail. */
+      minSpanPx: z.number().min(0).max(8).optional(),
       normalThreshold: z.number(),
       depthThresholdScaled: z.number(),
       colorFrom: z.union([z.literal('palette-dark'), z.string()]),

@@ -58,6 +58,7 @@ function composite(aov: AovImage, style: StylePreset, color: [number, number, nu
   const mask = extractOutline(aov, {
     superSample: style.temporal.superSample,
     widthPx: style.outline.widthPx,
+    minSpanPx: style.outline.minSpanPx,
     normalThreshold: style.outline.normalThreshold,
     depthThresholdScaled: style.outline.depthThresholdScaled,
   });

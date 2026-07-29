@@ -75,8 +75,10 @@ export interface Palette {
 export interface OutlineParams {
   /** supersample factor S: a 1x stroke of widthPx is widthPx*S at render res */
   superSample: number;
-  /** 1x stroke width (StylePreset.outline.widthPx) */
+  /** 1x stroke width (StylePreset.outline.widthPx); may be fractional */
   widthPx: number;
+  /** 1x span below which the SILHOUETTE stroke is dropped (0/absent = never) */
+  minSpanPx?: number;
   /** dot(n_a, n_b) < this -> interior crease */
   normalThreshold: number;
   /** |depth_a - depth_b| > this * depth -> crease (threshold SCALED by depth) */
