@@ -180,27 +180,72 @@ function touchedEdges(rgba: Uint8Array, w: number, h: number): string[] {
 
 /**
  * The QA flag a silhouette raises when it reaches the cell edge, naming which
- * edges and how far. The claim is deliberately what a styled cell can actually
- * show: reaching the border means the padding budget is spent there, so
- * anything further out IS lost — whether this particular frame lost pixels is
- * not knowable from the cell alone, and saying "cut off" flatly would overstate
- * it. Which edge is the diagnostic: `bottom` on a feet-baseline preset means a
- * foot swings below the grounded plane, `left`/`right` mean the arm span
- * outgrew the cell.
+ * edges and — this is the part that matters — the knob for THAT edge.
+ *
+ * The claim is deliberately what a styled cell can actually show: reaching the
+ * border means the padding budget is spent there, so anything further out IS
+ * lost; whether this particular frame lost pixels is not knowable from the cell
+ * alone, and saying "cut off" flatly would overstate it.
+ *
+ * ## Why the bottom edge gets its own answer
+ *
+ * On a `feet-baseline` preset the camera pins world Y=0 onto the pivot row
+ * (`cellPx.h - paddingPx`) BY CONSTRUCTION — camera.ts solves every direction
+ * to hit that pixel, and the model bounds never enter the vertical solve. So
+ * silhouette below the pivot row is geometry at or below the ground plane, and
+ * the character is standing IN the floor rather than on it.
+ *
+ * Shrinking the camera does not fix that. It was nonetheless what this flag
+ * used to say, and it said it on the P3 exit measurement: all 48 frames hit the
+ * bottom edge because rigging had discarded the border's grounding and left the
+ * body centred on the origin — half of it underground, 16 px below the pivot at
+ * 32 px/m. Lowering `pixelsPerMeter` would have stopped the clipping by making
+ * a half-buried character smaller, which is not the same thing as fixing it.
+ *
+ * The tilt is the honest caveat: at elevation, a ground point on the near edge
+ * of the footprint projects a little below the anchor (`halfDepth·sin(el)·ppm`,
+ * ~3 px for a 0.38 m-deep character at 30° and 32 px/m). That is what the
+ * padding is FOR, so it does not reach the edge — and a bottom-edge hit means
+ * the overshoot outgrew the padding, which the tilt alone does not do.
  */
-function clippedFlag(refs: QAFlag['frameRefs'], edges: Set<string>): QAFlag | null {
+function clippedFlag(
+  refs: QAFlag['frameRefs'],
+  edges: Set<string>,
+  camera: CameraPreset,
+): QAFlag | null {
   if (refs.length === 0) return null;
+  const sides = [...edges].sort();
+  const grounding = sides.includes('bottom') && camera.pivot === 'feet-baseline';
+  const overflow = sides.some((e) => e !== 'bottom') || !grounding;
+
+  const remedies: string[] = [];
+  if (grounding) {
+    const pivotRow = camera.cellPx.h - camera.paddingPx;
+    remedies.push(
+      `BOTTOM is not a framing problem on this preset: '${camera.id}' pins world Y=0 to row ` +
+        `${pivotRow} of a ${camera.cellPx.h} px cell, so silhouette below it is geometry under ` +
+        `the ground plane - the character is standing IN the floor. Lowering pixelsPerMeter ` +
+        `only makes a half-buried character smaller. Ground the mesh instead: ` +
+        `\`spritebook rig --feet-ground\` re-runs with the body sat on Y=0.`,
+    );
+  }
+  if (overflow) {
+    remedies.push(
+      `${sides.filter((e) => e !== 'bottom' || !grounding).join(', ')} means the character ` +
+        `genuinely outgrew the cell: lower pixelsPerMeter or raise cellPx. If it is far too ` +
+        `big, check the SCALE instead - a generated character keeps whatever scale its backend ` +
+        `chose unless \`gen --height\` said otherwise, and gen warns when nobody did.`,
+    );
+  }
+
   return {
     code: 'silhouette-clipped',
     severity: 'warn',
     sourceStage: 'look',
     frameRefs: refs.slice(0, 8),
     message: `the silhouette reaches the cell edge on ${refs.length} frame` +
-      `${refs.length === 1 ? '' : 's'} (${[...edges].sort().join(', ')}). The padding budget ` +
-      'is exhausted there, so anything further out is cut. Either the camera is too tight ' +
-      '(lower pixelsPerMeter or raise cellPx), or the MESH is not the size it claims - a ' +
-      'generated character keeps the scale its backend chose unless `gen --height` said ' +
-      'otherwise, and gen warns when nobody did.',
+      `${refs.length === 1 ? '' : 's'} (${sides.join(', ')}). The padding budget is exhausted ` +
+      `there, so anything further out is cut. ${remedies.join(' ')}`,
   };
 }
 
@@ -319,7 +364,7 @@ export async function styleClipsFromAovs(
     flickerPct: flickerPct(flickerFrames, w1, h1),
     flags: [
       ...qaFlags(style, camera),
-      ...[clippedFlag(clipped, clippedEdges)].filter((f) => f !== null),
+      ...[clippedFlag(clipped, clippedEdges, camera)].filter((f) => f !== null),
     ],
     styledDir,
   };
@@ -394,7 +439,7 @@ export async function styleFromAovs(
     flickerPct: flickerPct(idleFrames, w1, h1),
     flags: [
       ...qaFlags(style, camera),
-      ...[clippedFlag(clipped, clippedEdges)].filter((f) => f !== null),
+      ...[clippedFlag(clipped, clippedEdges, camera)].filter((f) => f !== null),
     ],
     styledDir,
   };

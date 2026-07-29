@@ -202,10 +202,20 @@ Deno.test('cluster-vote with an empty palette refuses at runtime too', async () 
  * Write a minimal AOV frame set whose lit plane is a filled rect. `inset` 0
  * makes the silhouette reach the border; a positive inset leaves a margin.
  */
-async function writeSyntheticAov(dir: string, sx: number, inset: number) {
+interface Insets {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+async function writeSyntheticAov(dir: string, sx: number, inset: number | Insets) {
+  const ins: Insets = typeof inset === 'number'
+    ? { top: inset, bottom: inset, left: inset, right: inset }
+    : inset;
   const rgba = new Uint8Array(sx * sx * 4);
-  for (let y = inset; y < sx - inset; y++) {
-    for (let x = inset; x < sx - inset; x++) {
+  for (let y = ins.top; y < sx - ins.bottom; y++) {
+    for (let x = ins.left; x < sx - ins.right; x++) {
       const i = (y * sx + x) * 4;
       rgba[i] = 180;
       rgba[i + 1] = 60;
@@ -287,5 +297,92 @@ Deno.test('silhouette-clipped fires when the character runs out of cell', async 
   } finally {
     await Deno.remove(cut, { recursive: true });
     await Deno.remove(fits, { recursive: true });
+  }
+});
+
+Deno.test('the bottom edge is a grounding fault, and is not blamed on the camera', async () => {
+  // The P3 exit measurement hit this on all 48 frames and the flag sent the
+  // user to pixelsPerMeter. It was grounding: rigging had discarded the
+  // border's placement and left the body centred on the origin, 16 px of it
+  // below the pivot row at 32 px/m. Shrinking the camera would have stopped the
+  // clipping by making a half-buried character smaller.
+  //
+  // camera.ts pins world Y=0 to `cellPx.h - paddingPx` for a feet-baseline
+  // preset and the model bounds never enter that solve, so silhouette below the
+  // pivot row IS geometry under the floor. That inference is what the flag owes
+  // the user.
+  const sx = 32;
+  const below = await Deno.makeTempDir();
+  const wide = await Deno.makeTempDir();
+  try {
+    await writeSyntheticAov(below, sx, { top: 8, bottom: 0, left: 8, right: 8 });
+    await writeSyntheticAov(wide, sx, { top: 8, bottom: 8, left: 0, right: 0 });
+    const src = (framesDir: string): AovSource => ({
+      framesDir,
+      directions: 1,
+      frames: 1,
+      width: sx,
+      height: sx,
+    });
+    const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 } };
+
+    const outB = await Deno.makeTempDir();
+    const outW = await Deno.makeTempDir();
+    try {
+      const b = (await styleFromAovs(src(below), cam, PIXEL_8, outB)).flags
+        .find((f) => f.code === 'silhouette-clipped');
+      assert(b, 'a body below the baseline still raises the flag');
+      assert(/rig --feet-ground/.test(b!.message), `it names the knob: ${b!.message}`);
+      assert(
+        /standing IN the floor/.test(b!.message),
+        `and says what is actually wrong: ${b!.message}`,
+      );
+      assert(
+        !/lower pixelsPerMeter or raise cellPx/.test(b!.message),
+        `and does NOT send the user to the camera: ${b!.message}`,
+      );
+
+      // the other half: a genuine overflow keeps the camera advice, because
+      // there it is the right answer
+      const w = (await styleFromAovs(src(wide), cam, PIXEL_8, outW)).flags
+        .find((f) => f.code === 'silhouette-clipped');
+      assert(w, 'an over-wide character raises the flag');
+      assert(
+        /lower pixelsPerMeter or raise cellPx/.test(w!.message),
+        `left/right IS a framing problem: ${w!.message}`,
+      );
+      assert(!/feet-ground/.test(w!.message), `and grounding is not mentioned: ${w!.message}`);
+    } finally {
+      await Deno.remove(outB, { recursive: true });
+      await Deno.remove(outW, { recursive: true });
+    }
+  } finally {
+    await Deno.remove(below, { recursive: true });
+    await Deno.remove(wide, { recursive: true });
+  }
+});
+
+Deno.test('bottom clipping on a CENTER pivot is framing, because Y=0 is not pinned', async () => {
+  // The grounding inference is only available on feet-baseline: a center pivot
+  // puts the bounding-box middle on the middle row and world Y=0 lands wherever
+  // the body's height puts it, so "below the pivot" says nothing about the floor.
+  const sx = 32;
+  const dir = await Deno.makeTempDir();
+  const out = await Deno.makeTempDir();
+  try {
+    await writeSyntheticAov(dir, sx, { top: 8, bottom: 0, left: 8, right: 8 });
+    const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 }, pivot: 'center' as const };
+    const f = (await styleFromAovs(
+      { framesDir: dir, directions: 1, frames: 1, width: sx, height: sx },
+      cam,
+      PIXEL_8,
+      out,
+    )).flags.find((fl) => fl.code === 'silhouette-clipped');
+    assert(f, 'still flagged');
+    assert(!/feet-ground/.test(f!.message), `no grounding claim it cannot support: ${f!.message}`);
+    assert(/lower pixelsPerMeter or raise cellPx/.test(f!.message), f!.message);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(out, { recursive: true });
   }
 });
