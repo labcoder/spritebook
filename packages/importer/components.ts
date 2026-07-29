@@ -1,11 +1,19 @@
 /**
- * Connected components of a mesh, and why a rig cares (P3-T3).
+ * Connected components of a mesh, and why the pipeline cares (P3-T3).
  *
  * A skinning model predicts ONE skeleton and weights every vertex against it.
  * When the geometry is several DETACHED shells — a robot whose hands float
  * beside its arms, a character with a separate prop — no joint placement can
  * make a chain drive a shell it does not touch, and the deform check reports
  * tearing that no amount of hinting will repair.
+ *
+ * This lives in the BORDER package, not in rig, because the split is a
+ * property of the mesh rather than of any attempt to rig it. `gen` measures it
+ * the moment a mesh becomes a result and records the count on the receipt;
+ * `pick` reads those counts to say which sibling is one body; `rig` re-measures
+ * at entry as a preflight. Putting it here keeps that order honest — the
+ * generation stage does not depend on the rigging package to describe its own
+ * output.
  *
  * Measured (spikes/trellis2/HINTS-REPORT.md): `robot-astro` has floating hands
  * and its aggregate torn fraction only moved 18.50% → 15.01% under hints, while

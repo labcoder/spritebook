@@ -38,13 +38,6 @@ export {
   uniqueEdges,
 } from './deform.ts';
 export { DEFAULT_MIN_HINT_OFFSET_M, deriveAutoHints } from './autohints.ts';
-export {
-  componentsOfFile,
-  connectedComponents,
-  disconnectedWarning,
-  SIGNIFICANT_FRACTION,
-} from './components.ts';
-export type { ComponentReport, MeshComponent } from './components.ts';
 export type { AutoHintOptions, AutoHints } from './autohints.ts';
 export type { DeformCheckOptions } from './deform.ts';
 

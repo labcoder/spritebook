@@ -41,7 +41,7 @@ import { applyRig } from './apply.ts';
 import { promoteToCanonical } from './promote.ts';
 import { deformCheck } from './deform.ts';
 import { applyOrientationFixes, detectFacingFile } from './orient.ts';
-import { componentsOfFile, disconnectedWarning } from './components.ts';
+import { componentsOfFile, disconnectedWarning } from '@spritebook/importer';
 import { applyEditsToRiggedGlb, applyJointEdits, hintsFromEdits } from './edits.ts';
 
 export interface RigJobOptions {

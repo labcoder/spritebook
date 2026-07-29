@@ -7,4 +7,5 @@ export * from './detect.ts';
 export * from './io.ts';
 export * from './fbx.ts';
 export * from './canonicalize.ts';
+export * from './components.ts';
 export * from './import.ts';
