@@ -70,6 +70,21 @@ Deno.test('the significance threshold is the documented one', () => {
   assertEquals(SIGNIFICANT_FRACTION, 0.1);
 });
 
+Deno.test('all fragments and no body is its own finding, not silence', () => {
+  // Reachable once `gen` records the significant count on the receipt: zero
+  // reads the same as one to a length check and means the opposite. Twenty
+  // equal shells is 5% each, so nothing clears the 10% floor.
+  const pos: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i < 20; i++) quad(pos, idx, i * 10);
+  const r = connectedComponents(Float32Array.from(pos), Uint32Array.from(idx));
+  assertEquals(r.significant.length, 0, 'no shell is body-sized');
+  const w = disconnectedWarning(r);
+  assert(w, 'and that is worse than split, so it cannot be silent');
+  assert(w.includes('NO body-sized piece'), w);
+  assert(w.includes('another seed'), `the remedy is a new generation, not a repair: ${w}`);
+});
+
 Deno.test('an empty mesh reports nothing rather than dividing by zero', () => {
   const r = connectedComponents(new Float32Array(), new Uint32Array());
   assertEquals(r.components.length, 0);

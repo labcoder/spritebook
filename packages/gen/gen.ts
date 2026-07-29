@@ -43,7 +43,7 @@ import {
   versionDir,
 } from '@spritebook/registry';
 import { defaultModelsRoot, detectPlatform } from '@spritebook/registry';
-import { importToCanonical } from '@spritebook/importer';
+import { componentsOfFile, disconnectedWarning, importToCanonical } from '@spritebook/importer';
 import { NodeIO } from '@gltf-transform/core';
 import { decode as decodePng } from 'fast-png';
 import { heightOf } from './pick.ts';
@@ -318,6 +318,24 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
       };
     }
 
+    // How many body-sized pieces the backend actually produced. This is a
+    // property of the MESH, so it is knowable HERE - one image, one glb - and
+    // waiting for someone to run `rig` only means finding out ~90 s of GPU
+    // later. Two things come out of it: a warn now, and a number on the receipt
+    // that lets `pick` compare siblings.
+    //
+    // Measured, and the reason the number is worth keeping: the SAME image at
+    // different seeds lands on different answers. `robot-astro` generated two
+    // bodies at seed 7 (60.4% / 20.0% - its hands came off) and one body at
+    // seeds 100 and 201 (78.9%, 89.8%). Bulma was one body at every seed tried.
+    // So "generate a few and take the connected one" is a real strategy, and it
+    // needs this recorded per result to be possible at all.
+    const shells = await componentsOfFile(rp.model);
+    const detached = disconnectedWarning(shells);
+    if (detached) {
+      yield { t: 'warn', jobId, at: at(), code: 'mesh-disconnected', message: detached };
+    }
+
     // the seed the adapter settled on, when it told us; otherwise the one asked for
     const effectiveSeed = await readEffectiveSeed(metaPath, opts.seed);
 
@@ -333,6 +351,7 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
         tris: described.tris,
         ...(described.textureRes !== undefined ? { textureRes: described.textureRes } : {}),
         kind: version.outputs?.kind ?? 'mesh',
+        bodies: shells.significant.length,
       },
       discarded: false,
     };

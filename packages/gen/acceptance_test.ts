@@ -189,6 +189,9 @@ Deno.test('ACCEPTANCE: image -> gen -> canonical textured glb with full provenan
     assertEquals(receipt.discarded, false);
     assert(receipt.output.tris > 0, 'triangle count recorded');
     assert(receipt.output.textureRes! > 0, 'texture resolution recorded');
+    // measured from the canonical bytes, not assumed: this is what lets `pick`
+    // compare siblings, and the fixture backend emits one solid
+    assertEquals(receipt.output.bodies, 1, 'body-sized shells recorded on the receipt');
     const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
     const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
     assertEquals(

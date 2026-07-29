@@ -159,7 +159,20 @@ export function connectedComponents(
  */
 export function disconnectedWarning(report: ComponentReport): string | null {
   const big = report.significant;
-  if (big.length <= 1) return null;
+  // No shell reaches 10%: the mesh is ALL fragments, which is worse than split
+  // and would otherwise fall through the `<= 1` gate below silently — zero
+  // significant shells reads the same as one to a length check, and does not
+  // mean the same thing at all.
+  // (a single shell always holds 100%, so reaching here means either an empty
+  // mesh or genuinely many small ones)
+  if (big.length === 0) {
+    if (report.weldedVertices === 0) return null;
+    return `this mesh has NO body-sized piece: its largest of ${report.components.length} shells ` +
+      `holds only ${(report.components[0].fraction * 100).toFixed(1)}% of the vertices. That is ` +
+      `not a character with debris, it is debris - the backend did not converge on a solid. ` +
+      `Re-generate at another seed rather than rigging this.`;
+  }
+  if (big.length === 1) return null;
   const shown = big.slice(0, 5)
     .map((c) => `${c.vertexCount.toLocaleString()} verts (${(c.fraction * 100).toFixed(1)}%)`)
     .join(', ');

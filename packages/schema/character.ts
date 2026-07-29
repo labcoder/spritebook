@@ -54,6 +54,23 @@ export const GenerationResultSchema = z.strictObject({
     tris: z.int().positive(),
     textureRes: z.int().positive().optional(),
     kind: z.enum(['mesh', 'gaussians']),
+    /** DETACHED shells holding a body-sized share of the mesh (>=10% of welded
+     * vertices, @spritebook/importer's `connectedComponents`).
+     *
+     * 1 is a single connected character. More means a rig's ONE skeleton cannot
+     * drive all of it, so the deform check will report tearing that no joint
+     * placement repairs — which is why `pick` compares this across siblings and
+     * says when a connected alternative exists. 0 means no piece is body-sized:
+     * the mesh is all fragments, which is worse than split, and it is recorded
+     * rather than rounded up to 1.
+     *
+     * The number varies by SEED on the same image (robot-astro: 2 bodies at
+     * seed 7, 1 at seeds 100 and 201), which is what makes it worth recording
+     * per result instead of per character.
+     *
+     * Optional: results generated before this was measured do not carry it, and
+     * absent stays honestly "unknown" rather than a fabricated 1. */
+    bodies: z.int().nonnegative().optional(),
   }),
   discarded: z.boolean(),
   /** The result this one came FROM, when it was not generated from an image.
