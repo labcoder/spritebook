@@ -75,7 +75,7 @@ export async function heightOf(bytes: Uint8Array): Promise<number> {
 
 /**
  * Promote a result. Event codes: unknown-result, discarded-result,
- * missing-model, no-source, reproject-failed.
+ * missing-model, no-source, reproject-failed, picked-multi-body (warn).
  */
 export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
   const at = () => new Date().toISOString();
@@ -119,6 +119,45 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       );
     }
     await Deno.mkdir(paths.canonicalDir, { recursive: true });
+
+    // `pick` promotes what it was ASKED to promote — it does not silently
+    // choose a different result — but it is the last point before ~90 s of
+    // rigging where the roster is still visible, so it says when a connected
+    // sibling exists. `gen` records `bodies` per result exactly for this: the
+    // same image at different seeds lands on different answers (robot-astro:
+    // two bodies at seed 7, one at 100 and 201), so "generate a few and take
+    // the connected one" is a real strategy and this is where it pays off.
+    //
+    // Absent `bodies` is UNKNOWN, not one: results generated before this was
+    // measured carry nothing, and treating them as connected would recommend
+    // a sibling on no evidence.
+    const bodies = receipt.output.bodies;
+    if (bodies !== undefined && bodies !== 1) {
+      const connected = manifest.generation.results.filter((r) =>
+        !r.discarded && r.id !== receipt.id && r.output.bodies === 1
+      );
+      const alt = connected.length > 0
+        ? `${connected.length === 1 ? 'Result' : 'Results'} ${
+          connected.map((r) => `"${r.id}"`).join(', ')
+        } ` +
+          `${connected.length === 1 ? 'is' : 'are'} a single body - ` +
+          `\`spritebook pick --result ${connected[0].id}\` instead, if the silhouette suits you.`
+        : `No sibling result here is a single body either, so this is not a pick to re-make - ` +
+          `re-run \`gen\` at another seed, or join the pieces before rigging.`;
+      yield {
+        t: 'warn',
+        jobId,
+        at: at(),
+        code: 'picked-multi-body',
+        message: bodies === 0
+          ? `Result "${receipt.id}" has NO body-sized piece - it is fragments, not a character. ` +
+            alt
+          : `Result "${receipt.id}" is ${bodies} DETACHED body-sized pieces. A rig predicts one ` +
+            `skeleton for all of them, so the deform check will report tearing that no joint ` +
+            `placement repairs. ${alt}`,
+      };
+    }
+
     const total = opts.reproject ? 3 : 2;
 
     // staged, not written straight to canonicalPath: the bytes and the
