@@ -28,7 +28,7 @@
  * clear asymmetry, so a barrel (no meaningful facing) reports ~0 and the
  * caller can decline to act rather than rotating something arbitrarily.
  */
-import { Document, NodeIO } from '@gltf-transform/core';
+import { Document, type Node, NodeIO } from '@gltf-transform/core';
 import type { FacingReport, OrientationFix } from '@spritebook/schema';
 
 /** Every position in the document, in world space, as a flat XYZ array. */
@@ -207,11 +207,101 @@ function mul(a: number[], b: number[]): number[] {
 }
 
 /**
- * Apply structural fixes by transforming the SCENE ROOTS, never the vertex
- * data: the mesh bytes stay byte-identical, so a fix is cheap, exactly
- * reversible, and cannot perturb the skinning that was just computed on those
- * vertices. Fixes compose in the order given and are recorded in
- * `RigState.orientationFixes` by the caller.
+ * Flatten every mesh node's transform into its vertex data, leaving the nodes
+ * at identity.
+ *
+ * Orientation fixes compose as node matrices, which is the natural way to write
+ * them — and it used to be where they STOPPED. A glTF skinned mesh ignores its
+ * node's transform (the joints place it), so `rig --feet-ground` wrote a
+ * translation onto a mesh that was about to be skinned and the translation
+ * silently evaporated: measured, a body 1 m below the ground plane got a node
+ * matrix of +1 and vertices still at -1. Baking is what makes a fix real.
+ *
+ * Every fix here is a yaw rotation and/or a translation — rigid and orthonormal
+ * — so NORMAL and TANGENT take the rotation directly, without the
+ * inverse-transpose a non-uniform scale would need, and their lengths survive.
+ * TANGENT.w is handedness, not geometry, so it is copied through.
+ */
+function bakeNodeTransforms(doc: Document): void {
+  const meshNodes = doc.getRoot().listNodes().filter((n) => n.getMesh() !== null);
+
+  // Accessors can be SHARED between primitives and between meshes. Transforming
+  // one twice composes the fix with itself; transforming one that two nodes
+  // place differently has no right answer at all. The importer hit the first
+  // half of this and deduped; the second half is refused, loudly, because
+  // producing a plausible wrong mesh is the worse failure.
+  const owner = new Map<unknown, string>();
+  for (const node of meshNodes) {
+    const key = node.getWorldMatrix().join(',');
+    for (const prim of node.getMesh()!.listPrimitives()) {
+      for (const name of ['POSITION', 'NORMAL', 'TANGENT'] as const) {
+        const acc = prim.getAttribute(name);
+        if (!acc) continue;
+        const seen = owner.get(acc);
+        if (seen !== undefined && seen !== key) {
+          throw new Error(
+            `applyOrientationFixes: ${name} data is shared by mesh nodes placed differently, ` +
+              `so no single baked transform is correct for it. Split the mesh before orienting it.`,
+          );
+        }
+        owner.set(acc, key);
+      }
+    }
+  }
+
+  const done = new Set<unknown>();
+  for (const node of meshNodes) {
+    const m = [...node.getWorldMatrix()];
+    for (const prim of node.getMesh()!.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      if (pos && !done.has(pos)) {
+        done.add(pos);
+        const a = pos.getArray() as Float32Array<ArrayBuffer>;
+        for (let i = 0; i < a.length; i += 3) {
+          const x = a[i], y = a[i + 1], z = a[i + 2];
+          a[i] = m[0] * x + m[4] * y + m[8] * z + m[12];
+          a[i + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+          a[i + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+        }
+        pos.setArray(a);
+      }
+      // direction vectors: rotation only, so no translation column
+      for (const name of ['NORMAL', 'TANGENT'] as const) {
+        const acc = prim.getAttribute(name);
+        if (!acc || done.has(acc)) continue;
+        done.add(acc);
+        const a = acc.getArray() as Float32Array<ArrayBuffer>;
+        const stride = acc.getElementSize();
+        for (let i = 0; i < a.length; i += stride) {
+          const x = a[i], y = a[i + 1], z = a[i + 2];
+          a[i] = m[0] * x + m[4] * y + m[8] * z;
+          a[i + 1] = m[1] * x + m[5] * y + m[9] * z;
+          a[i + 2] = m[2] * x + m[6] * y + m[10] * z;
+        }
+        acc.setArray(a);
+      }
+    }
+  }
+
+  // the transform now lives in the data, so leaving it on the nodes too would
+  // apply it twice to anything that reads them
+  const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  for (const node of meshNodes) {
+    for (let n: Node | null = node; n !== null; n = n.getParentNode()) {
+      n.setMatrix(identity as never);
+    }
+  }
+}
+
+/**
+ * Apply structural fixes, composing them as node transforms and then BAKING the
+ * result into the vertex data. Fixes compose in the order given and are
+ * recorded in `RigState.orientationFixes` by the caller.
+ *
+ * The bake is not an optimization. These fixes run on the canonical mesh
+ * immediately before it is rigged, and a skinned mesh node's transform is
+ * ignored by the glTF spec — so a fix left on the node is a fix that does
+ * nothing the moment `applyRig` attaches a skin. See `bakeNodeTransforms`.
  */
 export async function applyOrientationFixes(
   inPath: string,
@@ -265,6 +355,7 @@ export async function applyOrientationFixes(
     }
   }
 
+  bakeNodeTransforms(doc);
   await Deno.writeFile(outPath, await io.writeBinary(doc));
   const after = await detectFacingFile(outPath);
   return { applied: fixes, facingAfter: after };

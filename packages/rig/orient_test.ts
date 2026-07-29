@@ -62,13 +62,25 @@ function rotateY(p: Float32Array, deg: number): Float32Array {
   return out;
 }
 
-async function writeGlb(path: string, positions: Float32Array): Promise<void> {
+async function writeGlb(
+  path: string,
+  positions: Float32Array,
+  opts: { normal?: [number, number, number] } = {},
+): Promise<void> {
   const doc = new Document();
   const buffer = doc.createBuffer();
   const acc = doc.createAccessor('P').setType('VEC3')
     .setArray(positions as Float32Array<ArrayBuffer>)
     .setBuffer(buffer);
   const prim = doc.createPrimitive().setAttribute('POSITION', acc);
+  if (opts.normal) {
+    const n = new Float32Array(positions.length);
+    for (let i = 0; i < n.length; i += 3) [n[i], n[i + 1], n[i + 2]] = opts.normal;
+    prim.setAttribute(
+      'NORMAL',
+      doc.createAccessor('N').setType('VEC3').setArray(n).setBuffer(buffer),
+    );
+  }
   const mesh = doc.createMesh('m').addPrimitive(prim);
   doc.createScene('s').addChild(doc.createNode('n').setMesh(mesh));
   await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
@@ -176,6 +188,83 @@ Deno.test('feet-ground and center place the body without fighting each other', a
     assert(Math.abs(b.min[1]) < 1e-4, `feet on the ground plane (min y = ${b.min[1]})`);
     assert(Math.abs((b.min[0] + b.max[0]) / 2) < 1e-4, 'centred on X');
     assert(Math.abs((b.min[2] + b.max[2]) / 2) < 1e-4, 'centred on Z');
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+/** Positions as a SKINNED reader sees them: raw vertex data, no node transform. */
+function vertexPositions(doc: Document): Float32Array {
+  const out: number[] = [];
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const a = prim.getAttribute('POSITION')?.getArray();
+      if (a) out.push(...a);
+    }
+  }
+  return Float32Array.from(out);
+}
+
+Deno.test('an orientation fix lands in the DATA, so skinning cannot discard it', async () => {
+  // These fixes run on the canonical mesh moments before `applyRig` attaches a
+  // skin, and the glTF spec says a skinned mesh node's transform no longer
+  // places the mesh. A fix written only onto the node is therefore a fix that
+  // evaporates: measured before this was baked, a body 1 m underground came
+  // back with a node matrix of +1 and vertices still at -1, and `rig
+  // --feet-ground` silently did nothing.
+  //
+  // Every other assertion in this file reads `worldPositions`, which applies
+  // node transforms - which is exactly why they all passed while the verb did
+  // not work. This one reads the vertices.
+  const dir = await Deno.makeTempDir();
+  try {
+    const src = `${dir}/sunken.glb`;
+    const out = `${dir}/grounded.glb`;
+    const p = humanoidPositions();
+    for (let i = 1; i < p.length; i += 3) p[i] -= 1; // shove the body underground
+    await writeGlb(src, p);
+    await applyOrientationFixes(src, out, ['feet-ground']);
+
+    const doc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const b = boundsOf(vertexPositions(doc));
+    assert(Math.abs(b.min[1]) < 1e-4, `feet at Y=0 in the VERTICES, got ${b.min[1]}`);
+    for (const node of doc.getRoot().listNodes()) {
+      if (!node.getMesh()) continue;
+      const m = node.getWorldMatrix();
+      for (let i = 0; i < 16; i++) {
+        assert(
+          Math.abs(m[i] - (i % 5 === 0 ? 1 : 0)) < 1e-6,
+          'and the node is back at identity, so nothing applies the fix twice',
+        );
+      }
+    }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test('a baked rotation keeps normals pointing where the faces do', async () => {
+  // POSITION and NORMAL have to move together. A bake that transformed only
+  // positions would light the character as though it had never turned - and
+  // nothing else in this file would notice, because facing is measured from
+  // positions alone.
+  const dir = await Deno.makeTempDir();
+  try {
+    const src = `${dir}/facing.glb`;
+    const out = `${dir}/turned.glb`;
+    await writeGlb(src, humanoidPositions(), { normal: [0, 0, 1] });
+    await applyOrientationFixes(src, out, ['rotate-90']);
+
+    const doc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const n = doc.getRoot().listMeshes()[0].listPrimitives()[0].getAttribute('NORMAL')!.getArray()!;
+    // rotate-90 takes +Z to +X (yawMatrix's stated convention)
+    assert(Math.abs(n[0] - 1) < 1e-5, `normal x -> 1, got ${n[0]}`);
+    assert(Math.abs(n[1]) < 1e-5, `normal y -> 0, got ${n[1]}`);
+    assert(Math.abs(n[2]) < 1e-5, `normal z -> 0, got ${n[2]}`);
+    assert(
+      Math.abs(Math.hypot(n[0], n[1], n[2]) - 1) < 1e-5,
+      'and it is still a unit vector',
+    );
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
