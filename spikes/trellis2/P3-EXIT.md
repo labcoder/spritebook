@@ -28,9 +28,9 @@ paying a ~35 s model load on each of three separate CLI invocations.
 recognisably the reference. Generation, retexture and the border all did their jobs.
 
 **The lit pass, which is the one the exporter ships, is a near-black silhouette.** Mean base colour
-0.344 in albedo against 0.160 in lit — the exported `atlas_lit_0.png` reads as a dark blob. Root
-cause not established: it is either the render's lighting or the style stage's palette, and telling
-them apart needs a pre-style AOV that the bake does not currently keep.
+0.344 in albedo against 0.160 in lit — the exported `atlas_lit_0.png` reads as a dark blob. (Root
+cause established after this section was first written; see "Root cause" below. It is neither the
+lighting nor the palette.)
 
 **Every frame is clipped at the bottom.** All 48. The silhouette runs to y=63 of a 64 px cell while
 the pivot sits at y=58, so there is geometry below the feet marker. The bake's own warning blames
@@ -41,11 +41,10 @@ cause is the pose or the grounding, and it sends the user to the wrong knob.
 encodes something in a channel this reading misses, or it is blank; either way nothing has ever
 looked at it.
 
-**The character is ~20 px of visible silhouette in a 64 px cell.** The canonical mesh measures X
-0.890 / **Y 1.000** / Z 0.229 m, because `gen` ran without `--height` and the border only rescales
-when a `declaredHeightM` is supplied — so the mesh kept TRELLIS.2's unit-box normalisation. A 1.0
-m-tall character is a metre-tall character: correct arithmetic against a camera in px/m, and almost
-certainly not what anyone wants from a photo of an adult. Nothing warned.
+**The character is ~20 px of visible silhouette in a 64 px cell**, and the manifest records
+`heightM: 0.99999` — TRELLIS.2's unit-box constant. My first reading blamed `gen` running without
+`--height`. That is half of it at most: passing `--height 1.65` moves nothing on screen, for the
+reason in "Root cause" below.
 
 ## The rig is flagged and the bake ran anyway
 
@@ -66,6 +65,46 @@ The criterion says "**on a fresh machine transcript**". A fresh machine has no s
 would fail there. The 5.6-minute number is real for this machine and unproven for the one the exit
 actually names.
 
+## Root cause: rigging silently discards the border's normalization
+
+The five defects above are mostly one, and it is not where I ranked it.
+
+`SPRITEBOOK_DEBUG_RAW_LIT=1` settled the first question immediately. On the 64 px bake the pre-style
+lit atlas is mean **0.415** across **167** colours; the shipped lit is mean **0.160** across **5**,
+and **81% of the character is a single colour** — palette index 0, the dark outline. Re-baking the
+same mesh at 128 px / 110 ppm, nothing else changed, gives pre-style 0.431 (identical) and shipped
+**0.336** with the outline down to 38%. **The renderer is fine and the style stage is fine.** A 20
+px character with 1–2 px limbs is mostly outline, by construction.
+
+So why is it 20 px? Not because `gen` ran without `--height` — re-running _with_ `--height 1.65`
+changes nothing on screen. The border does its job correctly and says so:
+
+    scale | ok | Raw height 1.0037 m; scaled x1.6439 to 1.6500 m, feet at Y=0.00000
+
+It encodes that as a parent NODE transform, and the glTF is exactly right:
+
+    node 0  name="world"  scale=[1.6439, 1.6439, 1.6439]  translation=[0, 0.8252, 0]  children=[1]
+    node 1  name="geometry_0"  mesh=0
+
+Then `rig` skins the mesh, and node 1 gains `skin: 0`. **A skinned mesh node's transform is ignored
+per the glTF spec** — the skin's joints place it — which `skinning.ts:268` implements correctly and
+deliberately. The `world` node survives in the file and stops meaning anything. Every canonical
+guarantee the border established, scale and feet-at-Y=0 alike, evaporates the moment a character is
+rigged.
+
+The arithmetic closes it. At local scale the mesh spans −0.5…+0.5 m; at 32 px/m about a pivot at
+y=58 that is y 42…74 in a 64 px cell, clipped at 63. Measured extent: **y 43…63**.
+
+That single defect produces the tiny sprite, the black lit pass, the 48 clipped frames, and the
+`heightM: 0.99999` in the manifest. It is invisible on any unrigged mesh, which is every fixture the
+suite renders.
+
+**The fix is a design decision, not a patch.** The candidates: bake the transform into vertex
+positions and inverse-bind matrices at the border so it cannot be ignored; have `rig` fold the
+ancestor transform into the joint hierarchy; or have the renderer walk above the skeleton root. The
+first matches what "canonical" is supposed to mean — the scale belongs in the data, not in a node
+the spec entitles readers to skip — but it touches D-012 and is not mine to choose alone.
+
 ## Verdict
 
 **The exit is not met.** Not on time — time is comfortable — but on output: the artifact a user
@@ -76,8 +115,15 @@ Every one of these was invisible while the chain ran on `fixture-gen`.
 
 Ranked by what blocks the exit:
 
-1. **The lit pass ships black** while albedo is correct — the user-visible defect.
-2. **UniRig's config is not in the registry** — breaks "fresh machine" outright.
-3. **48/48 frames clipped**, with a warning that names the wrong cause.
-4. **`bake` accepts a rig whose own deform check rejected it.**
-5. **`gen` without `--height` yields an arbitrary scale**, silently.
+1. ~~The lit pass ships black~~ — SYMPTOM. Root cause below.
+2. ~~UniRig's config is not in the registry~~ — **FIXED**: the catalog ships it, sha256-pinned at a
+   pinned revision, and the `llm-config-from-cache` warning is gone.
+3. ~~48/48 frames clipped~~ — SYMPTOM of the same root cause. The warning's advice was also wrong
+   and now names both possible causes.
+4. **`bake` accepts a rig whose own deform check rejected it.** Still open, and still its own
+   question: 37 of 40 joints flagged, `accepted: false`, sprites shipped anyway.
+5. ~~`gen` without `--height` yields an arbitrary scale~~ — it now WARNS, naming the measured height
+   and the flag. But that was never the whole story: declaring the height does not help either.
+
+**The one that matters: rigging discards the border's normalization.** Everything struck through
+above except the registry fix is that bug wearing different clothes.
