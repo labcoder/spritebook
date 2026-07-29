@@ -1,7 +1,7 @@
 # Why the texture never matched the reference
 
-**Date:** 2026-07-28 · RTX 3090 · guidance sweep on one mesh (16 runs), then four subjects through
-the real verbs (4 generations + 10 retextures)
+**Date:** 2026-07-28 · RTX 3090 · guidance sweep (16 runs), four subjects through the real verbs (4
+generations + 10 retextures), then a 2x2 mesh-vs-image crossover (8 runs)
 
 The complaint was "retexture doesn't look like the source, and the seed shouldn't matter this much
 when you have the source image." Two suspects were ruled out with measurement, two real causes were
@@ -141,8 +141,39 @@ clean. So out-of-distribution alone does not explain bulma.
 
 **An alternative this data cannot rule out.** Every bulma retexture encoded the same r1 mesh. A flat
 anime reference produces a notably flat mesh, and the texturing pipeline conditions on the mesh it
-is handed. The trigger may be bulma's GEOMETRY rather than her art style. Separating them needs a
-second flat-art subject, which is the next measurement, not a conclusion here.
+is handed. The trigger may be bulma's GEOMETRY rather than her art style. Settled below.
+
+## The crossover: it is the IMAGE, with nothing left over
+
+Same seed in every cell; only the mesh and the conditioning image move. Seeds 1234 and 1235 were
+picked because both return 100% metal in the control cell — a cell that starts clean cannot show
+which swap rescued it.
+
+| metallic (mean of 2 seeds) | image: bulma | image: mermaid |
+| -------------------------- | ------------ | -------------- |
+| **mesh: bulma**            | 100.0%       | **0.0%**       |
+| **mesh: mermaid**          | **100.0%**   | 0.0%           |
+
+    main effect of MESH  (bulma - mermaid):   -0.0%
+    main effect of IMAGE (bulma - mermaid): +100.0%
+
+**The IMAGE hypothesis survives and the MESH hypothesis is dead.** Not "mostly" — the mesh effect is
+zero to the precision measured, and all four cells are saturated at 0% or 100% with no interaction
+term and no partial credit. Bulma's own mesh painted from the mermaid's image is clean; the
+mermaid's mesh painted from bulma's image is fully metal.
+
+Three consequences:
+
+- **The geometry is innocent**, so there is nothing to fix upstream in generation. The mesh bulma's
+  gen pass produced is fine and stays fine.
+- **Nothing in our pipeline can prevent it.** The conditioning image is the user's reference; we
+  cannot rewrite it into something the decoder likes without changing the character.
+- **The gate is the right answer**, not a workaround for a deeper bug. Detect, reject, reroll.
+
+Saturation tracks the image too — bulma's mesh under the mermaid's image reaches 0.428, well above
+what bulma's own image ever produced. The conditioning dominates both channels.
+
+Renders: `out/crossover_sheet.png`. Re-run with `crossover.py`.
 
 ### Colour, judged by eye rather than by the mean
 
@@ -156,8 +187,10 @@ Rendered comparison: `out/cross_subject_rendered.png`.
 
 ## Still unknown
 
-- **Whether bulma's ART STYLE or her MESH is the trigger.** Both are unusual and both feed the
-  texturing pass. A second flat-line-art subject separates them.
+- **WHY a flat-line-art reference reads as metal.** The crossover proves the image is the trigger
+  and the mesh is not; it says nothing about the mechanism. `preprocess_image` premultiplies onto
+  black and bulma is full of black linework, which is a guess worth testing and nothing more.
+- **Whether every flat-line-art reference does this**, or only this one. One image is one image.
 - **Whether the 0.60 metal threshold is right.** It has now seen exactly one subject that trips it.
   Three others sit at 0-15%, comfortably clear, so the valley holds - but no run has landed between
   15% and 76%, which is where the threshold would actually be tested.
