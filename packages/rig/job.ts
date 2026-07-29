@@ -41,6 +41,7 @@ import { applyRig } from './apply.ts';
 import { promoteToCanonical } from './promote.ts';
 import { deformCheck } from './deform.ts';
 import { applyOrientationFixes, detectFacingFile } from './orient.ts';
+import { componentsOfFile, disconnectedWarning } from './components.ts';
 import { applyEditsToRiggedGlb, applyJointEdits, hintsFromEdits } from './edits.ts';
 
 export interface RigJobOptions {
@@ -149,6 +150,16 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
           }) - ` +
           `it may be symmetric. Check the first bake and use --face-front or --rotate if needed.`,
       };
+    }
+    // Detached geometry, BEFORE ~90 s of prediction. A skeleton is one chain
+    // and cannot drive a shell it does not touch, so this ceiling is knowable
+    // from the mesh alone - measured on robot-astro, whose floating hands held
+    // its auto-hint repair to 18.5% -> 15.0% where a single-body mesh went
+    // 12.7% -> 4.9%.
+    const shells = await componentsOfFile(meshPath);
+    const detached = disconnectedWarning(shells);
+    if (detached) {
+      yield { t: 'warn', jobId, at: at(), code: 'mesh-disconnected', message: detached };
     }
     yield { t: 'progress', jobId, at: at(), step: 'facing', done: 1, total: 4 };
 
