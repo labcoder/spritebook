@@ -83,3 +83,24 @@ Deno.test('loadCatalog: missing file and broken JSON throw actionably', async ()
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test('unirig ships the opt-350m config, so `rig` needs no ambient HF cache', async () => {
+  // The P3 exit measurement caught this: `rig` warned that it was reading
+  // UniRig's architecture config from THIS machine's Hugging Face cache. The
+  // exit criterion is measured "on a fresh machine", where there is no such
+  // cache and the verb refuses outright — so the 5.6-minute run was real for
+  // one box and unproven for the one the criterion names.
+  const cat = await loadCatalog();
+  const v = cat.models.find((m) => m.id === 'unirig')!.versions[0];
+  const cfg = v.files.find((f) => f.path === 'opt-350m/config.json');
+  assert(cfg, `unirig must ship the config: ${v.files.map((f) => f.path).join(', ')}`);
+  // pinned to a REVISION, not a branch: `main` would let the bytes move out
+  // from under the hash and turn every install into a verify failure
+  assert(
+    /\/resolve\/[0-9a-f]{40}\//.test(cfg.sha256 ? cfg.url : ''),
+    `pin the revision, not a branch: ${cfg.url}`,
+  );
+  assertEquals(cfg.bytes, 644, 'architecture hyperparameters only - no weights');
+  // and it must land where the adapter looks (llm_config_source: modelDir/opt-350m)
+  assert(cfg.path.startsWith('opt-350m/'), cfg.path);
+});
