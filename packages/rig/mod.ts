@@ -37,6 +37,8 @@ export {
   dominantPerpendicularAxis,
   uniqueEdges,
 } from './deform.ts';
+export { DEFAULT_MIN_HINT_OFFSET_M, deriveAutoHints } from './autohints.ts';
+export type { AutoHintOptions, AutoHints } from './autohints.ts';
 export type { DeformCheckOptions } from './deform.ts';
 
 export { isIntegerDType, parseNpy, readNpz, readNpzFile } from './npz.ts';

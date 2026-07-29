@@ -542,6 +542,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'rotate',
     'edits',
     'rerun-with-hints',
+    'auto-hints',
     'accept',
     'unaccept',
     'backend',
@@ -1112,7 +1113,93 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           `joint edits file "${editsPath}"`,
         ).edits;
       }
-      const rerunWithHints = args.includes('--rerun-with-hints');
+      let rerunWithHints = args.includes('--rerun-with-hints');
+
+      // --auto-hints: derive the edits from the previous run's own deform
+      // report instead of asking the user to author them — each torn joint's
+      // target is the centroid of the flesh it drives. Measured across three
+      // subjects (HINTS-REPORT.md): a big offset repairs decisively, a joint
+      // already on its centroid does not move, and the split is REPORTED so
+      // the residual reads as a backend limit, not as under-clicking.
+      if (args.includes('--auto-hints')) {
+        if (editsPath || rerunWithHints) {
+          return fail(
+            'rig' as JobEvent['jobId'],
+            'bad-args',
+            '--auto-hints derives the edits and implies the rerun - combining it with --edits ' +
+              'or --rerun-with-hints would mean two sources of truth for one joint',
+          );
+        }
+        const outDir = flag(args, 'out');
+        if (!outDir) {
+          return fail('rig' as JobEvent['jobId'], 'missing-arg', '--auto-hints needs --out <dir>');
+        }
+        const { DeformReportSchema, RigSkeletonSchema } = await import('@spritebook/schema');
+        const { deriveAutoHints } = await import('@spritebook/rig');
+        let report, skeleton;
+        try {
+          report = parseWith(
+            DeformReportSchema,
+            JSON.parse(await Deno.readTextFile(`${outDir}/deform-report.json`)),
+            'DeformReport',
+          );
+          skeleton = parseWith(
+            RigSkeletonSchema,
+            JSON.parse(await Deno.readTextFile(`${outDir}/rig.json`)),
+            'RigSkeleton',
+          );
+        } catch (err) {
+          return fail(
+            'rig' as JobEvent['jobId'],
+            'no-previous-rig',
+            `--auto-hints reads the PREVIOUS run's deform-report.json, rig.json and rigged.glb ` +
+              `from --out, and "${outDir}" does not have them: ${
+                err instanceof Error ? err.message : String(err)
+              }. Run \`spritebook rig\` once first.`,
+          );
+        }
+        const auto = await deriveAutoHints(`${outDir}/rigged.glb`, report, skeleton);
+        if (auto.belowFloor.length > 0) {
+          const list = auto.belowFloor
+            .map((b) => `${b.joint} (${(b.offsetM * 1000).toFixed(0)} mm)`)
+            .join(', ');
+          const w: JobEvent = {
+            t: 'warn',
+            jobId: 'rig' as JobEvent['jobId'],
+            at: now(),
+            code: 'no-placement-offset',
+            message: `${auto.belowFloor.length} flagged joint` +
+              `${auto.belowFloor.length === 1 ? ' is' : 's are'} already sitting on the flesh ` +
+              `they drive: ${list}. There is no placement offset to exploit, so re-hinting ` +
+              `them cannot repair their tearing - that residual is a limit of the skinning ` +
+              `backend, not something more hinting will fix.`,
+          };
+          emit(w, `warn [${w.code}]: ${w.message}`);
+        }
+        if (auto.unmeasurable.length > 0) {
+          const w: JobEvent = {
+            t: 'warn',
+            jobId: 'rig' as JobEvent['jobId'],
+            at: now(),
+            code: 'hint-unmeasurable',
+            message: `could not measure ${auto.unmeasurable.join(', ')} - no vertices above ` +
+              `the weight floor, or missing from the skeleton.`,
+          };
+          emit(w, `warn [${w.code}]: ${w.message}`);
+        }
+        if (auto.edits.length === 0) {
+          return fail(
+            'rig' as JobEvent['jobId'],
+            'no-placement-offset',
+            'every flagged joint already sits on the flesh it drives, so auto-hints has ' +
+              'nothing to move. Re-running would be a plain re-roll wearing a repair costume; ' +
+              'the tearing that remains is a skinning-backend limit.',
+          );
+        }
+        edits = auto.edits;
+        rerunWithHints = true;
+      }
+
       if (rerunWithHints && edits.length === 0) {
         return fail(
           'rig' as JobEvent['jobId'],

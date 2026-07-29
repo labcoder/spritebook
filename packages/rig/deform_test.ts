@@ -232,3 +232,30 @@ Deno.test('the seam rule needs two edges - one outlier is never a tear', async (
     await Deno.remove(c.dir, { recursive: true });
   }
 });
+
+Deno.test('auto-hints: a torn joint far from its flesh gets an edit; a floor filters', async () => {
+  const { deriveAutoHints } = await import('./autohints.ts');
+  const c = await stageCase(chainSkeleton(), await weightsNpz(shreddedWeights()));
+  try {
+    await applyRig(c);
+    const report = await deformCheck({ riggedPath: c.outPath, outDir: c.dir, angleDeg: 60 });
+    assert(report.flaggedJoints.includes('bone_1'), 'precondition: the fixture tears');
+
+    // floor 0: every measurable torn joint yields an edit toward its centroid
+    const open = await deriveAutoHints(c.outPath, report, chainSkeleton(), { minOffsetM: 0 });
+    const edit = open.edits.find((e) => e.joint === 'bone_1');
+    assert(edit, `bone_1 edit expected, got ${JSON.stringify(open)}`);
+    assert(Math.hypot(...edit.delta) > 0, 'the delta moves the joint');
+    assertEquals(open.belowFloor.length, 0);
+
+    // a huge floor reclassifies the same joint as "nothing to exploit", WITH
+    // its measured offset, so the caller can say so in millimetres
+    const closed = await deriveAutoHints(c.outPath, report, chainSkeleton(), { minOffsetM: 10 });
+    assert(!closed.edits.some((e) => e.joint === 'bone_1'));
+    const below = closed.belowFloor.find((b) => b.joint === 'bone_1');
+    assert(below, 'bone_1 lands below the floor');
+    assertEquals(below.offsetM, Math.hypot(...edit.delta), 'same measurement, either side');
+  } finally {
+    await Deno.remove(c.dir, { recursive: true });
+  }
+});

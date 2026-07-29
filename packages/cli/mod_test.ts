@@ -756,3 +756,39 @@ Deno.test('rig --accept records the review; undo takes it back', async () => {
     await Deno.remove(raw, { recursive: true });
   }
 });
+
+Deno.test('rig --auto-hints refuses honestly before any GPU work', async () => {
+  const run = async (argv: string[]) => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await runCli(argv, {
+      stdout: (l) => out.push(l),
+      stderr: (l) => err.push(l),
+      now: () => '2026-07-12T00:00:00Z',
+    });
+    return { code, out, err: err.join('NEWLINE') };
+  };
+  const empty = (await Deno.makeTempDir({ prefix: 'sb-ah-' })).replaceAll('\\', '/');
+  try {
+    // two sources of truth for one joint is a contradiction, not a merge
+    const both = await run([
+      'rig',
+      '--model',
+      'x.glb',
+      '--out',
+      empty,
+      '--auto-hints',
+      '--rerun-with-hints',
+    ]);
+    assertEquals(both.code, 1);
+    assert(both.err.includes('two sources of truth'), both.err);
+
+    // no previous run in --out: name the three files and the fix
+    const bare = await run(['rig', '--model', 'x.glb', '--out', empty, '--auto-hints']);
+    assertEquals(bare.code, 1);
+    assert(bare.err.includes('deform-report.json'), bare.err);
+    assert(bare.err.includes('rig` once first') || bare.err.includes('once first'), bare.err);
+  } finally {
+    await Deno.remove(empty, { recursive: true });
+  }
+});
