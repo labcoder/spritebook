@@ -1084,6 +1084,29 @@ def test_trellis2_metal_gate() -> None:
     # all must not be read as emitting zeros OR ones
     ok(t2.metal_fraction([]) == 0.0, "an empty channel reads as no metal")
 
+    # A GPU TENSOR, which is what generation actually hands this. The first
+    # version called np.asarray straight on it and every real `gen` died with
+    # "can't convert cuda:0 device type tensor to numpy" - invisible to this
+    # suite, because the fakes are numpy and the retexture path reads PIL.
+    class _Cudaish:
+        """Quacks like a torch CUDA tensor: numpy only after .detach().cpu()."""
+
+        def __init__(self, values) -> None:
+            self._v = np.asarray(values, dtype=np.float32)
+
+        def detach(self):  # noqa: ANN201
+            return self
+
+        def cpu(self):  # noqa: ANN201
+            return self._v
+
+        def __array__(self, *a, **k):  # noqa: ANN002, ANN003
+            raise TypeError("can't convert cuda:0 device type tensor to numpy")
+
+    got = t2.metal_fraction(_Cudaish([0.9, 0.9, 0.1]))
+    ok(abs(got - 2 / 3) < 1e-6, f"a CUDA tensor is moved first, got {got}")
+    ok(t2.metal_fraction(_Cudaish([0.0, 0.0])) == 0.0, "and still reads zero as zero")
+
 
 def test_trellis2_retry_ladder() -> None:
     from .adapters import trellis2 as t2

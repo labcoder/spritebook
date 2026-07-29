@@ -184,9 +184,19 @@ def collapse_kind(attrs: Any) -> str | None:
 
 
 def metal_fraction(metallic: Any) -> float:
-    """Fraction of a metallic channel above 0.5, on any [0, 1] array."""
+    """Fraction of a metallic channel above 0.5, on any [0, 1] array.
+
+    `.detach().cpu()` first because the generation path hands this a torch
+    tensor living on the GPU, and `np.asarray` on one raises "can't convert
+    cuda:0 device type tensor to numpy" — which is exactly how this shipped
+    broken: `base_color_mean` beside it is duck-typed and survives a CUDA
+    tensor, the retexture path reads PIL images, and the test fakes are numpy,
+    so nothing in the suite ever handed this a GPU tensor.
+    """
     import numpy as np
 
+    if hasattr(metallic, "detach"):  # a torch tensor, possibly on CUDA
+        metallic = metallic.detach().cpu()
     a = np.asarray(metallic, dtype=np.float32)
     return 0.0 if a.size == 0 else float((a > 0.5).mean())
 
