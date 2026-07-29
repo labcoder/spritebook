@@ -61,6 +61,37 @@ Candidate product feature, recorded not built: the centroid derivation is automa
 `deform-report.json` → `hints-patch.json` → `--rerun-with-hints` — and on this evidence it is worth
 surfacing as a single verb once a second character confirms it.
 
+## Cross-subject: the pattern holds, and shows its limit
+
+Same protocol on the two other rigged subjects — before / plain reroll / hinted, aggregate torn
+fraction over all influenced edges. Both are far worse than bulma (30–80% per-joint fractions, max
+stretches 15–45×): non-humanoid geometry — a mermaid tail with jellyfish, a robot with DETACHED
+floating hands — that UniRig has no skeleton for.
+
+| subject         | before | reroll | hinted    | hint offsets          |
+| --------------- | ------ | ------ | --------- | --------------------- |
+| painted-mermaid | 12.69% | 12.67% | **4.89%** | 44 joints, 330–660 mm |
+| robot-astro     | 18.50% | 18.50% | 15.01%    | 24 joints, 410–580 mm |
+
+Reroll noise on the aggregate is ~0.02 pp, so both movements are real — and they complete the
+pattern from bulma:
+
+- **Big offsets repair.** The mermaid's wholesale mis-placement (median 513 mm) cut 2.6× in one
+  hinted pass.
+- **Topology the skeleton cannot express does not.** Astro's offsets were just as large, but no
+  joint placement makes a humanoid skeleton drive detached hands cleanly; 18.5% → 15.0% is the
+  honest ceiling, and the numbers say so without anyone having to render it.
+
+## The verb: `rig --auto-hints`
+
+The loop above is now one flag: read the previous run's own deform report, derive the centroid
+edits, warn — with millimetres — for every flagged joint that has no placement offset to exploit
+("that residual is a limit of the skinning backend, not something more hinting will fix"), refuse
+outright when NO joint has one, and re-run with the rest as hints. Constants argued from this data:
+50 mm floor between the measured no-repair (21 mm) and repair (169 mm+) populations.
+
+Live on the mermaid it reproduces the manual experiment: **4.85%** against the manual 4.89%.
+
 ## A misparse that nearly became a finding
 
 Mid-investigation, a quick probe "discovered" weight sums of −1.73..+3.42 and body-wide influence
