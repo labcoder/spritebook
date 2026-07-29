@@ -177,10 +177,16 @@ export const DeformJointStatSchema = z.strictObject({
   joint: z.string().min(1),
   /** vertices this joint influences above the weight floor */
   influencedVertices: z.int().nonnegative(),
+  /** edges with BOTH endpoints influenced — the denominator of the seam rule */
+  influencedEdges: z.int().nonnegative(),
+  /** of those, edges whose length ratio exceeded the stretch threshold */
+  stretchedEdges: z.int().nonnegative(),
   /** mean/max displacement of those vertices across the pose set, metres */
   meanDisplacementM: z.number().nonnegative(),
   maxDisplacementM: z.number().nonnegative(),
-  /** max stretch factor of an edge inside the influenced set (1 = rigid) */
+  /** max stretch factor of an edge inside the influenced set (1 = rigid);
+   * SEVERITY only — the flag is the seam rule over stretchedEdges, because a
+   * max over tens of thousands of edges saturates on dense meshes */
   maxEdgeStretch: z.number().nonnegative(),
   flags: z.array(z.enum(['dead-joint', 'excessive-stretch', 'no-influence'])),
 });

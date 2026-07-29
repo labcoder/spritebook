@@ -35,14 +35,32 @@
  * the raw authored positions) so the numbers are the effect of the pose alone,
  * not of any bind-matrix error the round-trip test already covers.
  *
- * `maxEdgeStretch` is the shredding signature (P0-T4 catalog item 1: "the
+ * Edge stretch is the shredding signature (P0-T4 catalog item 1: "the
  * Giant's arm/torso boundary weights are rough — visible shredding under
  * animation"). Shredding is not vertices moving far, it is neighbours moving
  * DIFFERENTLY: an edge whose endpoints are weighted to joints that swing apart
- * stretches without bound while its neighbours sit still. So the metric is the
- * largest length ratio over mesh edges with BOTH endpoints inside the
- * influenced set, and 2.0 (an edge doubling in length at a 30-degree bend) is
- * the default line between "soft falloff" and "torn".
+ * stretches without bound while its neighbours sit still. Ratios are measured
+ * over mesh edges with BOTH endpoints inside the influenced set, and 2.0 (an
+ * edge doubling at a 30-degree bend) is the line between "soft falloff" and
+ * "torn".
+ *
+ * **The FLAG counts a seam, not the worst edge.** It used to be
+ * `maxEdgeStretch > 2`, and on the first real generated character (bulma,
+ * 200k faces, 345k edges) that flagged 31 of 52 joints — a max over ~50k
+ * edges is an extreme-value statistic, and it saturates on dense meshes.
+ * Reproducing the check offline (spikes/trellis2/deform_dist.py, validated
+ * against the shipped report to 4 decimals on every joint) showed the two
+ * populations the max cannot tell apart: calf_l "failing" on 5 outlier edges
+ * of 21,909 (0.02%, P99 ratio 1.24), and spine_02 genuinely torn along a
+ * 712-edge band (1.5% of its boundary, P99 2.17). So the flag is now
+ * `stretchedEdges >= max(2, 1% of influencedEdges)`: at least one in a
+ * hundred boundary edges doubling — equivalently, the 99th-percentile edge
+ * exceeding the threshold — and never a single-edge conviction. On bulma that
+ * is 9 joints instead of 31, led by the spine/neck/clavicle chain that every
+ * run had been pointing at. `maxEdgeStretch` stays in the report as the
+ * severity number; it just no longer convicts alone. The offenders are NOT
+ * degenerate slivers (median rest length 3-6 mm against a 7 mm mesh median),
+ * so a rest-length floor was measured and rejected as the fix.
  *
  * ## Cost
  *
@@ -70,8 +88,12 @@ export const DEFORM_REPORT_FILE = 'deform-report.json';
 export const DEFAULT_ANGLE_DEG = 30;
 /** A joint "influences" a vertex when its weight exceeds this. */
 export const DEFAULT_WEIGHT_FLOOR = 0.05;
-/** Edge length ratio above which the deformation is torn, not soft. */
+/** Edge length ratio above which an edge counts as stretched. */
 export const DEFAULT_STRETCH_THRESHOLD = 2;
+/** Fraction of influenced edges that must stretch before the joint is torn. */
+export const DEFAULT_STRETCH_FRACTION = 0.01;
+/** ...and never fewer than this many: one edge is an outlier, not a seam. */
+export const MIN_STRETCHED_EDGES = 2;
 /** Max displacement at or below this (0.1 mm) means the joint did nothing. */
 export const DEAD_JOINT_EPS_M = 1e-4;
 /** Rest edges shorter than this cannot yield a ratio; they are skipped. */
@@ -84,8 +106,10 @@ export interface DeformCheckOptions {
   outDir: string;
   angleDeg?: number;
   weightFloor?: number;
-  /** `maxEdgeStretch` above this flags `excessive-stretch` (default 2) */
+  /** an edge counts as stretched above this length ratio (default 2) */
   stretchThreshold?: number;
+  /** fraction of influenced edges that must stretch to flag (default 0.01) */
+  stretchFraction?: number;
   /** injectable clock — the report's `at` is the only non-deterministic field */
   now?: () => string;
 }
@@ -170,6 +194,7 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
   const angleDeg = opts.angleDeg ?? DEFAULT_ANGLE_DEG;
   const weightFloor = opts.weightFloor ?? DEFAULT_WEIGHT_FLOOR;
   const stretchThreshold = opts.stretchThreshold ?? DEFAULT_STRETCH_THRESHOLD;
+  const stretchFraction = opts.stretchFraction ?? DEFAULT_STRETCH_FRACTION;
   const now = opts.now ?? (() => new Date().toISOString());
   if (!(angleDeg > 0)) throw new Error(`deformCheck: angleDeg must be positive, got ${angleDeg}`);
   if (!(weightFloor >= 0 && weightFloor < 1)) {
@@ -201,6 +226,8 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
       stats.push({
         joint,
         influencedVertices: 0,
+        influencedEdges: 0,
+        stretchedEdges: 0,
         meanDisplacementM: 0,
         maxDisplacementM: 0,
         maxEdgeStretch: 0,
@@ -250,6 +277,8 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
     const meanDisplacementM = sum / verts.length;
 
     let maxEdgeStretch = 0;
+    let influencedEdges = 0;
+    let stretchedEdges = 0;
     for (let e = 0; e < edges.length; e += 2) {
       const a = edges[e], b = edges[e + 1];
       if (!influenced[a] || !influenced[b]) continue;
@@ -259,6 +288,8 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
         restPos[a * 3 + 2] - restPos[b * 3 + 2],
       );
       if (restLen < DEGENERATE_EDGE_M) continue;
+      influencedEdges++;
+      let worst = 0;
       for (const out of posed) {
         const len = Math.hypot(
           out[a * 3] - out[b * 3],
@@ -266,16 +297,22 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
           out[a * 3 + 2] - out[b * 3 + 2],
         );
         const ratio = len / restLen;
-        if (ratio > maxEdgeStretch) maxEdgeStretch = ratio;
+        if (ratio > worst) worst = ratio;
       }
+      if (worst > maxEdgeStretch) maxEdgeStretch = worst;
+      if (worst > stretchThreshold) stretchedEdges++;
     }
 
     const flags: DeformJointStat['flags'] = [];
     if (maxDisplacementM <= DEAD_JOINT_EPS_M) flags.push('dead-joint');
-    if (maxEdgeStretch > stretchThreshold) flags.push('excessive-stretch');
+    // a seam, not an outlier: see the module docstring for the bulma numbers
+    const seamFloor = Math.max(MIN_STRETCHED_EDGES, Math.ceil(influencedEdges * stretchFraction));
+    if (stretchedEdges >= seamFloor && influencedEdges > 0) flags.push('excessive-stretch');
     stats.push({
       joint,
       influencedVertices: verts.length,
+      influencedEdges,
+      stretchedEdges,
       meanDisplacementM,
       maxDisplacementM,
       maxEdgeStretch,

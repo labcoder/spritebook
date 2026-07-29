@@ -187,3 +187,48 @@ Deno.test('the torn vertex is the one the fixture aimed at', async () => {
     await Deno.remove(c.dir, { recursive: true });
   }
 });
+
+Deno.test('a huge max on scattered edges no longer convicts a joint', async () => {
+  // The bulma finding in miniature (spikes/trellis2/deform_dist.py): calf_l
+  // carried maxEdgeStretch 3.76 from 5 outlier edges of 21,909 (0.02%, P99
+  // 1.24) and was flagged identically to spine_02's genuine 712-edge band.
+  // The flag is now the seam rule - stretchedEdges >= max(2, fraction of
+  // influencedEdges) - so the SAME torn data stops flagging when the fraction
+  // is set above its seam size, while the max still reports the severity.
+  const c = await stageCase(chainSkeleton(), await weightsNpz(shreddedWeights()));
+  try {
+    await applyRig(c);
+    const report = await deformCheck({
+      riggedPath: c.outPath,
+      outDir: c.dir,
+      angleDeg: 60,
+      stretchFraction: 0.9, // the toy's tear is a few edges, far below 90%
+    });
+    const s = stat(report, 'bone_1');
+    assert(s.maxEdgeStretch > 2, `the outlier is still measured: ${s.maxEdgeStretch}`);
+    assert(s.stretchedEdges >= 2, `and counted: ${s.stretchedEdges}`);
+    assert(s.stretchedEdges < s.influencedEdges * 0.9, 'but it is not a seam at this fraction');
+    assertEquals(s.flags, [], 'so the max alone no longer convicts');
+  } finally {
+    await Deno.remove(c.dir, { recursive: true });
+  }
+});
+
+Deno.test('the seam rule needs two edges - one outlier is never a tear', async () => {
+  // MIN_STRETCHED_EDGES exists so a single wild edge cannot flag a joint no
+  // matter how small the influenced set is. The torn fixture tears several
+  // incident edges, so it clears the floor; this pins the floor itself.
+  const c = await stageCase(chainSkeleton(), await weightsNpz(shreddedWeights()));
+  try {
+    await applyRig(c);
+    const report = await deformCheck({ riggedPath: c.outPath, outDir: c.dir, angleDeg: 60 });
+    const s = stat(report, 'bone_1');
+    // the fixture's tear IS a multi-edge seam: that is why it may flag at all
+    assert(s.stretchedEdges >= 2, `fixture tears a seam, got ${s.stretchedEdges} edges`);
+    assertEquals(s.flags, ['excessive-stretch']);
+    // the report carries the denominator, so a reader can judge the fraction
+    assert(s.influencedEdges > 0);
+  } finally {
+    await Deno.remove(c.dir, { recursive: true });
+  }
+});
