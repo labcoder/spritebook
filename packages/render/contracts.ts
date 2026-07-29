@@ -155,9 +155,11 @@ export const AOV_TARGETS: readonly AovTarget[] = [
   { pass: 'normal', format: 'rgba8unorm', bpp: 4, encode: 'rgba8' }, // n*0.5+0.5
   { pass: 'depth', format: 'r32float', bpp: 4, encode: 'gray16' }, // linearized view depth
   // coverage, NOT an object id: the FS writes a constant 1 wherever a fragment
-  // survives, so 1 = drawn and 0 = empty. Multi-primitive characters and
-  // socketed props are indistinguishable here; a real per-primitive id would
-  // change these bytes and is a separate opt-in change.
+  // survives, so 1 = drawn and 0 = empty IN THE TEXTURE. Multi-primitive
+  // characters and socketed props are indistinguishable here; a real
+  // per-primitive id would change these bytes and is a separate opt-in change.
+  // The PNG carries the same boolean at full 16-bit scale (png.ts) so the file
+  // is legible; readers test against 0, never against 1.
   { pass: 'mask', format: 'r32uint', bpp: 4, encode: 'u32' }, // 1 = drawn; 0 = empty
 ] as const;
 

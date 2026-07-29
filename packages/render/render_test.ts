@@ -98,9 +98,14 @@ Deno.test('render: depth and mask AOVs encode drawn vs background correctly', as
     // corner (0,0) is background: depth cleared to far (1.0 -> 65535), mask empty (0)
     assertEquals(dd[0], 65535, 'depth background = far');
     assertEquals(md[0], 0, 'mask background = 0');
-    // drawn texels exist: nearer depth (< far) and coverage 1
+    // drawn texels exist: nearer depth (< far), and coverage at full scale.
+    // This used to assert `v === 1`, which passed on a file every viewer
+    // renders as solid black - the assertion agreed with the encoder and
+    // neither of them agreed with anyone opening the png. Coverage is a
+    // boolean, so the check is "not dark enough to pass for empty".
     assert(dd.some((v) => v < 65535), 'depth has drawn (nearer) texels');
-    assert(md.some((v) => v === 1), 'mask has object-id texels');
+    assert(md.some((v) => v === 65535), 'mask has covered texels, at full scale');
+    assert(!md.some((v) => v !== 0 && v !== 65535), 'and coverage is only ever those two');
   } finally {
     await Deno.remove(outDir, { recursive: true });
   }
