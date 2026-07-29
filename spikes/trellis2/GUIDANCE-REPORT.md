@@ -1,6 +1,7 @@
 # Why the texture never matched the reference
 
-**Date:** 2026-07-28 · RTX 3090 · one mesh (`bulma` r1), one image, 16 runs + a live verb run
+**Date:** 2026-07-28 · RTX 3090 · guidance sweep on one mesh (16 runs), then four subjects through
+the real verbs (4 generations + 10 retextures)
 
 The complaint was "retexture doesn't look like the source, and the seed shouldn't matter this much
 when you have the source image." Two suspects were ruled out with measurement, two real causes were
@@ -113,12 +114,53 @@ the receipt as provenance — and **never passed to the pipeline**. `--adjust gu
 accepted and did nothing. Both now reach the shape and sparse-structure samplers, and a test pins
 that they arrive.
 
+## Cross-subject: the metal problem is bulma's, not the path's
+
+Three more subjects through the real verbs — `gen` once, `retexture` at two seeds each.
+
+| subject           | style                | in TRELLIS.2's examples | retexture metal | ladder attempts |
+| ----------------- | -------------------- | ----------------------- | --------------- | --------------- |
+| **bulma**         | flat anime line art  | no                      | **76.2%**       | 3 (on r5)       |
+| painted-mermaid   | painted illustration | yes                     | 7.6%            | 1, 1            |
+| lineless-princess | lineless soft 3D     | yes                     | 0.1%            | 1, 1            |
+| robot-astro       | glossy 3D robot      | no                      | 14.1%           | 1, 1            |
+
+**Said plainly: the gate is idle on three subjects out of four.** The six retexture runs across the
+three new subjects produced zero rejections, and every one accepted its first seed. Generation was
+majority-metal 0 times out of 4. Bulma's own r2-r4 show one attempt each only because they predate
+the gate; r5 is the only bulma retexture the ladder has actually run.
+
+**And the metal channel is not tracking material semantics at all.** Astro Bot is a chrome-and-gloss
+robot — the one subject here that should legitimately read metallic — and it comes back at 14%,
+while a cartoon girl in a cotton shirt comes back at 76%. Whatever that channel is doing on bulma,
+it is not describing the material.
+
+The two example-set subjects carry a confound: clean is consistent with "not flat line art" AND with
+"the model has seen this image". `robot-astro` is what breaks it — out of the example set, and
+clean. So out-of-distribution alone does not explain bulma.
+
+**An alternative this data cannot rule out.** Every bulma retexture encoded the same r1 mesh. A flat
+anime reference produces a notably flat mesh, and the texturing pipeline conditions on the mesh it
+is handed. The trigger may be bulma's GEOMETRY rather than her art style. Separating them needs a
+second flat-art subject, which is the next measurement, not a conclusion here.
+
+### Colour, judged by eye rather than by the mean
+
+Guidance at 7.5 is right on all four. Saturation lands above source on two subjects — mermaid 0.504
+against 0.289, princess 0.267 against 0.232 — which read on the sheet as _more vivid_, not garish;
+the mermaid's jellyfish glow and the princess's pink recover detail her generation pass lost. On
+`lineless-princess` the retextures are visibly BETTER than the generation, which is the first
+evidence that this feature earns its place beyond rescuing a bad seed.
+
+Rendered comparison: `out/cross_subject_rendered.png`.
+
 ## Still unknown
 
-- **One subject.** Every number here is bulma. The 7.5 default is safe (it only strengthens
-  conditioning that already exists) but the _size_ of the gain is unmeasured elsewhere.
-- **Whether the metal rate is subject-specific.** The flower says in-distribution art is fine; two
-  more characters in different styles would say whether flat art is the trigger.
+- **Whether bulma's ART STYLE or her MESH is the trigger.** Both are unusual and both feed the
+  texturing pass. A second flat-line-art subject separates them.
+- **Whether the 0.60 metal threshold is right.** It has now seen exactly one subject that trips it.
+  Three others sit at 0-15%, comfortably clear, so the valley holds - but no run has landed between
+  15% and 76%, which is where the threshold would actually be tested.
 - **`guidance_rescale`** stayed at its shipped 0.0 so strength alone could be credited. Raising it
   is the standard remedy if higher strength ever burns colour.
 - **Whether generation benefits too.** Untested, deliberately.
