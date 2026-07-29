@@ -679,3 +679,80 @@ Deno.test('gen --adjust refuses seed and prototype keys', async () => {
     assert(e.message.includes(needle), `${args.join(' ')}: ${e.message}`);
   }
 });
+
+Deno.test('rig --accept records the review; undo takes it back', async () => {
+  // The missing half of the deform gate: both rig tracks write accepted:false
+  // ("theirs to set") and bake warns while it stays false. This is the verb
+  // that sets it - ONE journaled patch, so the decision undoes like any other.
+  const { createWorkspace, readWorkspace, setRigState, workspacePaths } = await import(
+    '@spritebook/core'
+  );
+  const raw = await Deno.makeTempDir({ prefix: 'sb-accept-' });
+  const dir = raw.replaceAll('\\', '/');
+  const rig = {
+    track: 'B' as const,
+    skeletonProfile: 'generic' as const,
+    jointCount: 40,
+    jointEdits: [],
+    orientationFixes: [],
+    accepted: false,
+  };
+  const run = async (argv: string[]) => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await runCli(argv, {
+      stdout: (l) => out.push(l),
+      stderr: (l) => err.push(l),
+      now: () => '2026-07-12T00:00:00Z',
+    });
+    return { code, out, err };
+  };
+  try {
+    await createWorkspace({
+      workspace: dir,
+      characterId: 'knight',
+      displayName: 'Knight',
+      source: { kind: 'mesh', originalFilename: 'x.glb', sha256: 'a'.repeat(64) },
+      now: () => '2026-07-12T00:00:00Z',
+    });
+
+    // refusals first: no rig yet, and the contradiction
+    const noRig = await run(['rig', '--workspace', dir, '--accept']);
+    assertEquals(noRig.code, 1);
+    assert(noRig.err.join('\n').includes('no rig to accept'), noRig.err.join('\n'));
+    const both = await run(['rig', '--workspace', dir, '--accept', '--unaccept']);
+    assertEquals(both.code, 1);
+    assert(both.err.join('\n').includes('contradict'), both.err.join('\n'));
+
+    await setRigState(dir, rig, { now: () => '2026-07-12T00:00:00Z' });
+    const journalBefore =
+      (await Deno.readTextFile(workspacePaths(dir).journal)).trim().split('\n').length;
+
+    const ok = await run(['rig', '--workspace', dir, '--accept', '--json']);
+    assertEquals(ok.code, 0, ok.err.join('\n'));
+    assertEquals(JSON.parse(ok.out[0]).accepted, true);
+    assertEquals((await readWorkspace(dir)).rig!.accepted, true);
+    // exactly ONE patch, so exactly one undo owns the decision
+    const journalAfter =
+      (await Deno.readTextFile(workspacePaths(dir).journal)).trim().split('\n').length;
+    assertEquals(journalAfter, journalBefore + 1);
+
+    // idempotence is a refusal, not a silent success
+    const again = await run(['rig', '--workspace', dir, '--accept']);
+    assertEquals(again.code, 1);
+    assert(again.err.join('\n').includes('already accepted'), again.err.join('\n'));
+
+    // undo reverts the ACCEPTANCE, nothing else
+    const undo = await run(['undo', '--manifest', `${dir}/character.json`]);
+    assertEquals(undo.code, 0, undo.err.join('\n'));
+    assertEquals((await readWorkspace(dir)).rig!.accepted, false);
+
+    // and the other direction exists too
+    await setRigState(dir, { ...rig, accepted: true }, { now: () => '2026-07-12T00:00:00Z' });
+    const un = await run(['rig', '--workspace', dir, '--unaccept']);
+    assertEquals(un.code, 0, un.err.join('\n'));
+    assertEquals((await readWorkspace(dir)).rig!.accepted, false);
+  } finally {
+    await Deno.remove(raw, { recursive: true });
+  }
+});

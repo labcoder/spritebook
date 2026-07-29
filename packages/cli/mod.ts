@@ -542,6 +542,8 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'rotate',
     'edits',
     'rerun-with-hints',
+    'accept',
+    'unaccept',
     'backend',
     'seed',
     'no-deform-check',
@@ -966,6 +968,75 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
   if (verb === 'rig') {
     // Track B auto-rig + the repair verbs (P3-T3). Tier 2 rewrites the mesh
     // and so runs BEFORE prediction; tier 1 moves joints on the rigged file.
+
+    // --accept / --unaccept: the REVIEW half of the deform gate, and a pure
+    // manifest patch — no model, no sidecar, no GPU. Both rig tracks write
+    // `accepted: false` ("theirs to set"), the bake warns while it stays
+    // false, and this is the verb that sets it. A query-style sub-mode like
+    // `anim --list`, not a job: one decision in, one document out.
+    if (args.includes('--accept') || args.includes('--unaccept')) {
+      if (args.includes('--accept') && args.includes('--unaccept')) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'bad-args',
+          '--accept and --unaccept contradict each other - pass one',
+        );
+      }
+      const workspace = flag(args, 'workspace');
+      if (!workspace) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'missing-arg',
+          '--accept needs --workspace <dir> (the character whose rig you reviewed)',
+        );
+      }
+      const accepted = args.includes('--accept');
+      try {
+        const { readWorkspace: read, setRigState } = await import('@spritebook/core');
+        const manifest = await read(workspace);
+        if (!manifest.rig) {
+          return fail(
+            'rig' as JobEvent['jobId'],
+            'no-rig',
+            `"${manifest.id}" has no rig to ${accepted ? 'accept' : 'unaccept'} - run ` +
+              '`spritebook rig --model ... --workspace ...` first',
+          );
+        }
+        if (manifest.rig.accepted === accepted) {
+          return fail(
+            'rig' as JobEvent['jobId'],
+            'no-change',
+            `this rig is already ${accepted ? 'accepted' : 'unaccepted'} - nothing to record`,
+          );
+        }
+        // ONE journaled patch, so `spritebook undo` takes the decision back
+        const m = await setRigState(workspace, { ...manifest.rig, accepted }, {
+          label: accepted ? 'Accept rig' : 'Unaccept rig',
+        });
+        if (json) {
+          io.stdout(JSON.stringify({
+            id: m.id,
+            accepted,
+            jointCount: m.rig!.jointCount,
+            track: m.rig!.track,
+          }));
+        } else {
+          io.stdout(
+            accepted
+              ? `rig accepted (${m.rig!.jointCount} joints, track ${m.rig!.track}) - ` +
+                `bake will stop warning about it`
+              : `rig unaccepted - bake will warn about it again`,
+          );
+        }
+        return 0;
+      } catch (err) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'accept-failed',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
     const model = flag(args, 'model');
     const out = flag(args, 'out');
     if (!model || !out) {
@@ -1435,9 +1506,10 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         message: `this character's rig (${manifest.rig.jointCount} joints, track ` +
           `${manifest.rig.track}) was never accepted - the deform check flagged joints when it ` +
           `was made, and RigState.accepted is still false. The sprites will bake with that ` +
-          `skinning. Check deform-report.json in the rig output and repair with ` +
-          `\`spritebook rig --edits <patch.json>\` or \`--rerun-with-hints\`. Baking continues; ` +
-          `this is a warning, not a refusal.`,
+          `skinning. Check deform-report.json in the rig output, repair with ` +
+          `\`spritebook rig --edits <patch.json>\` or \`--rerun-with-hints\`, or - if you have ` +
+          `looked and the sprites are fine - record that with \`spritebook rig --workspace ` +
+          `<dir> --accept\`. Baking continues; this is a warning, not a refusal.`,
       };
       emit(w, `warn [${w.code}]: ${w.message}`);
     }
