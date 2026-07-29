@@ -125,6 +125,24 @@ single palette entry. At 49 px a slim character's limbs are 2-3 px wide and an o
 of them - the same effect measured at 128 px drops it to 38%. That is a style question (outline
 width against cell size for slim subjects), not the bug that was fixed here.
 
+## The chain after the fixes, in one run
+
+`p3_exit.sh` (now defaulting to the `--height 1.65` workspace): pick 1 s, rig 85 s, bake 4 s, export
+1 s. No `silhouette-clipped`, no scale warning, and the new `rig-unaccepted` warn fires exactly
+where silence used to be. The composite against the reference is
+`out/p3-exit/final_vs_reference.png`: complete figure, grounded, pixel-8 at the half-pixel line.
+
+**What one look shows is now quality, not defects.** The pink top, skirt and socks read; the hair
+bakes muddy green-brown against a teal reference and the face is texture noise at 64 px. Those are
+generation-fidelity limits (the canonical mesh's texture is what it is), not pipeline bugs — the
+albedo matches the canonical texture it was given.
+
+**A seam the re-run exposed, recorded not fixed:** the outline comparison baked this workspace with
+`--style pixel-8-both`, D-029's writeback recorded that id in the character's look, and the
+scaffolding preset was then deleted — so a flagless bake refused with _unknown style "pixel-8-both"
+(from the character's look)_. The error is honest and one `--style pixel-8` bake repairs it.
+Pre-release this is fine; post-release, deleting a preset id is a migration.
+
 ## Verdict
 
 **The exit is not met.** Not on time — time is comfortable — but on output: the artifact a user
@@ -140,8 +158,10 @@ Ranked by what blocks the exit:
    pinned revision, and the `llm-config-from-cache` warning is gone.
 3. ~~48/48 frames clipped~~ — SYMPTOM of the same root cause. The warning's advice was also wrong
    and now names both possible causes.
-4. **`bake` accepts a rig whose own deform check rejected it.** Still open, and still its own
-   question: 37 of 40 joints flagged, `accepted: false`, sprites shipped anyway.
+4. ~~`bake` accepts a rig whose own deform check rejected it~~ — **FIXED as a loud warn**:
+   `rig-unaccepted` fires at bake time, naming the rig and the repair verbs. Not a refusal, for a
+   reason the message states: no verb can set `accepted: true` yet, so refusing would dead-end every
+   rigged character.
 5. ~~`gen` without `--height` yields an arbitrary scale~~ — it now WARNS, naming the measured height
    and the flag. But that was never the whole story: declaring the height does not help either.
 

@@ -12,7 +12,11 @@
 # around failures - a broken stage is the finding.
 set -u
 cd "$(dirname "$0")/../.."
-WS=spikes/trellis2/out/verb-e2e/bulma
+# Defaults to the workspace generated WITH --height under the vertex-baking
+# border (the verb-e2e/bulma workspace predates both and re-measures the old
+# defect, which is only useful as history). Override: p3_exit.sh <ws> <result>.
+WS=${1:-spikes/trellis2/out/p3-exit/bulma-fixed}
+RESULT=${2:-r1}
 PERMS="--allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run"
 LOG=spikes/trellis2/out/p3-exit
 mkdir -p "$LOG"
@@ -32,14 +36,16 @@ stage() {
 
 rm -f "$LOG/timings.csv"
 
-stage pick deno run $PERMS packages/cli/mod.ts pick --workspace "$WS" --result r5
+stage pick deno run $PERMS packages/cli/mod.ts pick --workspace "$WS" --result "$RESULT"
 
 stage rig deno run $PERMS packages/cli/mod.ts rig \
   --model "$WS/canonical/model.glb" --out "$WS/rig" --workspace "$WS"
 
 stage bake deno run $PERMS packages/cli/mod.ts bake --workspace "$WS"
 
-BAKE=$(ls -d "$WS"/bakes/bake-* 2>/dev/null | head -1)
+# newest by mtime, matching the manifest lastBakeId - alphabetical head -1
+# exported a stale bake once the workspace held more than one
+BAKE=$(ls -dt "$WS"/bakes/bake-* 2>/dev/null | head -1)
 if [ -n "$BAKE" ]; then
   stage export deno run $PERMS packages/cli/mod.ts export \
     --bake "$BAKE" --out "$WS/export" --targets godot
