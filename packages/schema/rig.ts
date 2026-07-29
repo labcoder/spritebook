@@ -181,6 +181,9 @@ export const DeformJointStatSchema = z.strictObject({
   influencedEdges: z.int().nonnegative(),
   /** of those, edges whose length ratio exceeded the stretch threshold */
   stretchedEdges: z.int().nonnegative(),
+  /** DETACHED shells this joint's influence set spans. >1 means the joint is
+   * asked to drive geometry it does not touch, which no placement hint fixes */
+  spannedComponents: z.int().nonnegative(),
   /** mean/max displacement of those vertices across the pose set, metres */
   meanDisplacementM: z.number().nonnegative(),
   maxDisplacementM: z.number().nonnegative(),

@@ -39,6 +39,11 @@ export interface AutoHints {
   edits: JointEdit[];
   /** flagged joints already sitting on their flesh — nothing to exploit */
   belowFloor: Array<{ joint: string; offsetM: number }>;
+  /** flagged joints whose influence set spans DETACHED shells. Reported apart
+   * from `belowFloor` because the cause differs and so does the remedy: no
+   * placement repairs a joint asked to drive geometry it does not touch, and
+   * the fix is to join the pieces, not to nudge anything. */
+  crossComponent: Array<{ joint: string; components: number }>;
   /** flagged joints that could not be measured (no vertices above the floor,
    * or missing from the skeleton) — surfaced, never silently dropped */
   unmeasurable: string[];
@@ -71,8 +76,18 @@ export async function deriveAutoHints(
   const rest = skinAll(asset, skinMatrices(restWorlds(asset), asset.inverseBind, asset.jointCount));
   const jointIndex = new Map(asset.jointNames.map((n, i) => [n, i]));
 
-  const out: AutoHints = { edits: [], belowFloor: [], unmeasurable: [] };
+  const out: AutoHints = { edits: [], belowFloor: [], crossComponent: [], unmeasurable: [] };
+  const spannedBy = new Map(report.joints.map((j) => [j.joint, j.spannedComponents]));
   for (const name of torn) {
+    // A joint straddling shells is diagnosed FIRST: its centroid sits in the
+    // gap between the pieces, so the derivation would happily produce a large
+    // offset that repairs nothing. Naming the real cause beats hinting into
+    // the void.
+    const spans = spannedBy.get(name) ?? 1;
+    if (spans > 1) {
+      out.crossComponent.push({ joint: name, components: spans });
+      continue;
+    }
     const si = jointIndex.get(name);
     const h = head.get(name);
     if (si === undefined || h === undefined) {

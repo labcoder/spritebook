@@ -259,3 +259,37 @@ Deno.test('auto-hints: a torn joint far from its flesh gets an edit; a floor fil
     await Deno.remove(c.dir, { recursive: true });
   }
 });
+
+Deno.test('a joint spanning detached shells is reported as cross-component', async () => {
+  // The fact that lets auto-hints say "this tear crosses components" instead
+  // of a bare "no offset". Measured on robot-astro, whose floating hands held
+  // its repair to 18.5% -> 15.0% where a single-body mesh went 12.7% -> 4.9%.
+  const { deriveAutoHints } = await import('./autohints.ts');
+  const c = await stageCase(chainSkeleton(), await weightsNpz(shreddedWeights()));
+  try {
+    await applyRig(c);
+    const report = await deformCheck({ riggedPath: c.outPath, outDir: c.dir, angleDeg: 60 });
+    // the tube fixture is ONE shell, so nothing spans and nothing is excused
+    for (const j of report.joints) {
+      assert(j.spannedComponents <= 1, `${j.joint} spans ${j.spannedComponents} on a single shell`);
+    }
+    const auto = await deriveAutoHints(c.outPath, report, chainSkeleton(), { minOffsetM: 0 });
+    assertEquals(auto.crossComponent, [], 'a one-piece mesh has no cross-component tears');
+
+    // now claim a joint spans two shells and watch the diagnosis change: the
+    // joint moves out of `edits` entirely, because hinting it is pointless
+    const torn = report.joints.find((j) => j.flags.includes('excessive-stretch'))!;
+    const spanned = {
+      ...report,
+      joints: report.joints.map((j) => j.joint === torn.joint ? { ...j, spannedComponents: 2 } : j),
+    };
+    const diagnosed = await deriveAutoHints(c.outPath, spanned, chainSkeleton(), { minOffsetM: 0 });
+    assertEquals(diagnosed.crossComponent, [{ joint: torn.joint, components: 2 }]);
+    assert(
+      !diagnosed.edits.some((e) => e.joint === torn.joint),
+      'a cross-component joint is never hinted - its centroid is in the gap',
+    );
+  } finally {
+    await Deno.remove(c.dir, { recursive: true });
+  }
+});

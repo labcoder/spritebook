@@ -1159,6 +1159,23 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           );
         }
         const auto = await deriveAutoHints(`${outDir}/rigged.glb`, report, skeleton);
+        if (auto.crossComponent.length > 0) {
+          const list = auto.crossComponent
+            .map((c) => `${c.joint} (${c.components} pieces)`)
+            .join(', ');
+          const w: JobEvent = {
+            t: 'warn',
+            jobId: 'rig' as JobEvent['jobId'],
+            at: now(),
+            code: 'tear-crosses-components',
+            message: `${auto.crossComponent.length} flagged joint` +
+              `${auto.crossComponent.length === 1 ? '' : 's'} drive DETACHED pieces of the ` +
+              `mesh: ${list}. This tear crosses components - the joint is being asked to move ` +
+              `geometry it does not touch, so no placement hint can repair it. Join the pieces ` +
+              `before rigging if they should move together.`,
+          };
+          emit(w, `warn [${w.code}]: ${w.message}`);
+        }
         if (auto.belowFloor.length > 0) {
           const list = auto.belowFloor
             .map((b) => `${b.joint} (${(b.offsetM * 1000).toFixed(0)} mm)`)
@@ -1188,12 +1205,16 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           emit(w, `warn [${w.code}]: ${w.message}`);
         }
         if (auto.edits.length === 0) {
+          const why = auto.crossComponent.length > 0
+            ? 'every flagged joint either straddles detached pieces of the mesh or already sits ' +
+              'on the flesh it drives'
+            : 'every flagged joint already sits on the flesh it drives';
           return fail(
             'rig' as JobEvent['jobId'],
             'no-placement-offset',
-            'every flagged joint already sits on the flesh it drives, so auto-hints has ' +
-              'nothing to move. Re-running would be a plain re-roll wearing a repair costume; ' +
-              'the tearing that remains is a skinning-backend limit.',
+            `${why}, so auto-hints has nothing to move. Re-running would be a plain re-roll ` +
+              `wearing a repair costume; the tearing that remains is a limit of the geometry ` +
+              `and the skinning backend, not something more hinting will fix.`,
           );
         }
         edits = auto.edits;

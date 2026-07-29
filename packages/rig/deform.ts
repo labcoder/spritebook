@@ -82,10 +82,76 @@ import {
   skinVertex,
 } from './skin.ts';
 
+/** Per-vertex shell id from a position weld + triangle union, -1 when unused. */
+function shellIndexPerVertex(
+  positions: Float32Array,
+  indices: Uint32Array,
+  vertexCount: number,
+): Int32Array {
+  // connectedComponents welds internally but returns only sizes; this repeats
+  // the walk to label vertices. One pass over the mesh, negligible next to the
+  // per-joint edge scans.
+  const parent = new Int32Array(vertexCount);
+  for (let i = 0; i < vertexCount; i++) parent[i] = i;
+  const find = (x: number): number => {
+    let r = x;
+    while (parent[r] !== r) r = parent[r];
+    while (parent[x] !== r) {
+      const n = parent[x];
+      parent[x] = r;
+      x = n;
+    }
+    return r;
+  };
+  // weld by position first, for the UV-seam reason components.ts documents
+  let min = Infinity, max = -Infinity;
+  for (let i = 0; i < positions.length; i++) {
+    if (positions[i] < min) min = positions[i];
+    if (positions[i] > max) max = positions[i];
+  }
+  const q = Math.max(max - min, Number.EPSILON) * 1e-6;
+  const at = new Map<string, number>();
+  for (let v = 0; v < vertexCount; v++) {
+    const k = `${Math.round(positions[v * 3] / q)},${Math.round(positions[v * 3 + 1] / q)},${
+      Math.round(positions[v * 3 + 2] / q)
+    }`;
+    const first = at.get(k);
+    if (first === undefined) at.set(k, v);
+    else {
+      const a = find(first), b = find(v);
+      if (a !== b) parent[a] = b;
+    }
+  }
+  const union = (x: number, y: number) => {
+    const rx = find(x), ry = find(y);
+    if (rx !== ry) parent[rx] = ry;
+  };
+  for (let t = 0; t + 2 < indices.length; t += 3) {
+    union(indices[t], indices[t + 1]);
+    union(indices[t + 1], indices[t + 2]);
+  }
+  const label = new Map<number, number>();
+  const out = new Int32Array(vertexCount);
+  for (let v = 0; v < vertexCount; v++) {
+    const r = find(v);
+    let id = label.get(r);
+    if (id === undefined) {
+      id = label.size;
+      label.set(r, id);
+    }
+    out[v] = id;
+  }
+  return out;
+}
+
 /** The deform check writes exactly this file into `outDir`. */
 export const DEFORM_REPORT_FILE = 'deform-report.json';
 /** Bend angle per joint, degrees — big enough to move, small enough to be sane. */
 export const DEFAULT_ANGLE_DEG = 30;
+/** Share of a joint's influence set a shell needs before it counts as spanned:
+ * one stray welded vertex on a floating speck is not a second body. */
+export const MIN_SHELL_SHARE = 0.05;
+
 /** A joint "influences" a vertex when its weight exceeds this. */
 export const DEFAULT_WEIGHT_FLOOR = 0.05;
 /** Edge length ratio above which an edge counts as stretched. */
@@ -208,6 +274,13 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
 
   const edges = uniqueEdges(asset.indices, asset.vertexCount);
   const buckets = influenceBuckets(asset, weightFloor);
+
+  // Which detached shell each vertex belongs to. A joint whose influence set
+  // spans several shells is being asked to drive geometry it does not touch,
+  // and no placement hint can repair that — `--auto-hints` says so rather than
+  // reporting a bare "no offset" (measured: robot-astro's floating hands held
+  // its repair to 18.5% -> 15.0%).
+  const shellOf = shellIndexPerVertex(restPos, asset.indices, asset.vertexCount);
   const rad = (angleDeg * Math.PI) / 180;
   const signs = [1, -1];
   const poses = signs.map((s) => `bend${s > 0 ? '+' : '-'}${angleDeg}deg`);
@@ -228,6 +301,7 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
         influencedVertices: 0,
         influencedEdges: 0,
         stretchedEdges: 0,
+        spannedComponents: 0,
         meanDisplacementM: 0,
         maxDisplacementM: 0,
         maxEdgeStretch: 0,
@@ -303,6 +377,17 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
       if (worst > stretchThreshold) stretchedEdges++;
     }
 
+    // components this joint's influence set touches, counting only shells it
+    // holds a real share of — one stray welded vertex is not a second body
+    const perShell = new Map<number, number>();
+    for (const v of verts) {
+      const c = shellOf[v];
+      if (c >= 0) perShell.set(c, (perShell.get(c) ?? 0) + 1);
+    }
+    const spannedComponents = [...perShell.values()]
+      .filter((n) => n / verts.length >= MIN_SHELL_SHARE)
+      .length;
+
     const flags: DeformJointStat['flags'] = [];
     if (maxDisplacementM <= DEAD_JOINT_EPS_M) flags.push('dead-joint');
     // a seam, not an outlier: see the module docstring for the bulma numbers
@@ -313,6 +398,7 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
       influencedVertices: verts.length,
       influencedEdges,
       stretchedEdges,
+      spannedComponents,
       meanDisplacementM,
       maxDisplacementM,
       maxEdgeStretch,
