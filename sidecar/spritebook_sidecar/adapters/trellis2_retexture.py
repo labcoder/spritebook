@@ -94,6 +94,11 @@ PARAMS_SCHEMA: dict[str, Any] = {
         # mixin short-circuits to no guidance at all - the only stage in either
         # pipeline that gets none, while shape and structure get 7.5.
         "textureGuidance": {"type": "number", "minimum": 1, "maximum": 20},
+        # upstream `guidance_rescale` (ships 0.0); deployments pair guided
+        # texturing with 0.1-0.3 to damp CFG artifacts. Never plumbed before
+        # A0 (spikes/trellis2/QUALITY-AUDIT.md), so every recorded retexture
+        # implicitly carried 0.0 - including the sweep that chose 7.5.
+        "textureGuidanceRescale": {"type": "number", "minimum": 0, "maximum": 1},
         "textureSize": {"type": "integer", "enum": [1024, 2048, 4096]},
         # catalog data, and 5 here against gen's 2 - see the module docstring
         "textureRetries": {"type": "integer", "minimum": 0, "maximum": 12},
@@ -110,6 +115,7 @@ DEFAULTS: dict[str, Any] = {
     # every strength, because texture sampling is ~2 s of that). It does NOT fix
     # the metal misclassification - that stayed at 0.92 across all 16 runs.
     "textureGuidance": 7.5,
+    "textureGuidanceRescale": 0.0,
     "textureSize": 2048,
     "textureRetries": 5,
     "lowVram": True,
@@ -263,6 +269,7 @@ def retexture_with_retries(
     texture_size: int,
     emit: Emitter,
     texture_guidance: float = 7.5,
+    texture_guidance_rescale: float = 0.0,
 ) -> tuple[Any, int, list[int]]:
     """The shared ladder, wired to the texturing pipeline."""
 
@@ -274,7 +281,10 @@ def retexture_with_retries(
             resolution=int(resolution),
             texture_size=int(texture_size),
             preprocess_image=True,
-            tex_slat_sampler_params={"guidance_strength": float(texture_guidance)},
+            tex_slat_sampler_params={
+                "guidance_strength": float(texture_guidance),
+                "guidance_rescale": float(texture_guidance_rescale),
+            },
         )
         painted = as_mesh(out)
         return out, quality_fault(atlas_mean(painted), atlas_metal_fraction(painted))
@@ -324,6 +334,7 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
         int(p["textureSize"]),
         emit,
         texture_guidance=float(p["textureGuidance"]),
+        texture_guidance_rescale=float(p["textureGuidanceRescale"]),
     )
     run_seconds = round(time.perf_counter() - run_t0, 2)
     textured = as_mesh(out)

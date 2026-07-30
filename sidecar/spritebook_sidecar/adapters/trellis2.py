@@ -117,6 +117,12 @@ PARAMS_SCHEMA: dict[str, Any] = {
         # CFG mixin short-circuits to no guidance at all. See generate_with_retries
         # for why generation keeps that default and retexture does not.
         "textureGuidance": {"type": "number", "minimum": 1, "maximum": 20},
+        # upstream `guidance_rescale` for the texture sampler (ships 0.0).
+        # Deployments running guided texturing pair strength ~2-3 with rescale
+        # 0.1-0.3 to damp CFG artifacts; ours was never plumbed, so every
+        # recorded run implicitly carried 0.0. Exposed for the A1 sweep
+        # (spikes/trellis2/QUALITY-AUDIT.md); moot while textureGuidance is 1.
+        "textureGuidanceRescale": {"type": "number", "minimum": 0, "maximum": 1},
         # loads each model for its stage and offloads after: the reason peak
         # VRAM is ~9 GiB rather than the ~24 the upstream README quotes
         "lowVram": {"type": "boolean"},
@@ -139,6 +145,7 @@ DEFAULTS: dict[str, Any] = {
     "steps": 12,
     "guidanceStrength": 7.5,
     "textureGuidance": 1.0,
+    "textureGuidanceRescale": 0.0,
     "lowVram": True,
     # the FALLBACK only. The catalog's operationDefaults normally supplies this,
     # per operation, because the collapse rate is not one number.
@@ -540,6 +547,7 @@ def generate_with_retries(
     steps: int = 12,
     guidance: float = 7.5,
     texture_guidance: float = 1.0,
+    texture_guidance_rescale: float = 0.0,
 ) -> tuple[Any, int, list[int]]:
     """The ladder, wired to the image-to-3D pipeline.
 
@@ -572,7 +580,10 @@ def generate_with_retries(
                 "steps": int(steps),
                 "guidance_strength": float(guidance),
             },
-            tex_slat_sampler_params={"guidance_strength": float(texture_guidance)},
+            tex_slat_sampler_params={
+                "guidance_strength": float(texture_guidance),
+                "guidance_rescale": float(texture_guidance_rescale),
+            },
         )[0]
         return mesh, quality_fault(
             base_color_mean(mesh.attrs), metal_fraction_from_attrs(mesh.attrs)
@@ -612,6 +623,7 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
         steps=int(p["steps"]),
         guidance=float(p["guidanceStrength"]),
         texture_guidance=float(p["textureGuidance"]),
+        texture_guidance_rescale=float(p["textureGuidanceRescale"]),
     )
     run_seconds = round(time.perf_counter() - run_t0, 2)
 

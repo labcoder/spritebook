@@ -58,6 +58,14 @@ Deno.test('trellis2 retextures with a bigger seed ladder than it generates with'
   assertEquals(defaultsFor(v, 'gen3d').lowVram, true);
   assertEquals(defaultsFor(v, 'retexture').resolution, 512);
   assertEquals(defaultsFor(v, 'gen3d').resolution, undefined);
+
+  // A0 (QUALITY-AUDIT.md): the texture sampler's guidance_rescale is plumbed
+  // and EXPLICIT at upstream's 0.0 on both operations — explicit so every
+  // receipt records what ran. textureGuidance itself was once silently 1.0 for
+  // gen3d, which is precisely how "the character everyone evaluated was
+  // textured by an unguided sampler" shipped; silence is not a default here.
+  assertEquals(defaultsFor(v, 'gen3d').textureGuidanceRescale, 0);
+  assertEquals(defaultsFor(v, 'retexture').textureGuidanceRescale, 0);
 });
 
 Deno.test('every entry can actually RUN every operation it declares', async () => {

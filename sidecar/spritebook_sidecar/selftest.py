@@ -1126,6 +1126,19 @@ def test_trellis2_retry_ladder() -> None:
     ok(sp["sparse_structure_sampler_params"]["steps"] == 12, "steps arrive")
     ok(sp["tex_slat_sampler_params"]["guidance_strength"] == 1.0,
        "generation keeps upstream's texture guidance - its sweep has not been run")
+    # A0 (QUALITY-AUDIT.md): rescale is plumbed, defaulting to upstream's 0.0.
+    # The arrival half matters more than the default half - textureGuidance
+    # itself was once "declared, validated, recorded, never passed".
+    ok(sp["tex_slat_sampler_params"]["guidance_rescale"] == 0.0,
+       "texture guidance_rescale arrives, at upstream's 0.0 default")
+    rescaled = _FakePipeline(bad=set())
+    t2.generate_with_retries(
+        rescaled, object(), 7, 2, "512", _RecordingEmitter(),
+        texture_guidance=2.0, texture_guidance_rescale=0.2,
+    )
+    rp = rescaled.sampler_params[0]["tex_slat_sampler_params"]
+    ok(rp == {"guidance_strength": 2.0, "guidance_rescale": 0.2},
+       f"a NON-default rescale reaches the sampler, got {rp}")
     ok([c for c, _ in emit.warns] == ["texture-rejected"], "warned once, on the bad seed")
     ok(not t2.collapsed(mesh.attrs), "the returned mesh is the healthy one")
 
@@ -1355,6 +1368,16 @@ def test_retexture_collapse_and_ladder() -> None:
     ok("a black texture" in emit.warns[0][1], f"named the dark end: {emit.warns[0][1]}")
     ok("a white texture" in emit.warns[1][1], f"named the bright end: {emit.warns[1][1]}")
     ok(rt.atlas_mean(out) > 0.1, "the returned mesh is the healthy one")
+    # A0: rescale arrives on the retexture path too, defaulting to upstream 0.0
+    ok(pipe.kw["tex_slat_sampler_params"] == {"guidance_strength": 7.5, "guidance_rescale": 0.0},
+       f"texture sampler params carry rescale at 0.0, got {pipe.kw['tex_slat_sampler_params']}")
+    tuned = _Pipe({})
+    rt.retexture_with_retries(
+        tuned, object(), object(), 7, 5, 512, 2048, _RecordingEmitter(),
+        texture_guidance=2.0, texture_guidance_rescale=0.2,
+    )
+    ok(tuned.kw["tex_slat_sampler_params"] == {"guidance_strength": 2.0, "guidance_rescale": 0.2},
+       f"a NON-default rescale reaches the retexture sampler, got {tuned.kw['tex_slat_sampler_params']}")
 
     # the metal fault climbs the SAME ladder: a healthy base colour is not a
     # pass, which is exactly the case that shipped before this gate existed
