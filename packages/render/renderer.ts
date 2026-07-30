@@ -59,15 +59,27 @@ export const LIGHT_DIR: readonly [number, number, number] = [0.4, 0.9, 0.5];
 /**
  * The floor a surface facing away from the key still receives, in LINEAR light.
  *
- * Measured consequence of the pair above: the key is mostly OVERHEAD, so a
- * surface pointing at the camera catches it at ndl 0.4527 and shades at
- * 0.12 + 0.88*0.4527 = 0.5184 of its albedo. That costs a white camera-facing
- * texel about 26% of its value (255 -> 189 after the sRGB encode), and it is
- * the whole of the "every sheet reads darker than its reference" gap. Not a
- * bug — see spikes/trellis2/LIGHTING-REPORT.md for the measurement that ruled
- * out a double encode and a missing term.
+ * The key is mostly OVERHEAD, so a surface pointing at the camera — the ones a
+ * sprite is made of — catches it at ndl 0.4527. At the 0.12 this shipped with,
+ * that shaded to 0.518 of albedo and cost a white camera-facing texel 26% of
+ * its value; averaged over a body (Lambert's mean over a sphere is 0.25) it was
+ * a 40% drop, and it was the whole of the "every sheet reads darker than its
+ * reference" gap. Never a bug: LIGHTING-REPORT.md measured the lit AOV against
+ * this exact formula and ruled out a double sRGB encode and a missing term.
+ *
+ * 0.30 because it is the only knob that MOVES the result. Measured across three
+ * subjects, raising ambient lifted mean value ~20% while aiming the key at the
+ * camera lifted it 2% — the adaptive palette re-normalizes, so a uniform
+ * brightening is quantized straight back out, and what ambient changes is the
+ * SHAPE of the distribution: it raises the dark tail without moving the top.
+ *
+ * The cost, recorded because it is real: the outline is `palette-dark`, so
+ * lifting the floor lifts the outline too. Princess (pastel, lineless) goes
+ * from an outline at V 0.094 to one at 0.161 and ends up with no texel below
+ * 0.15 at all; her outline-to-body contrast falls 2.2x -> 1.7x. Still legible,
+ * and the trade was made deliberately.
  */
-export const AMBIENT = 0.12;
+export const AMBIENT = 0.30;
 
 const bpp = AOV_TARGETS.map((t) => t.bpp);
 

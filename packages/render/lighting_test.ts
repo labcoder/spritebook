@@ -131,14 +131,17 @@ Deno.test('the lit AOV is exactly albedo * (ambient + (1-ambient)*ndl), sRGB-enc
   }
 });
 
-Deno.test('the shipped rig costs a camera-facing surface ~26% of its value', async () => {
+Deno.test('what the rig costs a camera-facing surface, from the rig itself', async () => {
   // The number behind "every sheet reads darker than its reference". It is not
   // a defect and this test exists to stop anyone re-diagnosing it as one: the
   // key light sits at [0.4, 0.9, 0.5], which is mostly OVERHEAD, so a surface
   // pointing at the camera catches it at ndl 0.45 rather than 1.0.
   //
   // For a sprite renderer that is the load-bearing fact, because the
-  // camera-facing surfaces are the ones that end up in the sheet.
+  // camera-facing surfaces are the ones that end up in the sheet. The bound is
+  // DERIVED from AMBIENT rather than pinned at a measured percentage, so
+  // changing the rig moves this test's expectation with it instead of failing
+  // it — the loss was 26% at the 0.12 that shipped first and is 19% at 0.30.
   if (!(await tryGetGpu())) return;
   const got = await shade([1, 1, 1, 1]);
   assert(got);
@@ -148,10 +151,14 @@ Deno.test('the shipped rig costs a camera-facing surface ~26% of its value', asy
 
   // white albedo, so sRGB(1.0) would be 255 and the shortfall is the rig alone
   const drop = 1 - got.lit[0] / 255;
+  const predicted = 1 - srgbEncode(AMBIENT + (1 - AMBIENT) * ndl);
   assert(
-    drop > 0.2 && drop < 0.32,
-    `a white camera-facing surface loses ${(drop * 100).toFixed(1)}% to the rig`,
+    Math.abs(drop - predicted) < 0.01,
+    `a white camera-facing surface loses ${(drop * 100).toFixed(1)}%; the rig predicts ${
+      (predicted * 100).toFixed(1)
+    }%`,
   );
+  assert(drop > 0, 'and it is a loss, not a gain');
 
   // A surface facing the light directly gets its full value back, which is what
   // proves the loss is ORIENTATION and not a global scale on the output.

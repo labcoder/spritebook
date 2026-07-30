@@ -124,9 +124,12 @@ export const REQUIRED_LIMITS: Record<string, number> = {
  * an ADAPTER change is an honest cache miss (driver-version-only updates are a
  * known gap — see diagnostics.ts).
  */
+// 0.5.0: the ambient floor moves 0.12 -> 0.30 (renderer.ts AMBIENT). Every
+// baked pixel changes, so this bump is what makes every existing cache entry
+// and every golden an honest miss rather than a silent disagreement.
 // 0.4.0: materials honoured (factor x texture, alpha cutout); median cut
 // reaches maxColors DISTINCT colours; area average weights colour by coverage.
-export const RENDERER_VERSION = 'spritebook-render@0.4.0';
+export const RENDERER_VERSION = 'spritebook-render@0.5.0';
 
 // ---------------------------------------------------------------------------
 // AOV contract (aov.ts + shaders.wgsl). One MRT pass, five color attachments,

@@ -1,0 +1,21 @@
+{
+  "directions": 2,
+  "frames": 6,
+  "cellPx": {
+    "w": 256,
+    "h": 256
+  },
+  "pivotPx": {
+    "x": 128,
+    "y": 232
+  },
+  "passes": [
+    "lit",
+    "albedo",
+    "normal",
+    "depth",
+    "mask"
+  ],
+  "framesDir": "C:/dev/Mighty/tools/spritebook/packages/style/fixtures/aov/frames",
+  "pageCount": 60
+}

@@ -63,13 +63,11 @@ Deno.test('palette membership: every opaque pixel of a pixel style is a palette 
 
 Deno.test('flicker is within each preset budget on the idle loop', async () => {
   // Tight regression guards at ~2x MEASURED, not the roadmap 1.2% target - all
-  // presets clear that with room. Measured: cel-2 0.054%, painterly 0.689%,
-  // and pixel 0.420% at 16 colours (0.273% at the 8 it used to ship) since its
-  // stroke went to half a pixel: a 2-texel Sx
-  // stroke sits at the cluster-vote margin, so an edge pixel can swing between
-  // outline and surface with subpixel motion. That is the accepted price of an
-  // outline that no longer swallows slim characters; the old 0.054% belongs to
-  // the 1 px stroke and is not coming back with this preset.
+  // presets clear that with room. `pixel` earns the loosest of the three
+  // because its stroke went to half a pixel: a 2-texel Sx stroke sits at the
+  // cluster-vote margin, so an edge pixel can swing between outline and surface
+  // with subpixel motion. That is the accepted price of an outline that no
+  // longer swallows slim characters.
   const budget: Record<string, number> = { 'pixel': 0.55, 'cel-2': 0.15, 'painterly': 1.0 };
   for (const [id, preset] of Object.entries(PRESETS)) {
     const out = await Deno.makeTempDir();
@@ -164,9 +162,16 @@ Deno.test('painterly: a bigger budget never shrinks the palette, and no entry is
       'and never exceeds its own budget',
     );
     // On THIS fixture both saturate: the lit AOV of a flat-shaded box holds
-    // exactly 8 distinct colours, so 8 is the ceiling for any maxColors >= 8.
-    // A palette larger than the source would be invented colour.
-    assertEquals(painterly.paletteHex.length, 8, "the fixture's own distinct-colour ceiling");
+    // only a handful of distinct colours, so that count is the ceiling for any
+    // maxColors above it. A palette larger than the source would be invented
+    // colour.
+    //
+    // It was 8 when AMBIENT was 0.12 and is 5 at 0.30, which is the same
+    // trade-off the rig change was made for, seen from the other side: shade is
+    // `ambient + (1-ambient)*ndl`, so raising the floor narrows the range from
+    // [0.12, 1.0] to [0.30, 1.0] and faces that used to quantize apart now
+    // collapse together. On a flat-shaded box that is most of the colour it has.
+    assertEquals(painterly.paletteHex.length, 5, "the fixture's own distinct-colour ceiling");
   } finally {
     await Deno.remove(out, { recursive: true });
     await Deno.remove(out8, { recursive: true });
