@@ -47,8 +47,12 @@ import { componentsOfFile, disconnectedWarning, importToCanonical } from '@sprit
 import { NodeIO } from '@gltf-transform/core';
 import { decode as decodePng } from 'fast-png';
 import { heightOf } from './pick.ts';
+import { rankCandidates, rankingMessage } from './candidates.ts';
 
 export interface GenJobOptions extends GenJobSpec {
+  /** N candidates in ONE sidecar job (the model loads once); every candidate
+   * becomes a receipt and a ranked suggestion is emitted. Default 1. */
+  candidates?: number;
   /** models root override (tests, and `--models-dir`) */
   modelsRoot?: string;
   /** the uv sidecar project dir */
@@ -165,7 +169,12 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     // `defaultsFor`, not `version.defaults`: a parameter can differ per
     // operation on one model (trellis2's seed-retry budget is 2 here and 5 for
     // retexture, because the same decoder fails 7x more often there).
-    const params = { ...defaultsFor(version, 'gen3d'), ...opts.params, seed: opts.seed };
+    const params = {
+      ...defaultsFor(version, 'gen3d'),
+      ...opts.params,
+      seed: opts.seed,
+      ...(opts.candidates !== undefined ? { candidates: opts.candidates } : {}),
+    };
     const check = validateParams(version.paramsSchema, params);
     if (!check.ok) {
       throw new GenFail(
@@ -200,6 +209,7 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     // 5. the backend, through the sidecar
     session = new SidecarSession({ sidecarDir: opts.sidecarDir });
     let sawMesh = false;
+    const rawPaths: string[] = [];
     let metaPath: string | undefined;
     for await (
       const e of session.run({
@@ -233,7 +243,10 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
           e.retryable,
         );
       }
-      if (e.t === 'artifact' && e.kind === 'mesh-raw') sawMesh = true;
+      if (e.t === 'artifact' && e.kind === 'mesh-raw') {
+        sawMesh = true;
+        rawPaths.push(e.path);
+      }
       // An adapter that retried announces the seed it ACTUALLY used. Recording
       // the requested one instead would make "re-run exactly this" reproduce
       // the failure rather than the result — trellis2 re-samples past a
@@ -260,109 +273,157 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
           `not honoring the gen3d contract`,
       );
     }
-    const rawPath = `${rp.dir}/${RAW_MODEL}`;
-    await Deno.stat(rawPath).catch(() => {
-      throw new GenFail(
-        'no-mesh',
-        `Backend "${entry.id}" announced a mesh but ${rawPath} is missing`,
-      );
-    });
-    yield { t: 'progress', jobId, at: at(), step: 'border', done: 2, total: 3 };
-
-    // 6. THE BORDER: everything becomes canonical glTF (D-012)
-    let canonical: { bytes: Uint8Array; report: unknown };
-    try {
-      const imported = await importToCanonical({
-        input: rawPath,
-        ...(opts.declaredHeightM !== undefined ? { declaredHeightM: opts.declaredHeightM } : {}),
-      });
-      canonical = { bytes: imported.bytes, report: imported.report };
-    } catch (err) {
-      throw new GenFail(
-        'border-failed',
-        `The generated mesh could not be canonicalized: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
+    // The adapter emits one mesh-raw per candidate, in index order (candidate
+    // 0 is `raw.glb`, the historical contract). Candidate i's requested seed is
+    // seed + i * SEED_STRIDE - the cross-adapter convention both adapters and
+    // this fallback share.
+    if (rawPaths.length === 0) {
+      throw new GenFail('no-mesh', `Backend "${entry.id}" announced a mesh but no path arrived`);
     }
-    await Deno.writeFile(rp.model, canonical.bytes);
-    await Deno.writeTextFile(rp.preflight, JSON.stringify(canonical.report, null, 2) + '\n');
-
-    // 7. the receipt, pinned to the CANONICAL bytes
-    const gltfSha256 = await sha256Hex(canonical.bytes);
-    const described = await describeMesh(canonical.bytes);
-    if (described.tris < 1) {
-      throw new GenFail('border-failed', 'The canonical mesh has no triangles');
-    }
-    // A generated mesh arrives at whatever scale the backend chose - TRELLIS.2
-    // normalises its LONGEST axis to 1.0 - and the border only rescales when a
-    // declaredHeightM says what the character actually is. Everything downstream
-    // then inherits that arbitrary number: `bake` frames in pixelsPerMeter, so a
-    // 1 m character lands ~20 px tall in a 64 px cell, its outline swallows the
-    // silhouette, and the sprite ships nearly black. This is the one place that
-    // knows the height was never declared, so it is the one place that can say
-    // so. It does NOT invent a default: guessing 1.7 m would be right for a
-    // person and wrong for a chibi, a prop or a robot, and it would rescale the
-    // mesh every later stage sees on the strength of that guess.
-    if (opts.declaredHeightM === undefined) {
-      const measured = await heightOf(canonical.bytes);
+    const wanted = typeof params.candidates === 'number' ? params.candidates : 1;
+    if (rawPaths.length !== wanted) {
       yield {
         t: 'warn',
         jobId,
         at: at(),
-        code: 'scale-undeclared',
-        message: `no --height was given, so this character kept the backend's own scale and ` +
-          `stands ${measured.toFixed(3)} m tall. That is the number every later stage believes: ` +
-          `\`bake\` frames at pixelsPerMeter, so the sprite's size in its cell follows directly ` +
-          `from it. Re-run with \`--height <metres>\` if that is not the size you meant.`,
+        code: 'candidates-short',
+        message: `asked for ${wanted} candidates and received ${rawPaths.length} - ` +
+          `ranking what arrived.`,
       };
     }
 
-    // How many body-sized pieces the backend actually produced. This is a
-    // property of the MESH, so it is knowable HERE - one image, one glb - and
-    // waiting for someone to run `rig` only means finding out ~90 s of GPU
-    // later. Two things come out of it: a warn now, and a number on the receipt
-    // that lets `pick` compare siblings.
-    //
-    // Measured, and the reason the number is worth keeping: the SAME image at
-    // different seeds lands on different answers. `robot-astro` generated two
-    // bodies at seed 7 (60.4% / 20.0% - its hands came off) and one body at
-    // seeds 100 and 201 (78.9%, 89.8%). Bulma was one body at every seed tried.
-    // So "generate a few and take the connected one" is a real strategy, and it
-    // needs this recorded per result to be possible at all.
-    const shells = await componentsOfFile(rp.model);
-    const detached = disconnectedWarning(shells);
-    if (detached) {
-      yield { t: 'warn', jobId, at: at(), code: 'mesh-disconnected', message: detached };
+    const made: Array<{
+      resultId: string;
+      modelPath: string;
+      bodies: number;
+      seed: number;
+    }> = [];
+    let m = manifest;
+    for (let i = 0; i < rawPaths.length; i++) {
+      const cid = i === 0 ? resultId : nextResultId(m);
+      const crp = i === 0 ? rp : resultPaths(opts.workspace, cid);
+      await Deno.mkdir(crp.dir, { recursive: true });
+      // candidate raws land in candidate 0's dir; each moves home as its
+      // result is minted, keeping results/<id>/raw.glb the invariant
+      if (rawPaths[i] !== crp.raw) await Deno.rename(rawPaths[i], crp.raw);
+      await Deno.stat(crp.raw).catch(() => {
+        throw new GenFail(
+          'no-mesh',
+          `Backend "${entry.id}" announced a mesh but ${crp.raw} is missing`,
+        );
+      });
+      yield {
+        t: 'progress',
+        jobId,
+        at: at(),
+        step: rawPaths.length > 1 ? `border:${cid}` : 'border',
+        done: 2,
+        total: 3,
+      };
+
+      // 6. THE BORDER: everything becomes canonical glTF (D-012)
+      let canonical: { bytes: Uint8Array; report: unknown };
+      try {
+        const imported = await importToCanonical({
+          input: crp.raw,
+          ...(opts.declaredHeightM !== undefined ? { declaredHeightM: opts.declaredHeightM } : {}),
+        });
+        canonical = { bytes: imported.bytes, report: imported.report };
+      } catch (err) {
+        throw new GenFail(
+          'border-failed',
+          `The generated mesh could not be canonicalized: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+      await Deno.writeFile(crp.model, canonical.bytes);
+      await Deno.writeTextFile(crp.preflight, JSON.stringify(canonical.report, null, 2) + '\n');
+
+      // 7. the receipt, pinned to the CANONICAL bytes
+      const gltfSha256 = await sha256Hex(canonical.bytes);
+      const described = await describeMesh(canonical.bytes);
+      if (described.tris < 1) {
+        throw new GenFail('border-failed', 'The canonical mesh has no triangles');
+      }
+      // A generated mesh arrives at whatever scale the backend chose - TRELLIS.2
+      // normalises its LONGEST axis to 1.0 - and the border only rescales when a
+      // declaredHeightM says what the character actually is. Everything
+      // downstream then inherits that arbitrary number: bake frames in
+      // pixelsPerMeter, so a 1 m character lands ~20 px tall in a 64 px cell.
+      // Said ONCE, not once per candidate.
+      if (opts.declaredHeightM === undefined && i === 0) {
+        const measured = await heightOf(canonical.bytes);
+        yield {
+          t: 'warn',
+          jobId,
+          at: at(),
+          code: 'scale-undeclared',
+          message: `no --height was given, so this character kept the backend's own scale and ` +
+            `stands ${measured.toFixed(3)} m tall. That is the number every later stage ` +
+            `believes: \`bake\` frames at pixelsPerMeter, so the sprite's size in its cell ` +
+            `follows directly from it. Re-run with \`--height <metres>\` if that is not the ` +
+            `size you meant.`,
+        };
+      }
+
+      // How many body-sized pieces this candidate came back as - the selection
+      // signal `pick` compares (it varies by seed: robot-astro was two bodies
+      // at seed 7 and one at 100/201).
+      const shells = await componentsOfFile(crp.model);
+      const detached = disconnectedWarning(shells);
+      if (detached) {
+        yield { t: 'warn', jobId, at: at(), code: 'mesh-disconnected', message: detached };
+      }
+
+      // the seed the adapter settled on, when it told us; otherwise the
+      // stride convention's request for this candidate
+      const effectiveSeed = await readEffectiveSeed(metaPath, opts.seed + i * SEED_STRIDE, i);
+
+      const receipt: GenerationResult = {
+        id: cid,
+        backend: { modelId: entry.id, version: installed.version },
+        params,
+        seed: effectiveSeed,
+        startedAt,
+        wallTimeS: Number(((performance.now() - t0) / 1000).toFixed(3)),
+        output: {
+          gltfSha256,
+          tris: described.tris,
+          ...(described.textureRes !== undefined ? { textureRes: described.textureRes } : {}),
+          kind: version.outputs?.kind ?? 'mesh',
+          bodies: shells.significant.length,
+        },
+        discarded: false,
+      };
+      m = await appendGenerationResult(opts.workspace, receipt, {
+        label: `Generate ${cid} (${entry.id})`,
+      });
+      yield { t: 'progress', jobId, at: at(), step: 'receipt', done: 3, total: 3 };
+
+      yield { t: 'artifact', jobId, at: at(), kind: 'gen-raw', path: crp.raw };
+      yield { t: 'artifact', jobId, at: at(), kind: 'gen-model', path: crp.model };
+      yield { t: 'artifact', jobId, at: at(), kind: 'gen-preflight', path: crp.preflight };
+      made.push({
+        resultId: cid,
+        modelPath: crp.model,
+        bodies: shells.significant.length,
+        seed: effectiveSeed,
+      });
     }
 
-    // the seed the adapter settled on, when it told us; otherwise the one asked for
-    const effectiveSeed = await readEffectiveSeed(metaPath, opts.seed);
+    // 8. candidates only: rank what was made and SUGGEST - the user picks
+    if (made.length > 1) {
+      const ranked = await rankCandidates(made, stored.storedPath);
+      yield {
+        t: 'warn',
+        jobId,
+        at: at(),
+        code: 'candidates-ranked',
+        message: rankingMessage(ranked),
+      };
+    }
 
-    const receipt: GenerationResult = {
-      id: resultId,
-      backend: { modelId: entry.id, version: installed.version },
-      params,
-      seed: effectiveSeed,
-      startedAt,
-      wallTimeS: Number(((performance.now() - t0) / 1000).toFixed(3)),
-      output: {
-        gltfSha256,
-        tris: described.tris,
-        ...(described.textureRes !== undefined ? { textureRes: described.textureRes } : {}),
-        kind: version.outputs?.kind ?? 'mesh',
-        bodies: shells.significant.length,
-      },
-      discarded: false,
-    };
-    await appendGenerationResult(opts.workspace, receipt, {
-      label: `Generate ${resultId} (${entry.id})`,
-    });
-    yield { t: 'progress', jobId, at: at(), step: 'receipt', done: 3, total: 3 };
-
-    yield { t: 'artifact', jobId, at: at(), kind: 'gen-raw', path: rawPath };
-    yield { t: 'artifact', jobId, at: at(), kind: 'gen-model', path: rp.model };
-    yield { t: 'artifact', jobId, at: at(), kind: 'gen-preflight', path: rp.preflight };
     yield { t: 'artifact', jobId, at: at(), kind: 'character-manifest', path: paths.manifest };
     yield {
       t: 'done',
@@ -399,13 +460,29 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
 export async function readEffectiveSeed(
   metaPath: string | undefined,
   requested: number,
+  candidate = 0,
 ): Promise<number> {
   if (metaPath === undefined) return requested;
   try {
-    const doc = JSON.parse(await Deno.readTextFile(metaPath)) as { effectiveSeed?: unknown };
-    const seed = doc.effectiveSeed;
+    const doc = JSON.parse(await Deno.readTextFile(metaPath)) as {
+      effectiveSeed?: unknown;
+      candidates?: Array<{ effectiveSeed?: unknown }>;
+    };
+    // candidates carry their own entries; candidate 0 also mirrors the legacy
+    // top-level field, so pre-candidates gen-metas keep reading correctly
+    const seed = doc.candidates?.[candidate]?.effectiveSeed ??
+      (candidate === 0 ? doc.effectiveSeed : undefined);
     return typeof seed === 'number' && Number.isInteger(seed) && seed >= 0 ? seed : requested;
   } catch {
     return requested;
   }
 }
+
+/**
+ * Candidate i's requested seed is `seed + i * SEED_STRIDE` — the convention
+ * every adapter implements, wide enough that a collapse-retry ladder (+1
+ * steps) can never walk one candidate into another's range. This constant is
+ * the FALLBACK for adapters that emit no gen-meta (fixture-gen); real backends
+ * record the effective seed per candidate and win.
+ */
+export const SEED_STRIDE = 1000;

@@ -93,6 +93,10 @@ COLLAPSE_MEAN_HIGH = 0.95
 METAL_TEXEL_FRACTION = 0.60
 
 GEN_ARTIFACT_MESH = "mesh-raw"
+#: candidate i's base seed is seed + i * SEED_STRIDE - a cross-adapter
+#: convention, wide enough that the collapse-retry ladder (+1 steps) can never
+#: walk one candidate into another's seed range
+SEED_STRIDE = 1000
 GEN_ARTIFACT_META = "gen-meta"
 RAW_MODEL = "raw.glb"
 META_FILE = "gen-meta.json"
@@ -133,6 +137,9 @@ PARAMS_SCHEMA: dict[str, Any] = {
         # a number compiled into ours.
         "textureRetries": {"type": "integer", "minimum": 0, "maximum": 12},
         "textureSize": {"type": "integer", "enum": [1024, 2048, 4096]},
+        # B2 (QUALITY-AUDIT.md): N candidates in ONE job, so the ~90 s model
+        # load is paid once. Ranked core-side; every candidate becomes a receipt.
+        "candidates": {"type": "integer", "minimum": 1, "maximum": 8},
         # raw output is 3-10 M faces, far past what a sprite bake needs or what
         # UniRig wants to rig
         "decimationTarget": {"type": "integer", "minimum": 10000, "maximum": 2000000},
@@ -152,6 +159,7 @@ DEFAULTS: dict[str, Any] = {
     "textureRetries": 2,
     "textureSize": 2048,
     "decimationTarget": 200000,
+    "candidates": 1,
 }
 
 
@@ -612,40 +620,70 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     pipeline = _load_pipeline(model_dir, bool(p["lowVram"]))
     load_seconds = round(time.perf_counter() - load_t0, 2)
 
-    run_t0 = time.perf_counter()
-    mesh, used_seed, tried = generate_with_retries(
-        pipeline,
-        image,
-        seed,
-        budget,
-        str(p["pipelineType"]),
-        emit,
-        steps=int(p["steps"]),
-        guidance=float(p["guidanceStrength"]),
-        texture_guidance=float(p["textureGuidance"]),
-        texture_guidance_rescale=float(p["textureGuidanceRescale"]),
-    )
-    run_seconds = round(time.perf_counter() - run_t0, 2)
+    candidates = int(p["candidates"])
+    entries: list[dict[str, Any]] = []
+    out_paths: list[Path] = []
+    for c in range(candidates):
+        base_seed = seed + c * SEED_STRIDE
+        run_t0 = time.perf_counter()
+        mesh, used_seed, tried = generate_with_retries(
+            pipeline,
+            image,
+            base_seed,
+            budget,
+            str(p["pipelineType"]),
+            emit,
+            steps=int(p["steps"]),
+            guidance=float(p["guidanceStrength"]),
+            texture_guidance=float(p["textureGuidance"]),
+            texture_guidance_rescale=float(p["textureGuidanceRescale"]),
+        )
+        run_seconds = round(time.perf_counter() - run_t0, 2)
 
-    out_path = (out_dir / RAW_MODEL).resolve()
-    _export_glb(mesh, out_path, int(p["textureSize"]), int(p["decimationTarget"]))
-    emit.progress("encode", budget + 1, budget + 1)
+        # candidate 0 keeps the historical name so a 1-candidate run is
+        # byte-for-byte the old contract
+        name = RAW_MODEL if c == 0 else f"raw-{c}.glb"
+        out_path = (out_dir / name).resolve()
+        _export_glb(mesh, out_path, int(p["textureSize"]), int(p["decimationTarget"]))
+        emit.progress(f"encode:{c + 1}/{candidates}", c + 1, candidates)
 
-    # The seed that WORKED, written where core can read it. Recording the
-    # requested seed instead would make "re-run exactly this" reproduce the
-    # failure rather than the result.
+        if used_seed != base_seed:
+            emit.warn(
+                "seed-changed",
+                f"candidate {c}: the requested seed {base_seed} produced material the "
+                f"quality gate rejected; this one was generated with seed {used_seed}, "
+                f"which is what the receipt records.",
+            )
+        entries.append(
+            {
+                "index": c,
+                "requestedSeed": base_seed,
+                "effectiveSeed": used_seed,
+                "seedsTried": tried,
+                "runSeconds": run_seconds,
+            }
+        )
+        out_paths.append(out_path)
+        del mesh
+
+    # The seeds that WORKED, written where core can read them. Recording the
+    # requested seeds instead would make "re-run exactly this" reproduce the
+    # failure rather than the result. The legacy top-level fields mirror
+    # candidate 0, so a 1-candidate gen-meta is byte-compatible with the
+    # pre-candidates format and old readers keep working.
     meta_path = (out_dir / META_FILE).resolve()
     meta_path.write_text(
         json.dumps(
             {
                 "adapter": "trellis2",
                 "adapterVersion": TRELLIS2_ADAPTER_VERSION,
-                "requestedSeed": seed,
-                "effectiveSeed": used_seed,
-                "seedsTried": tried,
+                "requestedSeed": entries[0]["requestedSeed"],
+                "effectiveSeed": entries[0]["effectiveSeed"],
+                "seedsTried": entries[0]["seedsTried"],
+                "candidates": entries,
                 "pipelineType": str(p["pipelineType"]),
                 "loadSeconds": load_seconds,
-                "runSeconds": run_seconds,
+                "runSeconds": round(sum(e["runSeconds"] for e in entries), 2),
                 **vram_peaks(),
             },
             indent=2,
@@ -654,15 +692,10 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
         encoding="utf-8",
     )
 
-    if used_seed != seed:
-        emit.warn(
-            "seed-changed",
-            f"the requested seed {seed} produced material the quality gate rejected; this "
-            f"was generated with seed {used_seed}, which is what the receipt records. The "
-            f"warnings above say what was wrong with each seed that was skipped.",
-        )
     emit.artifact(GEN_ARTIFACT_META, str(meta_path))
-    emit.artifact(GEN_ARTIFACT_MESH, str(out_path))
+    # one mesh-raw per candidate, in INDEX ORDER - core pairs them positionally
+    for out_path in out_paths:
+        emit.artifact(GEN_ARTIFACT_MESH, str(out_path))
 
 
 ADAPTER = Adapter(

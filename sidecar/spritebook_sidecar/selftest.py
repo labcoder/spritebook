@@ -326,6 +326,29 @@ def test_fixture_gen_determinism(tmp: Path) -> None:
     _cutout_png(narrow, narrow=True)
     ok(gen("fg4", 7, narrow) != a1, "a different silhouette produces a different mesh")
 
+    # B2: candidates. One job, N mesh-raw artifacts IN INDEX ORDER, seeds
+    # strided by SEED_STRIDE, and candidate 0 byte-identical to a plain run of
+    # the same seed - the 1-candidate contract is unchanged, just repeated.
+    from spritebook_sidecar.adapters import fixture_gen as fg
+
+    e = _E()
+    reg["fixture-gen"].run(
+        {"imagePath": str(img), "outDir": str(tmp / "fgc"), "seed": 7, "candidates": 3}, e
+    )
+    raws = [p for k, p in e.art if k == "mesh-raw"]
+    ok(len(raws) == 3, f"three candidates emit three mesh-raw artifacts: {len(raws)}")
+    ok(raws[0].endswith("raw.glb") and raws[1].endswith("raw-1.glb"), f"index order: {raws}")
+    ok(Path(raws[0]).read_bytes() == a1, "candidate 0 is byte-identical to the plain run")
+    stride_alone = gen("fgs", 7 + fg.SEED_STRIDE)
+    ok(
+        Path(raws[1]).read_bytes() == stride_alone,
+        "candidate 1 IS the plain run at seed + SEED_STRIDE - the convention is real",
+    )
+    ok(
+        len({Path(r).read_bytes() for r in raws}) == 3,
+        "the three candidates are three different meshes",
+    )
+
 
 def test_fixture_gen_validation(tmp: Path) -> None:
     """An empty silhouette must fail loudly, not emit a degenerate mesh."""

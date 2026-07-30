@@ -69,6 +69,8 @@ FIXTURE_GEN_VERSION = "1.0.0"
 #: the mandatory artifact kind for a gen3d adapter.
 RAW_MODEL = "raw.glb"
 GEN_ARTIFACT_MESH = "mesh-raw"
+#: candidate i's base seed is seed + i * SEED_STRIDE (same convention as trellis2)
+SEED_STRIDE = 1000
 
 # --- shape constants ----------------------------------------------------------
 
@@ -98,6 +100,10 @@ PARAMS_SCHEMA: dict[str, Any] = {
         "imagePath": {"type": "string", "minLength": 1},
         "outDir": {"type": "string", "minLength": 1},
         "seed": {"type": "integer", "minimum": 0},
+        # N candidates in one job, seeds strided by SEED_STRIDE - here for the
+        # same reason echo exists: the whole candidates path is testable with
+        # no GPU and no download
+        "candidates": {"type": "integer", "minimum": 1, "maximum": 8},
         # accepted for GenAdapterParams uniformity; fixture-gen has no weights
         "modelDir": {"type": "string"},
         "tris": {"type": "integer", "minimum": 64, "maximum": 50000},
@@ -106,7 +112,7 @@ PARAMS_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
-DEFAULTS: dict[str, Any] = {"tris": 2000, "textureSize": 512}
+DEFAULTS: dict[str, Any] = {"tris": 2000, "textureSize": 512, "candidates": 1}
 
 
 # --- source image -------------------------------------------------------------
@@ -398,41 +404,52 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     tex_size = int(p["textureSize"])
 
     source = load_source(image_path)
-    positions, normals, uvs, indices = build_mesh(source, seed, tris)
-    emit.progress("shape", 1, 3)
+    candidates = int(p["candidates"])
+    out_paths: list[Path] = []
+    for c in range(candidates):
+        # the same stride convention as the real backends, so core's
+        # fallback-seed accounting is one rule everywhere
+        cand_seed = seed + c * SEED_STRIDE
+        positions, normals, uvs, indices = build_mesh(source, cand_seed, tris)
+        emit.progress(f"shape:{c + 1}/{candidates}", c * 3 + 1, 3 * candidates)
 
-    # Output validation BEFORE anything is written or announced.
-    mesh_stats = validate_mesh(positions, normals, uvs, indices)
+        # Output validation BEFORE anything is written or announced.
+        mesh_stats = validate_mesh(positions, normals, uvs, indices)
 
-    texture = bake_texture(source, tex_size)
-    emit.progress("texture", 2, 3)
-    validate_texture(texture)
+        texture = bake_texture(source, tex_size)
+        emit.progress(f"texture:{c + 1}/{candidates}", c * 3 + 2, 3 * candidates)
+        validate_texture(texture)
 
-    generator = (
-        f"spritebook-fixture-gen/{FIXTURE_GEN_VERSION} "
-        f"(seed={seed}; tris={mesh_stats['triangles']}; tex={tex_size})"
-    )
-    out_path = (out_dir / RAW_MODEL).resolve()
-    write_glb(
-        out_path,
-        positions=positions,
-        normals=normals,
-        uvs=uvs,
-        indices=indices,
-        texture_png=encode_png(texture),
-        generator=generator,
-    )
-    emit.progress("encode", 3, 3)
+        generator = (
+            f"spritebook-fixture-gen/{FIXTURE_GEN_VERSION} "
+            f"(seed={cand_seed}; tris={mesh_stats['triangles']}; tex={tex_size})"
+        )
+        name = RAW_MODEL if c == 0 else f"raw-{c}.glb"
+        out_path = (out_dir / name).resolve()
+        write_glb(
+            out_path,
+            positions=positions,
+            normals=normals,
+            uvs=uvs,
+            indices=indices,
+            texture_png=encode_png(texture),
+            generator=generator,
+        )
+        emit.progress(f"encode:{c + 1}/{candidates}", c * 3 + 3, 3 * candidates)
 
-    # Artifact validation over exit codes: prove a reader agrees before we
-    # announce the file to core.
-    verify_written_glb(
-        out_path,
-        expect_vertices=int(positions.shape[0]),
-        expect_indices=int(indices.size),
-        expect_texture=True,
-    )
-    emit.artifact(GEN_ARTIFACT_MESH, str(out_path))
+        # Artifact validation over exit codes: prove a reader agrees before we
+        # announce the file to core.
+        verify_written_glb(
+            out_path,
+            expect_vertices=int(positions.shape[0]),
+            expect_indices=int(indices.size),
+            expect_texture=True,
+        )
+        out_paths.append(out_path)
+
+    # one mesh-raw per candidate, in INDEX ORDER - core pairs them positionally
+    for out_path in out_paths:
+        emit.artifact(GEN_ARTIFACT_MESH, str(out_path))
 
 
 ADAPTER = Adapter(

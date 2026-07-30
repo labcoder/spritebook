@@ -445,3 +445,46 @@ Deno.test('gen says so when nobody declared what size the character is', async (
     await f.cleanup();
   }
 });
+
+Deno.test('ACCEPTANCE: gen --candidates makes N receipts and ranks them', async () => {
+  if (!(await sidecarAvailable())) return;
+  const f = await setup();
+  try {
+    const events = await collect(runGenJob(genOpts(f, { candidates: 3 })));
+    const err = events.find((e) => e.t === 'error');
+    assert(!err, `candidates gen failed: ${JSON.stringify(err)}`);
+
+    const manifest = parseWith(
+      CharacterManifestSchema,
+      JSON.parse(await Deno.readTextFile(artifact(events, 'character-manifest'))),
+      'CharacterManifest',
+    );
+    assertEquals(
+      manifest.generation.results.map((r) => r.id),
+      ['r1', 'r2', 'r3'],
+      'every candidate becomes a receipt',
+    );
+    // the stride convention: candidate i requested seed + i*1000 (fixture-gen
+    // emits no gen-meta, so the recorded seed IS the convention's fallback)
+    assertEquals(manifest.generation.results.map((r) => r.seed), [7, 1007, 2007]);
+    // three distinct meshes, each with its own canonical bytes
+    assertEquals(
+      new Set(manifest.generation.results.map((r) => r.output.gltfSha256)).size,
+      3,
+      'three candidates are three different canonical meshes',
+    );
+    for (const id of ['r1', 'r2', 'r3']) {
+      const rp = `${f.workspace}/results/${id}`;
+      assert((await Deno.stat(`${rp}/raw.glb`)).size > 0, `${id} kept its raw`);
+      assert((await Deno.stat(`${rp}/model.glb`)).size > 0, `${id} has a canonical model`);
+    }
+    // nothing was picked FOR the user; the ranking is a suggestion
+    assertEquals(manifest.generation.pickedResultId, undefined);
+    const ranked = events.find((e) => e.t === 'warn' && e.code === 'candidates-ranked');
+    assert(ranked && ranked.t === 'warn', 'a ranking was suggested');
+    assert(/pick --result r\d/.test(ranked.message), `it names a pick: ${ranked.message}`);
+    assert(/bodies|body/.test(ranked.message), `and shows the signals: ${ranked.message}`);
+  } finally {
+    await f.cleanup();
+  }
+});

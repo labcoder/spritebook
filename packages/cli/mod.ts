@@ -583,6 +583,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'character',
     'image',
     'adjust',
+    'candidates',
     'model',
     'model-version',
     'seed',
@@ -922,6 +923,9 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           version: flag(args, 'model-version'),
           seed: seed ?? 0,
           params,
+          ...(flag(args, 'candidates') !== undefined
+            ? { candidates: intFlag(args, 'candidates', 1) }
+            : {}),
           declaredHeightM: flag(args, 'height') !== undefined
             ? numFlag(args, 'height', 1.7)
             : undefined,
