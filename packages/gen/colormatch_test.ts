@@ -251,8 +251,13 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
   await Deno.mkdir(rp.dir, { recursive: true });
   await glbWithTexture(rp.model, 32, 32, () => [24, 106, 76]); // green texture
 
+  // noReproject: this fixture is one synthetic triangle, which the real
+  // reprojection pass rightly refuses; the reproject DEFAULT is covered by the
+  // acceptance test on the fixture backend's actual geometry
   const events: unknown[] = [];
-  for await (const e of runPickJob({ jobId: 'pick', workspace: ws, resultId: 'r1' })) {
+  for await (
+    const e of runPickJob({ jobId: 'pick', workspace: ws, resultId: 'r1', noReproject: true })
+  ) {
     events.push(e);
   }
   const steps = (events as Array<{ t: string; step?: string }>).filter((e) => e.t === 'progress')
@@ -286,7 +291,13 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
   // and --no-color-match is honoured
   const events2: unknown[] = [];
   for await (
-    const e of runPickJob({ jobId: 'pick2', workspace: ws, resultId: 'r1', noColorMatch: true })
+    const e of runPickJob({
+      jobId: 'pick2',
+      workspace: ws,
+      resultId: 'r1',
+      noColorMatch: true,
+      noReproject: true,
+    })
   ) {
     events2.push(e);
   }

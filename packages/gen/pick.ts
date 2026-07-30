@@ -45,12 +45,18 @@ export interface PickJobOptions {
   workspace: string;
   /** result id to promote (`r1`, `r2`, ...) */
   resultId: string;
-  /** repaint the texture from the source image before recording the hash */
+  /** FORCE reprojection — for a mesh-sourced character with an `--image`, or
+   * any case where the default did not apply. Image-sourced characters
+   * reproject by default (A3: face recovery on 3/3 subjects, no back damage),
+   * so this flag is only needed to opt IN where the default is off. */
   reproject?: boolean;
+  /** skip the DEFAULT reprojection for an image-sourced character */
+  noReproject?: boolean;
   /** skip the DEFAULT colour-match pass (A2) — it otherwise runs for every
    * image-sourced character, reconciling the texture's colour statistics with
    * the source. Skipping is a choice worth recording, hence a flag and not an
-   * option that must be asserted. */
+   * option that must be asserted. Both fidelity passes off
+   * (`--no-color-match --no-reproject`) is the plain byte-copy pick. */
   noColorMatch?: boolean;
   /** source image override; defaults to the manifest's stored source */
   imagePath?: string;
@@ -169,7 +175,14 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
     // you", and a default that must be asked for fixes nothing. A mesh-sourced
     // character has no image to match and never runs it.
     const wantColorMatch = manifest.source.kind === 'image' && opts.noColorMatch !== true;
-    const total = 2 + (wantColorMatch ? 1 : 0) + (opts.reproject ? 1 : 0);
+    // Reprojection is a DEFAULT for image-sourced characters too (A3: it
+    // returned the faces on 3/3 subjects with no back damage). `reproject`
+    // stays as the explicit opt-IN for the cases the default excludes — a
+    // mesh-sourced character handed an `--image`.
+    const wantReproject = manifest.source.kind === 'image'
+      ? opts.noReproject !== true
+      : opts.reproject === true;
+    const total = 2 + (wantColorMatch ? 1 : 0) + (wantReproject ? 1 : 0);
     let done = 0;
 
     // staged, not written straight to canonicalPath: the bytes and the
@@ -265,17 +278,36 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
     }
 
     let reprojected = false;
-    if (opts.reproject) {
+    reproject:
+    if (wantReproject) {
       const image = fidelityImage;
+      let readable = true;
       try {
         await Deno.stat(image);
       } catch {
-        throw Object.assign(
-          new Error(
-            `Cannot reproject: the source image is missing at ${image} - pass --image explicitly`,
-          ),
-          { code: 'no-source' },
-        );
+        readable = false;
+      }
+      if (!readable) {
+        // an EXPLICIT ask (--reproject, or an --image that does not exist) is
+        // an error; the silent DEFAULT missing its stored source soft-skips
+        // with a warn, exactly like colour-match above
+        if (opts.reproject === true || opts.imagePath !== undefined) {
+          throw Object.assign(
+            new Error(
+              `Cannot reproject: the source image is missing at ${image} - pass --image explicitly`,
+            ),
+            { code: 'no-source' },
+          );
+        }
+        yield {
+          t: 'warn',
+          jobId,
+          at: at(),
+          code: 'reproject-skipped',
+          message: `the stored source image is missing at ${image}, so the default ` +
+            `reprojection did not run. The texture keeps its generated detail.`,
+        };
+        break reproject;
       }
       const painted = `${paths.canonicalDir}/pick-${opts.resultId}-reprojected.tmp.glb`;
       tmp.push(painted);

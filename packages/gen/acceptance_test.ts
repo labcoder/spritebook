@@ -281,10 +281,11 @@ Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash'
     const gen = await collect(runGenJob(genOpts(f)));
     assert(!gen.find((e) => e.t === 'error'), JSON.stringify(gen.at(-1)));
 
-    // A plain pick now COLOUR-MATCHES by default (A2): an image-sourced
-    // character's texture is reconciled with its source, so canonical is NOT a
-    // byte copy any more — that behaviour moved behind --no-color-match, and
-    // both directions are asserted here.
+    // A plain pick now runs BOTH fidelity passes by default (A2 + A3): an
+    // image-sourced character's texture is colour-matched to its source and
+    // the source is reprojected onto the front. Canonical is NOT a byte copy
+    // any more — that contract moved behind --no-color-match --no-reproject,
+    // and both directions are asserted here.
     const picked = await collect(
       runPickJob({ jobId: 'itest-pick', workspace: f.workspace, resultId: 'r1' }),
     );
@@ -296,28 +297,29 @@ Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash'
       'CharacterManifest',
     );
     assertEquals(manifest.generation.pickedResultId, 'r1');
-    assertEquals(manifest.canonicalMesh?.reprojected, false);
+    assertEquals(manifest.canonicalMesh?.reprojected, true, 'the default pick reprojects');
     assertEquals(manifest.canonicalMesh?.colorMatched, true, 'the default pick colour-matches');
     assertEquals(
       manifest.canonicalMesh?.imageSha256,
       manifest.source.sha256,
-      'and pins the image it matched to - the stored source, since no --image was given',
+      'and pins the image it conditioned on - the stored source, since no --image was given',
     );
 
-    // the opt-out restores the byte-copy contract
+    // both opt-outs together restore the byte-copy contract
     const plain = await collect(
       runPickJob({
         jobId: 'itest-plain',
         workspace: f.workspace,
         resultId: 'r1',
         noColorMatch: true,
+        noReproject: true,
       }),
     );
     assert(!plain.find((e) => e.t === 'error'), JSON.stringify(plain.at(-1)));
     assertEquals(
       await Deno.readFile(canonicalPath),
       await Deno.readFile(artifact(gen, 'gen-model')),
-      'pick --no-color-match is a byte copy',
+      'pick --no-color-match --no-reproject is a byte copy',
     );
     manifest = parseWith(
       CharacterManifestSchema,
