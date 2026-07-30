@@ -91,6 +91,9 @@ export interface CanonicalMeshPatch {
   heightM?: number;
   texturedBy?: 'backend' | 'texture-substage';
   reprojected?: boolean;
+  colorMatched?: boolean;
+  /** the image the fidelity passes conditioned on (see the schema's docstring) */
+  imageSha256?: string;
 }
 
 /**

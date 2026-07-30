@@ -590,7 +590,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'models-dir',
     'catalog',
   ],
-  pick: ['workspace', 'out', 'result', 'reproject', 'image', 'sidecar'],
+  pick: ['workspace', 'out', 'result', 'reproject', 'no-color-match', 'image', 'sidecar'],
   retexture: [
     'workspace',
     'out',
@@ -820,6 +820,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
             workspace,
             resultId,
             reproject: args.includes('--reproject'),
+            noColorMatch: args.includes('--no-color-match'),
             imagePath: flag(args, 'image'),
           }),
           emit,

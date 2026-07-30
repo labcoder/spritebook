@@ -38,6 +38,7 @@ import {
 import { loadCatalog } from '@spritebook/registry';
 import { NodeIO } from '@gltf-transform/core';
 import { reprojectTexture } from './reproject.ts';
+import { colorMatchTexture } from './colormatch.ts';
 
 export interface PickJobOptions {
   jobId: string;
@@ -46,6 +47,11 @@ export interface PickJobOptions {
   resultId: string;
   /** repaint the texture from the source image before recording the hash */
   reproject?: boolean;
+  /** skip the DEFAULT colour-match pass (A2) — it otherwise runs for every
+   * image-sourced character, reconciling the texture's colour statistics with
+   * the source. Skipping is a choice worth recording, hence a flag and not an
+   * option that must be asserted. */
+  noColorMatch?: boolean;
   /** source image override; defaults to the manifest's stored source */
   imagePath?: string;
 }
@@ -158,7 +164,13 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       };
     }
 
-    const total = opts.reproject ? 3 : 2;
+    // colour-match runs BY DEFAULT for image-sourced characters: it is the
+    // designed fix for "the texture's colours do not match the image I gave
+    // you", and a default that must be asked for fixes nothing. A mesh-sourced
+    // character has no image to match and never runs it.
+    const wantColorMatch = manifest.source.kind === 'image' && opts.noColorMatch !== true;
+    const total = 2 + (wantColorMatch ? 1 : 0) + (opts.reproject ? 1 : 0);
+    let done = 0;
 
     // staged, not written straight to canonicalPath: the bytes and the
     // manifest have to change together, so nothing becomes canonical until
@@ -166,7 +178,7 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
     let staged = `${paths.canonicalDir}/pick-${opts.resultId}.tmp.glb`;
     tmp.push(staged);
     await Deno.writeFile(staged, bytes);
-    yield { t: 'progress', jobId, at: at(), step: 'promote', done: 1, total };
+    yield { t: 'progress', jobId, at: at(), step: 'promote', done: ++done, total };
 
     // texturedBy is a property of the JOB, so derive it from what the backend
     // declared it emits rather than guessing from the file
@@ -181,9 +193,80 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       // ran; 'backend' is the honest default for a mesh that arrived textured
     }
 
+    // Both fidelity passes condition on the SAME image, resolved once — and its
+    // hash is pinned in the patch, because `--image` overrides previously went
+    // unrecorded and "re-run exactly this" was unanswerable for such a pick.
+    const fidelityImage = opts.imagePath ?? sourceImagePath(opts.workspace, manifest);
+    let imageSha: string | undefined;
+
+    let colorMatched = false;
+    if (wantColorMatch) {
+      let readable = true;
+      try {
+        await Deno.stat(fidelityImage);
+      } catch {
+        readable = false;
+      }
+      if (!readable && opts.imagePath !== undefined) {
+        // an EXPLICIT image that does not exist is an error, not a soft skip
+        throw Object.assign(
+          new Error(`Cannot color-match: no image at ${fidelityImage}`),
+          { code: 'no-source' },
+        );
+      }
+      if (!readable) {
+        yield {
+          t: 'warn',
+          jobId,
+          at: at(),
+          code: 'color-match-skipped',
+          message: `the stored source image is missing at ${fidelityImage}, so the default ` +
+            `colour-match pass did not run. The texture keeps the backend's own colours.`,
+        };
+      } else {
+        const matched = `${paths.canonicalDir}/pick-${opts.resultId}-matched.tmp.glb`;
+        tmp.push(matched);
+        const stats = await colorMatchTexture({
+          modelPath: staged,
+          imagePath: fidelityImage,
+          outPath: matched,
+        });
+        if (stats.skipped === 'low-chroma') {
+          // the pass declined: a near-monochrome source has no palette worth
+          // matching to, and transferring its statistics would crush the
+          // texture toward grey. The STAGED file stays the untouched original —
+          // the skip path's output is a re-serialization, not the same bytes.
+          yield {
+            t: 'warn',
+            jobId,
+            at: at(),
+            code: 'color-match-skipped',
+            message: `the source image is nearly monochrome (mean chroma ` +
+              `${stats.sourceChroma.toFixed(3)} < 0.02), so colour-match declined to run - ` +
+              `matching to a grey palette would drain the texture's colour. Pass ` +
+              `--no-color-match to silence this, or nothing: the texture is unchanged.`,
+          };
+        } else {
+          staged = matched;
+          colorMatched = true;
+          imageSha = await sha256Hex(await Deno.readFile(fidelityImage));
+          const clamp = stats.clamped.length > 0 ? ` clamped:${stats.clamped.join('')}` : '';
+          yield {
+            t: 'progress',
+            jobId,
+            at: at(),
+            step: `color-match:hue-${stats.hueDistBefore}->${stats.hueDistAfter}` +
+              `:L-${stats.lBefore}->${stats.lAfter}${clamp}`,
+            done: ++done,
+            total,
+          };
+        }
+      }
+    }
+
     let reprojected = false;
     if (opts.reproject) {
-      const image = opts.imagePath ?? sourceImagePath(opts.workspace, manifest);
+      const image = fidelityImage;
       try {
         await Deno.stat(image);
       } catch {
@@ -209,9 +292,10 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
           jobId,
           at: at(),
           step: `reproject:${(stats.coverage * 100).toFixed(1)}%-painted`,
-          done: 2,
-          total: 3,
+          done: ++done,
+          total,
         };
+        imageSha = imageSha ?? await sha256Hex(await Deno.readFile(image));
         if (stats.coverage < 0.05) {
           yield {
             t: 'warn',
@@ -238,16 +322,33 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
     // pops the whole step instead of half of it.
     await Deno.rename(staged, canonicalPath);
     const finalBytes = await Deno.readFile(canonicalPath);
+    const repainted = reprojected || colorMatched;
+    const suffix = reprojected && colorMatched
+      ? ' (color-matched, reprojected)'
+      : reprojected
+      ? ' (reprojected)'
+      : colorMatched
+      ? ' (color-matched)'
+      : '';
     await pickResult(opts.workspace, opts.resultId, {
-      label: reprojected ? `Pick ${opts.resultId} (reprojected)` : `Pick ${opts.resultId}`,
+      label: `Pick ${opts.resultId}${suffix}`,
       // the height is measured from the mesh: the receipt does not carry one,
       // and core refuses to invent it
       heightM: await heightOf(finalBytes),
       texturedBy,
       reprojected,
-      // reprojection repaints the texture, so the receipt's hash describes
-      // bytes that are no longer the canonical ones
-      ...(reprojected ? { canonicalMesh: { gltfSha256: await sha256Hex(finalBytes) } } : {}),
+      // either fidelity pass repaints the texture, so the receipt's hash
+      // describes bytes that are no longer the canonical ones; the image both
+      // passes conditioned on rides in the SAME patch
+      ...(repainted
+        ? {
+          canonicalMesh: {
+            gltfSha256: await sha256Hex(finalBytes),
+            ...(colorMatched ? { colorMatched: true } : {}),
+            ...(imageSha !== undefined ? { imageSha256: imageSha } : {}),
+          },
+        }
+        : {}),
     });
     yield { t: 'progress', jobId, at: at(), step: 'record', done: total, total };
 

@@ -159,6 +159,15 @@ export const CharacterManifestSchema = z.strictObject({
     heightM: z.number().positive(),
     texturedBy: z.enum(['backend', 'texture-substage']),
     reprojected: z.boolean(),
+    /** the colour-match pass ran (A2): the texture's Oklab statistics were
+     * reconciled with the source image's. Absent = did not run (results picked
+     * before the pass existed, `--no-color-match`, or a low-chroma skip). */
+    colorMatched: z.boolean().optional(),
+    /** The image the fidelity passes (colour-match, reprojection) conditioned
+     * on. Pinned because `pick --image` can override the stored source, and
+     * before this nothing recorded which bytes actually drove the repaint —
+     * "re-run exactly this" was unanswerable for an overridden pick. */
+    imageSha256: Sha256Schema.optional(),
   }).optional(),
   rig: RigStateSchema.optional(),
   /** The character's own clip choices (D-029). `bake` reads the ENABLED ones as

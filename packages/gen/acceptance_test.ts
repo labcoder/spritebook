@@ -281,17 +281,15 @@ Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash'
     const gen = await collect(runGenJob(genOpts(f)));
     assert(!gen.find((e) => e.t === 'error'), JSON.stringify(gen.at(-1)));
 
-    // plain pick first: canonical/model.glb is a byte copy of the result
+    // A plain pick now COLOUR-MATCHES by default (A2): an image-sourced
+    // character's texture is reconciled with its source, so canonical is NOT a
+    // byte copy any more — that behaviour moved behind --no-color-match, and
+    // both directions are asserted here.
     const picked = await collect(
       runPickJob({ jobId: 'itest-pick', workspace: f.workspace, resultId: 'r1' }),
     );
     assert(!picked.find((e) => e.t === 'error'), JSON.stringify(picked.at(-1)));
     const canonicalPath = artifact(picked, 'canonical-model');
-    assertEquals(
-      await Deno.readFile(canonicalPath),
-      await Deno.readFile(artifact(gen, 'gen-model')),
-      'a plain pick is a byte copy',
-    );
     let manifest = parseWith(
       CharacterManifestSchema,
       JSON.parse(await Deno.readTextFile(artifact(picked, 'character-manifest'))),
@@ -299,6 +297,33 @@ Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash'
     );
     assertEquals(manifest.generation.pickedResultId, 'r1');
     assertEquals(manifest.canonicalMesh?.reprojected, false);
+    assertEquals(manifest.canonicalMesh?.colorMatched, true, 'the default pick colour-matches');
+    assertEquals(
+      manifest.canonicalMesh?.imageSha256,
+      manifest.source.sha256,
+      'and pins the image it matched to - the stored source, since no --image was given',
+    );
+
+    // the opt-out restores the byte-copy contract
+    const plain = await collect(
+      runPickJob({
+        jobId: 'itest-plain',
+        workspace: f.workspace,
+        resultId: 'r1',
+        noColorMatch: true,
+      }),
+    );
+    assert(!plain.find((e) => e.t === 'error'), JSON.stringify(plain.at(-1)));
+    assertEquals(
+      await Deno.readFile(canonicalPath),
+      await Deno.readFile(artifact(gen, 'gen-model')),
+      'pick --no-color-match is a byte copy',
+    );
+    manifest = parseWith(
+      CharacterManifestSchema,
+      JSON.parse(await Deno.readTextFile(artifact(plain, 'character-manifest'))),
+      'CharacterManifest',
+    );
     const beforeHash = manifest.canonicalMesh!.gltfSha256;
 
     // now with reprojection: bytes change, and the manifest follows them
