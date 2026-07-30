@@ -14,7 +14,7 @@
  */
 import type { Lab, Palette } from './contracts.ts';
 import type { StylePreset } from '@spritebook/schema';
-import { srgbToLab } from './oklab.ts';
+import { srgbToLab } from '@spritebook/core';
 import { buildAdaptivePalette, hysteresis, nearestIndex, paletteFromHex } from './palette.ts';
 import { bayerValue } from './dither.ts';
 

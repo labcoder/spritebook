@@ -10,7 +10,7 @@ import type { CameraPreset } from '@spritebook/schema';
 import { parseWith, StylePresetSchema } from '@spritebook/schema';
 import { styleFromAovs } from './pipeline.ts';
 import { CEL_2, PAINTERLY, PIXEL, PRESETS } from './presets.ts';
-import { srgbToHex } from './oklab.ts';
+import { srgbToHex } from '@spritebook/core';
 import type { AovSource } from './contracts.ts';
 
 const FRAMES = new URL('./fixtures/aov/frames/', import.meta.url).pathname.replace(

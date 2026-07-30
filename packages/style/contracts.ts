@@ -58,8 +58,9 @@ export function aovFileName(direction: number, frame: number, pass: string): str
 // ---------------------------------------------------------------------------
 // Perceptual color (oklab.ts + palette.ts) — Agent A
 // ---------------------------------------------------------------------------
-/** An OKLab triple (L, a, b). */
-export type Lab = readonly [number, number, number];
+/** An OKLab triple (L, a, b) — the maths lives in @spritebook/core since colour
+ * matching (gen's color-match pass) needed it outside the style stage. */
+export type { Lab } from '@spritebook/core';
 
 export interface Palette {
   /** N colors as sRGB bytes, 3 per color (r,g,b); deterministic order */

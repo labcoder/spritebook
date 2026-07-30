@@ -11,7 +11,7 @@ import type { CameraPreset } from '@spritebook/schema';
 import { parseWith, StylePresetSchema } from '@spritebook/schema';
 import { styleClipsFromAovs, styleFromAovs } from './pipeline.ts';
 import { PIXEL } from './presets.ts';
-import { srgbToHex } from './oklab.ts';
+import { srgbToHex } from '@spritebook/core';
 import { aovFileName } from './contracts.ts';
 import type { ClipAovSource } from './pipeline.ts';
 

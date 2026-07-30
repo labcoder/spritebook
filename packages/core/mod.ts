@@ -17,3 +17,4 @@ export * from './presets.ts';
 export * from './stub-bake.ts';
 export * from './sidecar.ts';
 export * from './params.ts';
+export * from './oklab.ts';

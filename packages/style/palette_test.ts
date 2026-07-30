@@ -1,5 +1,5 @@
 import { assert, assertAlmostEquals, assertEquals, assertThrows } from 'jsr:@std/assert@1';
-import { srgbToHex, srgbToLab } from './oklab.ts';
+import { srgbToHex, srgbToLab } from '@spritebook/core';
 import {
   buildAdaptivePalette,
   hysteresis,

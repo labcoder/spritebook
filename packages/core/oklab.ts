@@ -9,7 +9,9 @@
  * round-trip tests pin srgb -> lab -> srgb to within +/-1 code value across a
  * full color sweep, and every grey code round-trips exactly.
  */
-import type { Lab } from './contracts.ts';
+/** An OKLab triple (L, a, b). Owned here since the move from @spritebook/style:
+ * the maths and its type travel together, and style re-exports for its callers. */
+export type Lab = readonly [number, number, number];
 
 /** sRGB EOTF: 8-bit code value (0..255) -> linear light (0..1). */
 export function srgbToLinear(c: number): number {

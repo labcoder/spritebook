@@ -24,7 +24,7 @@
  * nearest-match measures distance to the color actually written to the sprite.
  */
 import type { Lab, Palette } from './contracts.ts';
-import { oklabToSrgb, srgbToLab } from './oklab.ts';
+import { oklabToSrgb, srgbToLab } from '@spritebook/core';
 
 /** Build a Palette from parallel sRGB bytes, deriving `lab` so it stays consistent. */
 function paletteFromSrgb(srgb: Uint8Array): Palette {

@@ -29,7 +29,7 @@ import {
 import { bayerMatrix } from './dither.ts';
 import { cutAlpha1bit, dilateEdgeColors } from './alpha.ts';
 import { flickerPct } from './flicker.ts';
-import { srgbToHex } from './oklab.ts';
+import { srgbToHex } from '@spritebook/core';
 
 function tag(direction: number, frame: number): string {
   return `d${String(direction).padStart(2, '0')}_f${String(frame).padStart(3, '0')}`;
