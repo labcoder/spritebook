@@ -87,6 +87,34 @@ export const PIXEL: StylePreset = parseWith(StylePresetSchema, {
   alpha: { mode: '1bit', cutoff: 0.5, bleedPx: 2 },
 }, 'StylePreset pixel');
 
+/**
+ * clean: the model as it is — no quantize, no outline, soft alpha. Supersampled
+ * and area-averaged, so edges resolve as coverage rather than jaggies.
+ *
+ * This is the "crisp snapshot of the 3D model" the quality audit found buried
+ * under the pixel default (QUALITY-AUDIT.md L5): every review of a generation
+ * was being made through a 16-colour NPR treatment. `clean` is the truthful
+ * first look; the documented recipe is `bake --style clean --cell 128 --ppm 64`.
+ *
+ * Its flicker accounting is its own, and the METRIC's limit is stated rather
+ * than hidden: flicker.ts counts ANY byte delta, which is the right question
+ * for quantized output (an unchanged surface stays exactly equal) and the
+ * wrong one for continuous tone, where every shaded pixel of a MOVING
+ * character drifts an LSB per frame. Measured: the bundled fixture reads
+ * 4.39%, bulma 11.33% and mermaid 24.28% at the 128 px recipe — numbers that
+ * approximate animated coverage, not perceived instability (the renders do
+ * not visibly flicker). The fixture number is pinned as a regression guard at
+ * ~2x measured in pipeline_test; a perceptual, delta-thresholded flicker
+ * metric for continuous output is named P4 work in QUALITY-AUDIT.md.
+ */
+export const CLEAN: StylePreset = parseWith(StylePresetSchema, {
+  id: 'clean',
+  mode: 'painterly',
+  temporal: { superSample: 4, clusterVote: false, paletteHysteresisEps: 0.02, texelSnap: true },
+  passes: [...ALL_PASSES],
+  alpha: { mode: 'soft', bleedPx: 2 },
+}, 'StylePreset clean');
+
 /** painterly: larger palette, area-average downsample, soft alpha, no hard outline. */
 export const PAINTERLY: StylePreset = parseWith(StylePresetSchema, {
   id: 'painterly',
@@ -104,6 +132,7 @@ export const PAINTERLY: StylePreset = parseWith(StylePresetSchema, {
 
 export const PRESETS: Record<string, StylePreset> = {
   'cel-2': CEL_2,
+  'clean': CLEAN,
   'pixel': PIXEL,
   'painterly': PAINTERLY,
 };

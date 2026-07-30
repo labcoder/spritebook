@@ -25,7 +25,7 @@ Deno.test('an unknown style id names the ones that exist, and the retired ones',
   const err = assertThrows(() => resolveStyle('pixel-24'), Error);
   assertEquals(
     err.message,
-    'Unknown style "pixel-24" - available: cel-2, painterly, pixel ' +
+    'Unknown style "pixel-24" - available: cel-2, clean, painterly, pixel ' +
       '(retired ids that still resolve: pixel-8, pixel-8-both, pixel-8-span, pixel-8-thin)',
   );
   assertThrows(() => resolveStyle('__proto__'), Error, 'Unknown style');

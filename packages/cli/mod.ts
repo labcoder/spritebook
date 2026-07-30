@@ -310,8 +310,10 @@ function styleOverridesFromFlags(args: string[], base: StylePreset): StyleOverri
     if (base.quantize === undefined) {
       throw new Error(
         `--colors has nothing to set on style "${base.id}": it does not quantize at all, so it ` +
-          `has no palette. Pick a style that does (${Object.keys(PRESETS).sort().join(', ')}) ` +
-          `or drop the flag.`,
+          `has no palette. Pick a style that does (${
+            Object.keys(PRESETS).filter((id) => PRESETS[id].quantize !== undefined).sort()
+              .join(', ')
+          }) or drop the flag.`,
       );
     }
     // the schema's own bound, restated so the message names the flag the user

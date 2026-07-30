@@ -34,7 +34,7 @@ const fn = (d: number, f: number) =>
   `d${String(d).padStart(2, '0')}_f${String(f).padStart(3, '0')}.png`;
 
 Deno.test('presets load and validate', () => {
-  assertEquals(Object.keys(PRESETS).sort(), ['cel-2', 'painterly', 'pixel']);
+  assertEquals(Object.keys(PRESETS).sort(), ['cel-2', 'clean', 'painterly', 'pixel']);
 });
 
 Deno.test('palette membership: every opaque pixel of a pixel style is a palette color', async () => {
@@ -68,7 +68,16 @@ Deno.test('flicker is within each preset budget on the idle loop', async () => {
   // cluster-vote margin, so an edge pixel can swing between outline and surface
   // with subpixel motion. That is the accepted price of an outline that no
   // longer swallows slim characters.
-  const budget: Record<string, number> = { 'pixel': 0.55, 'cel-2': 0.15, 'painterly': 1.0 };
+  // clean's 9% is a REGRESSION GUARD, not a quality bar: the any-byte-delta
+  // metric reads continuous-tone output as ~animated coverage (fixture 4.39%
+  // measured), so the guard exists to catch a broken texelSnap/hysteresis, and
+  // perceived flicker needs the thresholded metric named for P4.
+  const budget: Record<string, number> = {
+    'pixel': 0.55,
+    'cel-2': 0.15,
+    'painterly': 1.0,
+    'clean': 9.0,
+  };
   for (const [id, preset] of Object.entries(PRESETS)) {
     const out = await Deno.makeTempDir();
     try {

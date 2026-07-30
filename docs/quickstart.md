@@ -142,14 +142,21 @@ you need it, and the TexturePacker and strips exports carry it too.
 
 ## Styles
 
-| Style       | Look                           | Palette                  | Dither      | Outline | Alpha |
-| ----------- | ------------------------------ | ------------------------ | ----------- | ------- | ----- |
-| `cel-2`     | flat cel tones                 | adaptive, max 6 (OKLab)  | none        | 1 px    | 1-bit |
-| `pixel`     | classic pixel art              | adaptive, max 16 (OKLab) | 4x4 ordered | 0.5 px  | 1-bit |
-| `painterly` | soft edges, larger tonal range | adaptive, max 32 (OKLab) | none        | none    | soft  |
+| Style       | Look                            | Palette                  | Dither      | Outline | Alpha |
+| ----------- | ------------------------------- | ------------------------ | ----------- | ------- | ----- |
+| `cel-2`     | flat cel tones                  | adaptive, max 6 (OKLab)  | none        | 1 px    | 1-bit |
+| `clean`     | the model as it is (no styling) | none                     | none        | none    | soft  |
+| `pixel`     | classic pixel art               | adaptive, max 16 (OKLab) | 4x4 ordered | 0.5 px  | 1-bit |
+| `painterly` | soft edges, larger tonal range  | adaptive, max 32 (OKLab) | none        | none    | soft  |
 
 All three render supersampled and downsample with temporal stabilization (texel snapping, palette
 hysteresis), so frames do not shimmer in motion.
+
+**The snapshot recipe** — the truthful first look at a generation, before any styling:
+
+```bash
+spritebook bake --workspace <dir> --style clean --cell 128 --ppm 64
+```
 
 The palette size is a starting point, not a ceiling — `--colors <n>` takes 2 to 256 and refines
 whichever style you picked.
