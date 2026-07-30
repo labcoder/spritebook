@@ -34,3 +34,11 @@ plain-copy contract reachable via `--no-color-match --no-reproject`. Evidence: f
 Held for the maintainer's confirmation (a default change on the strength of three subjects is theirs
 to ratify). A4 (source-image palette) note: after match + reproject, bulma's hair reads teal in the
 render — the residual that A4 was conditioned on may already be gone; re-measure before building it.
+
+## A4 closed on this evidence (2026-07-30)
+
+Ratified as default; re-measured on the final path (match λ0.5 + reproject, pixel-16 bake of bulma):
+the palette is `#0a1622 #0a2743 #093a4e #2f3651 #226a69 #47688e ... #3f8ba7 ...` — **four teal
+entries and three blue**, flicker 0.352% (budget 0.55). The "no teal in the palette" defect class
+that conditioned A4 (source-image palette) no longer exists, so A4 is CLOSED WITHOUT BUILDING. Wave
+A is complete: A0 ✓ A1 ✓ (3.5/0.2) A2 ✓ (λ0.5) A3 ✓ (default-on) A4 ✓ (moot).
