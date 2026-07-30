@@ -13,6 +13,7 @@ import {
   CHROMA_FLOOR,
   colorMatchTexture,
   expectedMeanShade,
+  L_BLEND,
   STD_RATIO_MAX,
   STD_RATIO_MIN,
 } from './colormatch.ts';
@@ -100,12 +101,38 @@ Deno.test('a green-shifted texture moves onto a teal reference', async () => {
       Math.hypot(gotLab[1] - refLab[1], gotLab[2] - refLab[2]) < 0.02,
       `texel hue lands on the reference: a/b ${gotLab[1].toFixed(3)}/${gotLab[2].toFixed(3)}`,
     );
-    // L is compensated for the rig's darkening, so the ALBEDO overshoots the
-    // reference's lightness by 1/cbrt(meanShade), capped at 0.95
-    const expectedL = Math.min(refLab[0] / Math.cbrt(expectedMeanShade()), 0.95);
+    // L aims at the BLENDED shade-compensated target (A2-LBLEND.md): full
+    // compensation washed out pastels, so only L_BLEND of the lift is applied,
+    // measured from the texture's own mean
+    const texLab = srgbToLab(24, 106, 76);
+    const compensated = Math.min(refLab[0] / Math.cbrt(expectedMeanShade()), 0.95);
+    const expectedL = texLab[0] + (compensated - texLab[0]) * L_BLEND;
     assert(
       Math.abs(gotLab[0] - expectedL) < 0.03,
-      `L aims above the reference: got ${gotLab[0].toFixed(3)}, target ${expectedL.toFixed(3)}`,
+      `L lands on the blended target: got ${gotLab[0].toFixed(3)}, target ${
+        expectedL.toFixed(3)
+      } (lBlend ${L_BLEND})`,
+    );
+    // and the sweep harness's override reaches the maths: at 0 the L stays put
+    const out0 = `${dir}/o0.glb`;
+    const s0 = await colorMatchTexture({
+      modelPath: glb,
+      imagePath: img,
+      outPath: out0,
+      lBlend: 0,
+    });
+    assert(
+      Math.abs(s0.lTarget - s0.lBefore) < 0.001,
+      `lBlend 0 aims at the texture's own L: target ${s0.lTarget} vs ${s0.lBefore}`,
+    );
+    assert(s0.hueDistAfter < s0.hueDistBefore, 'and the hue still improves');
+    // the metric this sweep exists for, seen from the LOW side: a dark L
+    // cannot hold a bright source's chroma, so lBlend 0 clips on this extreme
+    // fixture. Too much L clips pastels toward white; too little clips chroma
+    // into the floor - the lambda sweep measures exactly this trade.
+    assert(
+      s0.gamutClipFraction > 0.5,
+      `low-L clipping is visible to the metric: ${s0.gamutClipFraction}`,
     );
   } finally {
     await Deno.remove(dir, { recursive: true });

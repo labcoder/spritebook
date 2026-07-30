@@ -39,4 +39,33 @@ CPU, then 12 front-view bakes for the renders.
    the reason.
 4. The chosen λ becomes `colormatch.ts`'s default; the guard-rail tests move with it.
 
-## Results land below this line only after the grid is complete.
+## Results (2026-07-30, 12/12 runs)
+
+| subject  | lambda | hueAfter | L after (target) | gamut clip % |
+| -------- | ------ | -------- | ---------------- | ------------ |
+| bulma    | 0.00   | 0.0057   | 0.545 (0.542)    | 32.5         |
+| bulma    | 0.50   | 0.0133   | 0.707 (0.725)    | 39.5         |
+| bulma    | 0.75   | 0.0228   | 0.775 (0.816)    | 43.6         |
+| bulma    | 1.00   | 0.0313   | 0.837 (0.907)    | 50.6         |
+| mermaid  | 0.00   | 0.0006   | 0.496            | 4.8          |
+| mermaid  | 0.50   | 0.0009   | 0.546            | 3.8          |
+| mermaid  | 0.75   | 0.0013   | 0.571            | 6.0          |
+| mermaid  | 1.00   | 0.0017   | 0.596            | 9.0          |
+| princess | 0.00   | 0.0001   | 0.548            | 1.2          |
+| princess | 0.50   | 0.0006   | 0.696            | 5.0          |
+| princess | 0.75   | 0.0049   | 0.764            | 23.1         |
+| princess | 1.00   | 0.0127   | 0.825            | 49.8         |
+
+**The registered rule failed closed, and taught something doing it:** no cell clears the 5% clip bar
+on EVERY subject, because bulma clips >= 32.5% even at lambda 0 — moving a grey-green texture onto
+saturated teal/pink is an out-of-gamut operation at ANY lightness. Gamut cost from the CHROMA
+transfer is a subject property; the lambda axis only owns the marginal clipping above it. Two clean
+lambda signals anyway: hue accuracy DEGRADES monotonically with lambda (clamped texels shift hue),
+and princess's clip curve (1.2 -> 5.0 -> 23.1 -> 49.8) is the measured face of the pastel bleach.
+
+**Decision (renders, as rule 3 provides; recorded):** **lambda = 0.5.** By eye: bulma recovers
+brightness with the pink top intact; princess brightens WITHOUT the white patches that appear from
+0.75 up; mermaid is indifferent across the row. lambda 0 wins the hue metric but leaves the measured
+darkness (bulma L 0.545) unfixed, which is the reason the L term exists. 0.5 buys most of the
+brightness for the least clipping growth. `L_BLEND = 0.5` is the shipped default; the guard-rail
+tests derive their expectations from it.

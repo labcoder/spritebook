@@ -33,11 +33,20 @@
  */
 import { NodeIO } from '@gltf-transform/core';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
-import { type Lab, oklabToSrgb, srgbToLab } from '@spritebook/core';
+import { type Lab, linearToSrgb, oklabToLinearRgb, srgbToLab } from '@spritebook/core';
 import { AMBIENT } from '@spritebook/render';
 
 /** Below this mean chroma the source has no palette worth matching to. */
 export const CHROMA_FLOOR = 0.02;
+/**
+ * How much of the shade-compensated L target to apply: the L target is
+ * `lerp(textureMeanL, sourceL / cbrt(meanShade), L_BLEND)`. 1.0 washed out
+ * pastels (a large Oklab L lift runs saturated colours into the sRGB gamut
+ * ceiling, where clamping desaturates - pink reads white); 0 would leave the
+ * measured texture darkness untouched. The default is the A2-LBLEND.md sweep's
+ * pick, judged on hue distance + gamut-clip fraction + the renders.
+ */
+export const L_BLEND = 0.5;
 /** A channel's std ratio is clamped into this band. */
 export const STD_RATIO_MIN = 0.5;
 export const STD_RATIO_MAX = 2.0;
@@ -58,6 +67,8 @@ export interface ColorMatchOptions {
   /** the cut-out RGBA source image (alpha marks the subject) */
   imagePath: string;
   outPath: string;
+  /** override of L_BLEND (the A2-LBLEND sweep harness; production uses the default) */
+  lBlend?: number;
 }
 
 export interface ColorMatchStats {
@@ -75,6 +86,9 @@ export interface ColorMatchStats {
   /** channels whose std ratio hit the clamp (named, for the warn) */
   clamped: string[];
   paintedTexels: number;
+  /** fraction of painted texels whose matched colour fell OUTSIDE the sRGB
+   * gamut before clamping - the number the pastel washout hides behind */
+  gamutClipFraction: number;
 }
 
 interface Stats {
@@ -166,7 +180,9 @@ export async function colorMatchTexture(opts: ColorMatchOptions): Promise<ColorM
 
   const hueDist = (a: Stats, b: Stats) => Math.hypot(a.mean[1] - b.mean[1], a.mean[2] - b.mean[2]);
   const lComp = Math.cbrt(expectedMeanShade());
-  const lTarget = Math.min(src.mean[0] / lComp, 0.95);
+  const lBlend = opts.lBlend ?? L_BLEND;
+  const compensated = Math.min(src.mean[0] / lComp, 0.95);
+  const lTarget = tex.mean[0] + (compensated - tex.mean[0]) * lBlend;
 
   const base: Omit<ColorMatchStats, 'skipped'> = {
     sourceChroma: Number(src.chroma.toFixed(4)),
@@ -177,6 +193,7 @@ export async function colorMatchTexture(opts: ColorMatchOptions): Promise<ColorM
     lTarget: Number(lTarget.toFixed(4)),
     clamped: [],
     paintedTexels: tex.n,
+    gamutClipFraction: 0,
   };
 
   if (src.chroma < CHROMA_FLOOR) {
@@ -192,14 +209,17 @@ export async function colorMatchTexture(opts: ColorMatchOptions): Promise<ColorM
     if (r !== raw) clamped.push('Lab'[c]);
     return r;
   };
-  // L's spread compensates like its mean: linear scaling moves both together
-  const kL = ratio(0, src.std[0] / lComp);
+  // L's spread blends like its mean: at lBlend 0 the texture keeps its own
+  // spread (ratio 1), at 1 it takes the fully compensated source spread
+  const lStdTarget = tex.std[0] + (src.std[0] / lComp - tex.std[0]) * lBlend;
+  const kL = ratio(0, lStdTarget);
   const kA = ratio(1, src.std[1]);
   const kB = ratio(2, src.std[2]);
 
   const out = new Uint8Array(texCount * 4);
   const sums = [0, 0, 0];
   let painted = 0;
+  let clippedTexels = 0;
   for (let i = 0; i < texCount; i++) {
     const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
     out[i * 4 + 3] = rgba[i * 4 + 3];
@@ -215,7 +235,11 @@ export async function colorMatchTexture(opts: ColorMatchOptions): Promise<ColorM
       (lab[1] - tex.mean[1]) * kA + src.mean[1],
       (lab[2] - tex.mean[2]) * kB + src.mean[2],
     ];
-    const [nr, ng, nb] = oklabToSrgb(matched);
+    const [lr, lg, lb] = oklabToLinearRgb(matched);
+    if (lr < -0.001 || lr > 1.001 || lg < -0.001 || lg > 1.001 || lb < -0.001 || lb > 1.001) {
+      clippedTexels++;
+    }
+    const nr = linearToSrgb(lr), ng = linearToSrgb(lg), nb = linearToSrgb(lb);
     out[i * 4] = nr;
     out[i * 4 + 1] = ng;
     out[i * 4 + 2] = nb;
@@ -240,5 +264,6 @@ export async function colorMatchTexture(opts: ColorMatchOptions): Promise<ColorM
     ),
     lAfter: Number(afterMean[0].toFixed(4)),
     clamped,
+    gamutClipFraction: painted > 0 ? Number((clippedTexels / painted).toFixed(4)) : 0,
   };
 }

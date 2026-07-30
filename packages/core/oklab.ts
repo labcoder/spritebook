@@ -55,6 +55,17 @@ export function srgbToLab(r: number, g: number, b: number): Lab {
  * (Ottosson's inverse matrices; the cube undoes the forward cube-root).
  */
 export function oklabToSrgb(lab: Lab): [number, number, number] {
+  const [r, g, b] = oklabToLinearRgb(lab);
+  return [linearToSrgb(r), linearToSrgb(g), linearToSrgb(b)];
+}
+
+/**
+ * OKLab -> LINEAR rgb, UNCLAMPED. Values outside [0, 1] mean the colour sits
+ * outside the sRGB gamut — which is exactly what gen's colour-match pass needs
+ * to MEASURE (its gamut-clip metric): `oklabToSrgb` clamps silently, and a
+ * clipped texel silently loses chroma, which is the pastel-washout failure.
+ */
+export function oklabToLinearRgb(lab: Lab): [number, number, number] {
   const [L, a, b] = lab;
   const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
   const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
@@ -62,10 +73,11 @@ export function oklabToSrgb(lab: Lab): [number, number, number] {
   const l = l_ * l_ * l_;
   const m = m_ * m_ * m_;
   const s = s_ * s_ * s_;
-  const r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
-  const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
-  const bb = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
-  return [linearToSrgb(r), linearToSrgb(g), linearToSrgb(bb)];
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+  ];
 }
 
 function clampByte(n: number): number {
