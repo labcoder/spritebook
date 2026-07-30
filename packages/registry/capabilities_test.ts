@@ -59,13 +59,16 @@ Deno.test('trellis2 retextures with a bigger seed ladder than it generates with'
   assertEquals(defaultsFor(v, 'retexture').resolution, 512);
   assertEquals(defaultsFor(v, 'gen3d').resolution, undefined);
 
-  // A0 (QUALITY-AUDIT.md): the texture sampler's guidance_rescale is plumbed
-  // and EXPLICIT at upstream's 0.0 on both operations — explicit so every
-  // receipt records what ran. textureGuidance itself was once silently 1.0 for
-  // gen3d, which is precisely how "the character everyone evaluated was
-  // textured by an unguided sampler" shipped; silence is not a default here.
-  assertEquals(defaultsFor(v, 'gen3d').textureGuidanceRescale, 0);
-  assertEquals(defaultsFor(v, 'retexture').textureGuidanceRescale, 0);
+  // A1 (spikes/trellis2/A1-SWEEP.md): texture guidance 3.5 with rescale 0.2 on
+  // BOTH operations, frozen by the 140-sample sweep and the maintainer's pick
+  // from its renders. gen3d's guidance was silently 1.0 (CFG off) until then —
+  // "the character everyone evaluated was textured by an unguided sampler" —
+  // and retexture's 7.5 predated the rescale knob existing at all. Explicit
+  // here so every receipt records what ran; silence is not a default.
+  assertEquals(defaultsFor(v, 'gen3d').textureGuidance, 3.5);
+  assertEquals(defaultsFor(v, 'gen3d').textureGuidanceRescale, 0.2);
+  assertEquals(defaultsFor(v, 'retexture').textureGuidance, 3.5);
+  assertEquals(defaultsFor(v, 'retexture').textureGuidanceRescale, 0.2);
 });
 
 Deno.test('every entry can actually RUN every operation it declares', async () => {

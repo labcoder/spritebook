@@ -146,3 +146,9 @@ of the retexture cells rides on the real verb (which exports correctly) in A3's 
 - `1024_cascade` stays available as a quality option; a future `--quality` detent or candidates tier
   can spend it deliberately. Nothing moves in the catalog until the maintainer picks from the sheets
   (`out/a1-sweep/sheets/`).
+
+## The pick (rule 6)
+
+2026-07-30: the maintainer took **3.5/0.2 for both gen3d and retexture**, from the contact sheets —
+matching the post-hoc recommendation, no override. Frozen in the catalog; the capabilities test pins
+both operations' defaults.
