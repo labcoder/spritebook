@@ -86,3 +86,56 @@ unchanged.
 because `CacheKeyInputs` has no lighting field; a rig change is only covered if whoever makes it
 bumps `RENDERER_VERSION`. That is fine while the rig is a compile-time constant and would be a bug
 the day it becomes a flag.
+
+---
+
+## Shipped: ambient 0.30
+
+`AMBIENT` 0.12 → 0.30, `RENDERER_VERSION` 0.4.0 → 0.5.0.
+
+| subject  | mean V        | p10           | outline (palette-dark) | below V 0.15     |
+| -------- | ------------- | ------------- | ---------------------- | ---------------- |
+| bulma    | 0.243 → 0.300 | 0.047 → 0.090 | 0.047 → 0.090          | 49.9% → 47.9%    |
+| mermaid  | 0.311 → 0.371 | 0.067 → 0.110 | 0.067 → 0.110          | 37.5% → 36.1%    |
+| princess | 0.286 → 0.338 | 0.094 → 0.161 | 0.094 → **0.161**      | 42.7% → **0.0%** |
+
+**The cost is princess, and it was checked before committing.** The outline is `palette-dark`, so
+lifting the floor lifts the outline: on a pastel lineless character it goes from `#180c08` to
+`#291712`, outline-to-body contrast falls 2.2× → 1.7%, and she ends up with no texel below V 0.15 at
+all. Still legible, and the trade is recorded in `renderer.ts` beside the constant.
+
+### The goldens moved, but only after the AOVs did
+
+The first refresh moved NOTHING, which is itself worth knowing: `_gen-goldens.ts` reads COMMITTED
+AOV PNGs, so the style goldens are downstream of a frozen render and cannot see a lighting change at
+all. Re-rendering the AOV fixtures first (`_render-aovs.ts`) is what makes a renderer change visible
+to them.
+
+| golden         | texels moved | max delta | mean V                 |
+| -------------- | ------------ | --------- | ---------------------- |
+| cel-2 f000     | 25.4%        | 40        | 0.498 → 0.572 (+14.8%) |
+| cel-2 f003     | 25.2%        | 40        | 0.501 → 0.574 (+14.5%) |
+| pixel f000     | 25.4%        | 40        | 0.516 → 0.582 (+12.7%) |
+| pixel f003     | 25.2%        | 40        | 0.535 → 0.593 (+10.8%) |
+| painterly f000 | 25.8%        | 12        | 0.588 → 0.630 (+7.2%)  |
+| painterly f003 | 26.4%        | 37        | 0.585 → 0.630 (+7.8%)  |
+
+The AOV fixtures' `mask` planes changed too, for an unrelated and already-committed reason: they
+predated the coverage-encoding fix and still held 0/1 where the renderer now writes 0/65535.
+
+Flicker needed no re-pin — cel-2 0.054%, pixel 0.430% (was 0.420), painterly 0.659% (was 0.689),
+against budgets 0.15 / 0.55 / 1.0.
+
+**Painterly's ceiling on the flat-shaded fixture fell 8 → 5 distinct colours**, which is the same
+trade from the other side: `shade = ambient + (1-ambient)*ndl`, so the range narrows from [0.12,
+1.0] to [0.30, 1.0] and faces that used to quantize apart collapse together.
+
+## The cache gap is closed
+
+`CacheKeyInputs.lightRigHash` hashes `{lightDir, ambient}` as DATA. Its own field rather than folded
+into `cameraPresetHash` — two bakes can share a camera preset exactly and differ in every pixel, so
+the camera hash cannot stand in for it. (Mirroring rides the camera hash for the opposite reason: it
+really does describe how directions are produced.)
+
+Verified on the P3 exit re-run: bake `8b7302cd` → **`674dc263`**, where before the fix four
+different rigs had all produced `8b7302cd`.
