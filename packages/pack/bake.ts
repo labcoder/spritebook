@@ -25,7 +25,7 @@ import type {
 } from '@spritebook/schema';
 import { canonicalJson, RENDER_PASSES } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
-import { renderSignature, runRenderJob } from '@spritebook/render';
+import { AMBIENT, LIGHT_DIR, renderSignature, runRenderJob } from '@spritebook/render';
 import {
   type AovSource,
   type ClipAovSource,
@@ -232,6 +232,9 @@ export async function buildCacheInputs(
         : canonicalJson(spec.camera),
     ),
     stylePresetHash: await sha256Hex(canonicalJson(spec.style)),
+    // the rig as DATA, so a change to it invalidates by itself rather than by
+    // whoever changed it also remembering to bump rendererVersion
+    lightRigHash: await sha256Hex(canonicalJson({ lightDir: LIGHT_DIR, ambient: AMBIENT })),
     rendererVersion: renderSig,
     // The backend that made this character, when one did. `source-mesh@0` is
     // the sentinel for NOT GENERATED HERE — a mesh that came in through the

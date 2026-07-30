@@ -118,6 +118,7 @@ const cacheKeyInputs = parseWith(CacheKeyInputsSchema, {
   clipBindingHash: sha('d'),
   cameraPresetHash: sha('e'),
   stylePresetHash: sha('f'),
+  lightRigHash: 'd'.repeat(64),
   rendererVersion: '0.1.0',
   backend: { modelId: 'pixal3d', version: '1.2', paramsHash: sha('0') },
 }, 'CacheKeyInputs fixture');

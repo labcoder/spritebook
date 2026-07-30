@@ -87,6 +87,7 @@
     "canonicalMeshSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "characterId": "fixture-char",
     "clipBindingHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "lightRigHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "rendererVersion": "spritebook-render@0.1.0",
     "rigStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "stylePresetHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"

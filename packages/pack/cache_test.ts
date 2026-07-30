@@ -11,6 +11,7 @@ function inputs(over: Partial<CacheKeyInputs> = {}): CacheKeyInputs {
     clipBindingHash: 'c'.repeat(64),
     cameraPresetHash: 'd'.repeat(64),
     stylePresetHash: 'e'.repeat(64),
+    lightRigHash: 'd'.repeat(64),
     rendererVersion: 'spritebook-render@0.1.0',
     backend: { modelId: 'source-mesh', version: '0', paramsHash: 'f'.repeat(64) },
     ...over,
@@ -58,4 +59,34 @@ Deno.test('BlobCache: binary round-trip, misses, key discipline', async () => {
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
+});
+
+Deno.test('the light rig invalidates on its own, without a version bump', async () => {
+  // The gap this closed, measured before it existed: four bakes of one
+  // character under four different light rigs all produced bake id `8b7302cd`,
+  // because CacheKeyInputs had no lighting field. Lighting changes every pixel,
+  // so those four would have traded cache entries — a rig change was covered
+  // only by whoever made it also remembering to bump `rendererVersion`.
+  const base = await bakeKey(inputs());
+  const relit = await bakeKey(inputs({ lightRigHash: '9'.repeat(64) }));
+  assert(relit !== base, 'a different rig is a different bake');
+
+  // and it reaches the FRAMES, not just the bake id
+  const f0 = await frameKey(base, { clipId: 'idle', direction: 0, frame: 0 });
+  const f0r = await frameKey(relit, { clipId: 'idle', direction: 0, frame: 0 });
+  assert(f0r !== f0, 'every cached frame is invalidated too');
+  assertEquals(
+    predictInvalidation(inputs(), inputs({ lightRigHash: '9'.repeat(64) }), frameGrid(2, 3)).length,
+    6,
+    'lighting is clip-atomic like the look: it changes every frame or none',
+  );
+
+  // its own field, NOT folded into the camera: two bakes can share a camera
+  // preset exactly and differ in every pixel, so the camera hash cannot stand
+  // in for it (mirroring rides the camera hash for the opposite reason — it
+  // really does describe how directions are produced)
+  assert(
+    await bakeKey(inputs({ cameraPresetHash: '9'.repeat(64) })) !== relit,
+    'the two are independent inputs',
+  );
 });

@@ -105,6 +105,7 @@ const manifest = parseWith(BakeManifestSchema, {
     clipBindingHash: 'c'.repeat(64),
     cameraPresetHash: 'd'.repeat(64),
     stylePresetHash: 'e'.repeat(64),
+    lightRigHash: 'd'.repeat(64),
     rendererVersion: 'spritebook-render@0.1.0',
     backend: { modelId: 'source-mesh', version: '0', paramsHash: 'f'.repeat(64) },
   },
