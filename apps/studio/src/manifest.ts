@@ -26,11 +26,18 @@ function str(v: unknown): string | undefined {
 
 export function toCard(dir: string, manifest: unknown): CharacterCard {
   if (manifest === null || typeof manifest !== 'object') {
-    return { dir, id: dir, displayName: dir, problem: 'manifest is not an object' };
+    return {
+      dir,
+      id: dir,
+      displayName: dir,
+      problem: 'manifest is not an object',
+    };
   }
   const m = manifest as Record<string, unknown>;
   const id = str(m.id);
-  if (!id) return { dir, id: dir, displayName: dir, problem: 'manifest has no id' };
+  if (!id) {
+    return { dir, id: dir, displayName: dir, problem: 'manifest has no id' };
+  }
 
   const look = (m.look ?? {}) as Record<string, unknown>;
   const rig = m.rig as Record<string, unknown> | undefined;

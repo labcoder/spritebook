@@ -22,7 +22,9 @@ export function severityOf(line: string): Severity {
   try {
     const e = JSON.parse(line);
     if (e !== null && typeof e === 'object') {
-      if (e.t === 'error' || (typeof e.error === 'string' && e.error.length > 0)) return 'error';
+      if (
+        e.t === 'error' || (typeof e.error === 'string' && e.error.length > 0)
+      ) return 'error';
       if (e.t === 'warn') return 'warn';
     }
     return 'info';
@@ -56,7 +58,9 @@ export class LogStore {
       at: now,
     };
     this.#lines.push(entry);
-    if (this.#lines.length > LOG_CAP) this.#lines.splice(0, this.#lines.length - LOG_CAP);
+    if (this.#lines.length > LOG_CAP) {
+      this.#lines.splice(0, this.#lines.length - LOG_CAP);
+    }
     if (entry.severity === 'error') this.#unseenErrors++;
     this.#emit();
     return entry;
@@ -79,7 +83,10 @@ export class LogStore {
   }
 
   #emit(): void {
-    this.#snapshot = { lines: [...this.#lines], unseenErrors: this.#unseenErrors };
+    this.#snapshot = {
+      lines: [...this.#lines],
+      unseenErrors: this.#unseenErrors,
+    };
     for (const fn of this.#listeners) fn();
   }
 }

@@ -28,6 +28,8 @@ export function pseudoExpand(id: string): string {
   // pad to >= 1.4x the source length, in visible chunks so truncation shows
   const target = Math.ceil(id.length * 1.4);
   let out = accented;
-  while (out.length < target) out += ' ·×·'.slice(0, Math.min(4, target - out.length));
+  while (out.length < target) {
+    out += ' ·×·'.slice(0, Math.min(4, target - out.length));
+  }
   return `⟦${out}⟧`;
 }
