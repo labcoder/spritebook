@@ -92,11 +92,18 @@ export const AMBIENT = 0.30;
  * pipelines). Still constant per direction per clip, so the temporal
  * stability law holds unchanged.
  *
- * The default was picked from renders of both on three subjects; the other
- * stays reachable via `bake --light-frame`.
+ * The default is 'camera', picked from the B3 sheets (three subjects, both
+ * options, 8 genuine directions): under 'world' the back rows lose the
+ * character — bulma's mean V spans 0.174 across directions and the pink
+ * shirt reads mud from behind; under 'camera' the spread drops to 0.072 and
+ * every facing reads as the same sprite, which is what sheet consumers
+ * assume. The one counter-signal (mermaid's spread RISING 0.026 → 0.125)
+ * turned out to be albedo, not lighting: her back hair is genuinely the
+ * brighter mass, and 'world' was cancelling that against the lighting
+ * falloff. 'world' stays reachable via `bake --light-frame world`.
  */
 export type LightFrame = 'world' | 'camera';
-export const DEFAULT_LIGHT_FRAME: LightFrame = 'world';
+export const DEFAULT_LIGHT_FRAME: LightFrame = 'camera';
 
 /** LIGHT_DIR as each direction camera sees it, per the frame choice. */
 export function lightDirFor(frame: LightFrame, yawDeg: number): [number, number, number] {

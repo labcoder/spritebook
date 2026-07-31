@@ -45,3 +45,29 @@ flattened variant documents what the refusal protects against).
 - Decision: none — this is a regression pin, recorded so the chain stays deliberate.
 
 ## Results land below this line only after the grids are complete.
+
+### B3 result — 'camera' is the default (2026-07-31)
+
+Three subjects (the A3 canonical picks) × both options × 8 genuinely rendered directions
+(`--no-mirror`, so no flipped frame could fake a lighting answer), clean style, cell 128. Mean V of
+covered pixels per direction, spread = max − min across the row:
+
+| subject  | world spread | camera spread | world mean V | camera mean V |
+| -------- | ------------ | ------------- | ------------ | ------------- |
+| bulma    | 0.174        | **0.072**     | 0.545        | 0.604         |
+| princess | 0.192        | **0.107**     | 0.578        | 0.650         |
+| mermaid  | 0.026        | 0.125         | 0.421        | 0.472         |
+
+The sheets: under 'world' the back rows lose the character — bulma's pink shirt and princess's
+cream dress read mud at d4–d6. Under 'camera' every facing reads as the same sprite. The
+counter-signal was investigated rather than averaged away: mermaid's spread RISES under 'camera'
+because her back hair is genuinely the brighter albedo mass — 'world' was cancelling that real
+albedo asymmetry against its lighting falloff, which is why her world row's 0.026 was never
+evidence of good lighting. 'camera' removes the lighting term from the spread; what remains is the
+character. The registered artefact check (a rim that flips sides between directions) does not
+appear: the key's screen-relative offset is constant by construction in 'camera' mode.
+
+**Landed:** `DEFAULT_LIGHT_FRAME = 'camera'` (renderer.ts); 'world' stays behind
+`bake --light-frame world`; lightRigHash carries the resolved frame, so the modes never share a
+cache row. Sheets: scratchpad `b3/lightframe-sheets.png`. Full suite green after the flip — the
+committed goldens are front-facing (yaw 0), where the two frames agree exactly.
