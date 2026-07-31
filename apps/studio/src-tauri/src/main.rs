@@ -29,6 +29,18 @@ fn repo_root() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.."))
 }
 
+/// Windows `canonicalize` returns verbatim paths (`\\?\C:\...`). Those bypass
+/// separator normalization, so a downstream `dir + "/character.json"` becomes
+/// an unopenable mixed-separator path — which is exactly how the first field
+/// test broke `pick`. Everything user- or CLI-facing goes through here.
+fn display_path(p: &Path) -> String {
+    let s = p.to_string_lossy();
+    s.strip_prefix(r"\\?\UNC\")
+        .map(|rest| format!(r"\\{rest}"))
+        .or_else(|| s.strip_prefix(r"\\?\").map(String::from))
+        .unwrap_or_else(|| s.into_owned())
+}
+
 /// One NDJSON session file per app run; the previous run's file is what the
 /// drawer REPLAYS. Lives under the OS local-data dir, newest-first by name.
 fn session_dir() -> PathBuf {
@@ -114,7 +126,7 @@ fn list_workspaces(root: String) -> Result<Vec<RawWorkspace>, String> {
         let manifest = serde_json::from_slice(&bytes)
             .unwrap_or(serde_json::Value::Null);
         out.push(RawWorkspace {
-            dir: entry.path().to_string_lossy().into_owned(),
+            dir: display_path(&entry.path()),
             manifest,
         });
     }

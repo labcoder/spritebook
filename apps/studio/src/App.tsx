@@ -68,17 +68,18 @@ export default function App() {
     prefs.setLocale(locale);
   }, [locale]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<Workspace[] | null> => {
     setLoadError(null);
     try {
       const ws = await bridge.listWorkspaces(root);
-      setWorkspaces(
-        ws.map((raw) => ({ raw, card: toCard(raw.dir, raw.manifest) })),
-      );
+      const next = ws.map((raw) => ({ raw, card: toCard(raw.dir, raw.manifest) }));
+      setWorkspaces(next);
       prefs.setProjectsRoot(root);
+      return next;
     } catch (err) {
       setWorkspaces(null);
       setLoadError(err instanceof Error ? err.message : String(err));
+      return null;
     }
   }, [root]);
 
@@ -108,12 +109,21 @@ export default function App() {
     setActiveTab('__new__');
   }, []);
 
-  // gen exited 0: the workspace exists now - re-read, open its tab, land on Gen
-  const onCreated = useCallback(async (dir: string) => {
+  // gen exited 0: the workspace exists now. Resolve it BY CHARACTER ID from
+  // the re-read list - the shell's dir notation (absolute, backslashes) never
+  // matches a GUI-composed relative path, and matching strings instead of ids
+  // is how the first field test got a tab that said "no longer under the
+  // loaded root" about a character it had just created.
+  const onCreated = useCallback(async (characterId: string) => {
     setNewOpen(false);
-    await load();
-    setOpenDirs((cur) => (cur.includes(dir) ? cur : [...cur, dir]));
-    setActiveTab(dir);
+    const list = await load();
+    const created = list?.find((w) => w.card.id === characterId);
+    if (!created) {
+      setActiveTab('gallery');
+      return;
+    }
+    setOpenDirs((cur) => (cur.includes(created.raw.dir) ? cur : [...cur, created.raw.dir]));
+    setActiveTab(created.raw.dir);
   }, [load]);
 
   // undo/redo act on the ACTIVE character's manifest through the core verbs

@@ -177,8 +177,9 @@ function CliTwin({ args }: { args: string[] }) {
 export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
   bridge: StudioBridge;
   projectsRoot: string;
-  /** called with the new workspace dir after gen exits 0 */
-  onCreated: (dir: string) => void;
+  /** called with the new CHARACTER ID after gen exits 0 - the App re-reads
+   * the list and resolves the workspace dir in the shell's own notation */
+  onCreated: (characterId: string) => void;
   onOpenModels: () => void;
 }) {
   const [name, setName] = useState('');
@@ -259,9 +260,9 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
       }));
     });
     setRun({ running: false, lines: r.lines.length, last: '' });
-    if (r.exitCode === 0) onCreated(workspace);
+    if (r.exitCode === 0) onCreated(slug);
     else setFailed(true);
-  }, [bridge, args, workspace, onCreated]);
+  }, [bridge, args, slug, onCreated]);
 
   return (
     <div className='gennew'>
@@ -414,6 +415,7 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
   onChanged: () => void;
 }) {
   const m = (manifest ?? {}) as Record<string, unknown>;
+  const characterId = typeof m.id === 'string' ? m.id : '';
   const gen = (m.generation ?? {}) as Record<string, unknown>;
   const results = (Array.isArray(gen.results) ? gen.results : []) as ResultEntry[];
   const picked = typeof gen.pickedResultId === 'string' ? gen.pickedResultId : undefined;
@@ -443,11 +445,14 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
   const moreLike = useCallback(async (id: string) => {
     setBusy(id);
     setFailedId(null);
-    const r = await bridge.runCli(['gen', '--workspace', dir, '--more-like', id, '--json']);
+    // gen ALWAYS requires --character (the field test's first error)
+    const r = await bridge.runCli(
+      ['gen', '--workspace', dir, '--character', characterId, '--more-like', id, '--json'],
+    );
     setBusy(null);
     if (r.exitCode === 0) onChanged();
     else setFailedId(id);
-  }, [bridge, dir, onChanged]);
+  }, [bridge, dir, characterId, onChanged]);
 
   return (
     <div className='cands'>

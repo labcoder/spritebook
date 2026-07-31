@@ -710,6 +710,9 @@ input {
   position: fixed;
   inset: 0;
   background: rgb(0 0 0 / 45%);
+  /* above the chrome: the clip-pathed primary button forms its own stacking
+   * context and painted OVER the modal in the first field test */
+  z-index: 100;
 }
 .pal {
   position: fixed;
