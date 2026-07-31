@@ -14,14 +14,23 @@ import { prefs } from './prefs';
 
 /* ---------------- stage rail ---------------- */
 
-const STAGE_LABEL: Record<StageKey, string> = {
-  gen: 'Gen',
-  rig: 'Rig',
-  anim: 'Anim',
-  look: 'Look',
-  bake: 'Bake',
-  export: 'Export',
-};
+/** Literal t() per key — the extractor refuses ids it cannot see statically. */
+function stageLabel(k: StageKey): string {
+  switch (k) {
+    case 'gen':
+      return t('Gen');
+    case 'rig':
+      return t('Rig');
+    case 'anim':
+      return t('Anim');
+    case 'look':
+      return t('Look');
+    case 'bake':
+      return t('Bake');
+    case 'export':
+      return t('Export');
+  }
+}
 
 function StageRail({ stages, active, onSelect }: {
   stages: Stage[];
@@ -42,7 +51,7 @@ function StageRail({ stages, active, onSelect }: {
         >
           <span className='n mono'>{s.n}</span>
           <i className='hue' style={{ background: `var(${s.hueVar})` }} />
-          <span className='nm hud'>{t(STAGE_LABEL[s.key])}</span>
+          <span className='nm hud'>{stageLabel(s.key)}</span>
           <i className={`dot ${s.state}`} aria-hidden='true' />
           {s.state === 'locked' && <span className='sr-only'>{t('locked')}</span>}
         </button>
@@ -60,7 +69,9 @@ function StageRail({ stages, active, onSelect }: {
 
 const ZOOMS = [1, 2, 4] as const;
 
-function CanvasWell({ bridge, card }: { bridge: StudioBridge; card: CharacterCard }) {
+function CanvasWell(
+  { bridge, card }: { bridge: StudioBridge; card: CharacterCard },
+) {
   const [src, setSrc] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [zoom, setZoom] = useState<number>(2);
@@ -135,7 +146,9 @@ function Rows({ obj }: { obj: Record<string, unknown> }) {
   const entries = Object.entries(obj).filter(([, v]) =>
     v === null || ['string', 'number', 'boolean'].includes(typeof v)
   );
-  if (entries.length === 0) return <div className='inote'>{t('nothing recorded')}</div>;
+  if (entries.length === 0) {
+    return <div className='inote'>{t('nothing recorded')}</div>;
+  }
   return (
     <>
       {entries.map(([k, v]) => (
@@ -187,14 +200,16 @@ function Inspector({ stage, stages, manifest, dir }: {
     <aside className='insp' aria-label={t('Inspector')}>
       <div className='isec'>
         <div className='isechead'>
-          <span className='hud'>{t(STAGE_LABEL[stage])}</span>
-          <span className='ieyebrow mono'>{s.n}// {STAGE_LABEL[stage].toUpperCase()}</span>
+          <span className='hud'>{stageLabel(stage)}</span>
+          <span className='ieyebrow mono'>{s.n}// {stage.toUpperCase()}</span>
         </div>
         <div className='inote'>{s.note}</div>
         <Rows obj={sliceFor(stage, manifest)} />
       </div>
       <div className='isec ifoot'>
-        <div className='inote'>{t('read-only — every value here is the manifest')}</div>
+        <div className='inote'>
+          {t('read-only — every value here is the manifest')}
+        </div>
         <div className='ival mono ipath' title={dir}>{dir}</div>
       </div>
     </aside>
@@ -217,7 +232,9 @@ function useInspectorWidth(): [number, (w: number) => void] {
   return [w, set];
 }
 
-function Grip({ width, setWidth }: { width: number; setWidth: (w: number) => void }) {
+function Grip(
+  { width, setWidth }: { width: number; setWidth: (w: number) => void },
+) {
   const dragging = useRef<{ startX: number; startW: number } | null>(null);
 
   return (
@@ -236,7 +253,9 @@ function Grip({ width, setWidth }: { width: number; setWidth: (w: number) => voi
       }}
       onPointerMove={(e) => {
         if (!dragging.current) return;
-        setWidth(dragging.current.startW + (dragging.current.startX - e.clientX));
+        setWidth(
+          dragging.current.startW + (dragging.current.startX - e.clientX),
+        );
       }}
       onPointerUp={() => {
         dragging.current = null;
@@ -274,7 +293,12 @@ export function Editor({ bridge, card, manifest }: {
       <CanvasWell bridge={bridge} card={card} />
       <Grip width={inspW} setWidth={setInspW} />
       <div style={{ width: inspW }} className='inspwrap'>
-        <Inspector stage={effective} stages={stages} manifest={manifest} dir={card.dir} />
+        <Inspector
+          stage={effective}
+          stages={stages}
+          manifest={manifest}
+          dir={card.dir}
+        />
       </div>
     </div>
   );

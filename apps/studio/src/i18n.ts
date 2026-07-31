@@ -9,14 +9,20 @@
  */
 import { setupI18n as makeI18n } from '@lingui/core';
 import { pseudoExpand } from './pseudo';
+import { es } from './locales/es';
 
-export type Locale = 'en' | 'pseudo';
+export type Locale = 'en' | 'es' | 'pseudo';
 
 export const i18n = makeI18n({
-  messages: { en: {}, pseudo: {} },
-  // the pseudo catalog is a FUNCTION, not data: any id it is asked for comes
-  // back +40% expanded, so no string can dodge the growth proof by being new
-  missing: (locale: string, id: string) => (locale === 'pseudo' ? pseudoExpand(id) : id),
+  messages: { en: {}, es, pseudo: {} },
+  // en is the identity catalog (id IS the copy); the pseudo catalog is a
+  // FUNCTION, not data — any id it is asked for comes back +40% expanded, so
+  // no string can dodge the growth proof by being new. es falling through
+  // here means a missing translation, and the extractor gate fails CI first.
+  missing: (
+    locale: string,
+    id: string,
+  ) => (locale === 'pseudo' ? pseudoExpand(id) : id),
 });
 
 export function setupI18n(initial: Locale): void {
@@ -25,6 +31,10 @@ export function setupI18n(initial: Locale): void {
 
 export function activateLocale(locale: Locale): void {
   i18n.activate(locale);
+}
+
+export function cycleLocale(cur: Locale): Locale {
+  return cur === 'en' ? 'es' : cur === 'es' ? 'pseudo' : 'en';
 }
 
 /** Translate. The id IS the English copy — extraction-ready callsites. */

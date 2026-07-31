@@ -28,7 +28,11 @@ export function Thumb({ bridge, dir }: { bridge: StudioBridge; dir: string }) {
 }
 
 export function Card(
-  { bridge, c, onOpen }: { bridge: StudioBridge; c: CharacterCard; onOpen: (dir: string) => void },
+  { bridge, c, onOpen }: {
+    bridge: StudioBridge;
+    c: CharacterCard;
+    onOpen: (dir: string) => void;
+  },
 ) {
   return (
     <button
@@ -55,7 +59,9 @@ export function Card(
             <div className='tags'>
               {c.stylePresetId && <span className='tag style'>{c.stylePresetId}</span>}
               {c.rig && (
-                <span className={`tag ${c.rig.accepted ? 'rig-ok' : 'rig-warn'}`}>
+                <span
+                  className={`tag ${c.rig.accepted ? 'rig-ok' : 'rig-warn'}`}
+                >
                   rig {c.rig.track}
                   {c.rig.jointCount !== undefined ? ` · ${c.rig.jointCount}j` : ''}
                   {c.rig.accepted ? ` · ${t('accepted')}` : ` · ${t('unaccepted')}`}
@@ -86,7 +92,9 @@ export function Gallery({ bridge, cards, loadError, onOpen }: {
       {cards && cards.length === 0 && (
         <div className='empty'>
           <p>{t('No characters under this root.')}</p>
-          <p className='mono'>{t('a character is any directory holding a character.json')}</p>
+          <p className='mono'>
+            {t('a character is any directory holding a character.json')}
+          </p>
         </div>
       )}
       {cards?.map((c) => <Card key={c.dir} bridge={bridge} c={c} onOpen={onOpen} />)}

@@ -9,7 +9,8 @@
     "preview:web": "vite preview --port 4175 --strictPort",
     "dev:desktop": "tauri dev",
     "build:desktop": "tauri build",
-    "check:web": "tsc --noEmit"
+    "check:web": "tsc --noEmit",
+    "i18n:extract": "deno run --allow-read i18n_extract.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",

@@ -35,10 +35,11 @@ export const prefs = {
   setTheme(t: 'dark' | 'light'): void {
     write(KEYS.theme, t);
   },
-  locale(): 'en' | 'pseudo' {
-    return read(KEYS.locale) === 'pseudo' ? 'pseudo' : 'en';
+  locale(): 'en' | 'es' | 'pseudo' {
+    const l = read(KEYS.locale);
+    return l === 'pseudo' || l === 'es' ? l : 'en';
   },
-  setLocale(l: 'en' | 'pseudo'): void {
+  setLocale(l: 'en' | 'es' | 'pseudo'): void {
     write(KEYS.locale, l);
   },
   projectsRoot(fallback: string): string {
