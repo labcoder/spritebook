@@ -5,15 +5,65 @@
  * depends on, and a clear-pass render probe. Exit code 0 only when an adapter
  * exists AND the probe passes — a doctor that finds illness says so loudly.
  *
+ * `--sidecar` extends the exam: boot the Python sidecar exactly as a gen job
+ * would (same dir resolution: SPRITEBOOK_SIDECAR_DIR or the repo default),
+ * perform the contract handshake, report version + adapter roster, and shut
+ * it down. Added for P4-T1 — the studio's status bar is this verb's client,
+ * per the capability-moves-to-core-first law. A sidecar failure fails the
+ * exit code like any other illness.
+ *
  * `--json` emits ONE JSON document line (documented exception to the NDJSON
  * job-event discipline: doctor is a diagnostic snapshot, not a job stream).
  */
 import { renderDiagnostics } from '@spritebook/render';
+import { SidecarSession } from '@spritebook/core';
 import { SPRITEBOOK_VERSION } from './version.ts';
 import type { CliIo } from './mod.ts';
 
+/** The same resolution gen/pick use, minus the per-call flag: doctor examines
+ * the DEFAULT configuration, so an env override is the only knob. */
+function defaultSidecarDir(): string {
+  const env = Deno.env.get('SPRITEBOOK_SIDECAR_DIR');
+  if (env) return env;
+  return decodeURIComponent(
+    new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+  );
+}
+
+interface SidecarReport {
+  ok: boolean;
+  dir: string;
+  contractVersion?: number;
+  sidecarVersion?: string;
+  python?: string;
+  adapters?: { id: string; kind: string; version: string }[];
+  error?: string;
+}
+
+async function examineSidecar(): Promise<SidecarReport> {
+  const dir = defaultSidecarDir();
+  const session = new SidecarSession({ sidecarDir: dir });
+  try {
+    const handle = await session.ensure();
+    const h = handle.handshake;
+    return {
+      ok: true,
+      dir,
+      contractVersion: h.contractVersion,
+      sidecarVersion: h.sidecarVersion,
+      python: h.python,
+      adapters: h.adapters.map((a) => ({ id: a.id, kind: a.kind, version: a.version })),
+    };
+  } catch (err) {
+    return { ok: false, dir, error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    await session.dispose();
+  }
+}
+
 export async function runDoctor(args: string[], io: CliIo): Promise<number> {
   const json = args.includes('--json');
+  const wantSidecar = args.includes('--sidecar');
   let diag;
   try {
     diag = await renderDiagnostics({ probe: true });
@@ -28,12 +78,14 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
     return 1;
   }
 
+  const sidecar = wantSidecar ? await examineSidecar() : undefined;
   const report = {
     spritebook: SPRITEBOOK_VERSION,
     deno: Deno.version.deno,
     v8: Deno.version.v8,
     platform: `${Deno.build.os}-${Deno.build.arch}`,
     ...diag,
+    ...(sidecar ? { sidecar } : {}),
   };
 
   if (json) {
@@ -64,6 +116,20 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
         io.stdout(`render probe: FAILED - ${diag.probe?.error ?? 'unknown'}`);
       }
     }
+    if (sidecar) {
+      if (sidecar.ok) {
+        io.stdout(
+          `sidecar: OK - contract v${sidecar.contractVersion}, ` +
+            `${sidecar.sidecarVersion} on python ${sidecar.python} (${sidecar.dir})`,
+        );
+        for (const a of sidecar.adapters ?? []) {
+          io.stdout(`  adapter: ${a.id} (${a.kind}) v${a.version}`);
+        }
+      } else {
+        io.stdout(`sidecar: FAILED - ${sidecar.error} (${sidecar.dir})`);
+      }
+    }
   }
-  return diag.available && diag.probe?.ok ? 0 : 1;
+  const renderHealthy = diag.available && diag.probe?.ok;
+  return renderHealthy && (sidecar?.ok ?? true) ? 0 : 1;
 }

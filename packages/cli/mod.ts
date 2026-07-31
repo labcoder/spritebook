@@ -656,7 +656,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
   ],
   prep: ['image', 'out', 'sidecar', 'models-dir', 'catalog'],
   models: ['models-dir', 'catalog', 'installed', 'accept-license', 'territory', 'from'],
-  doctor: [],
+  doctor: ['sidecar'],
 };
 
 /** Accepted everywhere. */

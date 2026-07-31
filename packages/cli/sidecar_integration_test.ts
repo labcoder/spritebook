@@ -219,3 +219,34 @@ Deno.test('ACCEPTANCE: registry-installed weight -> spritebook prep -> cutout + 
     await Deno.remove(work, { recursive: true });
   }
 });
+
+Deno.test('doctor --sidecar: boots, handshakes, reports the roster, exits by health', async () => {
+  // P4-T1: the studio status bar consumes exactly this document, so the test
+  // asserts the CONTRACT of the report, not incidental fields.
+  if (!(await sidecarAvailable())) {
+    console.log('skip: uv or sidecar/ not available');
+    return;
+  }
+  const lines: string[] = [];
+  const code = await runCli(['doctor', '--sidecar', '--json'], {
+    stdout: (s) => lines.push(s),
+    stderr: (s) => lines.push(s),
+  });
+  assertEquals(lines.length, 1, 'doctor --json is ONE document line');
+  const report = JSON.parse(lines[0]);
+  assert(report.sidecar, 'the report carries a sidecar section when asked');
+  assert(report.sidecar.ok, `sidecar exam failed: ${report.sidecar.error}`);
+  assert(report.sidecar.contractVersion >= 1);
+  assert(typeof report.sidecar.python === 'string' && report.sidecar.python.length > 0);
+  const ids = (report.sidecar.adapters as { id: string }[]).map((a) => a.id);
+  assert(ids.length > 0, 'the roster is not empty');
+  assert(ids.includes('fixture-gen'), `fixture-gen missing from roster: ${ids.join(', ')}`);
+  // exit composes render health AND sidecar health; on this machine both hold
+  assertEquals(code, 0, 'healthy exam exits 0');
+
+  // and WITHOUT the flag the report must not mention the sidecar at all -
+  // the section appearing unasked would mean doctor boots python on every run
+  const plain: string[] = [];
+  await runCli(['doctor', '--json'], { stdout: (s) => plain.push(s), stderr: () => {} });
+  assert(!('sidecar' in JSON.parse(plain[0])), 'no sidecar section unless asked');
+});
