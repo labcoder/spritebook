@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { Menu } from '@base-ui/react/menu';
 import { t } from './i18n';
 import { log, type Severity } from './log';
+import type { StudioBridge } from './bridge';
 
 /* ---------------- menu bar ---------------- */
 
@@ -136,11 +137,12 @@ export interface TabItem {
   label: string;
 }
 
-export function Tabs({ tabs, active, onSelect, onClose }: {
+export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
   tabs: TabItem[];
   active: string;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
+  onNew: () => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   // roving arrows per the tabs pattern; Home/End for completeness
@@ -166,47 +168,58 @@ export function Tabs({ tabs, active, onSelect, onClose }: {
   // caught by the audit) — so the close affordance lives INSIDE the tab as a
   // non-focusable click target, and the keyboard path is the Delete key
   return (
-    <div
-      className='tabsrow'
-      role='tablist'
-      aria-label={t('Characters')}
-      ref={listRef}
-    >
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type='button'
-          role='tab'
-          data-tabid={tab.id}
-          aria-selected={tab.id === active}
-          aria-controls='main-panel'
-          tabIndex={tab.id === active ? 0 : -1}
-          className={`ctab-btn ${tab.id === active ? 'on' : ''}`}
-          onClick={() => onSelect(tab.id)}
-          onKeyDown={(e) => {
-            if (e.key === 'Delete' && tab.id !== 'gallery') {
-              e.preventDefault();
-              onClose(tab.id);
-              return;
-            }
-            onKeyDown(e);
-          }}
-        >
-          {tab.label}
-          {tab.id !== 'gallery' && (
-            <span
-              className='ctab-close'
-              title={`${t('Close')} (${t('Delete key')})`}
-              onClick={(e) => {
-                e.stopPropagation();
+    <div className='tabsrow'>
+      <div
+        className='tablist'
+        role='tablist'
+        aria-label={t('Characters')}
+        ref={listRef}
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type='button'
+            role='tab'
+            data-tabid={tab.id}
+            aria-selected={tab.id === active}
+            aria-controls='main-panel'
+            tabIndex={tab.id === active ? 0 : -1}
+            className={`ctab-btn ${tab.id === active ? 'on' : ''}`}
+            onClick={() => onSelect(tab.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Delete' && tab.id !== 'gallery') {
+                e.preventDefault();
                 onClose(tab.id);
-              }}
-            >
-              ×
-            </span>
-          )}
-        </button>
-      ))}
+                return;
+              }
+              onKeyDown(e);
+            }}
+          >
+            {tab.label}
+            {tab.id !== 'gallery' && (
+              <span
+                className='ctab-close'
+                title={`${t('Close')} (${t('Delete key')})`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose(tab.id);
+                }}
+              >
+                ×
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+      <button
+        type='button'
+        className='tabnew'
+        aria-label={t('New character')}
+        title={t('New character')}
+        onClick={onNew}
+      >
+        +
+      </button>
     </div>
   );
 }
@@ -228,10 +241,28 @@ const PASSES: Record<Filter, (s: Severity) => boolean> = {
   error: (s) => s === 'error',
 };
 
-export function LogDrawer({ open }: { open: boolean }) {
+export function LogDrawer({ open, bridge }: { open: boolean; bridge: StudioBridge }) {
   const { lines } = useLog();
   const [filter, setFilter] = useState<Filter>('all');
   const [copied, setCopied] = useState(false);
+  const [replayed, setReplayed] = useState<'no' | 'empty' | 'yes'>('no');
+
+  const replay = useCallback(async () => {
+    const prev = await bridge.prevSession(500);
+    if (!prev || prev.length === 0) {
+      setReplayed('empty');
+      return;
+    }
+    for (const line of prev) {
+      let jobId = 'replay';
+      try {
+        const e = JSON.parse(line);
+        if (typeof e.jobId === 'string') jobId = `replay:${e.jobId}`;
+      } catch { /* verbatim line, generic replay id */ }
+      log.append(jobId, line);
+    }
+    setReplayed('yes');
+  }, [bridge]);
   const endRef = useRef<HTMLDivElement>(null);
   const visible = lines.filter((l) => PASSES[filter](l.severity));
 
@@ -281,6 +312,14 @@ export function LogDrawer({ open }: { open: boolean }) {
             </button>
           ))}
         </div>
+        <button
+          type='button'
+          className='btn logcopy'
+          onClick={replay}
+          disabled={replayed !== 'no'}
+        >
+          {replayed === 'empty' ? t('no previous session') : t('Replay previous session')}
+        </button>
         <button type='button' className='btn logcopy' onClick={copy}>
           {copied ? t('Copied') : t('Copy')}
         </button>

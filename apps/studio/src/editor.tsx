@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StudioBridge } from './bridge';
 import type { CharacterCard } from './manifest';
+import { Candidates } from './gen';
 import { type Stage, type StageKey, stageStates } from './stages';
 import { t } from './i18n';
 import { prefs } from './prefs';
@@ -275,10 +276,12 @@ function Grip(
 
 /* ---------------- the frame ---------------- */
 
-export function Editor({ bridge, card, manifest }: {
+export function Editor({ bridge, card, manifest, onChanged }: {
   bridge: StudioBridge;
   card: CharacterCard;
   manifest: unknown;
+  /** a verb changed the manifest — the projections must re-read */
+  onChanged: () => void;
 }) {
   const stages = stageStates(manifest);
   const [active, setActive] = useState<StageKey>('look');
@@ -290,7 +293,18 @@ export function Editor({ bridge, card, manifest }: {
   return (
     <div className='editor'>
       <StageRail stages={stages} active={effective} onSelect={setActive} />
-      <CanvasWell bridge={bridge} card={card} />
+      {effective === 'gen'
+        ? (
+          <div className='center genstage'>
+            <Candidates
+              bridge={bridge}
+              dir={card.dir}
+              manifest={manifest}
+              onChanged={onChanged}
+            />
+          </div>
+        )
+        : <CanvasWell bridge={bridge} card={card} />}
       <Grip width={inspW} setWidth={setInspW} />
       <div style={{ width: inspW }} className='inspwrap'>
         <Inspector

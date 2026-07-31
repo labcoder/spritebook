@@ -14,6 +14,7 @@ import { Editor } from './editor';
 import { LogDrawer, MenuBar, StatusBar, Tabs } from './chrome';
 import { Palette, type PaletteAction } from './palette';
 import { ManageModels } from './models';
+import { GenerateNew } from './gen';
 
 const bridge = makeBridge();
 
@@ -42,6 +43,7 @@ export default function App() {
     exitCode: null,
   });
   const [openDirs, setOpenDirs] = useState<string[]>([]);
+  const [newOpen, setNewOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('gallery');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -96,9 +98,23 @@ export default function App() {
   }, []);
 
   const closeTab = useCallback((dir: string) => {
-    setOpenDirs((cur) => cur.filter((d) => d !== dir));
+    if (dir === '__new__') setNewOpen(false);
+    else setOpenDirs((cur) => cur.filter((d) => d !== dir));
     setActiveTab((cur) => (cur === dir ? 'gallery' : cur));
   }, []);
+
+  const openNew = useCallback(() => {
+    setNewOpen(true);
+    setActiveTab('__new__');
+  }, []);
+
+  // gen exited 0: the workspace exists now - re-read, open its tab, land on Gen
+  const onCreated = useCallback(async (dir: string) => {
+    setNewOpen(false);
+    await load();
+    setOpenDirs((cur) => (cur.includes(dir) ? cur : [...cur, dir]));
+    setActiveTab(dir);
+  }, [load]);
 
   // undo/redo act on the ACTIVE character's manifest through the core verbs
   // (invariant 7: journaled patches; the GUI is just a caller). The drawer
@@ -146,6 +162,7 @@ export default function App() {
       id: dir,
       label: byDir.get(dir)?.card.displayName ?? dir.split(/[\\/]/).pop() ?? dir,
     })),
+    ...(newOpen ? [{ id: '__new__', label: t('New character') }] : []),
   ];
 
   const activeWs = activeTab === 'gallery' ? undefined : byDir.get(activeTab);
@@ -188,6 +205,12 @@ export default function App() {
       hint: 'Ctrl+Shift+Z',
       enabled: activeTab !== 'gallery',
       run: () => runJournal('redo'),
+    },
+    {
+      id: 'new',
+      title: t('New character'),
+      enabled: !newOpen,
+      run: openNew,
     },
     {
       id: 'gallery',
@@ -242,6 +265,7 @@ export default function App() {
         active={activeTab}
         onSelect={setActiveTab}
         onClose={closeTab}
+        onNew={openNew}
       />
 
       {activeTab === 'gallery' && (
@@ -286,12 +310,22 @@ export default function App() {
               onOpen={openCharacter}
             />
           )
+          : activeTab === '__new__'
+          ? (
+            <GenerateNew
+              bridge={bridge}
+              projectsRoot={root}
+              onCreated={onCreated}
+              onOpenModels={() => setModelsOpen(true)}
+            />
+          )
           : activeWs
           ? (
             <Editor
               bridge={bridge}
               card={activeWs.card}
               manifest={activeWs.raw.manifest}
+              onChanged={load}
             />
           )
           : (
@@ -301,7 +335,7 @@ export default function App() {
           )}
       </main>
 
-      <LogDrawer open={drawerOpen} />
+      <LogDrawer open={drawerOpen} bridge={bridge} />
       <StatusBar
         exam={exam}
         counts={{ characters: workspaces?.length ?? null, bridge: bridge.name }}

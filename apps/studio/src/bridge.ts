@@ -44,6 +44,12 @@ export interface StudioBridge {
   listWorkspaces(root: string): Promise<RawWorkspace[]>;
   /** Newest bake's contact gif for a workspace dir, as a data URL, if any. */
   readThumb(dir: string): Promise<string | null>;
+  /** A source image as a data URL for preview (extension-allowlisted). */
+  readImage(path: string): Promise<string | null>;
+  /** The PREVIOUS app run's session log tail, for the drawer's replay. */
+  prevSession(maxLines: number): Promise<string[] | null>;
+  /** Native file drop with real paths, when the shell provides it. */
+  onFileDrop?(cb: (paths: string[]) => void): void;
 }
 
 type TauriGlobal = {
@@ -107,6 +113,20 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
       const b64 = (await t.core.invoke('read_thumb', { dir })) as string | null;
       return b64 ? `data:image/gif;base64,${b64}` : null;
     },
+    async readImage(path) {
+      const r = (await t.core.invoke('read_image', { path })) as [string, string] | null;
+      return r ? `data:${r[0]};base64,${r[1]}` : null;
+    },
+    async prevSession(maxLines) {
+      return (await t.core.invoke('read_prev_session', { maxLines })) as string[] | null;
+    },
+    onFileDrop(cb) {
+      // v2 emits webview drag/drop as tauri://drag-drop with { paths, position }
+      t.event.listen('tauri://drag-drop', (e) => {
+        const payload = e.payload as { paths?: string[] };
+        if (payload?.paths?.length) cb(payload.paths);
+      });
+    },
   };
 }
 
@@ -158,6 +178,13 @@ const DEMO_CATALOG = {
         diskBytes: 0,
         platforms: ['windows-cpu', 'linux-cpu', 'macos-cpu'],
         installed: true,
+        paramsSchema: {
+          properties: {
+            seed: { type: 'integer', minimum: 0 },
+            candidates: { type: 'integer', minimum: 1, maximum: 8 },
+          },
+        },
+        defaults: { seed: 0, candidates: 1 },
       }],
     },
     {
@@ -171,6 +198,19 @@ const DEMO_CATALOG = {
         platforms: ['windows-cuda', 'linux-cuda'],
         minVramGb: 12,
         installed: true,
+        paramsSchema: {
+          properties: {
+            steps: { type: 'integer', minimum: 1, maximum: 100 },
+            guidanceStrength: { type: 'number', minimum: 0 },
+            pipelineType: { type: 'string', enum: ['512', '1024', '1024_cascade'] },
+            lowVram: { type: 'boolean' },
+            candidates: { type: 'integer', minimum: 1, maximum: 8 },
+          },
+        },
+        defaults: { lowVram: true, seed: 0 },
+        operationDefaults: {
+          gen3d: { steps: 12, guidanceStrength: 7.5, pipelineType: '512' },
+        },
       }],
     },
     {
@@ -189,6 +229,8 @@ const DEMO_CATALOG = {
         platforms: ['windows-cuda'],
         minVramGb: 8,
         installed: false,
+        paramsSchema: { properties: { seed: { type: 'integer' } } },
+        defaults: { seed: 0 },
       }],
     },
   ],
@@ -255,6 +297,18 @@ function browserBridge(): StudioBridge {
     },
     readThumb() {
       return Promise.resolve(null);
+    },
+    readImage() {
+      // a 2x2 checker: enough for the preview STATE without pretending a file
+      return Promise.resolve(
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGNgYGD4z8DA8J+BgQEADQQDAg6dhSMAAAAASUVORK5CYII=',
+      );
+    },
+    prevSession() {
+      return Promise.resolve([
+        JSON.stringify({ t: 'queued', jobId: 'demo-prev', at: '2026-07-31T00:00:00.000Z' }),
+        JSON.stringify({ t: 'done', jobId: 'demo-prev', at: '2026-07-31T00:00:01.000Z' }),
+      ]);
     },
   };
 }
