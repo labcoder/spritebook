@@ -29,6 +29,29 @@ fn repo_root() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.."))
 }
 
+/// One NDJSON session file per app run; the previous run's file is what the
+/// drawer REPLAYS. Lives under the OS local-data dir, newest-first by name.
+fn session_dir() -> PathBuf {
+    let base = std::env::var("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir());
+    base.join("spritebook-studio/logs")
+}
+
+fn session_path() -> &'static PathBuf {
+    use std::sync::OnceLock;
+    static PATH: OnceLock<PathBuf> = OnceLock::new();
+    PATH.get_or_init(|| {
+        let dir = session_dir();
+        let _ = std::fs::create_dir_all(&dir);
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        dir.join(format!("session-{stamp}.ndjsonl"))
+    })
+}
+
 #[tauri::command]
 async fn run_cli(app: tauri::AppHandle, job_id: String, args: Vec<String>) -> Result<i32, String> {
     // per-job channel, so two concurrent jobs can never interleave lines
@@ -40,6 +63,10 @@ async fn run_cli(app: tauri::AppHandle, job_id: String, args: Vec<String>) -> Re
             .arg("-A")
             .arg(root.join("packages/cli/mod.ts"))
             .args(&args)
+            // the core-side sink: every JobEvent of every run lands in THIS
+            // app run's session file, which the next run's drawer can replay
+            .arg("--log-append")
+            .arg(session_path())
             .current_dir(&root)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -124,9 +151,67 @@ fn read_thumb(dir: String) -> Result<Option<String>, String> {
     }
 }
 
+/// Lines of the newest session file BEFORE this run's — the drawer's replay.
+#[tauri::command]
+fn read_prev_session(max_lines: usize) -> Result<Option<Vec<String>>, String> {
+    let dir = session_dir();
+    let current = session_path();
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Ok(None);
+    };
+    let mut files: Vec<PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p != current && p.extension().is_some_and(|x| x == "ndjsonl"))
+        .collect();
+    files.sort(); // session-<millis> sorts chronologically
+    match files.last() {
+        Some(p) => {
+            let text = std::fs::read_to_string(p).map_err(|e| e.to_string())?;
+            let lines: Vec<String> = text.lines().map(String::from).collect();
+            let start = lines.len().saturating_sub(max_lines);
+            Ok(Some(lines[start..].to_vec()))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Source-image preview bytes. Read-only, and only image extensions — the
+/// webview must not become a generic file reader.
+#[tauri::command]
+fn read_image(path: String) -> Result<Option<(String, String)>, String> {
+    use base64::Engine;
+    let p = PathBuf::from(&path);
+    let mime = match p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("gif") => "image/gif",
+        _ => return Ok(None),
+    };
+    match std::fs::read(&p) {
+        Ok(bytes) => Ok(Some((
+            mime.to_string(),
+            base64::engine::general_purpose::STANDARD.encode(bytes),
+        ))),
+        Err(_) => Ok(None),
+    }
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![run_cli, list_workspaces, read_thumb])
+        .invoke_handler(tauri::generate_handler![
+            run_cli,
+            list_workspaces,
+            read_thumb,
+            read_prev_session,
+            read_image
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
