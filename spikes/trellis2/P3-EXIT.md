@@ -242,6 +242,12 @@ lit-vs-albedo gap this report measured at the start (albedo 0.344 / lit 0.160) �
 closed by the scale fix. It is a look problem now, not a broken-pipeline problem, and it belongs to
 P4.
 
+> **Superseded (2026-07-31):** the colour gap did NOT go to P4 — it was diagnosed and closed inside
+> P3 by the quality waves (spikes/trellis2/QUALITY-AUDIT.md and the A/B/C-wave records beside it):
+> ambient 0.12 → 0.30, `pixel` at 16 colours, texture guidance 3.5/0.2, the Oklab colour-match pass
+> (λ 0.5), source-image reprojection default-on in `pick`, and camera-frame lighting. The teal and
+> the blue are in the shipped palette; docs/internal/roadmap/p3.md carries the close note.
+
 ## Still open
 
 - The colour gap above.
