@@ -13,12 +13,12 @@ are unchanged.
 
 ## Runtime & shell
 
-| Dependency               | Role                                                                                                                        | License             | Status           |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------- | ---------------- |
-| Deno 2.x                 | TS runtime, workspace, WebGPU, tests                                                                                        | MIT                 | std              |
-| zod 4.x                  | runtime validation for `@spritebook/schema`; v4 core rewrite + native JSON-Schema interop (pairs with D-009 `paramsSchema`) | MIT                 | std; lock-pinned |
+| Dependency               | Role                                                                                                                                                                                                          | License             | Status           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ---------------- |
+| Deno 2.x                 | TS runtime, workspace, WebGPU, tests                                                                                                                                                                          | MIT                 | std              |
+| zod 4.x                  | runtime validation for `@spritebook/schema`; v4 core rewrite + native JSON-Schema interop (pairs with D-009 `paramsSchema`)                                                                                   | MIT                 | std; lock-pinned |
 | Tauri 2.x (pin minor)    | app shell — **chosen by P0-T3 (D-005)**; `deno desktop` revisit trigger noted in D-005; in use since P4-T1 (`apps/studio/src-tauri`, pinned 2.11/2.6 + serde, serde_json, base64 crates — all MIT+Apache-2.0) | MIT+Apache-2.0      | std              |
-| wgpu (under Deno WebGPU) | GPU backend                                                                                                                 | MIT/Apache-2.0 dual | std              |
+| wgpu (under Deno WebGPU) | GPU backend                                                                                                                                                                                                   | MIT/Apache-2.0 dual | std              |
 
 ## Core render, style, pack
 
@@ -92,15 +92,16 @@ the bundled starter.
 
 ## GUI
 
-| Dependency                                                                     | Role                                                             | License     | Status                                                                                  |
-| ------------------------------------------------------------------------------ | ---------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------- |
-| React 19 + Vite                                                                | framework + build                                                | MIT         | std                                                                                     |
-| **Base UI** `@base-ui/react`                                                   | headless a11y primitives (35 comps incl. number-field scrubbing) | MIT         | **✓** v1.0 stable Dec 2025; full-time MUI team incl. Radix authors; WCAG out of the box |
-| three.js (pinned) + camera-controls + three-viewport-gizmo + TransformControls | inspection viewports                                             | MIT         | std                                                                                     |
-| Lingui                                                                         | ICU i18n                                                         | MIT         | std                                                                                     |
-| zustand                                                                        | GUI-local state                                                  | MIT         | std                                                                                     |
-| Chakra Petch, IBM Plex Sans/Mono                                               | type                                                             | SIL OFL 1.1 | std                                                                                     |
-| Lucide                                                                         | icons                                                            | ISC         | std                                                                                     |
+| Dependency                                                                     | Role                                                                | License     | Status                                                                                             |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| React 19 + Vite                                                                | framework + build                                                   | MIT         | std                                                                                                |
+| **Base UI** `@base-ui/react`                                                   | headless a11y primitives (35 comps incl. number-field scrubbing)    | MIT         | **✓** v1.0 stable Dec 2025; full-time MUI team incl. Radix authors; WCAG out of the box            |
+| three.js (pinned) + camera-controls + three-viewport-gizmo + TransformControls | inspection viewports                                                | MIT         | std                                                                                                |
+| Lingui                                                                         | ICU i18n — runtime wired P4-T1, pinned 6.6.0; extraction pass later | MIT         | std                                                                                                |
+| zustand                                                                        | GUI-local state                                                     | MIT         | std                                                                                                |
+| Chakra Petch, IBM Plex Sans/Mono                                               | type                                                                | SIL OFL 1.1 | std                                                                                                |
+| axe-core (dev only)                                                            | a11y audit against the dev app (never bundled)                      | MPL-2.0     | std; devDependency only — MPL is file-level copyleft, acceptable for a dev tool that ships nothing |
+| Lucide                                                                         | icons                                                               | ISC         | std                                                                                                |
 
 ## Open gates
 
