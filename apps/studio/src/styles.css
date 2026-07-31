@@ -266,20 +266,20 @@ input {
   padding: 4px 6px;
 }
 .tag.style {
-  color: var(--sb-cyan);
-  border-color: var(--sb-cyan);
+  color: var(--sb-cyan-ink);
+  border-color: var(--sb-cyan-ink);
 }
 .tag.rig-ok {
   color: var(--sb-ok);
   border-color: var(--sb-ok);
 }
 .tag.rig-warn {
-  color: var(--sb-signal);
-  border-color: var(--sb-signal);
+  color: var(--sb-signal-ink);
+  border-color: var(--sb-signal-ink);
 }
 .tag.baked {
-  color: var(--sb-sun);
-  border-color: var(--sb-sun);
+  color: var(--sb-sun-ink);
+  border-color: var(--sb-sun-ink);
 }
 .empty {
   grid-column: 1 / -1;
@@ -308,7 +308,7 @@ input {
   color: var(--sb-ok);
 }
 .statusbar .bad {
-  color: var(--sb-signal);
+  color: var(--sb-signal-ink);
 }
 .statusbar .right {
   margin-left: auto;
@@ -665,10 +665,10 @@ input {
   flex: none;
 }
 .logline.sev-warn .logtext {
-  color: var(--sb-sun);
+  color: var(--sb-sun-ink);
 }
 .logline.sev-error .logtext {
-  color: var(--sb-signal);
+  color: var(--sb-signal-ink);
 }
 .loghandle {
   font: 400 11px/1 'IBM Plex Mono', monospace;
@@ -681,7 +681,7 @@ input {
   border-color: var(--sb-line);
 }
 .loghandle.haserr {
-  color: var(--sb-signal);
+  color: var(--sb-signal-ink);
 }
 .logbadge {
   margin-left: 6px;

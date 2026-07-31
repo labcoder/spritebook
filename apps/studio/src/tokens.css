@@ -41,6 +41,17 @@
   --sb-focus: #5a6bf0;
   --sb-on-acid: #17190a;
 
+  /* accents in a TEXT role (rule 5 generalized): on charcoal the accents are
+   * already legible, so dark ink == accent; light overrides below. Cobalt is
+   * deliberately ABSENT — it fails AA as text on dark (3.9:1) and is a focus
+   * ring, never copy. */
+  --sb-acid-ink: #c6dc34;
+  /* the one dark ink that ISN'T its accent: #DD3FD3 reads 4.26:1 on raise */
+  --sb-magenta-ink: #e14fd8;
+  --sb-cyan-ink: #55d0d6;
+  --sb-sun-ink: #e8c226;
+  --sb-signal-ink: #f05d4e;
+
   /* canvas wells — fixed in both themes (rule 4) */
   --sb-check-a: #232329;
   --sb-check-b: #1b1b20;
@@ -69,6 +80,15 @@
   --sb-ok: #3140c4;
   --sb-focus: #3140c4;
   --sb-on-acid: #17190a;
+
+  /* ink-darkened accent variants for text on paper — each clears 4.5:1 on
+   * panel AND raise (held by tokens_test.ts). acid-ink runs darker than the
+   * doc's #67750A, which fails on raise (3.8:1). */
+  --sb-acid-ink: #4f5a06;
+  --sb-magenta-ink: #8a1480;
+  --sb-cyan-ink: #19646a;
+  --sb-sun-ink: #715703;
+  --sb-signal-ink: #a2261c;
 
   /* rule 4, stated where a light-theme edit would look for it: the wells do
    * not follow the theme — same values as dark, on purpose */

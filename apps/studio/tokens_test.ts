@@ -102,6 +102,25 @@ Deno.test('the ratified deltas: ok diverges by theme; light line/strong is stron
   );
 });
 
+Deno.test('every accent-as-text ink clears 4.5:1 on panel AND raise, both themes', () => {
+  // rule 5 generalized by the manual AA pass: accents in a TEXT role go
+  // through -ink tokens (tags, drawer severities, badges). Cobalt has no ink
+  // on purpose — it fails as text on dark and is a focus ring, never copy.
+  const inks = ['sb-acid-ink', 'sb-magenta-ink', 'sb-cyan-ink', 'sb-sun-ink', 'sb-signal-ink'];
+  for (const [name, t] of [['dark', dark], ['light', light]] as const) {
+    for (const ink of inks) {
+      assert(t.has(ink), `${name} defines ${ink}`);
+      for (const surface of ['sb-panel', 'sb-raise']) {
+        const ratio = contrast(t.get(ink)!, t.get(surface)!);
+        assert(
+          ratio >= 4.5,
+          `${name}: ${ink} on ${surface} is ${ratio.toFixed(2)}:1, AA wants 4.5:1`,
+        );
+      }
+    }
+  }
+});
+
 Deno.test('status hues stay AA-legible as TEXT on the status bar panel', () => {
   // the status bar renders ok/signal as text on panel — that is a real usage
   // in App.tsx, so it is a real constraint here
