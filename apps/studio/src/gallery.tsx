@@ -1,0 +1,95 @@
+/** The read-only character gallery. A card is a BUTTON: it opens the character's tab. */
+import { useEffect, useState } from 'react';
+import type { StudioBridge } from './bridge';
+import type { CharacterCard } from './manifest';
+import { t } from './i18n';
+
+export function Thumb({ bridge, dir }: { bridge: StudioBridge; dir: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    let live = true;
+    bridge.readThumb(dir).then((s) => {
+      if (!live) return;
+      if (s) setSrc(s);
+      else setMissing(true);
+    }, () => live && setMissing(true));
+    return () => {
+      live = false;
+    };
+  }, [bridge, dir]);
+  return (
+    <div className='thumb' aria-hidden='true'>
+      {src
+        ? <img src={src} alt='' />
+        : <span className='nothumb'>{missing ? t('no bake yet') : '…'}</span>}
+    </div>
+  );
+}
+
+export function Card(
+  { bridge, c, onOpen }: { bridge: StudioBridge; c: CharacterCard; onOpen: (dir: string) => void },
+) {
+  return (
+    <button
+      type='button'
+      className='card'
+      onClick={() => onOpen(c.dir)}
+      aria-label={`${t('Open')} ${c.displayName}`}
+    >
+      <Thumb bridge={bridge} dir={c.dir} />
+      <div className='cardbody'>
+        <div className='cardname'>{c.displayName}</div>
+        <div className='cardid'>
+          {c.id}
+          {c.heightM !== undefined ? ` · ${c.heightM.toFixed(2)} m` : ''}
+          {c.pickedResultId ? ` · pick ${c.pickedResultId}` : ''}
+        </div>
+        {c.problem
+          ? (
+            <div className='tags'>
+              <span className='tag rig-warn'>{c.problem}</span>
+            </div>
+          )
+          : (
+            <div className='tags'>
+              {c.stylePresetId && <span className='tag style'>{c.stylePresetId}</span>}
+              {c.rig && (
+                <span className={`tag ${c.rig.accepted ? 'rig-ok' : 'rig-warn'}`}>
+                  rig {c.rig.track}
+                  {c.rig.jointCount !== undefined ? ` · ${c.rig.jointCount}j` : ''}
+                  {c.rig.accepted ? ` · ${t('accepted')}` : ` · ${t('unaccepted')}`}
+                </span>
+              )}
+              {c.lastBakeId && <span className='tag baked'>{t('baked')} {c.lastBakeId}</span>}
+            </div>
+          )}
+      </div>
+    </button>
+  );
+}
+
+export function Gallery({ bridge, cards, loadError, onOpen }: {
+  bridge: StudioBridge;
+  cards: CharacterCard[] | null;
+  loadError: string | null;
+  onOpen: (dir: string) => void;
+}) {
+  return (
+    <div className='gallery'>
+      {loadError && (
+        <div className='empty'>
+          <p>{t('Could not read that root.')}</p>
+          <p className='mono'>{loadError}</p>
+        </div>
+      )}
+      {cards && cards.length === 0 && (
+        <div className='empty'>
+          <p>{t('No characters under this root.')}</p>
+          <p className='mono'>{t('a character is any directory holding a character.json')}</p>
+        </div>
+      )}
+      {cards?.map((c) => <Card key={c.dir} bridge={bridge} c={c} onOpen={onOpen} />)}
+    </div>
+  );
+}

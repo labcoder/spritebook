@@ -226,7 +226,8 @@ input {
   justify-content: center;
   border-bottom: 1px solid var(--sb-line);
   /* the well rule: dark checker in BOTH themes */
-  background: repeating-conic-gradient(var(--sb-check-a) 0% 25%, var(--sb-check-b) 0% 50%) 0 0 /
+  background: repeating-conic-gradient(var(--sb-check-a) 0% 25%,
+    var(--sb-check-b) 0% 50%) 0 0 /
     16px 16px;
 }
 .thumb img {
@@ -313,4 +314,379 @@ input {
   margin-left: auto;
   display: flex;
   gap: 12px;
+}
+
+/* ---- character tabs ---- */
+.tabsrow {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 8px 12px 0;
+  background: var(--sb-panel);
+  border-bottom: 1px solid var(--sb-line);
+  flex: none;
+}
+.ctab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  top: 1px;
+  padding: 7px 14px 8px;
+  color: var(--sb-dim);
+  border: 1px solid transparent;
+  border-bottom: none;
+  font-size: 12.5px;
+}
+.ctab-btn.on {
+  background: var(--sb-bg);
+  color: var(--sb-text);
+  border-color: var(--sb-line);
+  box-shadow: inset 0 2px 0 var(--sb-cyan);
+}
+.ctab-close {
+  color: var(--sb-dim);
+  font-size: 13px;
+  padding: 0 2px;
+}
+.ctab-close:hover {
+  color: var(--sb-signal);
+}
+.mainpanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.mainpanel .gallery {
+  flex: 1;
+}
+.mainpanel > .empty {
+  padding: 40px;
+  color: var(--sb-dim);
+  text-align: center;
+}
+
+/* ---- editor frame ---- */
+.editor {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: var(--sb-bg);
+}
+.rail {
+  width: 176px;
+  flex: none;
+  background: var(--sb-panel);
+  border-right: 1px solid var(--sb-line);
+  padding: 12px 0 8px;
+  display: flex;
+  flex-direction: column;
+}
+.stage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  color: var(--sb-dim);
+  position: relative;
+  text-align: left;
+}
+.stage .n {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  width: 20px;
+}
+.stage .nm {
+  font-size: 11px;
+}
+.stage .hue {
+  width: 8px;
+  height: 8px;
+  flex: none;
+}
+.stage .dot {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.stage .dot.done {
+  background: var(--sb-ok);
+}
+.stage .dot.warn {
+  background: var(--sb-signal);
+}
+.stage .dot.idle {
+  border: 1px solid var(--sb-line);
+}
+.stage .dot.locked {
+  border: 1px dotted var(--sb-line);
+}
+.stage.on {
+  color: var(--sb-text);
+  background: var(--sb-raise);
+}
+.stage.on::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--sb-cyan);
+}
+.stage.st-locked {
+  opacity: 0.55;
+  cursor: default;
+}
+.railnote {
+  margin-top: auto;
+  padding: 10px 14px 4px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--sb-dim);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* ---- canvas well ---- */
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.canvashead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--sb-line);
+  flex: none;
+}
+.canvashead .hud {
+  font-size: 11px;
+}
+.dimtext {
+  color: var(--sb-dim);
+  font-size: 11.5px;
+}
+.zoom {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+.zoom button {
+  padding: 4px 9px;
+  border: 1px solid var(--sb-line);
+  font: 400 11px/1 'IBM Plex Mono', monospace;
+  color: var(--sb-dim);
+}
+.zoom button[aria-pressed='true'] {
+  background: var(--sb-acid);
+  color: var(--sb-on-acid);
+  border-color: var(--sb-acid);
+  font-weight: 500;
+}
+.well {
+  flex: 1;
+  margin: 14px;
+  position: relative;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: repeating-conic-gradient(var(--sb-check-a) 0% 25%,
+    var(--sb-check-b) 0% 50%) 0 0 /
+    16px 16px;
+  border: 1px solid var(--sb-line);
+  min-height: 0;
+}
+.well img {
+  image-rendering: pixelated;
+  flex: none;
+}
+.wellnote {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  font-size: 10.5px;
+  color: var(--sb-dim);
+}
+
+/* ---- inspector + grip ---- */
+.grip {
+  width: 6px;
+  flex: none;
+  cursor: col-resize;
+  background: var(--sb-panel);
+  border-left: 1px solid var(--sb-line);
+  touch-action: none;
+}
+.grip:hover,
+.grip:focus-visible {
+  background: var(--sb-cobalt);
+}
+.inspwrap {
+  flex: none;
+  min-width: 0;
+  display: flex;
+}
+.insp {
+  flex: 1;
+  background: var(--sb-panel);
+  border-left: 1px solid var(--sb-line);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.isec {
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid var(--sb-line);
+}
+.isechead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.isechead .hud {
+  font-size: 10.5px;
+}
+.ieyebrow {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  /* dim, not an accent: cyan-as-text fails AA on paper (axe caught it) —
+   * the stage hue lives on the rail chip, annotations stay legible */
+  color: var(--sb-dim);
+}
+.irow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 12px;
+}
+.ikey {
+  color: var(--sb-dim);
+}
+.ival {
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inote {
+  font-size: 11px;
+  color: var(--sb-dim);
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+.ifoot {
+  margin-top: auto;
+  border-bottom: none;
+}
+.ipath {
+  direction: rtl;
+  text-align: left;
+}
+
+/* ---- log drawer ---- */
+.logdrawer {
+  flex: none;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  background: var(--sb-panel);
+  border-top: 1px solid var(--sb-line-strong);
+}
+.loghead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--sb-line);
+  flex: none;
+}
+.loghead .hud {
+  font-size: 10.5px;
+}
+.logcount {
+  font-size: 10.5px;
+  color: var(--sb-dim);
+}
+.logfilters {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+.logfilter {
+  padding: 4px 10px;
+  border: 1px solid var(--sb-line);
+  font: 400 11px/1 'IBM Plex Mono', monospace;
+  color: var(--sb-dim);
+}
+.logfilter[aria-pressed='true'] {
+  background: var(--sb-raise);
+  color: var(--sb-text);
+  border-color: var(--sb-dim);
+}
+.logcopy {
+  padding: 4px 12px;
+  font-size: 11px;
+}
+.logbody {
+  flex: 1;
+  overflow: auto;
+  padding: 6px 12px;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.logempty {
+  color: var(--sb-dim);
+  padding: 12px 0;
+}
+.logline {
+  display: flex;
+  gap: 10px;
+  white-space: pre;
+}
+.logjob {
+  color: var(--sb-dim);
+  flex: none;
+}
+.logline.sev-warn .logtext {
+  color: var(--sb-sun);
+}
+.logline.sev-error .logtext {
+  color: var(--sb-signal);
+}
+.loghandle {
+  font: 400 11px/1 'IBM Plex Mono', monospace;
+  color: var(--sb-dim);
+  padding: 4px 8px;
+  border: 1px solid transparent;
+}
+.loghandle:hover {
+  color: var(--sb-text);
+  border-color: var(--sb-line);
+}
+.loghandle.haserr {
+  color: var(--sb-signal);
+}
+.logbadge {
+  margin-left: 6px;
+  padding: 2px 6px;
+  background: var(--sb-signal);
+  color: var(--sb-bg);
+  font-weight: 500;
 }

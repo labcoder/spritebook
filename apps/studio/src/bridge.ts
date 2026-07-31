@@ -8,8 +8,11 @@
  * (invariant 1); nothing here mutates anything.
  *
  * D-005 rider honored: CLI streams arrive on a PER-JOB channel
- * (`cli:<jobId>`), never a global event name.
+ * (`cli:<jobId>`), never a global event name. Every relayed line also lands
+ * in the session log store VERBATIM — the drawer's "nothing fails silently"
+ * depends on the bridge never editorializing.
  */
+import { log } from './log';
 
 export interface RawWorkspace {
   dir: string;
@@ -49,6 +52,7 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
       const unlisten = await t.event.listen(`cli:${jobId}`, (e) => {
         const line = String(e.payload);
         last = line;
+        log.append(jobId, line);
         onLine?.(line);
       });
       try {
@@ -90,29 +94,33 @@ const DEMO_MANIFEST = {
   source: { kind: 'image' },
 };
 
+function demoReport(sidecar: boolean): Record<string, unknown> {
+  return {
+    spritebook: '0.5.0-demo',
+    adapter: { description: 'demo adapter (browser preview)' },
+    probe: { ok: true },
+    ...(sidecar
+      ? {
+        sidecar: {
+          ok: true,
+          contractVersion: 1,
+          sidecarVersion: 'demo',
+          python: '3.x-demo',
+          adapters: [{ id: 'fixture-gen', kind: 'gen3d', version: '0' }],
+        },
+      }
+      : {}),
+  };
+}
+
 function browserBridge(): StudioBridge {
+  let seq = 0;
   return {
     name: 'browser-demo',
     runDoctor(opts) {
-      return Promise.resolve({
-        exitCode: 0,
-        report: {
-          spritebook: '0.5.0-demo',
-          adapter: { description: 'demo adapter (browser preview)' },
-          probe: { ok: true },
-          ...(opts.sidecar
-            ? {
-              sidecar: {
-                ok: true,
-                contractVersion: 1,
-                sidecarVersion: 'demo',
-                python: '3.x-demo',
-                adapters: [{ id: 'fixture-gen', kind: 'gen3d', version: '0' }],
-              },
-            }
-            : {}),
-        },
-      });
+      const report = demoReport(opts.sidecar);
+      log.append(`doctor-demo-${++seq}`, JSON.stringify(report));
+      return Promise.resolve({ exitCode: 0, report });
     },
     listWorkspaces() {
       return Promise.resolve([
@@ -127,6 +135,16 @@ function browserBridge(): StudioBridge {
             rig: { track: 'B', accepted: true, jointCount: 52 },
             generation: { pickedResultId: 'r1' },
             lastBakeId: undefined,
+          },
+        },
+        {
+          // no canonical mesh yet: the card the LOCK states demo against
+          dir: 'demo/sprout',
+          manifest: {
+            id: 'sprout',
+            displayName: 'sprout',
+            generation: { results: [{ id: 'r1' }, { id: 'r2' }] },
+            source: { kind: 'image' },
           },
         },
       ]);
