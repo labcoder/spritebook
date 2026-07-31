@@ -71,3 +71,49 @@ appear: the key's screen-relative offset is constant by construction in 'camera'
 `bake --light-frame world`; lightRigHash carries the resolved frame, so the modes never share a
 cache row. Sheets: scratchpad `b3/lightframe-sheets.png`. Full suite green after the flip — the
 committed goldens are front-facing (yaw 0), where the two frames agree exactly.
+
+### C1 result — steps stays 12 (2026-07-31)
+
+12 gens (`c_wave.py`, one pipeline load, `out/c-wave/sweep.jsonl`), clean front renders judged at
+bbox zoom. Per-steps means across the 4 cells:
+
+| steps | hueDist    | mean C     | max metal | wall  |
+| ----- | ---------- | ---------- | --------- | ----- |
+| 12    | 0.0278     | 0.0948     | 0.15      | 42s   |
+| 20    | 0.0244     | 0.0929     | 0.16      | 50s   |
+| 35    | **0.0207** | **0.0807** | **0.62**  | 70s   |
+
+Steps 35 crosses the registered ≥20% hue bar (25%) — and is disqualified by the same read that
+rejected cascade in A1: the hue "win" rides a chroma collapse (bulma s7: C 0.110 → 0.066, hair
+renders near-black) and a metal explosion (0.62 / 0.26 on bulma, vs 0.00 at 12/20). hueDist read
+without chromaDelta flatters desaturation; the metric SET says 35 is a regression.
+
+Steps 20 is the honest candidate: bulma identical to 12 on both seeds, mermaid s100's fragmented
+hair mass visibly fills in, mermaid s7 different-but-not-better. That is one clear cell of four
+with the hue gain (12%) below the registered bar — moving a fleet-wide default on one cell is the
+seed-42 lesson the rubric exists to prevent, and the same de-fragmentation is what a
+`--candidates` re-roll at 12 already buys. Ties go to 12; this is at most half a signal. **The
+catalog default stays 12.** The character that genuinely needs more sampling has the existing
+per-job knob: `gen --adjust steps=20`. Grid: scratchpad `cwave-bakes/c1-steps-zoom.png`.
+
+### C3 result — 2048 stays; 4096 cannot even render today (2026-07-31)
+
+Receipt texRes confirms both sizes export as asked. hueDist at 4096 is identical to 2048 within
+noise (seed 7: 0.0381 vs 0.0380; seed 100: 0.0160 vs 0.0155) — the registered null. The registered
+128 px render pair then failed harder than a null: both 4096 meshes are REFUSED by the render lane
+(`renderer setup validation error: Buffer with '' label is invalid`) while all twelve 2048 meshes
+bake clean. 4096 is not just invisible at sprite scales; it does not load. **textureSize stays
+2048**, and the render-lane refusal is recorded so a future "bump it for quality" idea starts from
+this fact. Wall cost would have been +65% (57s vs 35s) for it.
+
+### C4 result — the refusal IS the pin (2026-07-31)
+
+The white-flattened (alpha-stripped) bulma was refused at the adapter's own gate:
+
+> AdapterError: bad-input: trellis2 needs a CUT-OUT RGBA image and '…bulma-flattened.png' is RGB.
+> Run the prep stage (rembg-u2net) first - its alpha is also what keeps this backend from reaching
+> for the gated briaai/RMBG-2.0 background remover.
+
+The documented-safe chain (our pre-cut RGBA + `preprocess_image=True`, rembg only firing when
+alpha is absent) is therefore enforced by the gate, not by convention. No change; the pin is this
+record plus the adapter error text it quotes.
