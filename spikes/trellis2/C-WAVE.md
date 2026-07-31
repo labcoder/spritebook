@@ -58,14 +58,14 @@ covered pixels per direction, spread = max − min across the row:
 | princess | 0.192        | **0.107**     | 0.578        | 0.650         |
 | mermaid  | 0.026        | 0.125         | 0.421        | 0.472         |
 
-The sheets: under 'world' the back rows lose the character — bulma's pink shirt and princess's
-cream dress read mud at d4–d6. Under 'camera' every facing reads as the same sprite. The
-counter-signal was investigated rather than averaged away: mermaid's spread RISES under 'camera'
-because her back hair is genuinely the brighter albedo mass — 'world' was cancelling that real
-albedo asymmetry against its lighting falloff, which is why her world row's 0.026 was never
-evidence of good lighting. 'camera' removes the lighting term from the spread; what remains is the
-character. The registered artefact check (a rim that flips sides between directions) does not
-appear: the key's screen-relative offset is constant by construction in 'camera' mode.
+The sheets: under 'world' the back rows lose the character — bulma's pink shirt and princess's cream
+dress read mud at d4–d6. Under 'camera' every facing reads as the same sprite. The counter-signal
+was investigated rather than averaged away: mermaid's spread RISES under 'camera' because her back
+hair is genuinely the brighter albedo mass — 'world' was cancelling that real albedo asymmetry
+against its lighting falloff, which is why her world row's 0.026 was never evidence of good
+lighting. 'camera' removes the lighting term from the spread; what remains is the character. The
+registered artefact check (a rim that flips sides between directions) does not appear: the key's
+screen-relative offset is constant by construction in 'camera' mode.
 
 **Landed:** `DEFAULT_LIGHT_FRAME = 'camera'` (renderer.ts); 'world' stays behind
 `bake --light-frame world`; lightRigHash carries the resolved frame, so the modes never share a
@@ -77,11 +77,11 @@ committed goldens are front-facing (yaw 0), where the two frames agree exactly.
 12 gens (`c_wave.py`, one pipeline load, `out/c-wave/sweep.jsonl`), clean front renders judged at
 bbox zoom. Per-steps means across the 4 cells:
 
-| steps | hueDist    | mean C     | max metal | wall  |
-| ----- | ---------- | ---------- | --------- | ----- |
-| 12    | 0.0278     | 0.0948     | 0.15      | 42s   |
-| 20    | 0.0244     | 0.0929     | 0.16      | 50s   |
-| 35    | **0.0207** | **0.0807** | **0.62**  | 70s   |
+| steps | hueDist    | mean C     | max metal | wall |
+| ----- | ---------- | ---------- | --------- | ---- |
+| 12    | 0.0278     | 0.0948     | 0.15      | 42s  |
+| 20    | 0.0244     | 0.0929     | 0.16      | 50s  |
+| 35    | **0.0207** | **0.0807** | **0.62**  | 70s  |
 
 Steps 35 crosses the registered ≥20% hue bar (25%) — and is disqualified by the same read that
 rejected cascade in A1: the hue "win" rides a chroma collapse (bulma s7: C 0.110 → 0.066, hair
@@ -89,12 +89,12 @@ renders near-black) and a metal explosion (0.62 / 0.26 on bulma, vs 0.00 at 12/2
 without chromaDelta flatters desaturation; the metric SET says 35 is a regression.
 
 Steps 20 is the honest candidate: bulma identical to 12 on both seeds, mermaid s100's fragmented
-hair mass visibly fills in, mermaid s7 different-but-not-better. That is one clear cell of four
-with the hue gain (12%) below the registered bar — moving a fleet-wide default on one cell is the
-seed-42 lesson the rubric exists to prevent, and the same de-fragmentation is what a
-`--candidates` re-roll at 12 already buys. Ties go to 12; this is at most half a signal. **The
-catalog default stays 12.** The character that genuinely needs more sampling has the existing
-per-job knob: `gen --adjust steps=20`. Grid: scratchpad `cwave-bakes/c1-steps-zoom.png`.
+hair mass visibly fills in, mermaid s7 different-but-not-better. That is one clear cell of four with
+the hue gain (12%) below the registered bar — moving a fleet-wide default on one cell is the seed-42
+lesson the rubric exists to prevent, and the same de-fragmentation is what a `--candidates` re-roll
+at 12 already buys. Ties go to 12; this is at most half a signal. **The catalog default stays 12.**
+The character that genuinely needs more sampling has the existing per-job knob:
+`gen --adjust steps=20`. Grid: scratchpad `cwave-bakes/c1-steps-zoom.png`.
 
 ### C3 result — 2048 stays; 4096 cannot even render today (2026-07-31)
 
@@ -114,6 +114,6 @@ The white-flattened (alpha-stripped) bulma was refused at the adapter's own gate
 > Run the prep stage (rembg-u2net) first - its alpha is also what keeps this backend from reaching
 > for the gated briaai/RMBG-2.0 background remover.
 
-The documented-safe chain (our pre-cut RGBA + `preprocess_image=True`, rembg only firing when
-alpha is absent) is therefore enforced by the gate, not by convention. No change; the pin is this
-record plus the adapter error text it quotes.
+The documented-safe chain (our pre-cut RGBA + `preprocess_image=True`, rembg only firing when alpha
+is absent) is therefore enforced by the gate, not by convention. No change; the pin is this record
+plus the adapter error text it quotes.

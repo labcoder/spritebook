@@ -210,8 +210,9 @@ Deno.test('a pathological spread ratio is clamped, and says which channels', asy
 // ---------------------------------------------------------------------------
 
 Deno.test('pick colour-matches by default, pins the image sha, and one undo takes it back', async () => {
-  const { appendGenerationResult, applyPatchOps, createWorkspace, readWorkspace, resultPaths } =
-    await import('@spritebook/core');
+  const { appendGenerationResult, applyPatchOps, createWorkspace, resultPaths } = await import(
+    '@spritebook/core'
+  );
   const { CharacterManifestSchema, ManifestPatchSchema, parseWith } = await import(
     '@spritebook/schema'
   );

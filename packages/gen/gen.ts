@@ -22,7 +22,6 @@ import {
   type GenJobSpec,
   type JobEvent,
   preflightVram,
-  RAW_MODEL,
 } from '@spritebook/schema';
 import { validateParams } from '@spritebook/core';
 import {
