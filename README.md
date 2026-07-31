@@ -30,12 +30,21 @@ The repo is a Deno workspace (`packages/*`; scaffolded at P1-T1, packages fill i
 phases). Requires [Deno](https://deno.com) 2.9.x.
 
 ```sh
-deno task test        # all workspace tests
-deno task lint        # deno lint
-deno task fmt         # format (fmt:check in CI)
-deno task coverage    # tests + coverage report
+deno task dev             # the studio in a BROWSER (demo-data bridge, port 5174)
+deno task dev:desktop     # the studio as the real desktop app (Tauri window;
+                          #   first run compiles Rust - takes a few minutes)
+deno task build:desktop   # packaged NSIS installer
+
+deno task test            # all workspace tests
+deno task test:watch      # test watcher
+deno task lint            # deno lint
+deno task fmt             # format (fmt:check in CI)
+deno task coverage        # tests + coverage report
 deno task hooks:install   # one-time: enables the conventional-commit hook
 ```
+
+`dev` serves chrome/tokens/a11y against labeled demo data — real workspaces, the sidecar exam, and
+thumbnails need the desktop shell (`dev:desktop`), whose bridge spawns the core CLI.
 
 CI runs lint/format/tests on Linux, macOS, and Windows, plus a Linux lane with Mesa lavapipe
 (software Vulkan) used by the render suites from P2 on. Platform targets and known gaps:

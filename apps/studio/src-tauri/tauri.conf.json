@@ -6,8 +6,8 @@
   "build": {
     "devUrl": "http://localhost:5174",
     "frontendDist": "../dist",
-    "beforeDevCommand": "deno task --cwd .. dev",
-    "beforeBuildCommand": "deno task --cwd .. build"
+    "beforeDevCommand": "deno task dev:web",
+    "beforeBuildCommand": "deno task build:web"
   },
   "app": {
     "withGlobalTauri": true,

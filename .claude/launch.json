@@ -6,6 +6,12 @@
       "runtimeExecutable": "deno",
       "runtimeArgs": ["task", "--cwd", "spikes/shell/app", "preview"],
       "port": 4174
+    },
+    {
+      "name": "studio-dev",
+      "runtimeExecutable": "deno",
+      "runtimeArgs": ["task", "--cwd", "apps/studio", "dev:web"],
+      "port": 5174
     }
   ]
 }

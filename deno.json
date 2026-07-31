@@ -47,7 +47,10 @@
     "apps/studio/src-tauri/target"
   ],
   "tasks": {
-    "dev": "deno test --watch --watch-exclude=node_modules --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=nvidia-smi,uv",
+    "dev": "deno task --cwd apps/studio dev:web",
+    "dev:desktop": "deno task --cwd apps/studio dev:desktop",
+    "build:desktop": "deno task --cwd apps/studio build:desktop",
+    "test:watch": "deno test --watch --watch-exclude=node_modules --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=nvidia-smi,uv",
     "test": "deno test --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=nvidia-smi,uv",
     "test:gpu": "SPRITEBOOK_REQUIRE_GPU=1 deno test --allow-read --allow-write --allow-env --allow-ffi packages/render/ packages/style/",
     "test:godot": "deno test --allow-read --allow-write --allow-env --allow-ffi --allow-run packages/export/godot_smoke_test.ts",

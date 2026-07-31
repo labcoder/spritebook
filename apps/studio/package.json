@@ -4,9 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 5174 --strictPort",
-    "build": "vite build",
-    "preview": "vite preview --port 4175 --strictPort"
+    "dev:web": "vite --port 5174 --strictPort",
+    "build:web": "vite build",
+    "preview:web": "vite preview --port 4175 --strictPort",
+    "dev:desktop": "tauri dev",
+    "build:desktop": "tauri build"
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",
@@ -14,6 +16,7 @@
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
     "@types/react": "19.2.13",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.4",
