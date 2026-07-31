@@ -10,4 +10,23 @@ export default defineConfig({
   preview: { port: 4175, strictPort: true },
   build: { outDir: 'dist', target: 'es2022' },
   clearScreen: false,
+  optimizeDeps: {
+    // NO lazy discovery: the rolldown scanner wedges the whole dev server
+    // for minutes crawling Deno's junction-heavy .deno store on Windows —
+    // the first request after any lockfile change answered NOTHING (not
+    // even index.html) while `[optimizer] scanning dependencies...` hung,
+    // which is exactly the white first-run window the maintainer reported
+    // (a rerun "worked" only by hitting the orphaned, finally-warm vite).
+    // Every dependency the app imports is listed EXPLICITLY instead; add
+    // new ones here or they load unbundled (slower, still correct).
+    noDiscovery: true,
+    include: [
+      'react',
+      'react/jsx-runtime',
+      'react-dom/client',
+      '@base-ui/react/menu',
+      '@lingui/core',
+      '@lingui/react',
+    ],
+  },
 });
