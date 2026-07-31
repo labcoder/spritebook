@@ -430,6 +430,11 @@ export interface ListedVersion {
   platforms: Platform[];
   minVramGb?: number;
   installed: boolean;
+  /** the D-009 form contract, verbatim from the catalog entry */
+  paramsSchema: ModelVersion['paramsSchema'];
+  defaults: Record<string, unknown>;
+  operationDefaults?: ModelVersion['operationDefaults'];
+  capabilities?: ModelVersion['capabilities'];
 }
 
 export interface ListedModel {
@@ -473,6 +478,13 @@ export async function runListQuery(
       platforms: v.platforms,
       ...(v.minVramGb !== undefined ? { minVramGb: v.minVramGb } : {}),
       installed: installed.has(`${m.id}@${v.version}`),
+      // D-009 made paramsSchema catalog data so option forms could render
+      // from it; the list row is where a GUI reads the catalog, so the
+      // schema, defaults, and per-operation overlays ride along verbatim.
+      paramsSchema: v.paramsSchema,
+      defaults: v.defaults,
+      ...(v.operationDefaults !== undefined ? { operationDefaults: v.operationDefaults } : {}),
+      ...(v.capabilities !== undefined ? { capabilities: v.capabilities } : {}),
     })),
   }));
 }

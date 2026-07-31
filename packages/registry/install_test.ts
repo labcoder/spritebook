@@ -90,6 +90,9 @@ Deno.test('install: happy path - verified files land, canonical receipt, events 
       diskBytes: TOY_A.byteLength + TOY_B.byteLength,
       platforms: ['windows-cpu', 'linux-cpu', 'macos-cpu'],
       installed: true,
+      // the D-009 form contract rides the list row (P4-T2)
+      paramsSchema: {},
+      defaults: {},
     }]);
   } finally {
     await Deno.remove(rig.tmp, { recursive: true });

@@ -660,7 +660,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
 };
 
 /** Accepted everywhere. */
-const GLOBAL_FLAGS = ['json'] as const;
+const GLOBAL_FLAGS = ['json', 'log-append'] as const;
 
 /**
  * The `--`-prefixed tokens this verb does not accept. Only `--` tokens are
@@ -685,12 +685,35 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
   const json = args.includes('--json');
   const verb = args[0];
 
+  // --log-append <file>: every JobEvent also lands in this file as NDJSON,
+  // REGARDLESS of --json — the sink is machine-facing (the studio's log
+  // drawer replays it), the terminal branch stays human. Job events only:
+  // query snapshots (doctor, models list) write documents, not streams.
+  // A sink that cannot be written must never kill the job it is recording —
+  // one stderr warning, then the run continues unsunk.
+  const logPath = flag(args, 'log-append');
+  let sinkBroken = false;
+  const sink = (line: string) => {
+    if (!logPath || sinkBroken) return;
+    try {
+      Deno.writeTextFileSync(logPath, line + '\n', { append: true });
+    } catch (err) {
+      sinkBroken = true;
+      io.stderr(
+        `warn: --log-append ${logPath} is unwritable (${
+          err instanceof Error ? err.message : err
+        }) - continuing without the sink`,
+      );
+    }
+  };
   const emit = (e: JobEvent, human: string) => {
+    sink(encodeEvent(e).trimEnd());
     if (json) io.stdout(encodeEvent(e).trimEnd());
     else io.stdout(human);
   };
   const fail = (jobId: JobEvent['jobId'], code: string, message: string): number => {
     const e: JobEvent = { t: 'error', jobId, at: now(), code, message, retryable: false };
+    sink(encodeEvent(e).trimEnd());
     if (json) io.stdout(encodeEvent(e).trimEnd());
     else io.stderr(`error: ${message}`);
     return 1;
