@@ -9,15 +9,50 @@ import { log, type Severity } from './log';
 
 /* ---------------- menu bar ---------------- */
 
-export function MenuBar({ theme, locale, gpu, onToggleTheme, onToggleLocale, onReload, onExam }: {
-  theme: string;
-  locale: string;
-  gpu: string | null;
-  onToggleTheme: () => void;
-  onToggleLocale: () => void;
-  onReload: () => void;
-  onExam: () => void;
+function MenuEntry({ label, hint, onClick, disabled }: {
+  label: string;
+  hint?: string;
+  onClick: () => void;
+  disabled?: boolean;
 }) {
+  return (
+    <Menu.Item className='menuitem' onClick={onClick} disabled={disabled}>
+      <span>{label}</span>
+      {hint && <span className='menuhint mono'>{hint}</span>}
+    </Menu.Item>
+  );
+}
+
+export function MenuBar(
+  {
+    theme,
+    locale,
+    gpu,
+    canEdit,
+    onToggleTheme,
+    onToggleLocale,
+    onReload,
+    onExam,
+    onPalette,
+    onModels,
+    onUndo,
+    onRedo,
+  }: {
+    theme: string;
+    locale: string;
+    gpu: string | null;
+    /** a character tab is active — undo/redo have a manifest to act on */
+    canEdit: boolean;
+    onToggleTheme: () => void;
+    onToggleLocale: () => void;
+    onReload: () => void;
+    onExam: () => void;
+    onPalette: () => void;
+    onModels: () => void;
+    onUndo: () => void;
+    onRedo: () => void;
+  },
+) {
   return (
     <header className='menubar'>
       <div className='logo'>
@@ -34,13 +69,47 @@ export function MenuBar({ theme, locale, gpu, onToggleTheme, onToggleLocale, onR
         <Menu.Portal>
           <Menu.Positioner sideOffset={4}>
             <Menu.Popup className='menupop'>
-              <Menu.Item className='menuitem' onClick={onReload}>{t('Reload gallery')}</Menu.Item>
-              <Menu.Item className='menuitem' onClick={onExam}>{t('Run health exam')}</Menu.Item>
+              <MenuEntry label={t('Reload gallery')} onClick={onReload} />
+              <MenuEntry label={t('Run health exam')} onClick={onExam} />
+              <MenuEntry
+                label={t('Manage models…')}
+                hint='Ctrl+M'
+                onClick={onModels}
+              />
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
+      <Menu.Root>
+        <Menu.Trigger className='menubtn'>{t('Edit')}</Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Positioner sideOffset={4}>
+            <Menu.Popup className='menupop'>
+              <MenuEntry
+                label={t('Undo')}
+                hint='Ctrl+Z'
+                onClick={onUndo}
+                disabled={!canEdit}
+              />
+              <MenuEntry
+                label={t('Redo')}
+                hint='Ctrl+Shift+Z'
+                onClick={onRedo}
+                disabled={!canEdit}
+              />
             </Menu.Popup>
           </Menu.Positioner>
         </Menu.Portal>
       </Menu.Root>
       <div className='menur'>
+        <button
+          type='button'
+          className='chip'
+          onClick={onPalette}
+          aria-label={t('Command palette')}
+        >
+          ⌘K
+        </button>
         <button
           type='button'
           className='chip'
@@ -52,7 +121,9 @@ export function MenuBar({ theme, locale, gpu, onToggleTheme, onToggleLocale, onR
         <button type='button' className='chip' onClick={onToggleTheme}>
           {t('theme')}: {theme}
         </button>
-        <span className='chip'>{gpu ? <b>{gpu}</b> : t('gpu: unexamined')}</span>
+        <span className='chip'>
+          {gpu ? <b>{gpu}</b> : t('gpu: unexamined')}
+        </span>
       </div>
     </header>
   );
@@ -84,7 +155,9 @@ export function Tabs({ tabs, active, onSelect, onClose }: {
     if (next !== null) {
       e.preventDefault();
       onSelect(ids[next]!);
-      const el = listRef.current?.querySelector<HTMLElement>(`[data-tabid="${ids[next]}"]`);
+      const el = listRef.current?.querySelector<HTMLElement>(
+        `[data-tabid="${ids[next]}"]`,
+      );
       el?.focus();
     }
   }, [tabs, active, onSelect]);
@@ -93,7 +166,12 @@ export function Tabs({ tabs, active, onSelect, onClose }: {
   // caught by the audit) — so the close affordance lives INSIDE the tab as a
   // non-focusable click target, and the keyboard path is the Delete key
   return (
-    <div className='tabsrow' role='tablist' aria-label={t('Characters')} ref={listRef}>
+    <div
+      className='tabsrow'
+      role='tablist'
+      aria-label={t('Characters')}
+      ref={listRef}
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -165,21 +243,32 @@ export function LogDrawer({ open }: { open: boolean }) {
   }, [visible.length, open]);
 
   const copy = useCallback(() => {
-    navigator.clipboard.writeText(visible.map((l) => l.line).join('\n')).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    }, () => {});
+    navigator.clipboard.writeText(visible.map((l) => l.line).join('\n')).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
+      () => {},
+    );
   }, [visible]);
 
   if (!open) return null;
   return (
-    <section className='logdrawer' id='log-drawer' aria-label={t('Session log')}>
+    <section
+      className='logdrawer'
+      id='log-drawer'
+      aria-label={t('Session log')}
+    >
       <div className='loghead'>
         <span className='hud'>{t('Session log')}</span>
         <span className='logcount mono'>
           {visible.length}/{lines.length} {t('lines')}
         </span>
-        <div className='logfilters' role='group' aria-label={t('Severity filter')}>
+        <div
+          className='logfilters'
+          role='group'
+          aria-label={t('Severity filter')}
+        >
           {(['all', 'warn', 'error'] as const).map((f) => (
             <button
               key={f}
@@ -188,7 +277,7 @@ export function LogDrawer({ open }: { open: boolean }) {
               aria-pressed={filter === f}
               onClick={() => setFilter(f)}
             >
-              {t(f)}
+              {f === 'all' ? t('all') : f === 'warn' ? t('warn') : t('error')}
             </button>
           ))}
         </div>
@@ -196,10 +285,12 @@ export function LogDrawer({ open }: { open: boolean }) {
           {copied ? t('Copied') : t('Copy')}
         </button>
       </div>
-      <div className='logbody mono'>
+      <div className='logbody mono' tabIndex={0} role='log' aria-label={t('Session log')}>
         {visible.length === 0 && (
           <div className='logempty'>
-            {t('Nothing yet — every line a core CLI writes lands here verbatim.')}
+            {t(
+              'Nothing yet — every line a core CLI writes lands here verbatim.',
+            )}
           </div>
         )}
         {visible.map((l) => (
@@ -228,7 +319,12 @@ export function StatusBar({ exam, counts, drawerOpen, onToggleDrawer }: {
   const rep = exam.report;
   const probeOk = (rep?.probe as { ok?: boolean } | undefined)?.ok;
   const sidecar = rep?.sidecar as
-    | { ok: boolean; contractVersion?: number; adapters?: unknown[]; error?: string }
+    | {
+      ok: boolean;
+      contractVersion?: number;
+      adapters?: unknown[];
+      error?: string;
+    }
     | undefined;
 
   return (
@@ -257,7 +353,11 @@ export function StatusBar({ exam, counts, drawerOpen, onToggleDrawer }: {
             )}
           </>
         )
-        : <span>{exam.running ? t('examining…') : t('health: not yet examined')}</span>}
+        : (
+          <span>
+            {exam.running ? t('examining…') : t('health: not yet examined')}
+          </span>
+        )}
       <span className='right'>
         <span>
           {counts.characters !== null ? `${counts.characters} ${t('characters')}` : ''}

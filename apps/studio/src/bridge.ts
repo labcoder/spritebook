@@ -25,10 +25,21 @@ export interface DoctorRun {
   report: Record<string, unknown> | null;
 }
 
+export interface CliRun {
+  exitCode: number | null;
+  /** every stdout line, verbatim and in order */
+  lines: string[];
+}
+
 export interface StudioBridge {
   name: 'tauri' | 'browser-demo';
+  /** Any core verb, streamed line-by-line; every line also lands in the log. */
+  runCli(args: string[], onLine?: (line: string) => void): Promise<CliRun>;
   /** `spritebook doctor [--sidecar] --json` through the shell. */
-  runDoctor(opts: { sidecar: boolean }, onLine?: (line: string) => void): Promise<DoctorRun>;
+  runDoctor(
+    opts: { sidecar: boolean },
+    onLine?: (line: string) => void,
+  ): Promise<DoctorRun>;
   /** Every `<root>/<ws>/character.json`, verbatim — manifest-as-interface. */
   listWorkspaces(root: string): Promise<RawWorkspace[]>;
   /** Newest bake's contact gif for a workspace dir, as a data URL, if any. */
@@ -36,43 +47,61 @@ export interface StudioBridge {
 }
 
 type TauriGlobal = {
-  core: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
+  core: {
+    invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+  };
   event: {
-    listen: (name: string, cb: (e: { payload: unknown }) => void) => Promise<() => void>;
+    listen: (
+      name: string,
+      cb: (e: { payload: unknown }) => void,
+    ) => Promise<() => void>;
   };
 };
 
 function tauriBridge(t: TauriGlobal): StudioBridge {
   let seq = 0;
+  const runCli = async (
+    args: string[],
+    onLine?: (line: string) => void,
+  ): Promise<CliRun> => {
+    const jobId = `${args[0] ?? 'cli'}-${Date.now()}-${++seq}`;
+    const lines: string[] = [];
+    const unlisten = await t.event.listen(`cli:${jobId}`, (e) => {
+      const line = String(e.payload);
+      lines.push(line);
+      log.append(jobId, line);
+      onLine?.(line);
+    });
+    try {
+      const exitCode = (await t.core.invoke('run_cli', { jobId, args })) as
+        | number
+        | null;
+      return { exitCode, lines };
+    } finally {
+      unlisten();
+    }
+  };
   return {
     name: 'tauri',
+    runCli,
     async runDoctor(opts, onLine) {
-      const jobId = `doctor-${Date.now()}-${++seq}`;
-      let last: string | null = null;
-      const unlisten = await t.event.listen(`cli:${jobId}`, (e) => {
-        const line = String(e.payload);
-        last = line;
-        log.append(jobId, line);
-        onLine?.(line);
-      });
-      try {
-        const args = opts.sidecar ? ['doctor', '--sidecar', '--json'] : ['doctor', '--json'];
-        const exitCode = (await t.core.invoke('run_cli', { jobId, args })) as number | null;
-        let report: DoctorRun['report'] = null;
-        if (last !== null) {
-          try {
-            report = JSON.parse(last);
-          } catch {
-            report = null;
-          }
+      const args = opts.sidecar ? ['doctor', '--sidecar', '--json'] : ['doctor', '--json'];
+      const { exitCode, lines } = await runCli(args, onLine);
+      let report: DoctorRun['report'] = null;
+      const last = lines.at(-1);
+      if (last !== undefined) {
+        try {
+          report = JSON.parse(last);
+        } catch {
+          report = null;
         }
-        return { exitCode, report };
-      } finally {
-        unlisten();
       }
+      return { exitCode, report };
     },
     async listWorkspaces(root) {
-      return (await t.core.invoke('list_workspaces', { root })) as RawWorkspace[];
+      return (await t.core.invoke('list_workspaces', {
+        root,
+      })) as RawWorkspace[];
     },
     async readThumb(dir) {
       const b64 = (await t.core.invoke('read_thumb', { dir })) as string | null;
@@ -113,10 +142,85 @@ function demoReport(sidecar: boolean): Record<string, unknown> {
   };
 }
 
+const DEMO_CATALOG = {
+  models: [
+    {
+      id: 'fixture-gen',
+      kind: 'gen3d',
+      displayName: 'Fixture generator (synthetic - no download)',
+      license: {
+        name: 'MIT (part of SpriteBook)',
+        spdx: 'MIT',
+        requiresAcceptance: false,
+      },
+      versions: [{
+        version: '1.0.0',
+        diskBytes: 0,
+        platforms: ['windows-cpu', 'linux-cpu', 'macos-cpu'],
+        installed: true,
+      }],
+    },
+    {
+      id: 'trellis2-4b',
+      kind: 'gen3d',
+      displayName: 'TRELLIS.2 4B (image to textured mesh)',
+      license: { name: 'MIT', spdx: 'MIT', requiresAcceptance: false },
+      versions: [{
+        version: 'af44b45f',
+        diskBytes: 16385069325,
+        platforms: ['windows-cuda', 'linux-cuda'],
+        minVramGb: 12,
+        installed: true,
+      }],
+    },
+    {
+      id: 'demo-gated',
+      kind: 'gen3d',
+      displayName: 'Demo gated model (license + territory)',
+      license: {
+        name: 'Custom (acceptance required)',
+        spdx: 'LicenseRef-Custom',
+        requiresAcceptance: true,
+        excludedTerritories: ['EU', 'UK', 'KR'],
+      },
+      versions: [{
+        version: '0.1.0',
+        diskBytes: 2147483648,
+        platforms: ['windows-cuda'],
+        minVramGb: 8,
+        installed: false,
+      }],
+    },
+  ],
+};
+
 function browserBridge(): StudioBridge {
   let seq = 0;
   return {
     name: 'browser-demo',
+    runCli(args, onLine) {
+      const jobId = `${args[0] ?? 'cli'}-demo-${++seq}`;
+      const emit = (line: string) => {
+        log.append(jobId, line);
+        onLine?.(line);
+        return line;
+      };
+      if (args[0] === 'models' && args[1] === 'list') {
+        return Promise.resolve({
+          exitCode: 0,
+          lines: [emit(JSON.stringify(DEMO_CATALOG))],
+        });
+      }
+      // every mutation is refused honestly in the browser: no shell, no core
+      const refusal = JSON.stringify({
+        t: 'error',
+        jobId,
+        code: 'browser-demo',
+        message: `"${args.join(' ')}" needs the desktop shell - the browser preview has no core`,
+        retryable: false,
+      });
+      return Promise.resolve({ exitCode: 1, lines: [emit(refusal)] });
+    },
     runDoctor(opts) {
       const report = demoReport(opts.sidecar);
       log.append(`doctor-demo-${++seq}`, JSON.stringify(report));

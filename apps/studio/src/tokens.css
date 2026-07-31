@@ -52,6 +52,11 @@
   --sb-sun-ink: #e8c226;
   --sb-signal-ink: #f05d4e;
 
+  /* keyboard/pointer selection surface: deep cobalt holds light text at AA in
+   * both themes (raw cobalt under bg-coloured text measured 3.9:1 — axe) */
+  --sb-select-bg: #3140c4;
+  --sb-select-text: #e7e4dc;
+
   /* canvas wells — fixed in both themes (rule 4) */
   --sb-check-a: #232329;
   --sb-check-b: #1b1b20;
@@ -89,6 +94,9 @@
   --sb-cyan-ink: #19646a;
   --sb-sun-ink: #715703;
   --sb-signal-ink: #a2261c;
+
+  --sb-select-bg: #3140c4;
+  --sb-select-text: #f6f4ed;
 
   /* rule 4, stated where a light-theme edit would look for it: the wells do
    * not follow the theme — same values as dark, on purpose */

@@ -121,6 +121,13 @@ Deno.test('every accent-as-text ink clears 4.5:1 on panel AND raise, both themes
   }
 });
 
+Deno.test('the selection surface holds its text at 4.5:1, both themes', () => {
+  for (const [name, t] of [['dark', dark], ['light', light]] as const) {
+    const ratio = contrast(t.get('sb-select-text')!, t.get('sb-select-bg')!);
+    assert(ratio >= 4.5, `${name}: select-text on select-bg is ${ratio.toFixed(2)}:1`);
+  }
+});
+
 Deno.test('status hues stay AA-legible as TEXT on the status bar panel', () => {
   // the status bar renders ok/signal as text on panel — that is a real usage
   // in App.tsx, so it is a real constraint here
