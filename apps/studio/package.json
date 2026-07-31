@@ -8,10 +8,13 @@
     "build:web": "vite build",
     "preview:web": "vite preview --port 4175 --strictPort",
     "dev:desktop": "tauri dev",
-    "build:desktop": "tauri build"
+    "build:desktop": "tauri build",
+    "check:web": "tsc --noEmit"
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",
+    "@lingui/core": "6.6.0",
+    "@lingui/react": "6.6.0",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
@@ -20,6 +23,8 @@
     "@types/react": "19.2.13",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.4",
+    "axe-core": "^4.12.1",
+    "typescript": "^7.0.2",
     "vite": "8.1.4"
   }
 }
