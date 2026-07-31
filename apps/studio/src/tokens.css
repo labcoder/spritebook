@@ -1,0 +1,77 @@
+/**
+ * The semantic token layer — RATIFIED 2026-07-31 (docs/design/design-system.md, D-030).
+ *
+ * Dark is the identity (concept A, "Marathon"); light is concept B ("printed
+ * spec sheet"). Components consume ONLY these custom properties — no raw hex
+ * below the token layer, ever (design-system hard commitment 1). The one
+ * deliberate hue divergence between themes is --sb-ok: acid reads "alive" on
+ * charcoal but decorative on paper, where cobalt ink reads "recorded".
+ *
+ * Canvas wells stay dark and checkered in BOTH themes (hard commitment 4):
+ * --sb-check-a/b never change with the theme.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  /* surfaces */
+  --sb-bg: #141416;
+  --sb-panel: #1b1b1f;
+  --sb-raise: #232329;
+  --sb-line: #32323a;
+  --sb-line-strong: #32323a;
+
+  /* text */
+  --sb-text: #e7e4dc;
+  --sb-dim: #8f8d96;
+
+  /* pipeline accents — hue codes the subsystem (the Marathon move) */
+  --sb-acid: #c6dc34;
+  --sb-magenta: #dd3fd3;
+  --sb-cobalt: #5a6bf0;
+  --sb-cyan: #55d0d6;
+  --sb-sun: #e8c226;
+  /* AA amendment (tokens_test.ts): the ratified #E23B2E measured 4.01:1 as
+   * TEXT on panel — the status bar and warn badges genuinely set it as text,
+   * so the value moved to the nearest vermilion that clears 4.5 on bg, panel
+   * AND raise. Fills only got more visible. */
+  --sb-signal: #f05d4e;
+
+  /* states */
+  --sb-ok: #c6dc34;
+  --sb-focus: #5a6bf0;
+  --sb-on-acid: #17190a;
+
+  /* canvas wells — fixed in both themes (rule 4) */
+  --sb-check-a: #232329;
+  --sb-check-b: #1b1b20;
+}
+
+:root[data-theme='light'] {
+  --sb-bg: #ece9e0;
+  --sb-panel: #f6f4ed;
+  --sb-raise: #e2dfd4;
+  --sb-line: #cdc9bb;
+  --sb-line-strong: #b9b5a6;
+
+  --sb-text: #191a1c;
+  /* AA amendment: #66646C measured 4.37:1 on raise — five points darker
+   * clears it everywhere with no visible character change */
+  --sb-dim: #615f67;
+
+  /* acid stays a FILL on light (rule 5); ink-darkened variants are for text */
+  --sb-acid: #c6dc34;
+  --sb-magenta: #a31896;
+  --sb-cobalt: #3140c4;
+  --sb-cyan: #2fa9b0;
+  --sb-sun: #c79a12;
+  --sb-signal: #c6301f;
+
+  --sb-ok: #3140c4;
+  --sb-focus: #3140c4;
+  --sb-on-acid: #17190a;
+
+  /* rule 4, stated where a light-theme edit would look for it: the wells do
+   * not follow the theme — same values as dark, on purpose */
+  --sb-check-a: #232329;
+  --sb-check-b: #1b1b20;
+}

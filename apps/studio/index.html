@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SpriteBook Studio</title>
+    <script>
+    // theme before first paint: saved pref wins, else the OS; the identity
+    // (dark) is the fallback. Stamped on <html> so tokens.css resolves.
+    (() => {
+      let t;
+      try {
+        t = localStorage.getItem('sb-theme');
+      } catch { /* storage unavailable: fall through */ }
+      if (t !== 'light' && t !== 'dark') {
+        t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      }
+      document.documentElement.dataset.theme = t;
+    })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

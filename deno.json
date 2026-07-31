@@ -41,7 +41,10 @@
     "spikes/shell/app/dist",
     "spikes/shell/app/node_modules",
     "spikes/autorig/UniRig",
-    ".claude"
+    ".claude",
+    "apps/studio/node_modules",
+    "apps/studio/dist",
+    "apps/studio/src-tauri/target"
   ],
   "tasks": {
     "dev": "deno test --watch --watch-exclude=node_modules --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=nvidia-smi,uv",

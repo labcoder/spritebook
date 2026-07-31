@@ -3,13 +3,13 @@
 Direction locked in UX passes 01–04: **Marathon / Ghost-in-the-Shell Neo-Tokyo** — acid hues as
 functional color coding on charcoal, tiny mono annotations, everything labeled like a diagnostic
 readout. **Token values below are FINAL — ratified by the maintainer 2026-07-31** from rendered
-concepts (three full-fidelity screens of the same Look-stage state, real bake data): concept A
-(this system's dark column, rendered exactly) as the identity, concept B ("printed spec sheet" —
-this system's light column with an engineering-drawing spine) ratified as the light theme. One
-identity, both grounds. The rendering also settled the light theme's working accents: **on paper,
-cobalt leads state fills** (progress cells, "current" markers, ok states) with acid reserved for
-the primary-action fill; separators step up to `line/strong`. The pixel-native "Workshop" challenger
-was considered and kept for marketing surfaces only. The semantic token layer ships in
+concepts (three full-fidelity screens of the same Look-stage state, real bake data): concept A (this
+system's dark column, rendered exactly) as the identity, concept B ("printed spec sheet" — this
+system's light column with an engineering-drawing spine) ratified as the light theme. One identity,
+both grounds. The rendering also settled the light theme's working accents: **on paper, cobalt leads
+state fills** (progress cells, "current" markers, ok states) with acid reserved for the
+primary-action fill; separators step up to `line/strong`. The pixel-native "Workshop" challenger was
+considered and kept for marketing surfaces only. The semantic token layer ships in
 `apps/studio/src/tokens.css`; values drop in there without layout changes, as designed.
 
 ## Hard commitments (non-negotiable, hold regardless of final palette)
@@ -28,27 +28,33 @@ was considered and kept for marketing surfaces only. The semantic token layer sh
 
 ## Ratified tokens (final, 2026-07-31)
 
-| Token            | Dark                  | Light ("printed spec sheet")  | Use                     |
-| ---------------- | --------------------- | ----------------------------- | ----------------------- |
-| `surface/bg`     | `#141416`             | `#ECE9E0` (paper)             | app background          |
-| `surface/panel`  | `#1B1B1F`             | `#F6F4ED`                     | rails, inspector, bars  |
-| `surface/raise`  | `#232329`             | `#E2DFD4`                     | cards, inputs           |
-| `line`           | `#32323A`             | `#CDC9BB`                     | borders, tick rules     |
-| `line/strong`    | `#32323A`             | `#B9B5A6`                     | chrome seams, outer edge |
-| `text`           | `#E7E4DC`             | `#191A1C`                     | primary text            |
-| `text/dim`       | `#8F8D96`             | `#66646C`                     | secondary               |
-| `accent/acid`    | `#C6DC34`             | fill same; text-ink `#67750A` | primary action, GEN     |
-| `accent/magenta` | `#DD3FD3`             | fill same; text-ink `#A31896` | selection, RIG          |
-| `accent/cobalt`  | `#5A6BF0`             | `#3140C4`                     | links, focus, ANIM      |
-| `accent/cyan`    | `#55D0D6`             | `#2FA9B0`                     | in-progress, LOOK       |
-| `accent/sun`     | `#E8C226`             | `#C79A12`                     | warnings, BAKE          |
-| `accent/signal`  | `#E23B2E`             | `#C6301F`                     | errors, flags           |
+| Token            | Dark                  | Light ("printed spec sheet")  | Use                               |
+| ---------------- | --------------------- | ----------------------------- | --------------------------------- |
+| `surface/bg`     | `#141416`             | `#ECE9E0` (paper)             | app background                    |
+| `surface/panel`  | `#1B1B1F`             | `#F6F4ED`                     | rails, inspector, bars            |
+| `surface/raise`  | `#232329`             | `#E2DFD4`                     | cards, inputs                     |
+| `line`           | `#32323A`             | `#CDC9BB`                     | borders, tick rules               |
+| `line/strong`    | `#32323A`             | `#B9B5A6`                     | chrome seams, outer edge          |
+| `text`           | `#E7E4DC`             | `#191A1C`                     | primary text                      |
+| `text/dim`       | `#8F8D96`             | `#615F67`                     | secondary                         |
+| `accent/acid`    | `#C6DC34`             | fill same; text-ink `#67750A` | primary action, GEN               |
+| `accent/magenta` | `#DD3FD3`             | fill same; text-ink `#A31896` | selection, RIG                    |
+| `accent/cobalt`  | `#5A6BF0`             | `#3140C4`                     | links, focus, ANIM                |
+| `accent/cyan`    | `#55D0D6`             | `#2FA9B0`                     | in-progress, LOOK                 |
+| `accent/sun`     | `#E8C226`             | `#C79A12`                     | warnings, BAKE                    |
+| `accent/signal`  | `#F05D4E`             | `#C6301F`                     | errors, flags                     |
 | `state/ok`       | `#C6DC34` (acid)      | `#3140C4` (cobalt)            | done dots, progress fill, ok text |
-| `well/checker`   | `#232329` / `#1B1B20` | same (rule 4)                 | canvas wells            |
+| `well/checker`   | `#232329` / `#1B1B20` | same (rule 4)                 | canvas wells                      |
 
 `state/ok` is the one place the two themes intentionally diverge in HUE, not just value: acid reads
 as "alive" on charcoal but as decoration on paper, where cobalt ink reads as "recorded". The B
 render made that call; it is semantic, so components never notice.
+
+Two values were amended the same day by the token layer's own AA test (`apps/studio/tokens_test.ts`,
+computing WCAG contrast from the CSS): dark `accent/signal` `#E23B2E` measured 4.01:1 as TEXT on
+panel (the status bar genuinely sets it as text) and moved to `#F05D4E`, which clears 4.5:1 on bg,
+panel and raise; light `text/dim` `#66646C` measured 4.37:1 on raise and moved to `#615F67`.
+Commitment 2 outranks any individual hex — that test is now the enforcement.
 
 **Hue codes the pipeline:** chartreuse GEN · magenta RIG · cobalt ANIM · cyan LOOK · sun BAKE · text
 EXPORT — used in the stage rail chips, tab accents, and progress fills. Color = subsystem identity
