@@ -28,7 +28,8 @@ export { RENDERER_VERSION } from './contracts.ts';
 // it into the cache key (D-011): lighting changes every pixel, so it has to
 // invalidate by itself rather than by whoever changes it remembering to bump
 // RENDERER_VERSION.
-export { AMBIENT, LIGHT_DIR } from './renderer.ts';
+export { AMBIENT, DEFAULT_LIGHT_FRAME, LIGHT_DIR, lightDirFor } from './renderer.ts';
+export type { LightFrame } from './renderer.ts';
 // render identity + health as plain data (D-004-safe; no GPU object crosses)
 export { renderDiagnostics, renderSignature } from './diagnostics.ts';
 export type { RenderDiagnostics } from './diagnostics.ts';

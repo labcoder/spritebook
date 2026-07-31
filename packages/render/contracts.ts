@@ -47,6 +47,9 @@ export interface RenderJobSpec {
    * character teleports.
    */
   directionSubset?: number[];
+  /** which frame the key light is fixed in; omitted = the renderer's default
+   * (renderer.ts DEFAULT_LIGHT_FRAME, decided from renders in C-WAVE.md) */
+  lightFrame?: 'world' | 'camera';
   /** carried through; the NPR style stack is P2-T2 */
   stylePreset: string;
   /** every render product is written under here */

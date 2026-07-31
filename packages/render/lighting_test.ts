@@ -168,3 +168,48 @@ Deno.test('what the rig costs a camera-facing surface, from the rig itself', asy
     'ndl 1 costs nothing at all',
   );
 });
+
+Deno.test('camera-frame lighting reproduces the front relation at every yaw', async () => {
+  // B3 (C-WAVE.md): 'world' keeps one world-space key, so a back view is lit
+  // from behind; 'camera' rotates the key with each direction's camera, so the
+  // light-to-camera relation at direction 0 is reproduced everywhere. Both are
+  // closed-form checkable without a GPU: at yaw 0 the two frames agree
+  // exactly, and at yaw 180 the camera-frame key has its horizontal components
+  // negated while Y (the overhead component) is untouched.
+  const { DEFAULT_LIGHT_FRAME, lightDirFor } = await import('./renderer.ts');
+
+  assertEquals(lightDirFor('world', 0), [...LIGHT_DIR] as [number, number, number]);
+  assertEquals(lightDirFor('camera', 0), [...LIGHT_DIR] as [number, number, number]);
+  assertEquals(
+    lightDirFor('world', 180),
+    [...LIGHT_DIR] as [number, number, number],
+    'world ignores yaw entirely',
+  );
+
+  const back = lightDirFor('camera', 180);
+  assert(Math.abs(back[0] + LIGHT_DIR[0]) < 1e-12, 'x flips at yaw 180');
+  assert(back[1] === LIGHT_DIR[1], 'the overhead component never changes');
+  assert(Math.abs(back[2] + LIGHT_DIR[2]) < 1e-12, 'z flips at yaw 180');
+
+  // rotation preserves length, so ndl magnitudes are comparable across frames
+  for (const yaw of [45, 90, 135, 270]) {
+    const d = lightDirFor('camera', yaw);
+    assert(
+      Math.abs(Math.hypot(...d) - Math.hypot(...LIGHT_DIR)) < 1e-12,
+      `unit-preserving at yaw ${yaw}`,
+    );
+  }
+
+  // the CONSEQUENCE, stated as the number the sheets will show: a +Z surface
+  // viewed from the back (yaw 180) has ndl 0 under 'world' (lit from behind,
+  // ambient only) and the front's 0.4527 under 'camera'
+  const len = Math.hypot(...LIGHT_DIR);
+  const ndlWorldBack = Math.max(0, -lightDirFor('world', 180)[2] / len);
+  const ndlCameraBack = Math.max(0, -back[2] / len);
+  assertEquals(ndlWorldBack, 0, 'world: the back of the character gets ambient only');
+  assert(
+    Math.abs(ndlCameraBack - LIGHT_DIR[2] / len) < 1e-12,
+    'camera: the back reads exactly like the front',
+  );
+  assert(DEFAULT_LIGHT_FRAME === 'world' || DEFAULT_LIGHT_FRAME === 'camera');
+});

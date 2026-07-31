@@ -81,6 +81,37 @@ export const LIGHT_DIR: readonly [number, number, number] = [0.4, 0.9, 0.5];
  */
 export const AMBIENT = 0.30;
 
+/**
+ * Which frame the key light is FIXED in (B3, C-WAVE.md).
+ *
+ * 'world': one world-space direction for every view — physically consistent
+ * turntable lighting, and the reason back-facing directions render dark (the
+ * lit side faces away from the camera).
+ * 'camera': the key rotates with each direction's camera, so all 8 directions
+ * read identically — the shipped-game convention (Dead Cells, impostor
+ * pipelines). Still constant per direction per clip, so the temporal
+ * stability law holds unchanged.
+ *
+ * The default was picked from renders of both on three subjects; the other
+ * stays reachable via `bake --light-frame`.
+ */
+export type LightFrame = 'world' | 'camera';
+export const DEFAULT_LIGHT_FRAME: LightFrame = 'world';
+
+/** LIGHT_DIR as each direction camera sees it, per the frame choice. */
+export function lightDirFor(frame: LightFrame, yawDeg: number): [number, number, number] {
+  if (frame === 'world') return [LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]];
+  // rotate the key about +Y by the camera's yaw, so the light-to-camera
+  // relation at direction 0 is reproduced at every direction
+  const r = (yawDeg * Math.PI) / 180;
+  const c = Math.cos(r), s = Math.sin(r);
+  return [
+    c * LIGHT_DIR[0] + s * LIGHT_DIR[2],
+    LIGHT_DIR[1],
+    -s * LIGHT_DIR[0] + c * LIGHT_DIR[2],
+  ];
+}
+
 const bpp = AOV_TARGETS.map((t) => t.bpp);
 
 function pad(n: number, width: number): string {
@@ -165,6 +196,7 @@ export class Renderer {
     pose: PoseMode = 'turntable',
     clipPoses?: ClipPoses,
     subset?: number[],
+    lightFrame: LightFrame = DEFAULT_LIGHT_FRAME,
   ): Promise<Renderer> {
     const { device } = gpu;
     device.pushErrorScope('validation');
@@ -270,7 +302,7 @@ export class Renderer {
     );
 
     const camData = framing.cameras.map((c) =>
-      packCamera(c.view, c.proj, c.near, c.far, LIGHT_DIR, AMBIENT)
+      packCamera(c.view, c.proj, c.near, c.far, lightDirFor(lightFrame, c.yawDeg), AMBIENT)
     );
 
     const err = await device.popErrorScope();
@@ -504,7 +536,7 @@ export async function makeRenderer(
   gpu: GpuContext,
   spec: Pick<
     RenderJobSpec,
-    'modelPath' | 'camera' | 'frames' | 'pose' | 'posesPath' | 'directionSubset'
+    'modelPath' | 'camera' | 'frames' | 'pose' | 'posesPath' | 'directionSubset' | 'lightFrame'
   >,
   shaderSrc: string,
 ): Promise<Renderer> {
@@ -547,6 +579,7 @@ export async function makeRenderer(
     pose,
     clipPoses,
     validateSubset(spec.directionSubset, spec.camera.directions),
+    spec.lightFrame ?? DEFAULT_LIGHT_FRAME,
   );
 }
 

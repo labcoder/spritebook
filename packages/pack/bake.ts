@@ -25,7 +25,13 @@ import type {
 } from '@spritebook/schema';
 import { canonicalJson, RENDER_PASSES } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
-import { AMBIENT, LIGHT_DIR, renderSignature, runRenderJob } from '@spritebook/render';
+import {
+  AMBIENT,
+  DEFAULT_LIGHT_FRAME,
+  LIGHT_DIR,
+  renderSignature,
+  runRenderJob,
+} from '@spritebook/render';
 import {
   type AovSource,
   type ClipAovSource,
@@ -94,6 +100,9 @@ export interface BakeJobSpec {
    * cache key (buildCacheInputs).
    */
   mirroring?: boolean;
+  /** which frame the key light is fixed in (B3): omitted = the renderer's
+   * default. Cache-covered via lightRigHash below. */
+  lightFrame?: 'world' | 'camera';
   /**
    * The two recipe facts a glb cannot state: which rig this character is on and
    * which backend produced it. Present when the bake has a character to ask
@@ -179,6 +188,7 @@ export async function buildCacheInputs(
     | 'clips'
     | 'packDir'
     | 'mirroring'
+    | 'lightFrame'
   >,
   renderSig: string,
   provenance: BakeProvenance = {},
@@ -234,7 +244,11 @@ export async function buildCacheInputs(
     stylePresetHash: await sha256Hex(canonicalJson(spec.style)),
     // the rig as DATA, so a change to it invalidates by itself rather than by
     // whoever changed it also remembering to bump rendererVersion
-    lightRigHash: await sha256Hex(canonicalJson({ lightDir: LIGHT_DIR, ambient: AMBIENT })),
+    lightRigHash: await sha256Hex(canonicalJson({
+      lightDir: LIGHT_DIR,
+      ambient: AMBIENT,
+      lightFrame: spec.lightFrame ?? DEFAULT_LIGHT_FRAME,
+    })),
     rendererVersion: renderSig,
     // The backend that made this character, when one did. `source-mesh@0` is
     // the sentinel for NOT GENERATED HERE — a mesh that came in through the
@@ -471,6 +485,7 @@ async function recomputeClips(
           modelPath: spec.modelPath,
           camera: supersample(spec.camera, s),
           frames: binding.frames,
+          lightFrame: spec.lightFrame,
           pose: 'clip',
           posesPath,
           // D-008: only the directions that are not flips (mirror.ts) — the
@@ -550,6 +565,7 @@ async function recompute(
       modelPath: spec.modelPath,
       camera: supersample(spec.camera, s),
       frames: spec.frames,
+      lightFrame: spec.lightFrame,
       pose: 'idle',
       // D-008: only the non-flip directions (mirror.ts)
       directionSubset: plan.rendered,

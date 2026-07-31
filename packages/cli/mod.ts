@@ -475,8 +475,19 @@ export function bakeSpecFromFlags(args: string[], resolved: BakeResolution): Bak
     clips: clipsFor(args, resolved.animationSet),
     packDir: flag(args, 'pack'),
     mirroring: mirroringFor(args, resolved.mirroring),
+    ...(lightFrameFor(args) !== undefined ? { lightFrame: lightFrameFor(args) } : {}),
     provenance: resolved.provenance,
   };
+}
+
+/** `--light-frame world|camera` — presence-detected; omitted = the renderer's default. */
+function lightFrameFor(args: string[]): 'world' | 'camera' | undefined {
+  const raw = flag(args, 'light-frame');
+  if (raw === undefined) return undefined;
+  if (raw !== 'world' && raw !== 'camera') {
+    throw new Error(`--light-frame must be "world" or "camera" (got "${raw}")`);
+  }
+  return raw;
 }
 
 /**
@@ -572,6 +583,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'only-invalidated',
     'mirror',
     'no-mirror',
+    'light-frame',
   ],
   export: ['bake', 'out', 'targets', 'fps'],
   undo: ['manifest'],
