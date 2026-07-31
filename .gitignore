@@ -23,6 +23,8 @@ tests/failures/
 # Spike outputs (measurements go in REPORT.md; pixels are throwaway)
 spikes/*/out/
 spikes/shell/tauri/src-tauri/target/
+apps/studio/src-tauri/target/
+apps/studio/src-tauri/gen/
 spikes/shell/tauri/src-tauri/gen/
 spikes/shell/build/
 
