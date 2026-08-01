@@ -1129,3 +1129,48 @@ input {
   align-items: center;
   gap: 7px;
 }
+
+/* ---- rig stage ---- */
+.rigstage {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+  max-width: 760px;
+}
+.rigreport {
+  overflow-x: auto;
+}
+.rigtable {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 8px;
+  font-size: 11.5px;
+}
+.rigtable th {
+  text-align: left;
+  font: 500 10px/1 'IBM Plex Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sb-dim);
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--sb-line-strong);
+}
+.rigtable td {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--sb-line);
+  vertical-align: baseline;
+}
+.rigtable .num {
+  text-align: right;
+}
+.rigtable td .mbadge {
+  margin-right: 4px;
+}
+.mbadge.sun {
+  color: var(--sb-sun-ink);
+  border-color: var(--sb-sun-ink);
+}
+.mbadge.signal {
+  color: var(--sb-signal-ink);
+  border-color: var(--sb-signal-ink);
+}

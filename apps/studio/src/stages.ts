@@ -88,7 +88,9 @@ export function stageStates(manifest: unknown): Stage[] {
       n: '03',
       hueVar: '--sb-cobalt',
       state: clips > 0 ? 'done' : 'idle',
-      note: clips > 0 ? `${clips} clips enabled` : 'no clips enabled',
+      note: clips > 0
+        ? `${clips} clips enabled`
+        : (rig ? 'no clips enabled' : 'no rig to animate yet'),
     },
     {
       key: 'look',

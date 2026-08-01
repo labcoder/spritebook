@@ -188,6 +188,19 @@ fn read_prev_session(max_lines: usize) -> Result<Option<Vec<String>>, String> {
     }
 }
 
+/// The rig's deform report, verbatim — a core-written artifact the Rig stage
+/// projects (like character.json, the FILE is the interface).
+#[tauri::command]
+fn read_rig_report(dir: String) -> Result<Option<serde_json::Value>, String> {
+    let p = Path::new(&dir).join("rig/deform-report.json");
+    match std::fs::read(&p) {
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map(Some)
+            .map_err(|e| format!("deform-report.json is not JSON: {e}")),
+        Err(_) => Ok(None),
+    }
+}
+
 /// Source-image preview bytes. Read-only, and only image extensions — the
 /// webview must not become a generic file reader.
 #[tauri::command]
@@ -222,7 +235,8 @@ fn main() {
             list_workspaces,
             read_thumb,
             read_prev_session,
-            read_image
+            read_image,
+            read_rig_report
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -148,7 +148,7 @@ function OptionsForm({ fields, values, onChange }: {
 
 /* ---------------- CLI twin ---------------- */
 
-function CliTwin({ args }: { args: string[] }) {
+export function CliTwin({ args }: { args: string[] }) {
   const [copied, setCopied] = useState(false);
   const line = `spritebook ${args.join(' ')}`;
   return (

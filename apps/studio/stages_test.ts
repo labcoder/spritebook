@@ -65,3 +65,14 @@ Deno.test('the real p3-exit manifest projects the states the desktop run showed'
   assert(s[4].note.includes('704614bc'));
   assertEquals(s[5].state, 'idle', 'no export recorded in the manifest');
 });
+
+Deno.test('anim says the honest thing when there is no rig yet', () => {
+  const noRig = stageStates({ id: 'x', canonicalMesh: {} });
+  assertEquals(noRig[2]!.note, 'no rig to animate yet');
+  const rigged = stageStates({
+    id: 'x',
+    canonicalMesh: {},
+    rig: { track: 'B', accepted: true, jointCount: 52 },
+  });
+  assertEquals(rigged[2]!.note, 'no clips enabled');
+});

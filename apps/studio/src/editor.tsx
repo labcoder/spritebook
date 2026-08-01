@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StudioBridge } from './bridge';
 import type { CharacterCard } from './manifest';
 import { Candidates } from './gen';
+import { RigStage } from './rigstage';
 import { type Stage, type StageKey, stageStates } from './stages';
 import { t } from './i18n';
 import { prefs } from './prefs';
@@ -297,6 +298,17 @@ export function Editor({ bridge, card, manifest, onChanged }: {
         ? (
           <div className='center genstage'>
             <Candidates
+              bridge={bridge}
+              dir={card.dir}
+              manifest={manifest}
+              onChanged={onChanged}
+            />
+          </div>
+        )
+        : effective === 'rig'
+        ? (
+          <div className='center genstage'>
+            <RigStage
               bridge={bridge}
               dir={card.dir}
               manifest={manifest}

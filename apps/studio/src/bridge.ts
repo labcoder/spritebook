@@ -48,6 +48,8 @@ export interface StudioBridge {
   readImage(path: string): Promise<string | null>;
   /** The PREVIOUS app run's session log tail, for the drawer's replay. */
   prevSession(maxLines: number): Promise<string[] | null>;
+  /** rig/deform-report.json, verbatim, when a rig has been run. */
+  readRigReport(dir: string): Promise<unknown | null>;
   /** Native file drop with real paths, when the shell provides it. */
   onFileDrop?(cb: (paths: string[]) => void): void;
 }
@@ -119,6 +121,9 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
     },
     async prevSession(maxLines) {
       return (await t.core.invoke('read_prev_session', { maxLines })) as string[] | null;
+    },
+    async readRigReport(dir) {
+      return await t.core.invoke('read_rig_report', { dir });
     },
     onFileDrop(cb) {
       // v2 emits webview drag/drop as tauri://drag-drop with { paths, position }
@@ -284,6 +289,18 @@ function browserBridge(): StudioBridge {
           },
         },
         {
+          // canonical mesh, no rig yet: the "run rig" state demos here
+          dir: 'demo/clay',
+          manifest: {
+            id: 'clay',
+            displayName: 'clay',
+            canonicalMesh: { heightM: 1.7 },
+            generation: { pickedResultId: 'r1', results: [{ id: 'r1', seed: 3 }] },
+            look: { stylePresetId: 'clean', cameraPresetId: 'standard-30' },
+            source: { kind: 'image' },
+          },
+        },
+        {
           // no canonical mesh yet: the card the LOCK states demo against
           dir: 'demo/sprout',
           manifest: {
@@ -303,6 +320,44 @@ function browserBridge(): StudioBridge {
       return Promise.resolve(
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGNgYGD4z8DA8J+BgQEADQQDAg6dhSMAAAAASUVORK5CYII=',
       );
+    },
+    readRigReport(dir) {
+      if (!dir.includes('bulma')) return Promise.resolve(null);
+      return Promise.resolve({
+        schemaVersion: 1,
+        poses: ['bend+30deg', 'bend-30deg'],
+        flaggedJoints: ['thumb_03_l', 'pinky_01_l', 'clavicle_r'],
+        joints: [
+          {
+            joint: 'spine_01',
+            flags: [],
+            maxEdgeStretch: 1.0,
+            meanDisplacementM: 0.07,
+            spannedComponents: 1,
+          },
+          {
+            joint: 'thumb_03_l',
+            flags: ['excessive-stretch'],
+            maxEdgeStretch: 3.87,
+            meanDisplacementM: 0.004,
+            spannedComponents: 1,
+          },
+          {
+            joint: 'pinky_01_l',
+            flags: ['no-influence'],
+            maxEdgeStretch: 0,
+            meanDisplacementM: 0,
+            spannedComponents: 1,
+          },
+          {
+            joint: 'clavicle_r',
+            flags: ['excessive-stretch'],
+            maxEdgeStretch: 12.7,
+            meanDisplacementM: 0.012,
+            spannedComponents: 2,
+          },
+        ],
+      });
     },
     prevSession() {
       return Promise.resolve([
