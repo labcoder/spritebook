@@ -151,8 +151,13 @@ export const BakePlanSchema = z.strictObject({
     fresh: z.int().nonnegative(),
     blocked: z.int().nonnegative(),
     unknown: z.int().nonnegative(),
-    /** frames that would be re-rendered vs served from cache */
     staleFrames: z.int().nonnegative(),
+    /**
+     * Frames a fresh character already has on disk and will not produce again.
+     * NOT the frame cache (`bake --cache`, which is opt-in and separate): a
+     * fresh character is skipped outright, so these frames cost nothing at all
+     * rather than costing a cache lookup.
+     */
     cachedFrames: z.int().nonnegative(),
   }),
 });

@@ -244,7 +244,7 @@ export function formatPlan(plan: BakePlan): string[] {
   for (const c of plan.characters) {
     const head = `  ${c.displayName} (${c.id}) — ${STATE_LABEL[c.state]}`;
     if (c.state === 'fresh') {
-      lines.push(`${head}, ${c.frames} frames all cached`);
+      lines.push(`${head}, ${c.frames} frames already baked`);
       continue;
     }
     lines.push(`${head}${c.staleFrames > 0 ? `, ${c.staleFrames} frames to render` : ''}`);
@@ -253,7 +253,7 @@ export function formatPlan(plan: BakePlan): string[] {
   }
   lines.push(
     `${t.toBake} to bake · ${t.fresh} fresh · ${t.blocked} blocked` +
-      ` · ${t.staleFrames} frames to render, ${t.cachedFrames} from cache`,
+      ` · ${t.staleFrames} frames to render, ${t.cachedFrames} already baked`,
   );
   if (t.blocked > 0) {
     lines.push('blocked characters are skipped; the run continues and exits non-zero');

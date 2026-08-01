@@ -252,10 +252,10 @@ plan for ./characters
   Bulma (bulma) — STALE, 96 frames to render
       · stylePresetHash: the style changed — a different preset, or an override on colors,
         outline, dithering, or supersampling
-  Goku (goku) — fresh, 96 frames all cached
+  Goku (goku) — fresh, 96 frames already baked
   Trunks (trunks) — BLOCKED
       · no canonical mesh on disk — generate one and pick it (`spritebook pick`) before baking
-1 to bake · 1 fresh · 1 blocked · 96 frames to render, 96 from cache
+1 to bake · 1 fresh · 1 blocked · 96 frames to render, 96 already baked
 ```
 
 `--plan` stops there. Without it the same plan is printed and then acted on. Either way two

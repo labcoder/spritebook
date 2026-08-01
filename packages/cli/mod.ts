@@ -1135,7 +1135,9 @@ async function runBakeAll(args: string[], io: CliIo, b: BatchIo): Promise<number
   }
   b.emit(
     { t: 'done', jobId: bakeId, at: b.now(), wallTimeS: 0 },
-    `all ${targets.length} baked`,
+    targets.length === 0
+      ? 'nothing to bake — the whole roster is fresh'
+      : `all ${targets.length} baked`,
   );
   return 0;
 }
