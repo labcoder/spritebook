@@ -10,6 +10,7 @@ import type { StudioBridge } from './bridge';
 import type { CharacterCard } from './manifest';
 import { Candidates } from './gen';
 import { RigStage } from './rigstage';
+import { AnimStage } from './animstage';
 import { type Stage, type StageKey, stageStates } from './stages';
 import { t } from './i18n';
 import { prefs } from './prefs';
@@ -180,8 +181,13 @@ function sliceFor(stage: StageKey, manifest: unknown): Record<string, unknown> {
     }
     case 'rig':
       return (m.rig ?? {}) as Record<string, unknown>;
-    case 'anim':
-      return { clips: Array.isArray(m.clips) ? m.clips.length : 0 };
+    case 'anim': {
+      const set = Array.isArray(m.animationSet) ? m.animationSet : [];
+      return {
+        bindings: set.length,
+        enabled: (set as { enabled?: boolean }[]).filter((b) => b.enabled === true).length,
+      };
+    }
     case 'look':
       return (m.look ?? {}) as Record<string, unknown>;
     case 'bake':
@@ -309,6 +315,17 @@ export function Editor({ bridge, card, manifest, onChanged }: {
         ? (
           <div className='center genstage'>
             <RigStage
+              bridge={bridge}
+              dir={card.dir}
+              manifest={manifest}
+              onChanged={onChanged}
+            />
+          </div>
+        )
+        : effective === 'anim'
+        ? (
+          <div className='center genstage'>
+            <AnimStage
               bridge={bridge}
               dir={card.dir}
               manifest={manifest}

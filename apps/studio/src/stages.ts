@@ -34,7 +34,9 @@ export function stageStates(manifest: unknown): Stage[] {
   const canonical = has(m.canonicalMesh);
   const results = Array.isArray(gen.results) ? gen.results.length : 0;
   const picked = typeof gen.pickedResultId === 'string' ? gen.pickedResultId : undefined;
-  const clips = Array.isArray(m.clips) ? m.clips.length : 0;
+  const clips = Array.isArray(m.animationSet)
+    ? (m.animationSet as { enabled?: boolean }[]).filter((b) => b.enabled === true).length
+    : 0;
   const lockNote = 'locked until a canonical mesh is saved';
 
   const genStage: Stage = {

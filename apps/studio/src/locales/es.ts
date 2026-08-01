@@ -212,4 +212,30 @@ export const es: Record<string, string> = {
   'joints': 'articulaciones',
   'track': 'vía',
   'Anim is next': 'Anim es lo siguiente',
+
+  // anim stage (P4-T2)
+  'Enabled clips': 'Clips activados',
+  'nothing enabled — pick clips from the library below':
+    'nada activado — elige clips de la biblioteca de abajo',
+  'frames': 'fotogramas',
+  'speed': 'velocidad',
+  'hold last': 'mantener último',
+  'hold last frame': 'mantener el último fotograma',
+  'Record change': 'Registrar cambio',
+  'Disable': 'Desactivar',
+  'Re-enable': 'Reactivar',
+  'disabled': 'desactivado',
+  'enabled': 'activado',
+  'clips': 'clips',
+  'directions': 'direcciones',
+  'frames per bake pass': 'fotogramas por pasada de bake',
+  'Clip library': 'Biblioteca de clips',
+  'Search': 'Buscar',
+  'name or tag…': 'nombre o etiqueta…',
+  'Category': 'Categoría',
+  'loop': 'bucle',
+  'Enable': 'Activar',
+  'could not read the clip library — the log drawer has the verbatim reason':
+    'no se pudo leer la biblioteca de clips — el registro tiene el motivo literal',
+  'clip library output was not JSON': 'la salida de la biblioteca no era JSON',
 };

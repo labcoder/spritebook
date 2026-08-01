@@ -142,6 +142,32 @@ const DEMO_MANIFEST = {
   displayName: 'bulma-fixed',
   look: { stylePresetId: 'pixel', cameraPresetId: 'standard-30' },
   rig: { track: 'B', accepted: false, jointCount: 52 },
+  animationSet: [
+    {
+      clipId: 'idle-loop',
+      packId: 'ual',
+      enabled: true,
+      frames: 6,
+      speed: 1,
+      holdLast: false,
+    },
+    {
+      clipId: 'walk-loop',
+      packId: 'ual',
+      enabled: true,
+      frames: 8,
+      speed: 1.5,
+      holdLast: false,
+    },
+    {
+      clipId: 'death',
+      packId: 'ual',
+      enabled: false,
+      frames: 10,
+      speed: 1,
+      holdLast: true,
+    },
+  ],
   generation: { pickedResultId: 'r2' },
   lastBakeId: '704614bc',
   canonicalMesh: { heightM: 1.65, reprojected: true, colorMatched: true },
@@ -241,6 +267,52 @@ const DEMO_CATALOG = {
   ],
 };
 
+const DEMO_CLIPS = {
+  pack: 'ual',
+  clips: [
+    {
+      id: 'idle-loop',
+      name: 'Idle_Loop',
+      category: 'idle',
+      tags: ['idle', 'loop'],
+      durationS: 2.0,
+      loop: true,
+    },
+    {
+      id: 'walk-loop',
+      name: 'Walk_Loop',
+      category: 'locomotion',
+      tags: ['walk', 'loop'],
+      durationS: 1.1,
+      loop: true,
+    },
+    {
+      id: 'run-loop',
+      name: 'Run_Loop',
+      category: 'locomotion',
+      tags: ['run', 'loop'],
+      durationS: 0.8,
+      loop: true,
+    },
+    {
+      id: 'sword-slash',
+      name: 'Sword_Slash',
+      category: 'combat',
+      tags: ['sword', 'attack'],
+      durationS: 1.4,
+      loop: false,
+    },
+    {
+      id: 'death',
+      name: 'Death',
+      category: 'combat',
+      tags: ['death', 'fall'],
+      durationS: 2.2,
+      loop: false,
+    },
+  ],
+};
+
 function browserBridge(): StudioBridge {
   let seq = 0;
   return {
@@ -256,6 +328,12 @@ function browserBridge(): StudioBridge {
         return Promise.resolve({
           exitCode: 0,
           lines: [emit(JSON.stringify(DEMO_CATALOG))],
+        });
+      }
+      if (args[0] === 'anim' && args.includes('--list')) {
+        return Promise.resolve({
+          exitCode: 0,
+          lines: [emit(JSON.stringify(DEMO_CLIPS))],
         });
       }
       // every mutation is refused honestly in the browser: no shell, no core
