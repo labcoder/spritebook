@@ -34,6 +34,7 @@ import {
   workspacePaths,
 } from '@spritebook/core';
 import { SidecarSession } from '@spritebook/core';
+import { acquireVramLeaseEvents, type VramLease } from '@spritebook/core';
 import {
   detectVramGb,
   gatePlatform,
@@ -60,6 +61,11 @@ export interface GenJobOptions extends GenJobSpec {
   catalogPath?: string;
   /** injected VRAM reading (tests); omitted -> the real probe */
   detectedVramGb?: number | null;
+  /**
+   * Shared VRAM-lease directory. Defaults to the machine-wide one; tests and
+   * anyone running two isolated SpriteBooks on one box override it.
+   */
+  vramLeaseDir?: string;
 }
 
 class GenFail extends Error {
@@ -114,6 +120,7 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
   yield { t: 'started', jobId, at: at() };
 
   let session: SidecarSession | undefined;
+  let lease: VramLease | undefined;
   try {
     // 1. the backend, from the catalog
     const catalog = await loadCatalog(opts.catalogPath);
@@ -155,14 +162,26 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     const platform = await detectPlatform();
     const plat = gatePlatform(version, platform);
     if (!plat.ok) throw new GenFail(plat.code, plat.message);
-    const vram = preflightVram(
-      version.minVramGb,
-      opts.detectedVramGb !== undefined ? opts.detectedVramGb : await detectVramGb(),
-    );
+    const detectedVramGb = opts.detectedVramGb !== undefined
+      ? opts.detectedVramGb
+      : await detectVramGb();
+    const vram = preflightVram(version.minVramGb, detectedVramGb);
     if (!vram.ok) throw new GenFail(vram.code, vram.message);
     if (vram.warn) {
       yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
     }
+
+    // 2b. the machine-wide lease. The preflight above asks "could this card
+    // ever run this model"; the lease asks "is the card free RIGHT NOW", which
+    // is a different question the moment a second SpriteBook process exists —
+    // and the Studio spawns one per job. Held for the whole sidecar run and
+    // released in the `finally` below, on every exit path.
+    lease = yield* acquireVramLeaseEvents({
+      gb: version.minVramGb ?? 0,
+      jobId,
+      budgetGb: detectedVramGb,
+      ...(opts.vramLeaseDir !== undefined ? { dir: opts.vramLeaseDir } : {}),
+    }, at);
 
     // 3. params validated against the CATALOG entry's schema, before spawning.
     // `defaultsFor`, not `version.defaults`: a parameter can differ per
@@ -444,6 +463,9 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     };
   } finally {
     await session?.dispose();
+    // released before the process exits, not after: a claim that outlives its
+    // job shrinks the machine's budget until its heartbeat lapses
+    await lease?.release();
   }
 }
 

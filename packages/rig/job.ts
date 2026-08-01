@@ -36,7 +36,13 @@ import {
   RIG_WEIGHTS_FILE,
   RigSkeletonSchema,
 } from '@spritebook/schema';
-import { setRigState, SidecarSession, workspacePaths } from '@spritebook/core';
+import {
+  acquireVramLeaseEvents,
+  setRigState,
+  SidecarSession,
+  type VramLease,
+  workspacePaths,
+} from '@spritebook/core';
 import { applyRig } from './apply.ts';
 import { promoteToCanonical } from './promote.ts';
 import { deformCheck } from './deform.ts';
@@ -68,6 +74,17 @@ export interface RigJobOptions {
   /** character workspace; when given, the rig is recorded as a journaled
    * patch so `spritebook undo` can take a repair back */
   workspace?: string;
+  /**
+   * VRAM this backend holds while it predicts — the catalog's `minVramGb` for
+   * the installed version. Resolved by the CALLER, because this job takes a
+   * pre-resolved `modelDir` and deliberately never sees the catalog (see the
+   * note by the adapter id below). Omitted or 0 takes no lease.
+   */
+  vramGb?: number;
+  /** total machine VRAM; null/undefined means no budgeting at all */
+  vramBudgetGb?: number | null;
+  /** shared lease directory; defaults to the machine-wide one */
+  vramLeaseDir?: string;
 }
 
 export interface RigJobSummary {
@@ -97,8 +114,21 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
   yield { t: 'started', jobId, at: at() };
 
   let session: SidecarSession | undefined;
+  let lease: VramLease | undefined;
   try {
     await Deno.mkdir(opts.outDir, { recursive: true });
+    // Taken BEFORE the orientation fixes and the facing check, cheap as those
+    // are, because the alternative is worse: a job that rewrites the user's
+    // mesh on disk and only then discovers it must queue for twenty minutes
+    // has done half a thing. Track A's fit calls this with no gb and takes no
+    // lease — it needs no GPU at all (D-026), so charging it for one would
+    // stall the humanoid path behind the generic one for nothing.
+    lease = yield* acquireVramLeaseEvents({
+      gb: opts.vramGb ?? 0,
+      jobId,
+      budgetGb: opts.vramBudgetGb,
+      ...(opts.vramLeaseDir !== undefined ? { dir: opts.vramLeaseDir } : {}),
+    }, at);
     let meshPath = opts.modelPath;
 
     // 1. tier-2 fixes first when asked — they rewrite the mesh, so predicting
@@ -456,5 +486,8 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
     };
   } finally {
     await session?.dispose();
+    // on every exit path, including a throw mid-prediction: a claim that
+    // outlives its job shrinks the machine's budget until its heartbeat lapses
+    await lease?.release();
   }
 }

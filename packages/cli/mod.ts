@@ -2110,6 +2110,15 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         decodeURIComponent(
           new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
         );
+      // The rig job takes a pre-resolved modelDir and never opens the catalog,
+      // so the VRAM figure is resolved HERE, where the catalog already is. A
+      // backend with no declared minimum claims nothing rather than a guess:
+      // an invented number would queue jobs behind a ceiling nobody measured.
+      const catalog = await registry.loadCatalog();
+      const rigVersion = catalog.models.find((m) => m.id === backend)?.versions.find((
+        v,
+      ) => v.version === installed.version);
+      const vramBudgetGb = await registry.detectVramGb();
 
       return await pump(
         runRigJob({
@@ -2119,6 +2128,8 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
           sidecarDir,
           modelDir: registry.versionDir(root, backend, installed.version),
           backend,
+          ...(rigVersion?.minVramGb !== undefined ? { vramGb: rigVersion.minVramGb } : {}),
+          vramBudgetGb,
           seed: seedFlag(args, 0),
           orientationFixes: fixes,
           edits,

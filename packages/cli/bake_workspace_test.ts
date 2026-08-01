@@ -38,6 +38,7 @@ import {
 } from '@spritebook/core';
 import { tryGetGpu } from '../render/gpu.ts';
 import { runCli } from './mod.ts';
+import { rigForKey } from '@spritebook/pack';
 
 const GLB = new URL('../style/fixtures/asymmetric.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -379,8 +380,16 @@ Deno.test('acceptance: the bake manifest records the backend that really made it
     assertEquals(baked.inputs.backend.version, '4b');
     assertEquals(
       baked.inputs.rigStateHash,
-      await sha256Hex(canonicalJson(manifest.rig)),
-      'and the rig it is actually on',
+      await sha256Hex(canonicalJson(rigForKey(manifest.rig!))),
+      'and the rig it is actually on — minus `accepted`, which D-031 keeps out',
+    );
+    // the same rig with the opposite acceptance hashes identically: pressing
+    // Accept must not cost this character every frame it has
+    assertEquals(
+      await sha256Hex(
+        canonicalJson(rigForKey({ ...manifest.rig!, accepted: !manifest.rig!.accepted })),
+      ),
+      baked.inputs.rigStateHash,
     );
   } finally {
     await Deno.remove(raw, { recursive: true });

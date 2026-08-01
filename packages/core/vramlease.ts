@@ -50,7 +50,7 @@
  * conservative declaration rather than a measurement, and why the job-time
  * `preflightVram` check stays where it is.
  */
-import { canonicalJson } from '@spritebook/schema';
+import { canonicalJson, type JobEvent } from '@spritebook/schema';
 
 export interface VramLeaseOptions {
   /** GiB this job holds for its whole run. 0 or less means no claim. */
@@ -229,7 +229,7 @@ export async function acquireVramLease(opts: VramLeaseOptions): Promise<VramLeas
 
   const started = now();
   let told = false;
-  const done = async (): Promise<VramLease> => ({
+  const done = (): VramLease => ({
     gb,
     path,
     release: async () => {
@@ -268,18 +268,25 @@ export async function acquireVramLease(opts: VramLeaseOptions): Promise<VramLeas
         await Deno.writeTextFile(path, canonicalJson({ ...mine, state: 'held' }));
         return 'granted' as const;
       }
+      // Name WHO, not just how many. "1 other job(s) holding 20 GiB" tells a
+      // user staring at a stuck job nothing they can act on; a jobId and a pid
+      // let them find it, watch it, or kill it.
+      const who = held
+        .map((c) => `${c.jobId} (pid ${c.pid}, ${c.gb} GiB)`)
+        .join(', ');
       const ahead = head !== undefined && head[0] !== name ? head[1] : null;
       reason = ahead
         ? `${ahead.jobId} (pid ${ahead.pid}) is ahead in the queue and needs ${ahead.gb} GiB; ` +
-          `${free} GiB of the machine's ${budget} GiB is free`
-        : `this job needs ${gb} GiB and ${free} GiB of the machine's ${budget} GiB is free ` +
-          `(${held.length} other job(s) holding ${committed} GiB)`;
+          `${free} GiB of the machine's ${budget} GiB is free` +
+          (who ? `, held by ${who}` : '')
+        : `this job needs ${gb} GiB and ${free} GiB of the machine's ${budget} GiB is free` +
+          (who ? `, held by ${who}` : '');
       return 'waiting' as const;
     });
 
     if (granted === 'granted') {
       if (told) opts.onAcquired?.((now() - started) / 1000);
-      return await done();
+      return done();
     }
     if (granted === 'reaped') {
       await abandon(
@@ -296,6 +303,59 @@ export async function acquireVramLease(opts: VramLeaseOptions): Promise<VramLeas
     }
     await sleep(pollMs);
   }
+}
+
+/**
+ * `acquireVramLease` for a job that speaks in events.
+ *
+ * A wait that is invisible is indistinguishable from a hang, and the whole
+ * point of leasing is that a job sometimes deliberately does not start. So the
+ * notice goes out on the JOB'S OWN stream — the same NDJSON the log drawer
+ * replays and `--log-append` sinks — as it happens, not afterwards in a
+ * summary nobody reads.
+ *
+ * Used as `const lease = yield* acquireVramLeaseEvents(...)` from inside a job
+ * generator: the events interleave into the job's stream and the lease comes
+ * back as the generator's return value.
+ */
+export async function* acquireVramLeaseEvents(
+  opts: VramLeaseOptions,
+  at: () => string,
+): AsyncGenerator<JobEvent, VramLease, unknown> {
+  const jobId = opts.jobId as JobEvent['jobId'];
+  const notices: string[] = [];
+  let lease: VramLease | undefined;
+  let failure: unknown;
+  let settled = false;
+  // both handlers attached, so `pending` itself never rejects and the race
+  // below cannot produce an unhandled rejection while we are yielding
+  const pending = acquireVramLease({
+    ...opts,
+    onWait: (reason) =>
+      notices.push(
+        `waiting for VRAM — ${reason}. Nothing is wrong; the machine is busy and admission is ` +
+          `in order, so this job will start as soon as its turn can be honoured.`,
+      ),
+    onAcquired: (waitedS) => notices.push(`VRAM available after ${waitedS.toFixed(1)}s; starting`),
+  }).then((l) => {
+    lease = l;
+  }, (err) => {
+    failure = err;
+  }).finally(() => {
+    settled = true;
+  });
+
+  while (!settled) {
+    await Promise.race([pending, sleep(100)]);
+    while (notices.length > 0) {
+      yield { t: 'warn', jobId, at: at(), code: 'vram-wait', message: notices.shift()! };
+    }
+  }
+  while (notices.length > 0) {
+    yield { t: 'warn', jobId, at: at(), code: 'vram-wait', message: notices.shift()! };
+  }
+  if (failure !== undefined) throw failure;
+  return lease!;
 }
 
 /** What the machine currently has committed — for `doctor` and for tests. */
