@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from './modal';
 import type { StudioBridge } from './bridge';
 import { t } from './i18n';
+import { modelsArgs } from './args';
 
 interface ModelVersion {
   version: string;
@@ -41,8 +42,7 @@ export function cliTwin(
   ref: string,
   acceptLicense: boolean,
 ): string {
-  const accept = action === 'install' && acceptLicense ? ' --accept-license' : '';
-  return `spritebook models ${action} ${ref}${accept}`;
+  return `spritebook ${modelsArgs(action, ref, acceptLicense).join(' ')}`;
 }
 
 function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {

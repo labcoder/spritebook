@@ -16,6 +16,7 @@ import type { CliRun, StudioBridge } from './bridge';
 import { slugify, slugProblem } from './slug';
 import { adjustArg, resolveOpDefaults, type SchemaField, schemaFields } from './schemaform';
 import { t } from './i18n';
+import { genArgs, moreLikeArgs, pickArgs } from './args';
 
 /** slugProblem returns one of three known sentences — literal per branch so
  * the extractor sees every id (t(variable) is a refused callsite). */
@@ -226,23 +227,34 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
 
   const workspace = `${projectsRoot}/${slug || '<id>'}`;
   const args = useMemo(() => {
-    const a = ['gen', '--workspace', workspace, '--character', slug || '<id>'];
-    if (imagePath) a.push('--image', imagePath);
-    a.push('--model', modelId);
-    const seed = values['seed'];
-    if (seed !== undefined && seed !== resolved['seed']) a.push('--seed', String(seed));
-    const cand = values['candidates'];
-    if (cand !== undefined && Number(cand) > 1) a.push('--candidates', String(cand));
     const rest = { ...values };
     delete rest['seed'];
     delete rest['candidates'];
-    const adjust = adjustArg(rest, resolved);
-    if (adjust) a.push('--adjust', adjust);
-    return a;
+    const seed = values['seed'];
+    const cand = values['candidates'];
+    return genArgs(workspace, {
+      characterId: slug || '<id>',
+      imagePath,
+      modelId,
+      adjust: adjustArg(rest, resolved),
+      ...(seed !== undefined && seed !== resolved['seed'] ? { seed: Number(seed) } : {}),
+      ...(cand !== undefined ? { candidates: Number(cand) } : {}),
+    });
   }, [workspace, slug, imagePath, modelId, values, resolved]);
 
-  const ready = problem === null && imagePath.length > 0 && version !== null &&
-    version.installed && run?.running !== true;
+  // HALLWAY TEST finding: the button sat disabled and said nothing, so a
+  // first-timer typed a name and had to GUESS that an image was also
+  // required. Every blocker now names itself, in the order they must be fixed.
+  const blocker = problem !== null
+    ? (name.length === 0 ? t('a name is required') : problemText(problem))
+    : imagePath.length === 0
+    ? t('a source image is required')
+    : version === null
+    ? t('pick a backend')
+    : !version.installed
+    ? t('that backend is not installed yet')
+    : null;
+  const ready = blocker === null && run?.running !== true;
 
   const generate = useCallback(async () => {
     setFailed(false);
@@ -378,6 +390,8 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
         >
           {run?.running ? t('Generating…') : t('Generate model')}
         </button>
+        {!ready && blocker !== null && <span className='blocker mono' role='status'>{blocker}
+        </span>}
         {run?.running && (
           <span className='genprogress mono' role='status'>
             {run.lines} {t('events')} · {run.last}
@@ -406,6 +420,8 @@ interface ResultEntry {
   backend?: { modelId?: string; version?: string };
   output?: { tris?: number; textureRes?: number };
   wallTimeS?: number;
+  /** the recipe this result was made with — re-run verbatim by more-like */
+  params?: { candidates?: number };
 }
 
 export function Candidates({ bridge, dir, manifest, onChanged }: {
@@ -426,29 +442,25 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
   const [busy, setBusy] = useState<string | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
 
-  const pickArgs = useCallback((id: string) => {
-    const a = ['pick', '--workspace', dir, '--result', id];
-    if (!reproject) a.push('--no-reproject');
-    if (!colorMatch) a.push('--no-color-match');
-    return a;
-  }, [dir, reproject, colorMatch]);
+  const pickFor = useCallback(
+    (id: string) => pickArgs(dir, id, { reproject, colorMatch }),
+    [dir, reproject, colorMatch],
+  );
 
   const doPick = useCallback(async (id: string) => {
     setBusy(id);
     setFailedId(null);
-    const r = await bridge.runCli([...pickArgs(id), '--json']);
+    const r = await bridge.runCli([...pickFor(id), '--json']);
     setBusy(null);
     if (r.exitCode === 0) onChanged();
     else setFailedId(id);
-  }, [bridge, pickArgs, onChanged]);
+  }, [bridge, pickFor, onChanged]);
 
   const moreLike = useCallback(async (id: string) => {
     setBusy(id);
     setFailedId(null);
     // gen ALWAYS requires --character (the field test's first error)
-    const r = await bridge.runCli(
-      ['gen', '--workspace', dir, '--character', characterId, '--more-like', id, '--json'],
-    );
+    const r = await bridge.runCli([...moreLikeArgs(dir, characterId, id), '--json']);
     setBusy(null);
     if (r.exitCode === 0) onChanged();
     else setFailedId(id);
@@ -490,8 +502,15 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
                 className='btn mbtn'
                 disabled={busy !== null}
                 onClick={() => moreLike(r.id)}
+                title={t('re-runs this result’s recipe with a new seed')}
               >
-                {busy === r.id ? t('Working…') : t('More like this')}
+                {busy === r.id ? t('Working…') : (
+                  // more-like reproduces the RECIPE, so a candidate ladder
+                  // yields that many again — the parity run found this
+                  (r.params?.candidates ?? 1) > 1
+                    ? `${t('More like this')} (×${r.params!.candidates})`
+                    : t('More like this')
+                )}
               </button>
               <button
                 type='button'
@@ -528,7 +547,7 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
             />
             {t('match source colours')}
           </label>
-          <CliTwin args={pickArgs(results[0]?.id ?? 'rN')} />
+          <CliTwin args={pickFor(results[0]?.id ?? 'rN')} />
         </div>
       )}
     </div>

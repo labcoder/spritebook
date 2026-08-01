@@ -9,6 +9,7 @@ import type { StudioBridge } from './bridge';
 import { t } from './i18n';
 import { CliTwin } from './gen';
 import { bindingSpec, framesMath } from './bindings';
+import { animDisableArgs, animEnableArgs } from './args';
 
 interface ClipMeta {
   id: string;
@@ -107,7 +108,7 @@ export function AnimStage({ bridge, dir, manifest, onChanged }: {
 
   const enable = (clipId: string) => {
     const d = draftFor(clipId);
-    run(['anim', '--enable', bindingSpec({ clipId, ...d }), '--workspace', dir]);
+    run(animEnableArgs(dir, [bindingSpec({ clipId, ...d })]));
   };
 
   const math = framesMath(bindings, 8);
@@ -193,8 +194,7 @@ export function AnimStage({ bridge, dir, manifest, onChanged }: {
                               type='button'
                               className='btn mbtn'
                               disabled={busy}
-                              onClick={() =>
-                                run(['anim', '--disable', b.clipId, '--workspace', dir])}
+                              onClick={() => run(animDisableArgs(dir, [b.clipId]))}
                             >
                               {t('Disable')}
                             </button>
@@ -224,9 +224,7 @@ export function AnimStage({ bridge, dir, manifest, onChanged }: {
               </div>
             </>
           )}
-        {enabledTwin.length > 0 && (
-          <CliTwin args={['anim', '--enable', enabledTwin, '--workspace', dir]} />
-        )}
+        {enabledTwin.length > 0 && <CliTwin args={animEnableArgs(dir, [enabledTwin])} />}
         {failed && (
           <span className='mv-exit mono'>
             {t('failed — the log drawer has the verbatim reason')}

@@ -19,6 +19,7 @@ import {
 import type { StageKey } from './stages';
 import { t } from './i18n';
 import { CliTwin } from './gen';
+import { bakeArgs } from './args';
 
 const PASSES = ['lit', 'albedo', 'normal', 'depth', 'mask'] as const;
 
@@ -140,7 +141,7 @@ export function BakeStage({ bridge, dir, manifest, onChanged, onGoToStage }: {
     loadBake(pass);
   }, [loadBake, pass, m.lastBakeId]);
 
-  const args = ['bake', '--workspace', dir];
+  const args = bakeArgs(dir);
 
   const runBake = useCallback(async () => {
     setRunning(true);

@@ -162,6 +162,11 @@ export const es: Record<string, string> = {
   'Replay previous session': 'Reproducir la sesión anterior',
   'no previous session': 'sin sesión anterior',
   'CLI twin': 'comando CLI equivalente',
+  'a source image is required': 'hace falta una imagen de origen',
+  'pick a backend': 'elige un backend',
+  'that backend is not installed yet': 'ese backend aún no está instalado',
+  're-runs this result’s recipe with a new seed':
+    'vuelve a ejecutar la receta de este resultado con otra semilla',
 
   // rig stage (P4-T2)
   'Rig this character': 'Riggear este personaje',

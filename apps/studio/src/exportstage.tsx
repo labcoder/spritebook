@@ -8,6 +8,7 @@ import type { StudioBridge } from './bridge';
 import { summarize } from './bakeprogress';
 import { t } from './i18n';
 import { CliTwin } from './gen';
+import { exportArgs } from './args';
 
 /** core's ExportTargetIdSchema, in its own order. */
 const TARGETS = ['godot', 'aseprite', 'texturepacker', 'strips'] as const;
@@ -56,7 +57,7 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
   // --bake takes the bake DIRECTORY, not its manifest (the parity run caught
   // this: core appends /manifest.json itself, so passing the file produced
   // ".../manifest.json/manifest.json" and a path error)
-  const args = ['export', '--bake', bakeDir, '--out', outDir, '--targets', selected.join(',')];
+  const args = exportArgs(bakeDir, outDir, selected);
 
   const runExport = useCallback(async () => {
     setRunning(true);

@@ -15,6 +15,7 @@ import { LogDrawer, MenuBar, StatusBar, Tabs } from './chrome';
 import { Palette, type PaletteAction } from './palette';
 import { ManageModels } from './models';
 import { GenerateNew } from './gen';
+import { journalArgs } from './args';
 
 const bridge = makeBridge();
 
@@ -131,8 +132,7 @@ export default function App() {
   // carries the verbatim result; a changed manifest re-projects on reload.
   const runJournal = useCallback(async (verb: 'undo' | 'redo') => {
     if (activeTab === 'gallery') return;
-    const manifest = `${activeTab}/character.json`;
-    const r = await bridge.runCli([verb, '--manifest', manifest, '--json']);
+    const r = await bridge.runCli([...journalArgs(activeTab, verb), '--json']);
     if (r.exitCode === 0) await load();
     if (!drawerOpen && r.exitCode !== 0) setDrawerOpen(true);
   }, [activeTab, load, drawerOpen]);

@@ -1436,3 +1436,8 @@ input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.blocker {
+  font-size: 11.5px;
+  color: var(--sb-sun-ink);
+}

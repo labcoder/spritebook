@@ -9,6 +9,7 @@ import type { StudioBridge } from './bridge';
 import { projectReport, type RigReportView, rigRunArgs } from './rig';
 import { t } from './i18n';
 import { CliTwin } from './gen';
+import { acceptRigArgs } from './args';
 
 const BUNDLED_BODY = 'packages/rig/bodies/ubc-male';
 
@@ -197,7 +198,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
   if (!rig) return <RunRig bridge={bridge} dir={dir} onChanged={onChanged} />;
 
   const accepted = rig.accepted === true;
-  const acceptArgs = ['rig', '--workspace', dir, accepted ? '--unaccept' : '--accept'];
+  const acceptArgs = acceptRigArgs(dir, accepted);
   const busy = run?.running === true;
 
   return (
