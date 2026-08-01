@@ -323,6 +323,23 @@ function styleOverridesFromFlags(args: string[], base: StylePreset): StyleOverri
     }
     out.quantize = { ...base.quantize, maxColors };
   }
+  if (flag(args, 'outline') !== undefined) {
+    const widthPx = numFlag(args, 'outline', 1);
+    if (base.outline === undefined) {
+      throw new Error(
+        `--outline has nothing to set on style "${base.id}": it draws no outline at all. Pick a ` +
+          `style that does (${
+            Object.keys(PRESETS).filter((id) => PRESETS[id].outline !== undefined).sort().join(', ')
+          }) or drop the flag.`,
+      );
+    }
+    // the schema's own bound (0.25..8), restated so the message names the flag
+    // the user typed rather than a nested field path they never wrote
+    if (widthPx < 0.25 || widthPx > 8) {
+      throw new Error(`--outline must be between 0.25 and 8 px (got ${widthPx})`);
+    }
+    out.outline = { ...base.outline, widthPx };
+  }
   return out;
 }
 
@@ -577,6 +594,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'cell',
     'ppm',
     'colors',
+    'outline',
     'elevation',
     'padding',
     'cache',
@@ -588,7 +606,30 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
   export: ['bake', 'out', 'targets', 'fps'],
   undo: ['manifest'],
   redo: ['manifest'],
-  anim: ['list', 'packs', 'tag', 'category', 'import-pack', 'into', 'enable', 'disable', 'workspace'],
+  anim: [
+    'list',
+    'packs',
+    'tag',
+    'category',
+    'import-pack',
+    'into',
+    'enable',
+    'disable',
+    'workspace',
+  ],
+  look: [
+    'list',
+    'workspace',
+    'camera',
+    'style',
+    'elevation',
+    'directions',
+    'ppm',
+    'cell',
+    'padding',
+    'colors',
+    'outline',
+  ],
   gen: [
     'workspace',
     'out',
@@ -751,6 +792,147 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
     return await runDoctor(args, io);
   }
 
+  if (verb === 'look') {
+    // The look as a DECISION (P4-T2), separated from the bake that runs it.
+    // `bake` has always written `look` as a side effect of baking, which made
+    // "choose the look" and "spend two minutes rendering" the same act; the
+    // Look stage needs to record a choice, state its cost, and let the user
+    // bake when they mean to.
+    const {
+      CAMERA_PRESETS,
+      readWorkspace: readWs,
+      resolveCamera,
+      setLook,
+      workspacePaths: wsPaths,
+    } = await import('@spritebook/core');
+    try {
+      // --list: the preset rosters, so a GUI renders cards from REAL catalog
+      // data (knobs included) instead of a hardcoded copy that drifts.
+      if (args.includes('--list')) {
+        const cameras = Object.entries(CAMERA_PRESETS).map(([id, c]) => ({ ...c, id }));
+        const styles = Object.entries(PRESETS).map(([id, s]) => ({
+          id,
+          mode: s.mode,
+          maxColors: s.quantize?.maxColors,
+          outlineWidthPx: s.outline?.widthPx,
+          superSample: s.temporal.superSample,
+          alphaMode: s.alpha.mode,
+        }));
+        if (json) {
+          io.stdout(
+            JSON.stringify({
+              cameras,
+              styles,
+              defaults: { camera: DEFAULT_CAMERA_PRESET_ID, style: DEFAULT_STYLE_PRESET_ID },
+            }),
+          );
+        } else {
+          io.stdout('cameras:');
+          for (const c of cameras) {
+            io.stdout(
+              `  ${c.id.padEnd(13)} ${
+                String(c.elevationDeg).padStart(6)
+              }deg  ${c.directions} dirs  ` +
+                `${c.pixelsPerMeter} px/m  ${c.cellPx.w}x${c.cellPx.h}`,
+            );
+          }
+          io.stdout('styles:');
+          for (const s of styles) {
+            io.stdout(
+              `  ${s.id.padEnd(13)} ${s.mode.padEnd(10)}` +
+                `${s.maxColors ? `${s.maxColors} colours  ` : 'no palette  '}` +
+                `${s.outlineWidthPx ? `outline ${s.outlineWidthPx}px` : 'no outline'}`,
+            );
+          }
+        }
+        return 0;
+      }
+
+      const workspace = flag(args, 'workspace');
+      if (!workspace) {
+        return fail(
+          'look' as JobEvent['jobId'],
+          'missing-arg',
+          'look needs --workspace <dir> to record on, or --list to see the presets',
+        );
+      }
+      const manifest = await readWs(workspace);
+      const stored = manifest.look;
+
+      // Same precedence as the bake: the stored look is the base, an explicit
+      // flag wins. Resolving both BEFORE recording means a manifest can never
+      // hold a look that refuses to bake.
+      const askedStyle = stylePresetIdFor(args, stored);
+      const styleId = canonicalStyleId(askedStyle);
+      if (!Object.hasOwn(PRESETS, styleId)) {
+        return fail(
+          'look' as JobEvent['jobId'],
+          'unknown-style',
+          `Unknown style "${askedStyle}" - available: ${Object.keys(PRESETS).sort().join(', ')}` +
+            ` (retired ids that still resolve: ${Object.keys(STYLE_ALIASES).sort().join(', ')})`,
+        );
+      }
+      const cameraId = flag(args, 'camera') ?? stored?.cameraPresetId ?? DEFAULT_CAMERA_PRESET_ID;
+      const cameraOverrides = {
+        ...(flag(args, 'camera') === undefined ? stored?.cameraOverrides : {}),
+        ...cameraOverridesFromFlags(args),
+      };
+      const styleOverrides = {
+        ...(flag(args, 'style') === undefined ? stored?.overrides : {}),
+        ...styleOverridesFromFlags(args, PRESETS[styleId]),
+      };
+      // both throw on an illegal preset+override COMBINATION
+      resolveCamera(cameraId, cameraOverrides);
+      resolveStyle(styleId, styleOverrides);
+
+      const look = {
+        cameraPresetId: cameraId,
+        ...(Object.keys(cameraOverrides).length > 0 ? { cameraOverrides } : {}),
+        stylePresetId: styleId,
+        ...(Object.keys(styleOverrides).length > 0 ? { overrides: styleOverrides } : {}),
+      };
+
+      // The cost, from the real artifact rather than arithmetic: every frame
+      // key embeds the whole recipe (pack/cache.ts), so ANY look change
+      // invalidates the entire last bake. Zero when nothing has been baked.
+      let staleFrames = 0;
+      if (manifest.lastBakeId !== undefined) {
+        try {
+          const bakeManifest = JSON.parse(
+            await Deno.readTextFile(
+              `${wsPaths(workspace).bakesDir}/bake-${manifest.lastBakeId}/manifest.json`,
+            ),
+          );
+          staleFrames = Array.isArray(bakeManifest.frames) ? bakeManifest.frames.length : 0;
+        } catch {
+          // the bake dir was pruned: the cost is unknown, not zero — say so by
+          // leaving it at 0 and letting the caller see lastBakeId is set
+        }
+      }
+
+      const m = await setLook(workspace, look, {
+        label: `Look: ${styleId} on ${cameraId}`,
+      });
+      if (json) io.stdout(JSON.stringify({ look: m.look, staleFrames }));
+      else {
+        io.stdout(`look recorded: style ${styleId}, camera ${cameraId}`);
+        if (staleFrames > 0) {
+          io.stdout(
+            `  this marks ${staleFrames} frame${staleFrames === 1 ? '' : 's'} of bake ` +
+              `${manifest.lastBakeId} stale - every frame key embeds the whole recipe`,
+          );
+        }
+      }
+      return 0;
+    } catch (err) {
+      return fail(
+        'look' as JobEvent['jobId'],
+        'look-failed',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   if (verb === 'anim') {
     // query/install verbs over animation packs (P3-T1). Like doctor, --json
     // emits ONE JSON document (a query snapshot, not a job stream).
@@ -833,7 +1015,9 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
             '--enable and --disable in one call would hide the order the journal needs - pass one',
           );
         }
-        if ((args.includes('--enable') && !enableRaw) || (args.includes('--disable') && !disableRaw)) {
+        if (
+          (args.includes('--enable') && !enableRaw) || (args.includes('--disable') && !disableRaw)
+        ) {
           return fail(
             'anim' as JobEvent['jobId'],
             'bad-args',
@@ -2011,7 +2195,7 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       'unknown-verb',
       `Unknown verb "${
         verb ?? ''
-      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, models, anim, bake, export, doctor, undo, redo (--version)`,
+      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, models, anim, look, bake, export, doctor, undo, redo (--version)`,
     );
   }
 

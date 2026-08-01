@@ -266,6 +266,36 @@ export async function setRigState(
 }
 
 /**
+ * Record the look (P4-T2), as a journaled patch — so choosing a camera or a
+ * style is undoable like every other decision, and `bake` inherits it without
+ * being the only verb that can write it.
+ *
+ * The caller passes the RESOLVED look object; validation of the merged
+ * preset+overrides belongs upstream (resolveCamera/resolveStyle refuse an
+ * illegal combination), because a manifest should never record a look that
+ * cannot bake.
+ */
+export async function setLook(
+  workspace: string,
+  look: NonNullable<CharacterManifest['look']>,
+  opts: ReceiptOptions & { label: string },
+): Promise<CharacterManifest> {
+  return await commit(workspace, (manifest) => {
+    if (canonicalJson(manifest.look ?? null) === canonicalJson(look)) {
+      throw new Error('setLook was given the look the character already has.');
+    }
+    return {
+      op: [{
+        op: manifest.look === undefined ? 'add' : 'replace',
+        path: '/look',
+        value: look,
+      }],
+      label: opts.label,
+    };
+  }, opts.now);
+}
+
+/**
  * Record the clip bindings (P4-T2), as a journaled patch: `anim --enable` and
  * `--disable` are decisions exactly like `rig --accept`, and one undo takes a
  * binding change back. Replaced wholesale for the same reason RigState is —
