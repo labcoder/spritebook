@@ -17,6 +17,7 @@ import { canonicalJson } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
 import { PIXEL } from '@spritebook/style';
 import { type BakeProvenance, buildCacheInputs } from './bake.ts';
+import { rigForKey } from './cache.ts';
 
 const MODEL = new URL('../anim/fixtures/humanoid-normal.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -69,8 +70,16 @@ Deno.test('with no character to ask, the sentinels say so and nothing changed', 
 Deno.test('the rig reaches the key, and a joint nudge moves it', async () => {
   const bare = await buildCacheInputs(spec, SIG);
   const rigged = await buildCacheInputs(spec, SIG, { rig: RIG });
-  assertEquals(rigged.rigStateHash, await sha256Hex(canonicalJson(RIG)));
+  // D-031: what is hashed is the rig MINUS `accepted` — see rigForKey
+  assertEquals(rigged.rigStateHash, await sha256Hex(canonicalJson(rigForKey(RIG))));
   assert(rigged.rigStateHash !== bare.rigStateHash, 'a rig is not "no rig"');
+
+  // and the acceptance itself is invisible to the key: pressing Accept moves
+  // no vertex, so it must not cost this character every frame it has
+  const accepted = await buildCacheInputs(spec, SIG, {
+    rig: { ...RIG, accepted: !RIG.accepted },
+  });
+  assertEquals(accepted.rigStateHash, rigged.rigStateHash, 'accepting is not a recipe change');
 
   // A tier-1 repair changes the pose and therefore the pixels. Under the
   // sentinel this hashed identically to every other rig state, so the only

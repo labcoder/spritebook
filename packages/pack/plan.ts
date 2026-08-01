@@ -29,11 +29,10 @@ function shorten(v: string): string {
 /**
  * What each field means to the person who changed it.
  *
- * `rigStateHash` names acceptance explicitly because it is the one entry here
- * that can move without any pixel moving: `RigState.accepted` is a human
- * judgement, it is hashed with the rest of the rig, and so recording it costs
- * a full re-bake. Stated rather than hidden — a plan that said "the rig
- * changed" after the user only pressed Accept would read as a bug.
+ * `rigStateHash` used to name acceptance here, because pressing Accept moved
+ * the key without moving a pixel. D-031 took `accepted` out of the hash
+ * instead — it was the honest fix, not the honest warning — so the reason no
+ * longer has to apologise for it.
  */
 const REASONS: Record<StaleField, (from: string, to: string) => string> = {
   characterId: (from, to) =>
@@ -42,8 +41,8 @@ const REASONS: Record<StaleField, (from: string, to: string) => string> = {
   canonicalMeshSha256: () =>
     'the canonical mesh changed — a different candidate was picked, or the mesh was regenerated',
   rigStateHash: () =>
-    'the rig changed — joint edits, orientation fixes, a re-run, or accepting it (an acceptance ' +
-    'alone changes no pixels, but it is recorded on the rig and the rig is hashed whole)',
+    'the rig changed — a re-run, joint edits, orientation fixes, a different track, or a bone ' +
+    'mask. Accepting a rig is NOT in this hash (D-031), so this is a real change to the skeleton',
   clipBindingHash: () =>
     'the animation changed — which clips are enabled, their frames/speed/hold, or the clip bytes ' +
     'in the pack itself',

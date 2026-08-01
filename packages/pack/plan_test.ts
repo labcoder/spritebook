@@ -124,13 +124,19 @@ function canonical(v: CacheKeyInputs): string {
   }`;
 }
 
-Deno.test('accepting a rig is reported as an acceptance, not a mystery', () => {
-  // RigState.accepted is hashed with the rest of the rig, so recording a human
-  // judgement costs a full re-bake. That is a real sharp edge at roster scale;
-  // the plan's job is to make sure nobody meets it as an unexplained re-render.
+Deno.test('the rig reason promises a REAL skeleton change (D-031)', () => {
+  // Before D-031, `accepted` was hashed with the rest of the rig, so pressing
+  // Accept invalidated every frame and this reason had to hedge. Now the hash
+  // excludes it (packages/pack/cache.ts `rigForKey`), so the sentence can
+  // promise something — and this test is what keeps the promise true if
+  // anyone puts the field back.
   const reasons = diffCacheInputs(BASE, { ...BASE, rigStateHash: h('9') });
   assert(
-    reasons[0]!.why.includes('accepting it'),
-    `the rig reason names acceptance: ${reasons[0]!.why}`,
+    reasons[0]!.why.includes('D-031'),
+    `the rig reason cites the decision that makes it honest: ${reasons[0]!.why}`,
+  );
+  assert(
+    !/accepting it/.test(reasons[0]!.why),
+    'and no longer blames an acceptance that cannot reach the key',
   );
 });

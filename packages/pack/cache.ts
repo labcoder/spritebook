@@ -20,8 +20,32 @@
  * (per-clip hashes in the anim package), the prediction refines with the keys.
  */
 import { computeCacheKey, sha256Hex } from '@spritebook/core';
-import { type CacheKeyInputs, canonicalJson } from '@spritebook/schema';
+import { type CacheKeyInputs, canonicalJson, type RigState } from '@spritebook/schema';
 import type { FrameId } from './contracts.ts';
+
+/**
+ * The rig as the CACHE sees it (D-031): everything except `accepted`.
+ *
+ * `RigState.accepted` is a human judgement recorded by `spritebook rig
+ * --accept`. Nothing reads it to change a pixel — the only readers are the
+ * bake's unaccepted-rig warning, the verb's own idempotence check, and GUI
+ * badges — while every geometric consequence of rigging (the skeleton, the
+ * weights, applied joint edits, applied orientation fixes) is promoted into
+ * `canonical/model.glb` and therefore already covered by
+ * `canonicalMeshSha256`. Hashing it made pressing Accept cost a full re-bake:
+ * an annoyance at one character, a hundred re-bakes bought with a click at
+ * roster scale, and the exact class of surprise P4-T3 exists to remove.
+ *
+ * Written as an OMISSION rather than a list of fields to keep. That direction
+ * matters: a field added to RigState tomorrow is hashed by default, so the
+ * failure mode of forgetting to update this function is a spurious cache miss
+ * (annoying, visible, safe) rather than stale pixels served under a key that
+ * never heard of the thing that changed.
+ */
+export function rigForKey(rig: RigState): Omit<RigState, 'accepted'> {
+  const { accepted: _accepted, ...geometric } = rig;
+  return geometric;
+}
 
 /** The 64-hex bake-level key (sha256 of canonical CacheKeyInputs). */
 export function bakeKey(inputs: CacheKeyInputs): Promise<string> {

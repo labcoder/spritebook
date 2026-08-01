@@ -6,7 +6,14 @@
  * or pixel buffer crosses this API (D-004 discipline throughout).
  */
 export * from './contracts.ts';
-export { artifactKey, bakeKey, BlobCache, frameKey, predictInvalidation } from './cache.ts';
+export {
+  artifactKey,
+  bakeKey,
+  BlobCache,
+  frameKey,
+  predictInvalidation,
+  rigForKey,
+} from './cache.ts';
 export { diffCacheInputs } from './plan.ts';
 export { assembleManifest, frameGrid } from './manifest.ts';
 export { DEFAULT_GAP_PX, DEFAULT_MAX_PAGE_SIZE_PX, packLayout } from './maxrects.ts';

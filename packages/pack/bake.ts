@@ -61,7 +61,7 @@ import {
   frameIdKey,
   PAGE_KIND,
 } from './contracts.ts';
-import { artifactKey, bakeKey, BlobCache, frameKey } from './cache.ts';
+import { artifactKey, bakeKey, BlobCache, frameKey, rigForKey } from './cache.ts';
 import { assembleManifest, frameGrid } from './manifest.ts';
 import { assertRenderedPrefix, flipCellPng, type MirrorPlan, mirrorPlan } from './mirror.ts';
 import { composePage, encodePagePng } from './atlas.ts';
@@ -225,8 +225,12 @@ export async function buildCacheInputs(
     // such. That is the honest answer for `bake --model x.glb`, which has no
     // manifest to ask; it used to be the answer for every bake, under a comment
     // saying the rig stage "lands with Track B", which it did in P3.
+    //
+    // `rigForKey` drops `accepted` (D-031): a human judgement that moves no
+    // vertex must not invalidate a hundred bakes. The sentinel has no such
+    // field, so an unrigged bake's key is byte-for-byte what it always was.
     rigStateHash: await sha256Hex(
-      canonicalJson(provenance.rig ?? { track: 'source-skin' }),
+      canonicalJson(provenance.rig ? rigForKey(provenance.rig) : { track: 'source-skin' }),
     ),
     clipBindingHash: await sha256Hex(clipBindings),
     // D-011, mirroring edition: mirroring changes the PIXELS (half the
