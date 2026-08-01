@@ -205,7 +205,7 @@ fn read_rig_report(dir: String) -> Result<Option<serde_json::Value>, String> {
 /// its pixel-truth direction strips from. Core produced both; the webview
 /// only slices the atlas it is given, at integer zoom.
 #[tauri::command]
-fn read_bake_atlas(dir: String) -> Result<Option<serde_json::Value>, String> {
+fn read_bake_atlas(dir: String, pass: Option<String>) -> Result<Option<serde_json::Value>, String> {
     use base64::Engine;
     let bakes = Path::new(&dir).join("bakes");
     let Ok(entries) = std::fs::read_dir(&bakes) else {
@@ -229,11 +229,13 @@ fn read_bake_atlas(dir: String) -> Result<Option<serde_json::Value>, String> {
     let manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(bake_dir.join("manifest.json")).map_err(|e| e.to_string())?)
             .map_err(|e| format!("bake manifest is not JSON: {e}"))?;
-    // the lit page is the one the sheet ships; AOV pages are rect-identical
+    // the lit page is the one the sheet ships; AOV pages are RECT-IDENTICAL
+    // (D-010), so the same frame rects address every pass
+    let want = pass.unwrap_or_else(|| "lit".to_string());
     let png_name = manifest
         .get("atlases")
         .and_then(|a| a.as_array())
-        .and_then(|a| a.iter().find(|x| x.get("pass").and_then(|p| p.as_str()) == Some("lit")))
+        .and_then(|a| a.iter().find(|x| x.get("pass").and_then(|p| p.as_str()) == Some(&want)))
         .and_then(|x| x.get("png"))
         .and_then(|p| p.as_str())
         .unwrap_or("atlas_lit_0.png")
@@ -274,6 +276,37 @@ fn read_image(path: String) -> Result<Option<(String, String)>, String> {
     }
 }
 
+/// Reveal a produced folder in the OS file manager — the Export stage's
+/// done-state affordance. Refuses anything that is not an existing directory,
+/// so it can never become a general "run this" hole.
+#[tauri::command]
+fn open_folder(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.is_dir() {
+        return Err(format!("not a directory: {path}"));
+    }
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut c = Command::new("explorer");
+        c.arg(&p);
+        c
+    };
+    #[cfg(target_os = "macos")]
+    let mut cmd = {
+        let mut c = Command::new("open");
+        c.arg(&p);
+        c
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut cmd = {
+        let mut c = Command::new("xdg-open");
+        c.arg(&p);
+        c
+    };
+    // explorer.exe returns 1 even on success; spawning is the whole contract
+    cmd.spawn().map(|_| ()).map_err(|e| format!("could not open {path}: {e}"))
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -283,7 +316,8 @@ fn main() {
             read_prev_session,
             read_image,
             read_rig_report,
-            read_bake_atlas
+            read_bake_atlas,
+            open_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

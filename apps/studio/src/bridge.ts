@@ -50,8 +50,13 @@ export interface StudioBridge {
   prevSession(maxLines: number): Promise<string[] | null>;
   /** rig/deform-report.json, verbatim, when a rig has been run. */
   readRigReport(dir: string): Promise<unknown | null>;
-  /** The newest bake's lit atlas + manifest, for pixel-truth strips. */
-  readBakeAtlas(dir: string): Promise<{ manifest: unknown; png: string } | null>;
+  /** The newest bake's atlas page + manifest (pages are rect-identical). */
+  readBakeAtlas(
+    dir: string,
+    pass?: string,
+  ): Promise<{ manifest: unknown; png: string } | null>;
+  /** Reveal a produced folder in the OS file manager. */
+  openFolder(path: string): Promise<void>;
   /** Native file drop with real paths, when the shell provides it. */
   onFileDrop?(cb: (paths: string[]) => void): void;
 }
@@ -127,10 +132,13 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
     async readRigReport(dir) {
       return await t.core.invoke('read_rig_report', { dir });
     },
-    async readBakeAtlas(dir) {
-      return (await t.core.invoke('read_bake_atlas', { dir })) as
+    async readBakeAtlas(dir, pass) {
+      return (await t.core.invoke('read_bake_atlas', { dir, pass: pass ?? 'lit' })) as
         | { manifest: unknown; png: string }
         | null;
+    },
+    async openFolder(path) {
+      await t.core.invoke('open_folder', { path });
     },
     onFileDrop(cb) {
       // v2 emits webview drag/drop as tauri://drag-drop with { paths, position }
@@ -512,12 +520,20 @@ function browserBridge(): StudioBridge {
         ],
       });
     },
-    readBakeAtlas() {
+    readBakeAtlas(_dir, _pass) {
       // a SYNTHETIC 2-direction x 3-frame atlas (16px cells) so the strips
       // demo honestly in a browser; the desktop shell serves real bake bytes
       return Promise.resolve({
         manifest: {
           bakeId: 'demo0000',
+          metrics: { cacheHitPct: 0, flickerPct: 0.3, framesTotal: 6, wallTimeS: 3.2 },
+          flags: [{
+            code: 'silhouette-clipped',
+            severity: 'warn',
+            sourceStage: 'look',
+            message:
+              'the silhouette reaches the cell edge on 2 frames (bottom). Lower pixelsPerMeter or raise cellPx.',
+          }],
           atlases: [{ pass: 'lit', png: 'atlas_lit_0.png', pageIndex: 0, sizePx: 96 }],
           frames: [
             {
@@ -561,6 +577,9 @@ function browserBridge(): StudioBridge {
         png:
           'iVBORw0KGgoAAAANSUhEUgAAAGAAAAAgCAYAAADtwH1UAAAAkUlEQVR42u3YoQ3DUBBEQZeTwoxTk8sJDnYvPweDlhh4Jc+Tlh36Qyxvm6S/Xp/vSvNC5QD73KR54XKAY27SAJQDnHOTBqAcYM1NGoBygMuAAAAAAAAAAICbACRJ0l3/gt7ztRPmhcoB9rlJ88LlAMfcpAEoBzjnJg1AOcCamzQA5QCXAQEAAAAAwHMBJEmP6QfHEh34+3dImgAAAABJRU5ErkJggg==',
       });
+    },
+    openFolder() {
+      return Promise.resolve();
     },
     prevSession() {
       return Promise.resolve([

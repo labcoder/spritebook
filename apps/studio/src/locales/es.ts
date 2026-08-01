@@ -275,4 +275,43 @@ export const es: Record<string, string> = {
   'could not read the presets — the log drawer has the verbatim reason':
     'no se pudieron leer los preajustes — el registro tiene el motivo literal',
   'preset output was not JSON': 'la salida de preajustes no era JSON',
+
+  // bake & review stage (P4-T2)
+  'Bake sheet': 'Hornear la hoja',
+  'Re-bake': 'Rehornear',
+  'Baking…': 'Horneando…',
+  'left': 'restantes',
+  'no bake yet — run one to review it here': 'sin bake todavía — ejecuta uno para revisarlo aquí',
+  'Review': 'Revisión',
+  'cache': 'caché',
+  'flicker': 'parpadeo',
+  'Clip': 'Clip',
+  'Direction': 'Dirección',
+  'direction': 'dirección',
+  'frame': 'fotograma',
+  'Play': 'Reproducir',
+  'Pause': 'Pausar',
+  'fps': 'fps',
+  'Pass': 'Pase',
+  'nearest-neighbor · integer zoom · AOV pages share the lit layout':
+    'vecino más cercano · zoom entero · las páginas AOV comparten el diseño de lit',
+  'Quality flags': 'Avisos de calidad',
+  'this bake raised no flags': 'este bake no levantó ningún aviso',
+
+  // export stage (P4-T2)
+  'nothing to export — bake a sheet first': 'nada que exportar — hornea una hoja primero',
+  'one bake, many formats': 'un bake, muchos formatos',
+  'Targets': 'Destinos',
+  'a .tres SpriteFrames resource with the anchor box':
+    'un recurso .tres SpriteFrames con la caja de anclaje',
+  'an .aseprite-importable sheet plus its JSON': 'una hoja importable en Aseprite con su JSON',
+  'the TexturePacker JSON (hash) sheet description':
+    'la descripción de hoja JSON (hash) de TexturePacker',
+  'one PNG strip per clip and direction': 'una tira PNG por clip y dirección',
+  'Export selected': 'Exportar lo seleccionado',
+  'Exporting…': 'Exportando…',
+  'pick at least one target': 'elige al menos un destino',
+  'Done': 'Listo',
+  'folders': 'carpetas',
+  'Open folder': 'Abrir la carpeta',
 };

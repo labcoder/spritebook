@@ -1326,3 +1326,113 @@ input {
   display: block;
   image-rendering: pixelated;
 }
+
+/* ---- bake stage ---- */
+.bakestage,
+.exportstage {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+  max-width: 860px;
+}
+.bakeprogress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+}
+.segbar {
+  display: flex;
+  gap: 2px;
+}
+.segbar i {
+  width: 9px;
+  height: 12px;
+  background: var(--sb-raise);
+  border: 1px solid var(--sb-line);
+}
+.segbar i.f {
+  background: var(--sb-cyan-ink);
+  border-color: var(--sb-cyan-ink);
+}
+.player {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+.playerwell {
+  display: inline-flex;
+  padding: 8px;
+  border: 1px solid var(--sb-line);
+  background: repeating-conic-gradient(var(--sb-check-a) 0% 25%, var(--sb-check-b) 0% 50%) 0 0 /
+    16px 16px;
+}
+.playermeta {
+  font-size: 10.5px;
+  color: var(--sb-dim);
+}
+.qaflags {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qaflag {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--sb-line);
+  background: var(--sb-panel);
+  font-size: 11.5px;
+}
+.qamsg {
+  flex: 1;
+  line-height: 1.5;
+}
+.qaflag .btn {
+  flex: none;
+}
+
+/* ---- export stage ---- */
+.targets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.target {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--sb-line);
+  background: var(--sb-panel);
+  font-size: 12px;
+}
+.targetname {
+  min-width: 120px;
+  font-weight: 500;
+}
+.target .inote {
+  margin-bottom: 0;
+}
+.filelist {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--sb-line);
+  padding: 8px 10px;
+  font-size: 10.5px;
+  color: var(--sb-dim);
+}
+.fileline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+}
+.filepath {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

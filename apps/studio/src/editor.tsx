@@ -12,6 +12,8 @@ import { Candidates } from './gen';
 import { RigStage } from './rigstage';
 import { AnimStage } from './animstage';
 import { LookStage } from './lookstage';
+import { BakeStage } from './bakestage';
+import { ExportStage } from './exportstage';
 import { type Stage, type StageKey, stageStates } from './stages';
 import { t } from './i18n';
 import { prefs } from './prefs';
@@ -210,7 +212,7 @@ function Inspector({ stage, stages, manifest, dir }: {
       <div className='isec'>
         <div className='isechead'>
           <span className='hud'>{stageLabel(stage)}</span>
-          <span className='ieyebrow mono'>{s.n}// {stage.toUpperCase()}</span>
+          <span className='ieyebrow mono'>{`${s.n}// ${stage.toUpperCase()}`}</span>
         </div>
         <div className='inote'>{s.note}</div>
         <Rows obj={sliceFor(stage, manifest)} />
@@ -338,6 +340,29 @@ export function Editor({ bridge, card, manifest, onChanged }: {
         ? (
           <div className='center genstage'>
             <LookStage
+              bridge={bridge}
+              dir={card.dir}
+              manifest={manifest}
+              onChanged={onChanged}
+            />
+          </div>
+        )
+        : effective === 'bake'
+        ? (
+          <div className='center genstage'>
+            <BakeStage
+              bridge={bridge}
+              dir={card.dir}
+              manifest={manifest}
+              onChanged={onChanged}
+              onGoToStage={setActive}
+            />
+          </div>
+        )
+        : effective === 'export'
+        ? (
+          <div className='center genstage'>
+            <ExportStage
               bridge={bridge}
               dir={card.dir}
               manifest={manifest}
