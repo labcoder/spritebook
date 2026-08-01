@@ -16,6 +16,7 @@ export * from './project.ts';
 export * from './character.ts';
 export * from './animpack.ts';
 export * from './bake.ts';
+export * from './batch.ts';
 export * from './cache.ts';
 export * from './jobs.ts';
 export * from './patch.ts';

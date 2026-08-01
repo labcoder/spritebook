@@ -17,8 +17,14 @@
  * drop the id, which is exactly what D-011 refuses. Recorded rather than
  * quietly optimized.
  */
-import type { CharacterId, CharacterManifest } from '@spritebook/schema';
+import type {
+  CharacterId,
+  CharacterManifest,
+  RosterEntry,
+  RosterManifest,
+} from '@spritebook/schema';
 import {
+  BakeManifestSchema,
   canonicalJson,
   CharacterIdSchema,
   CharacterManifestSchema,
@@ -26,6 +32,9 @@ import {
   ManifestPatchSchema,
   migrateCharacterManifest,
   parseWith,
+  ROSTER_FILE,
+  RosterManifestSchema,
+  SCHEMA_VERSION,
 } from '@spritebook/schema';
 import { ManifestJournal } from './journal.ts';
 import { writeAtomic } from './receipts.ts';
@@ -199,6 +208,127 @@ async function copyTree(from: string, to: string, skipTop: Set<string>): Promise
     // files outside its own workspace is not self-contained, and silently
     // materializing them here would hide that
   }
+}
+
+// ---------------------------------------------------------------------------
+// The roster scan (P4-T3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every character under a root, as plain data.
+ *
+ * DERIVED, always. The scan reads the character.json files and rebuilds the
+ * index from scratch; `roster.json` is written for the user and the GUI to
+ * read, and this function never reads it back. That is deliberate — an index
+ * that were consulted as truth would be a second place a character's id and
+ * name live, and the first stale one silently bakes the wrong thing.
+ *
+ * A directory whose character.json exists but cannot be read or parsed lands
+ * in `unreadable` rather than being skipped. A batch that quietly did 9 of 10
+ * is precisely the failure this whole task exists to prevent, so the count the
+ * user sees has to include the ones that went wrong.
+ */
+export interface ScanRosterOptions {
+  now?: () => string;
+  /** only characters whose manifest was written at or after this instant */
+  changedSince?: Date;
+}
+
+export async function scanRoster(
+  root: string,
+  opts: ScanRosterOptions = {},
+): Promise<RosterManifest> {
+  const now = opts.now ?? (() => new Date().toISOString());
+  const base = root.replace(/[\\/]+$/, '');
+  const characters: RosterEntry[] = [];
+  const unreadable: { dir: string; error: string }[] = [];
+
+  let entries: Deno.DirEntry[];
+  try {
+    entries = [...Deno.readDirSync(base)];
+  } catch (err) {
+    throw new Error(
+      `Cannot read the roster root "${base}": ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory) continue;
+    const dir = `${base}/${entry.name}`;
+    const paths = workspacePaths(dir);
+    let stat: Deno.FileInfo;
+    try {
+      stat = await Deno.stat(paths.manifest);
+    } catch {
+      continue; // not a workspace — roots hold other directories too, and that
+      // is not an error the way an unparseable manifest is
+    }
+    // The mtime is what `--changed-since` compares. It answers "was this
+    // TOUCHED", which is a different and much cheaper question than "would
+    // its pixels differ" — see the plan for the second one. A rename touches
+    // the manifest and invalidates nothing (D-011), so the two answers
+    // legitimately disagree and both are worth having.
+    const updatedAt = (stat.mtime ?? new Date(0)).toISOString();
+    if (opts.changedSince && (stat.mtime ?? new Date(0)) < opts.changedSince) continue;
+
+    let manifest: CharacterManifest;
+    try {
+      manifest = await readWorkspace(dir);
+    } catch (err) {
+      unreadable.push({ dir: entry.name, error: err instanceof Error ? err.message : String(err) });
+      continue;
+    }
+    // `ready` asks the disk, not the manifest: a manifest can carry a
+    // canonicalMesh record whose file was deleted underneath it, and finding
+    // that out at frame 1 of an overnight run is the expensive way to learn it
+    let ready = manifest.canonicalMesh !== undefined;
+    if (ready) {
+      try {
+        await Deno.stat(paths.canonicalModel);
+      } catch {
+        ready = false;
+      }
+    }
+    let lastBakedAt: string | undefined;
+    if (manifest.lastBakeId !== undefined) {
+      try {
+        const baked = JSON.parse(
+          await Deno.readTextFile(`${paths.bakesDir}/bake-${manifest.lastBakeId}/manifest.json`),
+        );
+        lastBakedAt = parseWith(BakeManifestSchema, baked, 'BakeManifest').createdAt;
+      } catch {
+        // the id points at a bake that is gone or unreadable; the plan will
+        // call that never-baked, which is the honest and safe reading
+      }
+    }
+    characters.push({
+      id: manifest.id,
+      dir: entry.name,
+      displayName: manifest.displayName,
+      updatedAt,
+      ready,
+      ...(manifest.lastBakeId !== undefined ? { lastBakeId: manifest.lastBakeId } : {}),
+      ...(lastBakedAt !== undefined ? { lastBakedAt } : {}),
+    });
+  }
+
+  // sorted so two scans of an unchanged root are byte-identical
+  characters.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  unreadable.sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
+  return parseWith(RosterManifestSchema, {
+    schemaVersion: SCHEMA_VERSION,
+    root: base,
+    scannedAt: now(),
+    characters,
+    unreadable,
+  }, 'RosterManifest');
+}
+
+/** Write the scan to `<root>/roster.json`, canonically. Returns the path. */
+export async function writeRosterManifest(roster: RosterManifest): Promise<string> {
+  const path = `${roster.root}/${ROSTER_FILE}`;
+  await writeAtomic(path, canonicalJson(roster));
+  return path;
 }
 
 async function readJournalState(paths: { manifest: string; journal: string; cursor: string }) {

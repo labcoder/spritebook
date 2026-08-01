@@ -7,6 +7,7 @@
  */
 export * from './contracts.ts';
 export { artifactKey, bakeKey, BlobCache, frameKey, predictInvalidation } from './cache.ts';
+export { diffCacheInputs } from './plan.ts';
 export { assembleManifest, frameGrid } from './manifest.ts';
 export { DEFAULT_GAP_PX, DEFAULT_MAX_PAGE_SIZE_PX, packLayout } from './maxrects.ts';
 export { assertRectIdentity, composePage, encodePagePng } from './atlas.ts';
