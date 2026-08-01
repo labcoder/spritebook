@@ -192,7 +192,7 @@ next bake records the live id, and the warning stops.
 | `--frames <n>`          | `6`           | frames of the built-in idle pose (positive integer)                 |
 | `--clips <spec>`        | (idle)        | `clip:frames[@speed][!hold][,...]` — bake real clips instead        |
 | `--pack <dir>`          | (bundled)     | animation pack the `--clips` ids resolve in                         |
-| `--cell <px\|WxH>`      | `64`          | output cell size; `64` is square, `96x128` is not                   |
+| `--cell <px\|WxH>`      | `96`          | output cell size; `96` is square, `96x128` is not                   |
 | `--ppm <n>`             | `32`          | pixels per meter (world scale)                                      |
 | `--colors <n>`          | style's own   | palette size, 2–256; refines the style rather than replacing it     |
 | `--elevation <deg>`     | `30`          | camera elevation angle                                              |
@@ -273,6 +273,20 @@ process would interleave passes on shared render targets. One character failing 
 the rest bake, the failures are named in the summary, and the exit code is non-zero. Blocked
 characters (no mesh, unreadable manifest, a look naming a preset that does not exist) are skipped
 the same way rather than being silently dropped from the count.
+
+#### Why the default cell is 96 px
+
+Sized for a CLIP SET, not for a standing idle. Measured on the bundled Track A body at 32 px/m: an
+idle pose needs a 37 x 63 px cell, while a six-clip set (idle, walk, jog, sprint, jab, death)
+reaches 37 px left and 36 px right of the pivot and needs **85 x 73** — a jab and a death reach
+sideways in a way a standing idle never does. 64 px fit the idle and clipped everything else, so the
+default moved to 96 (D-032). Drop back with `--cell 64` if you only ship idles; the choice is
+recorded on the character's look like any other.
+
+That is one body and one clip set — a sword-combo pack reaches further. If `bake` raises
+`silhouette-clipped` on the **left or right** edge, the character has outgrown the cell and `--cell`
+is the answer. On the **bottom** edge it is not a framing problem at all: the pivot row IS world
+Y=0, so silhouette below it is geometry under the floor, and no cell size helps.
 
 ### `spritebook export`
 

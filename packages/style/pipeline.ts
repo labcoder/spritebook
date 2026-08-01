@@ -225,8 +225,14 @@ function clippedFlag(
       `BOTTOM is not a framing problem on this preset: '${camera.id}' pins world Y=0 to row ` +
         `${pivotRow} of a ${camera.cellPx.h} px cell, so silhouette below it is geometry under ` +
         `the ground plane - the character is standing IN the floor. Lowering pixelsPerMeter ` +
-        `only makes a half-buried character smaller. Ground the mesh instead: ` +
-        `\`spritebook rig --feet-ground\` re-runs with the body sat on Y=0.`,
+        `only makes a half-buried character smaller, and no cell size fixes it. TWO causes, ` +
+        `and they need different fixes: the MESH may be ungrounded, which ` +
+        `\`spritebook rig --feet-ground\` re-runs with the body sat on Y=0 - check first, with ` +
+        `a bind-pose bake, whether it clips at all. If the bind pose is clean and only the ` +
+        `CLIPS sink, it is the retarget: rotations transfer and limb lengths come from the ` +
+        `target skeleton, so a body whose leg-to-hip proportion differs from the source's can ` +
+        `push an extended foot through the floor even though the rest pose sits on it. That is ` +
+        `a known gap (no foot-ground IK); the workaround is more padding.`,
     );
   }
   if (overflow) {

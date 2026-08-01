@@ -253,8 +253,8 @@ type CharacterLook = NonNullable<CharacterManifest['look']>;
  * user actually typed.
  *
  * Presence detection, not defaults, and that distinction is what makes
- * `--workspace` safe: `intFlag(args, 'cell', 64)` cannot tell "the user asked
- * for 64" from "nobody said anything", so folding defaults in would overwrite a
+ * `--workspace` safe: `intFlag(args, 'cell', 96)` cannot tell "the user asked
+ * for 96" from "nobody said anything", so folding defaults in would overwrite a
  * character's stored cell size on every bake that did not restate it.
  */
 function cameraOverridesFromFlags(args: string[]): CameraOverrides {

@@ -35,7 +35,9 @@ Deno.test('standard-30 holds the values the bake flags default to', () => {
     directions: 8,
     yawOffsetDeg: 0,
     pixelsPerMeter: 32,
-    cellPx: { w: 64, h: 64 },
+    // 96, not 64, since D-032 — 64 was sized for an idle pose and a real clip
+    // set needs 85 x 73 px (measured, tools/proofs/framing.ts)
+    cellPx: { w: 96, h: 96 },
     paddingPx: 6,
     pivot: 'feet-baseline',
     orthographic: true,

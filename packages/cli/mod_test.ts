@@ -869,7 +869,8 @@ Deno.test('--cell takes WxH, because cellPx always had two numbers', () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
   const resolved = { model: 'm.glb', character: 'c', out: 'o' };
 
-  assertEquals(bakeSpecFromFlags(base, resolved).camera.cellPx, { w: 64, h: 64 });
+  // the preset's own default, which D-032 moved from 64 to 96
+  assertEquals(bakeSpecFromFlags(base, resolved).camera.cellPx, { w: 96, h: 96 });
   assertEquals(
     bakeSpecFromFlags([...base, '--cell', '128'], resolved).camera.cellPx,
     { w: 128, h: 128 },

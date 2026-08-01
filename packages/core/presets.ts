@@ -34,12 +34,28 @@ import {
   parseWith,
 } from '@spritebook/schema';
 
-/** Shared by every detent — see the module note on why these are not per-preset. */
+/**
+ * Shared by every detent — see the module note on why these are not per-preset.
+ *
+ * `cellPx` is 96, not 64, because of D-032: 64 was sized for an IDLE POSE and
+ * SpriteBook's output is animated sheets. Measured on the Track A body at
+ * ppm 32 across a six-clip set (`tools/proofs/framing.ts`): an idle needs
+ * 37 x 63 px and fits 64 comfortably, while the clip set reaches 37 px left and
+ * 36 px right of the pivot and needs **85 x 73** — so every animated character
+ * clipped on the shipped default, which is exactly what the 100-character
+ * pivot found on 100 of 100. 96 holds it with 11 px of width to spare.
+ *
+ * The measurement is ONE body and ONE clip set; a sword-combo pack reaches
+ * further and `--cell` stays the escape hatch. Raising the cell rather than
+ * lowering `pixelsPerMeter` is deliberate: px/m is the world-locked ruler the
+ * whole roster shares, and shrinking the character to fit the frame would trade
+ * a framing bug for a detail one.
+ */
 const COMMON = {
   directions: 8,
   yawOffsetDeg: 0,
   pixelsPerMeter: 32,
-  cellPx: { w: 64, h: 64 },
+  cellPx: { w: 96, h: 96 },
   paddingPx: 6,
   pivot: 'feet-baseline',
   orthographic: true,
