@@ -137,6 +137,42 @@ export const BakePlanEntrySchema = z.strictObject({
 });
 export type BakePlanEntry = z.output<typeof BakePlanEntrySchema>;
 
+/**
+ * What a batch actually did — the document an unattended run leaves behind.
+ *
+ * The plan says what WOULD happen; this says what happened, and its reason for
+ * existing is the half the plan structurally cannot cover. QA flags live on the
+ * BakeManifest and a morning report can read them there. Job-level WARNINGS
+ * live only in the event stream, so before this they reached the terminal of
+ * whoever was not watching at 3am and nowhere else — a hundred-character run
+ * emitted a hundred `rig-unaccepted` warnings and the morning had no record
+ * that a single one had happened.
+ */
+export const BATCH_REPORT_FILE = 'bake-report.json';
+
+export const BatchWarningSchema = z.strictObject({
+  code: z.string().min(1),
+  /** how many characters raised it */
+  characters: z.int().nonnegative(),
+  /** one verbatim message — the remedy is the useful half, not the count */
+  example: z.string().min(1),
+  /** the first few, so a reader can go and look */
+  firstCharacters: z.array(CharacterIdSchema),
+});
+export type BatchWarning = z.output<typeof BatchWarningSchema>;
+
+export const BatchReportSchema = z.strictObject({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  root: z.string().min(1),
+  finishedAt: IsoTimeSchema,
+  baked: z.array(CharacterIdSchema),
+  failed: z.array(CharacterIdSchema),
+  blocked: z.array(CharacterIdSchema),
+  /** sorted by how many characters raised it, most first */
+  warnings: z.array(BatchWarningSchema),
+});
+export type BatchReport = z.output<typeof BatchReportSchema>;
+
 export const BakePlanSchema = z.strictObject({
   schemaVersion: z.literal(SCHEMA_VERSION),
   root: z.string().min(1),

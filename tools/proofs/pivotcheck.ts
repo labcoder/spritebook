@@ -59,17 +59,50 @@ async function measure(cell: string, padding: string, ppm: string, useClips: boo
   const ws = `${tmp}/pc`;
   try {
     await cli(
-      ['gen', '--workspace', ws, '--character', 'pivotcheck', '--image', IMAGE, '--model', 'fixture-gen'],
+      [
+        'gen',
+        '--workspace',
+        ws,
+        '--character',
+        'pivotcheck',
+        '--image',
+        IMAGE,
+        '--model',
+        'fixture-gen',
+      ],
       'gen',
     );
     await cli(['pick', '--workspace', ws, '--result', 'r1'], 'pick');
     await cli(
-      ['rig', '--track-a', '--workspace', ws, '--body', BODY, '--model', `${ws}/canonical/model.glb`, '--out', `${ws}/rig`],
+      [
+        'rig',
+        '--track-a',
+        '--workspace',
+        ws,
+        '--body',
+        BODY,
+        '--model',
+        `${ws}/canonical/model.glb`,
+        '--out',
+        `${ws}/rig`,
+      ],
       'fit',
     );
     if (useClips) await cli(['anim', '--enable', 'idle-loop:4', '--workspace', ws], 'anim');
     await cli(
-      ['bake', '--workspace', ws, '--cell', cell, '--ppm', ppm, '--padding', padding, '--directions', '2'],
+      [
+        'bake',
+        '--workspace',
+        ws,
+        '--cell',
+        cell,
+        '--ppm',
+        ppm,
+        '--padding',
+        padding,
+        '--directions',
+        '2',
+      ],
       'bake',
     );
     const character = JSON.parse(await Deno.readTextFile(`${ws}/character.json`));
@@ -118,7 +151,7 @@ if (offsets.every((o) => o === 0)) {
     '  the silhouette reaches the LAST row of the cell in every configuration, while the\n' +
       '  pivot is `h - padding`. The camera solver grounds the character on the cell floor\n' +
       '  rather than on the pivot row, so the recorded pivot floats `padding - 1` px above\n' +
-      "  the feet — and no cell size fixes it, which is why the oversized bake still flagged.",
+      '  the feet — and no cell size fixes it, which is why the oversized bake still flagged.',
   );
 } else {
   console.log('  mixed: read the rows above.');

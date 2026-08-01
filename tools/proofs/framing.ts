@@ -97,7 +97,17 @@ try {
   say(`  clips: ${CLIPS}`);
 
   await cli(
-    ['gen', '--workspace', ws, '--character', 'framing', '--image', IMAGE, '--model', 'fixture-gen'],
+    [
+      'gen',
+      '--workspace',
+      ws,
+      '--character',
+      'framing',
+      '--image',
+      IMAGE,
+      '--model',
+      'fixture-gen',
+    ],
     'gen',
   );
   await cli(['pick', '--workspace', ws, '--result', 'r1'], 'pick');
@@ -171,8 +181,10 @@ try {
   const below = worst(all, 'below');
   const left = worst(all, 'left');
   const right = worst(all, 'right');
-  say(`  ${'WORST OVERALL'.padEnd(18)} ${String(above).padStart(6)} ${String(below).padStart(6)} ` +
-    `${String(left).padStart(6)} ${String(right).padStart(6)}`);
+  say(
+    `  ${'WORST OVERALL'.padEnd(18)} ${String(above).padStart(6)} ${String(below).padStart(6)} ` +
+      `${String(left).padStart(6)} ${String(right).padStart(6)}`,
+  );
 
   // ------------------------------------------------------------- the verdict
   const pad = 6;

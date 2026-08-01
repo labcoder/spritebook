@@ -295,6 +295,30 @@ try {
   }
   flicker.sort((a, b) => b.pct - a.pct);
   const meanFlicker = flicker.reduce((n, f) => n + f.pct, 0) / Math.max(1, flicker.length);
+  // the batch's own report: JOB warnings, which no BakeManifest records
+  try {
+    const report = JSON.parse(await Deno.readTextFile(`${ROOT}/bake-report.json`)) as {
+      warnings: { code: string; characters: number; example: string }[];
+    };
+    // A QA flag is ALSO emitted as a warn event, so it would appear twice —
+    // once here from the job stream and once below from the manifest, where it
+    // belongs. The job-warning section is for what the manifest cannot record.
+    const jobOnly = report.warnings.filter((w) => !flagCounts.has(w.code));
+    if (jobOnly.length === 0) {
+      say('  job warnings: none beyond the QA flags below');
+    } else {
+      for (const w of jobOnly) {
+        say(`
+  job warning "${w.code}" on ${w.characters}/${N} characters:`);
+        for (const chunk of w.example.match(/[\s\S]{1,92}(\s|$)/g) ?? [w.example]) {
+          say(`    ${chunk.trim()}`);
+        }
+      }
+      say('');
+    }
+  } catch {
+    say('  (no bake-report.json — the batch did not write one)');
+  }
   say(`  ${N} characters · ${framesTotal} frames on disk`);
   say(
     `  flicker: mean ${meanFlicker.toFixed(2)}% · worst ${flicker[0]!.id} ` +

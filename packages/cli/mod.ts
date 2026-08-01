@@ -30,8 +30,10 @@ import {
   ManifestPatchSchema,
   migrateCharacterManifest,
   parseWith,
+  SCHEMA_VERSION,
 } from '@spritebook/schema';
 import type {
+  BatchReport,
   CameraOverrides,
   CameraPreset,
   CharacterManifest,
@@ -930,7 +932,9 @@ export async function resolveBake(
         `skinning. Check deform-report.json in the rig output, repair with ` +
         `\`spritebook rig --edits <patch.json>\` or \`--rerun-with-hints\`, or - if you have ` +
         `looked and the sprites are fine - record that with \`spritebook rig --workspace ` +
-        `<dir> --accept\`. Baking continues; this is a warning, not a refusal.`,
+        `<dir> --accept\`, which since D-031 costs NOTHING: acceptance is out of the cache key, ` +
+        `so recording it re-bakes not one frame. Baking continues; this is a warning, not a ` +
+        `refusal.`,
     };
     emit(w, `warn [${w.code}]: ${w.message}`);
   }
@@ -1043,7 +1047,16 @@ async function runBakeAll(args: string[], io: CliIo, b: BatchIo): Promise<number
   }
 
   const { scanRoster, writeRosterManifest } = await import('@spritebook/core');
-  const { formatPlan, planRoster, toBake, writePlan } = await import('./batch.ts');
+  const {
+    formatPlan,
+    formatWarnings,
+    planRoster,
+    summariseWarnings,
+    toBake,
+    warnTee,
+    writePlan,
+    writeReport,
+  } = await import('./batch.ts');
   let roster;
   try {
     roster = await scanRoster(root, { now: b.now, ...(changedSince ? { changedSince } : {}) });
@@ -1097,6 +1110,12 @@ async function runBakeAll(args: string[], io: CliIo, b: BatchIo): Promise<number
   const targets = toBake(plan);
   const pass = passthroughBakeArgs(args);
   const failedIds: string[] = [];
+  const bakedIds: string[] = [];
+  // Every child's WARNINGS, kept. QA flags live on the BakeManifest and a
+  // morning report can read them there; warns live only in the event stream,
+  // so without this a hundred-character run emits a hundred `rig-unaccepted`
+  // lines to a terminal nobody is watching and leaves no record at all.
+  const seenWarns: { characterId: string; code: string; message: string }[] = [];
   for (const [i, c] of targets.entries()) {
     b.emit(
       {
@@ -1111,17 +1130,33 @@ async function runBakeAll(args: string[], io: CliIo, b: BatchIo): Promise<number
     );
     // One failure never ends the batch: a roster where character 4 has a bad
     // mesh must still bake the other 99, and the 4 must be named at the end.
-    const code = await runCli(['bake', '--workspace', `${root}/${c.dir}`, ...pass], io);
+    const tee = warnTee(io);
+    const code = await runCli(['bake', '--workspace', `${root}/${c.dir}`, ...pass], tee.io);
+    for (const w of tee.warns) seenWarns.push({ characterId: c.id, ...w });
     if (code !== 0) failedIds.push(c.id);
+    else bakedIds.push(c.id);
   }
 
   const blockedIds = plan.characters.filter((c) => c.state === 'blocked').map((c) => c.id);
+  const warnings = summariseWarnings(seenWarns);
+  const reportPath = await writeReport({
+    schemaVersion: SCHEMA_VERSION,
+    root,
+    finishedAt: b.now(),
+    baked: bakedIds as BatchReport['baked'],
+    failed: failedIds as BatchReport['failed'],
+    blocked: blockedIds as BatchReport['blocked'],
+    warnings,
+  });
   if (!b.json) {
     io.stdout(
       `baked ${targets.length - failedIds.length}/${targets.length}` +
         `${failedIds.length > 0 ? ` — FAILED: ${failedIds.join(', ')}` : ''}` +
         `${blockedIds.length > 0 ? ` — skipped (blocked): ${blockedIds.join(', ')}` : ''}`,
     );
+    // the morning half: what the run WARNED about, which no manifest records
+    for (const line of formatWarnings(warnings, targets.length)) io.stdout(line);
+    io.stdout(`report written to ${reportPath}`);
   }
   if (failedIds.length > 0 || blockedIds.length > 0) {
     return b.fail(

@@ -31,6 +31,8 @@
 import type {
   BakePlan,
   BakePlanEntry,
+  BatchReport,
+  BatchWarning,
   CacheKeyInputs,
   RosterEntry,
   RosterManifest,
@@ -39,11 +41,13 @@ import type {
 import {
   BakeManifestSchema,
   BakePlanSchema,
+  BATCH_REPORT_FILE,
   canonicalJson,
   parseWith,
   PLAN_FILE,
   SCHEMA_VERSION,
 } from '@spritebook/schema';
+import type { CliIo } from './mod.ts';
 import { workspacePaths } from '@spritebook/core';
 import type { BakeJobSpec } from '@spritebook/pack';
 import { buildCacheInputs, diffCacheInputs } from '@spritebook/pack';
@@ -207,6 +211,96 @@ export function toBake(plan: BakePlan): BakePlanEntry[] {
   return plan.characters.filter((c) =>
     c.state === 'never-baked' || c.state === 'stale' || c.state === 'unknown'
   );
+}
+
+/**
+ * A CliIo that passes everything through untouched and keeps the WARNINGS it
+ * sees on the way past.
+ *
+ * A batch runs each character through `runCli`, so the child's warnings go
+ * straight to the terminal and nowhere a summary can reach them. Both output
+ * forms are recognised because the batch does not control which one it is in:
+ * `--json` writes the JobEvent verbatim, and the human branch writes the
+ * `warn [code]: message` line that `emit` builds. Both are the CLI's own
+ * shapes, not a guess at them.
+ */
+export function warnTee(inner: CliIo): { io: CliIo; warns: { code: string; message: string }[] } {
+  const warns: { code: string; message: string }[] = [];
+  const see = (line: string) => {
+    if (line.startsWith('{')) {
+      try {
+        const e = JSON.parse(line) as { t?: string; code?: string; message?: string };
+        if (e.t === 'warn' && e.code && e.message) warns.push({ code: e.code, message: e.message });
+        return;
+      } catch {
+        // not an event line; fall through to the human form
+      }
+    }
+    const m = /^warn \[([^\]]+)\]: ([\s\S]*)$/.exec(line);
+    if (m) warns.push({ code: m[1]!, message: m[2]! });
+  };
+  return {
+    io: {
+      stdout: (s) => {
+        see(s);
+        inner.stdout(s);
+      },
+      stderr: (s) => {
+        see(s);
+        inner.stderr(s);
+      },
+      ...(inner.now !== undefined ? { now: inner.now } : {}),
+    },
+    warns,
+  };
+}
+
+/** Roll per-character warnings into the report's per-code summary. */
+export function summariseWarnings(
+  seen: { characterId: string; code: string; message: string }[],
+): BatchWarning[] {
+  const byCode = new Map<string, { characters: Set<string>; example: string }>();
+  for (const w of seen) {
+    const entry = byCode.get(w.code) ?? { characters: new Set<string>(), example: w.message };
+    entry.characters.add(w.characterId);
+    byCode.set(w.code, entry);
+  }
+  return [...byCode]
+    .map(([code, e]) => ({
+      code,
+      characters: e.characters.size,
+      example: e.example,
+      firstCharacters: [...e.characters].slice(0, 8) as BatchWarning['firstCharacters'],
+    }))
+    .sort((a, b) => b.characters - a.characters || (a.code < b.code ? -1 : 1));
+}
+
+export async function writeReport(report: BatchReport): Promise<string> {
+  const path = `${report.root}/${BATCH_REPORT_FILE}`;
+  const tmp = `${path}.tmp`;
+  await Deno.writeTextFile(tmp, canonicalJson(report));
+  await Deno.rename(tmp, path);
+  return path;
+}
+
+/** The warnings section of the summary a human reads after an unattended run. */
+export function formatWarnings(warnings: BatchWarning[], total: number): string[] {
+  if (warnings.length === 0) return ['no warnings across the batch'];
+  const lines: string[] = [];
+  for (const w of warnings) {
+    lines.push(`  ${w.code} — ${w.characters}/${total} character(s)`);
+    // the message, wrapped: the remedy is the useful half and a 400-char line
+    // in a terminal is a line nobody reads
+    for (const chunk of w.example.match(/[\s\S]{1,92}(\s|$)/g) ?? [w.example]) {
+      lines.push(`      ${chunk.trim()}`);
+    }
+    lines.push(
+      `      first: ${w.firstCharacters.join(', ')}${
+        w.characters > w.firstCharacters.length ? ` …and ${w.characters - 8} more` : ''
+      }`,
+    );
+  }
+  return lines;
 }
 
 export async function writePlan(plan: BakePlan): Promise<string> {

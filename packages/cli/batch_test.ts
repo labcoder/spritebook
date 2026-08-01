@@ -20,6 +20,7 @@ import {
   ROSTER_FILE,
 } from '@spritebook/schema';
 import { passthroughBakeArgs, runCli } from './mod.ts';
+import { formatWarnings, summariseWarnings, warnTee } from './batch.ts';
 
 const NOW = () => '2026-08-01T00:00:00Z';
 
@@ -259,4 +260,83 @@ Deno.test('each character bakes with EXACTLY the flags the batch was given', () 
   ]);
   // a valueless batch flag at end-of-line must not eat the next real flag
   assertEquals(passthroughBakeArgs(['bake', '--root', '--frames', '4']), ['--frames', '4']);
+});
+
+Deno.test('the batch KEEPS its children’s warnings, in both output modes', () => {
+  // a batch runs each character through runCli, so a warn goes to the terminal
+  // and nowhere a summary can reach it. Both forms are recognised because the
+  // batch does not control which one it is in.
+  const sink = { stdout: () => {}, stderr: () => {} };
+  const json = warnTee(sink);
+  json.io.stdout(JSON.stringify({
+    t: 'warn',
+    jobId: 'bake',
+    at: NOW(),
+    code: 'rig-unaccepted',
+    message: 'the rig was never accepted',
+  }));
+  json.io.stdout(JSON.stringify({ t: 'done', jobId: 'bake', at: NOW(), wallTimeS: 1 }));
+  assertEquals(json.warns, [{ code: 'rig-unaccepted', message: 'the rig was never accepted' }]);
+
+  const human = warnTee(sink);
+  human.io.stdout('warn [style-alias]: "clean" is retired; using "cel-2"');
+  human.io.stdout('done in 2.3s');
+  assertEquals(human.warns, [{
+    code: 'style-alias',
+    message: '"clean" is retired; using "cel-2"',
+  }]);
+
+  // a message spanning lines is kept whole, and a line that merely mentions
+  // the word is not mistaken for one
+  const tricky = warnTee(sink);
+  tricky.io.stdout('warn [multi]: first line\nsecond line');
+  tricky.io.stdout('the word warn appears here but this is not an event');
+  tricky.io.stdout('{ not json after all');
+  assertEquals(tricky.warns.length, 1);
+  assertEquals(tricky.warns[0]!.message, 'first line\nsecond line');
+});
+
+Deno.test('everything passes through the tee untouched', () => {
+  // it is a tee, not a filter: the terminal must see exactly what it saw before
+  const out: string[] = [];
+  const err: string[] = [];
+  const t = warnTee({ stdout: (s) => out.push(s), stderr: (s) => err.push(s) });
+  t.io.stdout('warn [x]: y');
+  t.io.stdout('plain');
+  t.io.stderr('error: bad');
+  assertEquals(out, ['warn [x]: y', 'plain']);
+  assertEquals(err, ['error: bad']);
+});
+
+Deno.test('warnings summarise by CODE, counting characters not occurrences', () => {
+  // "rig-unaccepted on 100 characters" is the sentence a morning reader needs;
+  // a character that warned twice must not read as two characters
+  const summary = summariseWarnings([
+    { characterId: 'a', code: 'rig-unaccepted', message: 'the rig for a' },
+    { characterId: 'a', code: 'rig-unaccepted', message: 'the rig for a again' },
+    { characterId: 'b', code: 'rig-unaccepted', message: 'the rig for b' },
+    { characterId: 'b', code: 'style-alias', message: 'clean is retired' },
+  ]);
+  assertEquals(summary.map((w) => [w.code, w.characters]), [
+    ['rig-unaccepted', 2],
+    ['style-alias', 1],
+  ], 'most-affected first');
+  assertEquals(summary[0]!.example, 'the rig for a', 'one verbatim message, not a count');
+  assertEquals(summary[0]!.firstCharacters, ['a', 'b']);
+  assertEquals(summariseWarnings([]), []);
+});
+
+Deno.test('the summary a human reads names the code, the count AND the remedy', () => {
+  const lines = formatWarnings(
+    summariseWarnings([{
+      characterId: 'a',
+      code: 'rig-unaccepted',
+      message: 'record it with `spritebook rig --accept`, which since D-031 costs nothing',
+    }]),
+    100,
+  );
+  const text = lines.join('\n');
+  assert(text.includes('rig-unaccepted — 1/100'), text);
+  assert(text.includes('costs nothing'), 'the remedy survives into the summary');
+  assertEquals(formatWarnings([], 0), ['no warnings across the batch']);
 });
