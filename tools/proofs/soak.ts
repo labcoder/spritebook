@@ -128,11 +128,11 @@ function report(samples: Sample[]): string[] {
   const first = samples[0]!;
   const last = samples.at(-1)!;
   const lines: string[] = [];
-  const hours = last.elapsedS / 3600;
+  const hours = (last.elapsedS - first.elapsedS) / 3600;
   lines.push(
-    `soak: ${samples.length} samples over ${last.elapsedS.toFixed(0)}s ` +
+    `soak: ${samples.length} samples over ${(last.elapsedS - first.elapsedS).toFixed(0)}s ` +
       `(${hours.toFixed(2)} h), every ~${
-        (last.elapsedS / Math.max(1, samples.length - 1)).toFixed(1)
+        ((last.elapsedS - first.elapsedS) / Math.max(1, samples.length - 1)).toFixed(1)
       }s`,
   );
   const series: [string, (s: Sample) => number | null, string][] = [
@@ -168,7 +168,21 @@ function report(samples: Sample[]): string[] {
 
 if (arg('report')) {
   const text = await Deno.readTextFile(arg('report'));
-  const samples = text.split('\n').filter(Boolean).map((l) => JSON.parse(l) as Sample);
+  const all = text.split('\n').filter(Boolean).map((l) => JSON.parse(l) as Sample);
+  // `--from` / `--to` (elapsed seconds) window the analysis. That is not
+  // cherry-picking as long as the window is stated, and it is necessary when
+  // the subject changes phase: a light build becoming a GPU bake is a STEP,
+  // and a slope fitted across a step is a number about the phase boundary
+  // rather than about a leak. Report both windows and say which is which.
+  const from = Number(arg('from', '0'));
+  const to = Number(arg('to', String(Number.MAX_SAFE_INTEGER)));
+  const samples = all.filter((s) => s.elapsedS >= from && s.elapsedS <= to);
+  if (from > 0 || to < Number.MAX_SAFE_INTEGER) {
+    console.log(
+      `window ${from}s..${to === Number.MAX_SAFE_INTEGER ? 'end' : `${to}s`}: ` +
+        `${samples.length} of ${all.length} samples`,
+    );
+  }
   for (const line of report(samples)) console.log(line);
 } else {
   const out = arg('out', 'soak.ndjson');

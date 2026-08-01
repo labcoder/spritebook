@@ -24,6 +24,17 @@
  *
  * `--n` scales the roster (the pilot runs at 2 to time one character first).
  * `--keep` leaves it on disk. `--skip-build` reuses an existing --keep roster.
+ * `--cycles N` repeats the pivot, alternating styles so each cycle is a real
+ * full invalidation. That IS the overnight soak workload — sample it from
+ * outside with tools/proofs/soak.ts and read the two with one window each:
+ *
+ *   deno run --allow-all tools/proofs/soak.ts --out soak.ndjson --every 20 &
+ *   DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/roster100.ts --n 100 --cycles 16 --keep
+ *
+ * then read the two windows separately — the build phase is a step change, and
+ * a slope fitted across it is a number about the phase boundary, not a leak:
+ *
+ *   deno run --allow-all tools/proofs/soak.ts --report soak.ndjson --from 300
  */
 import { runCli } from '../../packages/cli/mod.ts';
 import { type BakePlan, BakePlanSchema } from '../../packages/schema/mod.ts';
@@ -209,34 +220,48 @@ try {
   say(`warm batch ${pad(secs(warmRun))}s (rendered nothing)`);
 
   // -------------------------------- 4. THE PIVOT: one style, all characters
-  say(`\n## the pivot — \`look --style cel-2\` on all ${N}`);
-  const pivotEdit = performance.now();
-  for (let i = 0; i < N; i++) {
-    await cli(['look', '--workspace', `${ROOT}/${id(i)}`, '--style', 'cel-2'], `look ${id(i)}`);
-  }
-  say(`  ${N} look changes recorded in ${pad(secs(pivotEdit))}s`);
+  //
+  // `--cycles N` repeats it, alternating styles so every cycle is a genuine
+  // full invalidation rather than a warm no-op. That is the overnight soak
+  // workload: the same thing the acceptance describes, run until the clock
+  // says enough. One cycle is the acceptance measurement; many cycles are the
+  // memory-stability measurement, and they are the same code either way.
+  const CYCLES = Math.max(1, Number(arg('cycles', '1')));
+  const STYLES = ['cel-2', 'pixel', 'painterly'];
+  for (let cycle = 0; cycle < CYCLES; cycle++) {
+    const style = STYLES[cycle % STYLES.length]!;
+    say(
+      `\n## pivot ${cycle + 1}/${CYCLES} — \`look --style ${style}\` on all ${N}` +
+        ` (${(secs(t0) / 60).toFixed(1)} min in)`,
+    );
+    const pivotEdit = performance.now();
+    for (let i = 0; i < N; i++) {
+      await cli(['look', '--workspace', `${ROOT}/${id(i)}`, '--style', style], `look ${id(i)}`);
+    }
+    say(`  ${N} look changes recorded in ${pad(secs(pivotEdit))}s`);
 
-  const pivotPlan = await plan();
-  const stale = pivotPlan.characters.filter((c) => c.state === 'stale');
-  say(
-    `  plan: ${pivotPlan.totals.toBake} stale · ${pivotPlan.totals.fresh} fresh · ` +
-      `${pivotPlan.totals.staleFrames} frames to render`,
-  );
-  const fields = [...new Set(stale.flatMap((c) => c.reasons.map((r) => r.field)))];
-  say(`  every stale character's reason: ${fields.join(', ')}`);
-  if (stale.length !== N || fields.length !== 1 || fields[0] !== 'stylePresetHash') {
-    throw new Error(
-      `the plan must name the style and nothing else: ${stale.length} stale, fields ${fields}`,
+    const pivotPlan = await plan();
+    const stale = pivotPlan.characters.filter((c) => c.state === 'stale');
+    say(
+      `  plan: ${pivotPlan.totals.toBake} stale · ${pivotPlan.totals.fresh} fresh · ` +
+        `${pivotPlan.totals.staleFrames} frames to render`,
+    );
+    const fields = [...new Set(stale.flatMap((c) => c.reasons.map((r) => r.field)))];
+    say(`  every stale character's reason: ${fields.join(', ')}`);
+    if (stale.length !== N || fields.length !== 1 || fields[0] !== 'stylePresetHash') {
+      throw new Error(
+        `the plan must name the style and nothing else: ${stale.length} stale, fields ${fields}`,
+      );
+    }
+
+    const pivot0 = performance.now();
+    await cli(['bake', '--all', '--root', ROOT], `pivot batch ${cycle + 1}`, false);
+    const pivotS = secs(pivot0);
+    say(
+      `pivot batch ${pad(pivotS)}s = ${(pivotS / 60).toFixed(1)} min · ` +
+        `${(pivotPlan.totals.staleFrames / pivotS).toFixed(1)} frames/s`,
     );
   }
-
-  const pivot0 = performance.now();
-  await cli(['bake', '--all', '--root', ROOT], 'pivot batch', false);
-  const pivotS = secs(pivot0);
-  say(
-    `\npivot batch ${pad(pivotS)}s = ${(pivotS / 60).toFixed(1)} min · ` +
-      `${(pivotPlan.totals.staleFrames / pivotS).toFixed(1)} frames/s`,
-  );
 
   // ------------------------------------------- 5. the morning flag report
   // This is the deliverable of an unattended run: the thing a human reads
