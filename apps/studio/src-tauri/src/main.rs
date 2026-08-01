@@ -201,6 +201,52 @@ fn read_rig_report(dir: String) -> Result<Option<serde_json::Value>, String> {
     }
 }
 
+/// The newest bake's LIT atlas plus its manifest — what the Look stage draws
+/// its pixel-truth direction strips from. Core produced both; the webview
+/// only slices the atlas it is given, at integer zoom.
+#[tauri::command]
+fn read_bake_atlas(dir: String) -> Result<Option<serde_json::Value>, String> {
+    use base64::Engine;
+    let bakes = Path::new(&dir).join("bakes");
+    let Ok(entries) = std::fs::read_dir(&bakes) else {
+        return Ok(None);
+    };
+    let mut candidates: Vec<(std::time::SystemTime, PathBuf)> = entries
+        .flatten()
+        .filter_map(|e| {
+            let manifest = e.path().join("manifest.json");
+            if !manifest.is_file() {
+                return None;
+            }
+            let t = e.metadata().and_then(|m| m.modified()).ok()?;
+            Some((t, e.path()))
+        })
+        .collect();
+    candidates.sort_by(|a, b| b.0.cmp(&a.0));
+    let Some((_, bake_dir)) = candidates.first() else {
+        return Ok(None);
+    };
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(bake_dir.join("manifest.json")).map_err(|e| e.to_string())?)
+            .map_err(|e| format!("bake manifest is not JSON: {e}"))?;
+    // the lit page is the one the sheet ships; AOV pages are rect-identical
+    let png_name = manifest
+        .get("atlases")
+        .and_then(|a| a.as_array())
+        .and_then(|a| a.iter().find(|x| x.get("pass").and_then(|p| p.as_str()) == Some("lit")))
+        .and_then(|x| x.get("png"))
+        .and_then(|p| p.as_str())
+        .unwrap_or("atlas_lit_0.png")
+        .to_string();
+    let Ok(bytes) = std::fs::read(bake_dir.join(&png_name)) else {
+        return Ok(None);
+    };
+    Ok(Some(serde_json::json!({
+        "manifest": manifest,
+        "png": base64::engine::general_purpose::STANDARD.encode(bytes),
+    })))
+}
+
 /// Source-image preview bytes. Read-only, and only image extensions — the
 /// webview must not become a generic file reader.
 #[tauri::command]
@@ -236,7 +282,8 @@ fn main() {
             read_thumb,
             read_prev_session,
             read_image,
-            read_rig_report
+            read_rig_report,
+            read_bake_atlas
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

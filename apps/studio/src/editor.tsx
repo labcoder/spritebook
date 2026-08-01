@@ -11,6 +11,7 @@ import type { CharacterCard } from './manifest';
 import { Candidates } from './gen';
 import { RigStage } from './rigstage';
 import { AnimStage } from './animstage';
+import { LookStage } from './lookstage';
 import { type Stage, type StageKey, stageStates } from './stages';
 import { t } from './i18n';
 import { prefs } from './prefs';
@@ -326,6 +327,17 @@ export function Editor({ bridge, card, manifest, onChanged }: {
         ? (
           <div className='center genstage'>
             <AnimStage
+              bridge={bridge}
+              dir={card.dir}
+              manifest={manifest}
+              onChanged={onChanged}
+            />
+          </div>
+        )
+        : effective === 'look'
+        ? (
+          <div className='center genstage'>
+            <LookStage
               bridge={bridge}
               dir={card.dir}
               manifest={manifest}

@@ -238,4 +238,41 @@ export const es: Record<string, string> = {
   'could not read the clip library — the log drawer has the verbatim reason':
     'no se pudo leer la biblioteca de clips — el registro tiene el motivo literal',
   'clip library output was not JSON': 'la salida de la biblioteca no era JSON',
+
+  // look stage (P4-T2)
+  'Camera': 'Cámara',
+  'Preset': 'Preajuste',
+  'Elevation': 'Elevación',
+  'Directions': 'Direcciones',
+  'Pixels per metre': 'Píxeles por metro',
+  'Cell': 'Celda',
+  'Cell width': 'Ancho de celda',
+  'Cell height': 'Alto de celda',
+  'Style': 'Estilo',
+  'Colours': 'Colores',
+  'colours': 'colores',
+  'no palette': 'sin paleta',
+  'outline': 'contorno',
+  'no outline': 'sin contorno',
+  'Outline px': 'Contorno px',
+  'supersample': 'supermuestreo',
+  'Apply': 'Aplicar',
+  'marks': 'marca',
+  'frames stale': 'fotogramas obsoletos',
+  'nothing baked yet — no frames to invalidate':
+    'nada horneado todavía — no hay fotogramas que invalidar',
+  'Record look': 'Registrar el look',
+  'Recording…': 'Registrando…',
+  'Reset to recorded': 'Volver a lo registrado',
+  'this is the recorded look': 'este es el look registrado',
+  'Last bake': 'Último bake',
+  'direction strips from the last bake': 'tiras de dirección del último bake',
+  'nearest-neighbor · integer zoom · one row per direction':
+    'vecino más cercano · zoom entero · una fila por dirección',
+  'these pixels are the OLD look': 'estos píxeles son el look ANTERIOR',
+  'no bake yet — Bake renders what this stage records':
+    'sin bake todavía — Bake renderiza lo que esta etapa registra',
+  'could not read the presets — the log drawer has the verbatim reason':
+    'no se pudieron leer los preajustes — el registro tiene el motivo literal',
+  'preset output was not JSON': 'la salida de preajustes no era JSON',
 };

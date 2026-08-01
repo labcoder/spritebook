@@ -50,6 +50,8 @@ export interface StudioBridge {
   prevSession(maxLines: number): Promise<string[] | null>;
   /** rig/deform-report.json, verbatim, when a rig has been run. */
   readRigReport(dir: string): Promise<unknown | null>;
+  /** The newest bake's lit atlas + manifest, for pixel-truth strips. */
+  readBakeAtlas(dir: string): Promise<{ manifest: unknown; png: string } | null>;
   /** Native file drop with real paths, when the shell provides it. */
   onFileDrop?(cb: (paths: string[]) => void): void;
 }
@@ -124,6 +126,11 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
     },
     async readRigReport(dir) {
       return await t.core.invoke('read_rig_report', { dir });
+    },
+    async readBakeAtlas(dir) {
+      return (await t.core.invoke('read_bake_atlas', { dir })) as
+        | { manifest: unknown; png: string }
+        | null;
     },
     onFileDrop(cb) {
       // v2 emits webview drag/drop as tauri://drag-drop with { paths, position }
@@ -267,6 +274,68 @@ const DEMO_CATALOG = {
   ],
 };
 
+const DEMO_LOOK_PRESETS = {
+  defaults: { camera: 'standard-30', style: 'pixel' },
+  cameras: [
+    {
+      id: 'low-15',
+      elevationDeg: 15,
+      directions: 8,
+      yawOffsetDeg: 0,
+      pixelsPerMeter: 32,
+      cellPx: { w: 64, h: 64 },
+      paddingPx: 6,
+    },
+    {
+      id: 'two-to-one',
+      elevationDeg: 26.565,
+      directions: 8,
+      yawOffsetDeg: 0,
+      pixelsPerMeter: 32,
+      cellPx: { w: 64, h: 64 },
+      paddingPx: 6,
+    },
+    {
+      id: 'standard-30',
+      elevationDeg: 30,
+      directions: 8,
+      yawOffsetDeg: 0,
+      pixelsPerMeter: 32,
+      cellPx: { w: 64, h: 64 },
+      paddingPx: 6,
+    },
+    {
+      id: 'isometric',
+      elevationDeg: 35.264,
+      directions: 8,
+      yawOffsetDeg: 0,
+      pixelsPerMeter: 32,
+      cellPx: { w: 64, h: 64 },
+      paddingPx: 6,
+    },
+  ],
+  styles: [
+    {
+      id: 'cel-2',
+      mode: 'cel',
+      maxColors: 6,
+      outlineWidthPx: 1,
+      superSample: 4,
+      alphaMode: '1bit',
+    },
+    { id: 'clean', mode: 'painterly', superSample: 4, alphaMode: 'soft' },
+    {
+      id: 'pixel',
+      mode: 'pixel',
+      maxColors: 16,
+      outlineWidthPx: 0.5,
+      superSample: 4,
+      alphaMode: '1bit',
+    },
+    { id: 'painterly', mode: 'painterly', maxColors: 32, superSample: 4, alphaMode: 'soft' },
+  ],
+};
+
 const DEMO_CLIPS = {
   pack: 'ual',
   clips: [
@@ -328,6 +397,12 @@ function browserBridge(): StudioBridge {
         return Promise.resolve({
           exitCode: 0,
           lines: [emit(JSON.stringify(DEMO_CATALOG))],
+        });
+      }
+      if (args[0] === 'look' && args.includes('--list')) {
+        return Promise.resolve({
+          exitCode: 0,
+          lines: [emit(JSON.stringify(DEMO_LOOK_PRESETS))],
         });
       }
       if (args[0] === 'anim' && args.includes('--list')) {
@@ -435,6 +510,56 @@ function browserBridge(): StudioBridge {
             spannedComponents: 2,
           },
         ],
+      });
+    },
+    readBakeAtlas() {
+      // a SYNTHETIC 2-direction x 3-frame atlas (16px cells) so the strips
+      // demo honestly in a browser; the desktop shell serves real bake bytes
+      return Promise.resolve({
+        manifest: {
+          bakeId: 'demo0000',
+          atlases: [{ pass: 'lit', png: 'atlas_lit_0.png', pageIndex: 0, sizePx: 96 }],
+          frames: [
+            {
+              clipId: 'idle',
+              direction: 0,
+              frame: 0,
+              atlas: { x: 0, y: 0, w: 16, h: 16, pageIndex: 0 },
+            },
+            {
+              clipId: 'idle',
+              direction: 0,
+              frame: 1,
+              atlas: { x: 16, y: 0, w: 16, h: 16, pageIndex: 0 },
+            },
+            {
+              clipId: 'idle',
+              direction: 0,
+              frame: 2,
+              atlas: { x: 32, y: 0, w: 16, h: 16, pageIndex: 0 },
+            },
+            {
+              clipId: 'idle',
+              direction: 1,
+              frame: 0,
+              atlas: { x: 0, y: 16, w: 16, h: 16, pageIndex: 0 },
+            },
+            {
+              clipId: 'idle',
+              direction: 1,
+              frame: 1,
+              atlas: { x: 16, y: 16, w: 16, h: 16, pageIndex: 0 },
+            },
+            {
+              clipId: 'idle',
+              direction: 1,
+              frame: 2,
+              atlas: { x: 32, y: 16, w: 16, h: 16, pageIndex: 0 },
+            },
+          ],
+        },
+        png:
+          'iVBORw0KGgoAAAANSUhEUgAAAGAAAAAgCAYAAADtwH1UAAAAkUlEQVR42u3YoQ3DUBBEQZeTwoxTk8sJDnYvPweDlhh4Jc+Tlh36Qyxvm6S/Xp/vSvNC5QD73KR54XKAY27SAJQDnHOTBqAcYM1NGoBygMuAAAAAAAAAAICbACRJ0l3/gt7ztRPmhcoB9rlJ88LlAMfcpAEoBzjnJg1AOcCamzQA5QCXAQEAAAAAwHMBJEmP6QfHEh34+3dImgAAAABJRU5ErkJggg==',
       });
     },
     prevSession() {
