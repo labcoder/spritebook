@@ -8,7 +8,10 @@ export default defineConfig({
   plugins: [react()],
   server: { port: 5174, strictPort: true },
   preview: { port: 4175, strictPort: true },
-  build: { outDir: 'dist', target: 'es2022' },
+  // three/webgpu has a TOP-LEVEL AWAIT that es2022 cannot express; the
+  // viewport skill names this exact trap. Both the build and the dep
+  // pre-bundle need esnext or the entry fails to transform.
+  build: { outDir: 'dist', target: 'esnext' },
   clearScreen: false,
   optimizeDeps: {
     // NO lazy discovery: the rolldown scanner wedges the whole dev server
@@ -20,7 +23,13 @@ export default defineConfig({
     // Every dependency the app imports is listed EXPLICITLY instead; add
     // new ones here or they load unbundled (slower, still correct).
     noDiscovery: true,
+    esbuildOptions: { target: 'esnext' },
     include: [
+      'three',
+      'three/webgpu',
+      'three/addons/loaders/GLTFLoader.js',
+      'three/addons/controls/TransformControls.js',
+      'camera-controls',
       'react',
       'react/jsx-runtime',
       'react-dom/client',

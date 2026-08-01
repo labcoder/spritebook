@@ -17,6 +17,7 @@ import { slugify, slugProblem } from './slug';
 import { adjustArg, resolveOpDefaults, type SchemaField, schemaFields } from './schemaform';
 import { t } from './i18n';
 import { genArgs, moreLikeArgs, pickArgs } from './args';
+import { Viewport } from './viewport/Viewport';
 
 /** slugProblem returns one of three known sentences — literal per branch so
  * the extractor sees every id (t(variable) is a refused callsite). */
@@ -437,6 +438,7 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
   const picked = typeof gen.pickedResultId === 'string' ? gen.pickedResultId : undefined;
   const canonical = m.canonicalMesh !== undefined && m.canonicalMesh !== null;
 
+  const [inspecting, setInspecting] = useState<string | null>(null);
   const [reproject, setReproject] = useState(true);
   const [colorMatch, setColorMatch] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -481,6 +483,15 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
           <p>{t('nothing generated')}</p>
         </div>
       )}
+      {(inspecting !== null || canonical) && (
+        <Viewport
+          bridge={bridge}
+          meshPath={inspecting !== null
+            ? `${dir}/results/${inspecting}/model.glb`
+            : `${dir}/canonical/model.glb`}
+          height={320}
+        />
+      )}
       <div className='candgrid'>
         {results.map((r) => (
           <div key={r.id} className={`cand ${picked === r.id ? 'picked' : ''}`}>
@@ -497,6 +508,14 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
               {r.wallTimeS !== undefined ? ` · ${Math.round(r.wallTimeS)}s` : ''}
             </div>
             <div className='candacts'>
+              <button
+                type='button'
+                className='btn mbtn'
+                aria-pressed={inspecting === r.id}
+                onClick={() => setInspecting(inspecting === r.id ? null : r.id)}
+              >
+                {t('Inspect')}
+              </button>
               <button
                 type='button'
                 className='btn mbtn'

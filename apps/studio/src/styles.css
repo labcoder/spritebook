@@ -1441,3 +1441,30 @@ input {
   font-size: 11.5px;
   color: var(--sb-sun-ink);
 }
+
+/* ---- inspection viewport ---- */
+.vpwrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vpbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.vphint {
+  margin-left: auto;
+  font-size: 10.5px;
+}
+.vphost {
+  height: 300px;
+  border: 1px solid var(--sb-line);
+  background: var(--sb-raise);
+  position: relative;
+  overflow: hidden;
+}
+.vpstate {
+  margin-top: -2px;
+}

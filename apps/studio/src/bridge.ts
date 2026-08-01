@@ -13,6 +13,7 @@
  * depends on the bridge never editorializing.
  */
 import { log } from './log';
+import { DEMO_MESH_B64 } from './demo-mesh';
 
 export interface RawWorkspace {
   dir: string;
@@ -57,6 +58,10 @@ export interface StudioBridge {
   ): Promise<{ manifest: unknown; png: string } | null>;
   /** Reveal a produced folder in the OS file manager. */
   openFolder(path: string): Promise<void>;
+  /** Canonical glTF bytes (base64) for the inspection viewport. */
+  readMesh(path: string): Promise<string | null>;
+  /** Write a joint-edits patch into the character's rig dir; returns its path. */
+  writeRigEdits(dir: string, json: string): Promise<string>;
   /** Native file drop with real paths, when the shell provides it. */
   onFileDrop?(cb: (paths: string[]) => void): void;
 }
@@ -139,6 +144,12 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
     },
     async openFolder(path) {
       await t.core.invoke('open_folder', { path });
+    },
+    async readMesh(path) {
+      return (await t.core.invoke('read_mesh', { path })) as string | null;
+    },
+    async writeRigEdits(dir, json) {
+      return (await t.core.invoke('write_rig_edits', { dir, json })) as string;
     },
     onFileDrop(cb) {
       // v2 emits webview drag/drop as tauri://drag-drop with { paths, position }
@@ -580,6 +591,14 @@ function browserBridge(): StudioBridge {
     },
     openFolder() {
       return Promise.resolve();
+    },
+    readMesh(path) {
+      // a fixed rigged humanoid so the viewport and bone overlay drive in a
+      // browser; anything that is not a canonical/result mesh still says no
+      return Promise.resolve(/\.(glb|gltf)$/i.test(path) ? DEMO_MESH_B64 : null);
+    },
+    writeRigEdits() {
+      return Promise.reject(new Error('writing edits needs the desktop shell'));
     },
     prevSession() {
       return Promise.resolve([

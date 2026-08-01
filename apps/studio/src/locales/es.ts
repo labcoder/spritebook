@@ -162,6 +162,23 @@ export const es: Record<string, string> = {
   'Replay previous session': 'Reproducir la sesión anterior',
   'no previous session': 'sin sesión anterior',
   'CLI twin': 'comando CLI equivalente',
+
+  // inspection viewport (P4-T2)
+  'Display mode': 'Modo de visualización',
+  'Textured': 'Con textura',
+  'Clay': 'Arcilla',
+  'Wire': 'Alambre',
+  'Frame': 'Encuadrar',
+  'Inspect': 'Inspeccionar',
+  'Mesh inspection viewport': 'Visor de inspección de malla',
+  'orbit drag · dolly wheel · F frames': 'orbitar arrastrando · zoom con la rueda · F encuadra',
+  'an inspection instrument — the sprites come from core, never from here':
+    'un instrumento de inspección — los sprites vienen del core, nunca de aquí',
+  'loading the mesh…': 'cargando la malla…',
+  'starting the viewport…': 'arrancando el visor…',
+  'nothing selected': 'nada seleccionado',
+  'that mesh is not on disk yet': 'esa malla aún no está en disco',
+  'click a joint to select it': 'haz clic en una articulación para seleccionarla',
   'a source image is required': 'hace falta una imagen de origen',
   'pick a backend': 'elige un backend',
   'that backend is not installed yet': 'ese backend aún no está instalado',

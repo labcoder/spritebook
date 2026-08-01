@@ -276,6 +276,49 @@ fn read_image(path: String) -> Result<Option<(String, String)>, String> {
     }
 }
 
+/// A canonical glTF for the inspection viewport. The viewport skill's asset
+/// rule: canonical meshes from the workspace only — never a raw user upload,
+/// because the importer border has already normalized format, orientation and
+/// scale. The extension allowlist enforces it, and the size ceiling keeps a
+/// pathological file from wedging the IPC channel it rides on.
+#[tauri::command]
+fn read_mesh(path: String) -> Result<Option<String>, String> {
+    use base64::Engine;
+    const MAX_BYTES: u64 = 128 * 1024 * 1024;
+    let p = PathBuf::from(&path);
+    match p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
+        Some("glb") | Some("gltf") => {}
+        _ => return Ok(None),
+    }
+    let meta = match std::fs::metadata(&p) {
+        Ok(m) => m,
+        Err(_) => return Ok(None),
+    };
+    if meta.len() > MAX_BYTES {
+        return Err(format!(
+            "{path} is {:.1} MB; the viewport reads up to {} MB over the IPC channel",
+            meta.len() as f64 / 1_048_576.0,
+            MAX_BYTES / 1_048_576
+        ));
+    }
+    match std::fs::read(&p) {
+        Ok(bytes) => Ok(Some(base64::engine::general_purpose::STANDARD.encode(bytes))),
+        Err(e) => Err(format!("could not read {path}: {e}")),
+    }
+}
+
+/// Write a joint-edits patch the `rig --edits` verb will read back. The ONLY
+/// write this shell performs, and it is scoped: a patch.json inside the
+/// character's own rig directory, never an arbitrary path.
+#[tauri::command]
+fn write_rig_edits(dir: String, json: String) -> Result<String, String> {
+    let rig_dir = PathBuf::from(&dir).join("rig");
+    std::fs::create_dir_all(&rig_dir).map_err(|e| e.to_string())?;
+    let path = rig_dir.join("joint-edits.json");
+    std::fs::write(&path, json).map_err(|e| e.to_string())?;
+    Ok(display_path(&path))
+}
+
 /// Reveal a produced folder in the OS file manager — the Export stage's
 /// done-state affordance. Refuses anything that is not an existing directory,
 /// so it can never become a general "run this" hole.
@@ -317,7 +360,9 @@ fn main() {
             read_image,
             read_rig_report,
             read_bake_atlas,
-            open_folder
+            open_folder,
+            read_mesh,
+            write_rig_edits
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
