@@ -28,6 +28,9 @@ import {
 } from './src/args.ts';
 import { bindingSpec } from './src/bindings.ts';
 import { lookArgs } from './src/look.ts';
+import { rigRunArgs } from './src/rig.ts';
+import { editsFile } from './src/viewport/picking.ts';
+import { JointEditsFileSchema, parseWith } from '@spritebook/schema';
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const IMAGE = `${REPO}spikes/trellis2/refs/bulma-front.png`;
@@ -49,7 +52,7 @@ async function manifestOf(ws: string): Promise<Record<string, unknown>> {
   return JSON.parse(await Deno.readTextFile(`${ws}/character.json`));
 }
 
-Deno.test('CLI-twin parity: ten GUI actions execute verbatim', async () => {
+Deno.test('CLI-twin parity: the GUI actions execute verbatim', async () => {
   const tmp = await Deno.makeTempDir();
   const ws = `${tmp}/parity`;
   try {
@@ -158,7 +161,23 @@ Deno.test('CLI-twin parity: ten GUI actions execute verbatim', async () => {
       'the backend the Generate cards offered is the one the catalog has',
     );
 
-    // 10. Accept rig — refused HONESTLY here, which is itself the contract:
+    // 10. Apply joint edits — the viewport's gizmo nudges become this file,
+    // and core's OWN schema is what judges it. A GUI that wrote a document
+    // the verb refuses would fail here rather than in front of a user.
+    //
+    // The full `rig --edits` run is deliberately NOT in the suite: it is a
+    // real UniRig pass (~70s, GPU + installed weights). It was executed once
+    // by hand against this exact builder and exited 0, applying the edits;
+    // what belongs in every run is the contract the GUI is responsible for —
+    // that the document it writes is one core will accept.
+    const doc = editsFile([
+      { joint: 'clavicle_r', delta: [0.012, -0.004, 0], mirrored: true },
+      { joint: 'thumb_03_l', delta: [0, 0.003, 0.001], mirrored: false },
+    ]);
+    parseWith(JointEditsFileSchema, doc, 'JointEditsFile from the viewport');
+    assertEquals(rigRunArgs(ws, { editsPath: 'p.json' }).slice(-2), ['--edits', 'p.json']);
+
+    // 11. Accept rig — refused HONESTLY here, which is itself the contract:
     // this character has no rig, and the twin says so rather than pretending
     const o = io();
     const code = await runCli([...acceptRigArgs(ws, false), '--json'], o);
@@ -188,7 +207,7 @@ Deno.test('CLI-twin parity: bake and export (GPU)', async () => {
     );
     await twin(pickArgs(ws, 'r1', { reproject: true, colorMatch: true }), 'pick');
 
-    // 11. Bake sheet — the Bake stage's primary action
+    // 12. Bake sheet — the Bake stage's primary action
     await twin(bakeArgs(ws), 'bake');
     const m = await manifestOf(ws);
     const bakeId = m.lastBakeId as string;
@@ -198,7 +217,7 @@ Deno.test('CLI-twin parity: bake and export (GPU)', async () => {
     );
     assert(bakeManifest.frames.length > 0, 'frames landed');
 
-    // 12. Export selected — over that bake, in the shape the stage builds
+    // 13. Export selected — over that bake, in the shape the stage builds
     const out = `${ws}/export`;
     await twin(exportArgs(`${ws}/bakes/bake-${bakeId}`, out, ['godot', 'strips']), 'export');
     // each target produced its folder, which is what the done state lists

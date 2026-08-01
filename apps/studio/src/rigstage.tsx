@@ -10,6 +10,8 @@ import { projectReport, type RigReportView, rigRunArgs } from './rig';
 import { t } from './i18n';
 import { CliTwin } from './gen';
 import { acceptRigArgs } from './args';
+import { Viewport } from './viewport/Viewport';
+import { editsFile, mergeEdits, mirrorPartner, type PendingEdit } from './viewport/picking';
 
 const BUNDLED_BODY = 'packages/rig/bodies/ubc-male';
 
@@ -181,6 +183,9 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
     | undefined;
   const [report, setReport] = useState<RigReportView | null>(null);
   const [editsPath, setEditsPath] = useState('');
+  const [edits, setEdits] = useState<PendingEdit[]>([]);
+  const [mirror, setMirror] = useState(false);
+  const [selectedJoint, setSelectedJoint] = useState<string | null>(null);
   const { run, failed, exec } = useRigRun(bridge, onChanged);
 
   useEffect(() => {
@@ -194,6 +199,19 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
       live = false;
     };
   }, [bridge, dir, rig?.accepted]);
+
+  // the nudges become a patch file core reads, then the rig re-runs with it:
+  // the GUI never edits a skeleton itself (invariant 1)
+  const applyEdits = async () => {
+    if (edits.length === 0) return;
+    try {
+      const path = await bridge.writeRigEdits(dir, JSON.stringify(editsFile(edits), null, 2));
+      const code = await exec(rigRunArgs(dir, { editsPath: path }));
+      if (code === 0) setEdits([]);
+    } catch {
+      // writeRigEdits refuses in the browser demo; the drawer carries it
+    }
+  };
 
   if (!rig) return <RunRig bridge={bridge} dir={dir} onChanged={onChanged} />;
 
@@ -275,6 +293,91 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
             'face-front first: every direction is derived from the front, so a wrong front makes all eight wrong',
           )}
         </div>
+      </section>
+
+      <section className='gensec'>
+        <div className='gensechead'>
+          <span className='hud'>{t('Joints')}</span>
+          <span className='inote'>
+            {t('click a joint, drag the gizmo — W move · E rotate · Q local/world')}
+          </span>
+        </div>
+        <Viewport
+          bridge={bridge}
+          meshPath={`${dir}/rig/rigged.glb`}
+          showSkeleton
+          height={340}
+          onNudge={(e) =>
+            setEdits((cur) =>
+              mergeEdits(cur, { joint: e.joint, delta: e.delta, mirrored: mirror })
+            )}
+          onJointSelected={setSelectedJoint}
+        />
+        <div className='genrow'>
+          <label className='bindhold'>
+            <input
+              type='checkbox'
+              checked={mirror}
+              onChange={(e) => setMirror(e.target.checked)}
+            />
+            {t('mirror to the other side')}
+          </label>
+          {selectedJoint && (
+            <span className='mono dimtext'>
+              {mirror && mirrorPartner(selectedJoint)
+                ? `${selectedJoint} + ${mirrorPartner(selectedJoint)}`
+                : mirror
+                ? `${selectedJoint} · ${t('no side partner — this joint moves alone')}`
+                : selectedJoint}
+            </span>
+          )}
+        </div>
+        {edits.length > 0 && (
+          <>
+            <div className='bindrows'>
+              {edits.map((e) => (
+                <div key={e.joint} className='bindrow'>
+                  <span className='mono bindid'>{e.joint}</span>
+                  <span className='mono clipmeta'>
+                    {e.delta.map((v) => `${(v * 1000).toFixed(1)}mm`).join(' · ')}
+                  </span>
+                  {e.mirrored && <span className='mbadge'>{t('mirrored')}</span>}
+                  <span className='candacts'>
+                    <button
+                      type='button'
+                      className='btn mbtn'
+                      onClick={() => setEdits((cur) => cur.filter((x) => x.joint !== e.joint))}
+                    >
+                      {t('Discard')}
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className='genrow'>
+              <button
+                type='button'
+                className='btn primary'
+                disabled={busy}
+                onClick={applyEdits}
+              >
+                {busy ? t('Applying…') : t('Apply joint edits and re-rig')}
+              </button>
+              <button
+                type='button'
+                className='btn mbtn'
+                disabled={busy}
+                onClick={() => setEdits([])}
+              >
+                {t('Discard all')}
+              </button>
+              <span className='inote'>
+                {t('writes rig/joint-edits.json, then re-runs the rig')}
+              </span>
+            </div>
+            <CliTwin args={rigRunArgs(dir, { editsPath: `${dir}/rig/joint-edits.json` })} />
+          </>
+        )}
       </section>
 
       <section className='gensec'>

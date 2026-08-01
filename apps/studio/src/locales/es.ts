@@ -231,6 +231,19 @@ export const es: Record<string, string> = {
   'Accept rig': 'Aceptar rig',
   'Unaccept rig': 'Retirar aceptación',
   'rig accepted': 'rig aceptado',
+  'Joints': 'Articulaciones',
+  'click a joint, drag the gizmo — W move · E rotate · Q local/world':
+    'haz clic en una articulación y arrastra el gizmo — W mover · E rotar · Q local/mundo',
+  'mirror to the other side': 'reflejar al otro lado',
+  'no side partner — this joint moves alone':
+    'sin pareja lateral — esta articulación se mueve sola',
+  'mirrored': 'reflejado',
+  'Discard': 'Descartar',
+  'Discard all': 'Descartar todo',
+  'Apply joint edits and re-rig': 'Aplicar las ediciones y re-riggear',
+  'Applying…': 'Aplicando…',
+  'writes rig/joint-edits.json, then re-runs the rig':
+    'escribe rig/joint-edits.json y vuelve a ejecutar el rig',
   'joints': 'articulaciones',
   'track': 'vía',
   'Anim is next': 'Anim es lo siguiente',
