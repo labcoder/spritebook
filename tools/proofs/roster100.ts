@@ -23,6 +23,8 @@
  *   DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/roster100.ts [--n 100]
  *
  * `--n` scales the roster (the pilot runs at 2 to time one character first).
+ * Characters get a per-character SEED, so the roster is N different meshes;
+ * `--same-seed` reproduces the first run's hundred-copies roster for comparison.
  * `--keep` leaves it on disk. `--skip-build` reuses an existing --keep roster.
  * `--cycles N` repeats the pivot, alternating styles so each cycle is a real
  * full invalidation. That IS the overnight soak workload — sample it from
@@ -50,6 +52,8 @@ const arg = (name: string, fallback: string): string => {
 const N = Number(arg('n', '100'));
 const KEEP = Deno.args.includes('--keep');
 const SKIP_BUILD = Deno.args.includes('--skip-build');
+/** every character on seed 0 — the weaker roster the first run measured */
+const SAME_SEED = Deno.args.includes('--same-seed');
 const ROOT = arg('root', `${REPO}.proof-roster100`);
 
 /**
@@ -121,6 +125,11 @@ try {
     for (let i = 0; i < N; i++) {
       const ws = `${ROOT}/${id(i)}`;
       let t = performance.now();
+      // A PER-CHARACTER SEED, so the roster is a hundred different meshes
+      // rather than a hundred copies. The first run of this proof used the
+      // default seed for all of them and reported flicker mean = worst = best,
+      // which measured the system at scale and said nothing about varied
+      // geometry. `--same-seed` reproduces that older, weaker roster.
       await cli(
         [
           'gen',
@@ -132,6 +141,8 @@ try {
           IMAGE,
           '--model',
           'fixture-gen',
+          '--seed',
+          String(SAME_SEED ? 0 : i),
         ],
         `gen ${id(i)}`,
       );
@@ -320,10 +331,20 @@ try {
     say('  (no bake-report.json — the batch did not write one)');
   }
   say(`  ${N} characters · ${framesTotal} frames on disk`);
+  const spread = flicker[0]!.pct - flicker.at(-1)!.pct;
   say(
     `  flicker: mean ${meanFlicker.toFixed(2)}% · worst ${flicker[0]!.id} ` +
-      `${flicker[0]!.pct.toFixed(2)}% · best ${flicker.at(-1)!.pct.toFixed(2)}%`,
+      `${flicker[0]!.pct.toFixed(2)}% · best ${flicker.at(-1)!.pct.toFixed(2)}% · ` +
+      `spread ${spread.toFixed(2)}pp`,
   );
+  if (spread === 0 && N > 1) {
+    say('  (zero spread — every character is identical; run without --same-seed for variety)');
+  } else if (N > 1) {
+    // the tail is where an unattended run's surprises live
+    say(
+      `  worst five: ${flicker.slice(0, 5).map((f) => `${f.id} ${f.pct.toFixed(2)}%`).join(' · ')}`,
+    );
+  }
   if (flagCounts.size === 0) {
     say('  QA flags: none');
   } else {
