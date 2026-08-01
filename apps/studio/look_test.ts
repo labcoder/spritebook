@@ -4,7 +4,7 @@
  * builder emits only DIVERGENCE, and the staleness statement is all-or-none
  * because every frame key embeds the whole recipe.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assertEquals } from 'jsr:@std/assert@1';
 import {
   DIRECTION_CHOICES,
   ELEVATION_DETENTS,
