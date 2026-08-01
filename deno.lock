@@ -20,6 +20,7 @@
     "npm:meshoptimizer@^1.2.0": "1.2.0",
     "npm:obj2gltf@^3.2.0": "3.2.0",
     "npm:pixelmatch@5.3.0": "5.3.0",
+    "npm:three@0.185.1": "0.185.1",
     "npm:three@~0.185.1": "0.185.1",
     "npm:vite@*": "8.1.4",
     "npm:zod@4.4.3": "4.4.3"

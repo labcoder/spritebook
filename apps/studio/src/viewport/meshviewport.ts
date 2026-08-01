@@ -15,6 +15,7 @@ import CameraControls from 'camera-controls';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { pickJoint, type ScreenJoint } from './picking';
+import { disposeTree, type MaterialLike, type TreeNode } from './dispose';
 
 export type ViewMode = 'textured' | 'clay' | 'wire';
 
@@ -43,6 +44,8 @@ function installOnce(): void {
 
 const CLAY = new THREE.MeshStandardMaterial({ color: 0x9a96a4, roughness: 0.85, metalness: 0 });
 const WIRE = new THREE.MeshBasicMaterial({ color: 0x55d0d6, wireframe: true });
+/** Module-level and therefore shared by every viewport — never disposed. */
+const SHARED: ReadonlySet<MaterialLike> = new Set([CLAY, WIRE] as unknown as MaterialLike[]);
 
 export class MeshViewport {
   #container: HTMLElement;
@@ -356,19 +359,14 @@ export class MeshViewport {
     }
     if (!this.#model) return;
     this.#scene.remove(this.#model);
-    this.#model.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      mesh.geometry?.dispose();
-      const original = this.#originalMaterials.get(mesh) ?? mesh.material;
-      for (const m of Array.isArray(original) ? original : [original]) {
-        if (!m) continue;
-        for (const value of Object.values(m)) {
-          if (value && (value as THREE.Texture).isTexture) (value as THREE.Texture).dispose();
-        }
-        m.dispose();
-      }
-    });
+    // the walk lives in dispose.ts so it can be tested without a GPU; SHARED
+    // is what stops a mesh missing from the map taking the app-wide clay or
+    // wireframe material down with it
+    disposeTree(
+      this.#model as unknown as TreeNode,
+      this.#originalMaterials as unknown as Map<TreeNode, MaterialLike | MaterialLike[]>,
+      SHARED,
+    );
     this.#originalMaterials.clear();
     this.#model = null;
     this.#bones = [];
