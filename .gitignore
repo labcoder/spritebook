@@ -43,3 +43,5 @@ docs/superpowers/
 # agent worktrees: transient clones, never source. (Was ".claude/.worktrees/",
 # which matched nothing — the real path has no leading dot on `worktrees`.)
 .claude/worktrees/
+# proof-run rosters (gigabytes of atlases; the transcript is the artifact)
+.proof-roster*/
