@@ -581,6 +581,10 @@ export function mergeAnimationSet(
  */
 const VERB_FLAGS: Record<string, readonly string[]> = {
   bake: [
+    'all',
+    'root',
+    'changed-since',
+    'plan',
     'workspace',
     'model',
     'character',
@@ -721,6 +725,421 @@ function unknownFlags(verb: string | undefined, args: string[]): string[] {
 }
 
 /** Run the CLI. Returns the process exit code. */
+/**
+ * Everything `bake` decides BEFORE any GPU work: the workspace's model,
+ * character and look, the style and camera those name, the pack its clips come
+ * from, and the resulting BakeJobSpec.
+ *
+ * Lifted out of the verb so `bake --all`'s plan can ask "what would this
+ * character bake with?" and get the same answer the bake will use. The body is
+ * the verb's own code unchanged; only its two exits are re-pointed — refusals
+ * throw a typed error instead of emitting one, and the two warnings become a
+ * list the caller emits — because the batch path has to survive a character it
+ * cannot resolve, and `fail` ends a process.
+ */
+export class BakeResolveError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = 'BakeResolveError';
+    this.code = code;
+  }
+}
+
+export interface ResolvedBake {
+  spec: BakeJobSpec;
+  manifest?: CharacterManifest;
+  /** the canonical preset ids the writeback records */
+  cameraId: string;
+  styleId: string;
+  /** the pack the clips resolved against, when there were clips */
+  packId?: string;
+  warnings: { code: string; message: string }[];
+}
+
+export async function resolveBake(
+  args: string[],
+  workspace: string | undefined,
+  now: () => string,
+): Promise<ResolvedBake> {
+  const bakeId = 'bake' as JobEvent['jobId'];
+  const warnings: { code: string; message: string }[] = [];
+  // shadows, so the copied body needs no edits: see the class doc above
+  const fail = (_id: JobEvent['jobId'], code: string, message: string): never => {
+    throw new BakeResolveError(code, message);
+  };
+  const emit = (e: JobEvent, _human?: string) => {
+    if (e.t === 'warn') warnings.push({ code: e.code, message: e.message });
+  };
+  void bakeId;
+  // --workspace supplies the model, the character id, the output root, and
+  // the character's own look + clips; every one of those is still overridable
+  // by its flag. Optional, like `rig --workspace`: without it `bake` behaves
+  // exactly as it always has. It is a PARAMETER rather than a flag read here
+  // so `bake --all` can resolve one roster member at a time off the same code.
+  let manifest: CharacterManifest | undefined;
+  if (workspace !== undefined) {
+    try {
+      manifest = await readWorkspace(workspace);
+    } catch (err) {
+      return fail(bakeId, 'no-workspace', err instanceof Error ? err.message : String(err));
+    }
+  }
+  const ws = workspace === undefined ? undefined : workspacePaths(workspace);
+  const model = flag(args, 'model') ?? ws?.canonicalModel;
+  const character = flag(args, 'character') ?? manifest?.id;
+  const out = flag(args, 'out') ?? ws?.bakesDir;
+  if (!model || !character || !out) {
+    return fail(
+      bakeId,
+      'missing-arg',
+      '--model <glb>, --character <id>, and --out <dir> are required - or --workspace <dir>, ' +
+        'which supplies all three from the character it holds',
+    );
+  }
+  const look = manifest?.look;
+  // The id as ASKED FOR, then the live preset it names. A character baked
+  // before a rename carries the old string in its look, so `asked` is what
+  // the user (or their manifest) said and `styleId` is what runs — every
+  // lookup below has to use the canonical one or an alias would die on
+  // `PRESETS[undefined]`.
+  const asked = stylePresetIdFor(args, look);
+  const styleId = canonicalStyleId(asked);
+  // Object.hasOwn: `--style __proto__` must be unknown-style, not a
+  // prototype-chain hit that dies later as a confusing TypeError (m7)
+  if (!Object.hasOwn(PRESETS, styleId)) {
+    return fail(
+      bakeId,
+      'unknown-style',
+      `Unknown style "${asked}"${
+        flag(args, 'style') === undefined ? " (from the character's look)" : ''
+      } - available: ${Object.keys(PRESETS).sort().join(', ')}` +
+        ` (retired ids that still resolve: ${Object.keys(STYLE_ALIASES).sort().join(', ')})`,
+    );
+  }
+  const aliasNote = styleAliasNote(asked);
+  const cameraId = cameraPresetIdFor(args, look);
+  if (!Object.hasOwn(CAMERA_PRESETS, cameraId)) {
+    return fail(
+      bakeId,
+      'unknown-camera',
+      `Unknown camera preset "${cameraId}"${
+        flag(args, 'camera') === undefined ? " (from the character's look)" : ''
+      } - available: ${Object.keys(CAMERA_PRESETS).sort().join(', ')}`,
+    );
+  }
+  // a valueless --clips must not silently bake the legacy idle stub, and a
+  // --pack with no clips to resolve changes nothing - both are user error
+  if (args.includes('--clips') && !flag(args, 'clips')) {
+    return fail(
+      bakeId,
+      'bad-args',
+      '--clips needs a value: clip:frames[@speed][!hold][,...] - see `spritebook anim --list`',
+    );
+  }
+  if (args.includes('--pack') && !flag(args, 'pack')) {
+    return fail(bakeId, 'bad-args', '--pack needs a directory path');
+  }
+  // naming both is a contradiction, and picking a winner would mean baking
+  // the opposite of half of what the user typed
+  if (args.includes('--mirror') && args.includes('--no-mirror')) {
+    return fail(
+      bakeId,
+      'bad-args',
+      '--mirror and --no-mirror contradict each other - pass one, or neither to use the ' +
+        "character's own setting",
+    );
+  }
+  const stored = manifest?.animationSet?.filter((c) => c.enabled) ?? [];
+  if (flag(args, 'pack') && !flag(args, 'clips') && stored.length === 0) {
+    return fail(
+      bakeId,
+      'bad-args',
+      '--pack only applies when there are clips to resolve: pass --clips, or point --workspace ' +
+        'at a character whose animationSet has enabled bindings',
+    );
+  }
+
+  // Which pack this bake reads. Resolved only when the answer is USED: to
+  // validate stored bindings against, and to record in the writeback. A bake
+  // with no workspace records nothing, and an idle-stub bake opens no pack at
+  // all — neither should start failing on a pack.json it never needed.
+  const packDir = flag(args, 'pack') ?? BUNDLED_PACK;
+  let packId: string | undefined;
+  if (workspace !== undefined && (flag(args, 'clips') !== undefined || stored.length > 0)) {
+    try {
+      const { loadPack } = await import('@spritebook/anim');
+      packId = (await loadPack(packDir)).id;
+    } catch (err) {
+      return fail(
+        bakeId,
+        'bad-pack',
+        `Cannot read an animation pack at "${packDir}": ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+    // A stored binding names the pack its clip came FROM. Resolving it
+    // against a different pack renders a different animation under the same
+    // clip id and reports done, so the mismatch is refused rather than
+    // guessed at. Only stored bindings are checked: `--clips` is the user
+    // naming ids right now, against the pack they also named.
+    const foreign = flag(args, 'clips') === undefined
+      ? stored.find((c) => c.packId !== packId)
+      : undefined;
+    if (foreign) {
+      return fail(
+        bakeId,
+        'pack-mismatch',
+        `This character's clip "${foreign.clipId}" comes from pack "${foreign.packId}", but ` +
+          `this bake reads "${packId}" at "${packDir}". Pass --pack <dir> pointing at ` +
+          `"${foreign.packId}" - resolving the id against another pack would bake a ` +
+          `different animation under the same name.`,
+      );
+    }
+  }
+
+  let spec: BakeJobSpec;
+  try {
+    spec = bakeSpecFromFlags(args, {
+      model,
+      character,
+      out,
+      look,
+      animationSet: stored,
+      mirroring: manifest?.mirroring.enabled,
+      provenance: provenanceOf(manifest),
+    });
+  } catch (err) {
+    return fail(bakeId, 'bad-args', err instanceof Error ? err.message : String(err));
+  }
+  // The rig's own deform check said no, and nothing has said yes since: both
+  // rig tracks write `accepted: false` and leave it "theirs to set", and no
+  // verb sets it yet. So this cannot be a refusal without dead-ending every
+  // rigged character — but the P3 exit run shipped 48 frames off a rig with
+  // 37 of 40 joints flagged and not one line said so at bake time. Loud warn.
+  if (manifest?.rig && !manifest.rig.accepted) {
+    const w: JobEvent = {
+      t: 'warn',
+      jobId: bakeId,
+      at: now(),
+      code: 'rig-unaccepted',
+      message: `this character's rig (${manifest.rig.jointCount} joints, track ` +
+        `${manifest.rig.track}) was never accepted - the deform check flagged joints when it ` +
+        `was made, and RigState.accepted is still false. The sprites will bake with that ` +
+        `skinning. Check deform-report.json in the rig output, repair with ` +
+        `\`spritebook rig --edits <patch.json>\` or \`--rerun-with-hints\`, or - if you have ` +
+        `looked and the sprites are fine - record that with \`spritebook rig --workspace ` +
+        `<dir> --accept\`. Baking continues; this is a warning, not a refusal.`,
+    };
+    emit(w, `warn [${w.code}]: ${w.message}`);
+  }
+  // A retired style id resolved rather than failing, and says so. Emitted here
+  // rather than thrown from resolveStyle because resolution returns a style
+  // and has no channel for a message — and because a manifest carrying an old
+  // id is a normal thing to own, not an error to fix.
+  if (aliasNote !== undefined) {
+    const w: JobEvent = {
+      t: 'warn',
+      jobId: bakeId,
+      at: now(),
+      code: 'style-alias',
+      message: `${aliasNote}${
+        flag(args, 'style') === undefined ? " The id came from the character's look." : ''
+      }`,
+    };
+    emit(w, `warn [${w.code}]: ${w.message}`);
+  }
+  return {
+    spec,
+    ...(manifest !== undefined ? { manifest } : {}),
+    cameraId,
+    styleId,
+    ...(packId !== undefined ? { packId } : {}),
+    warnings,
+  };
+}
+
+/** The `bake` flags `--all` owns; everything else passes through to each bake. */
+const BATCH_BOOLEAN = new Set(['all', 'plan']);
+const BATCH_VALUED = new Set(['root', 'changed-since', 'workspace']);
+
+/**
+ * The batch's args, minus the batch's own flags. Each character is baked with
+ * EXACTLY what the user typed — same style, same clips, same cache — so the
+ * plan's prediction and the bake's behaviour come from one flag surface.
+ */
+export function passthroughBakeArgs(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 1; i < args.length; i++) {
+    const a = args[i]!;
+    if (a.startsWith('--')) {
+      const name = a.slice(2);
+      if (BATCH_BOOLEAN.has(name)) continue;
+      if (BATCH_VALUED.has(name)) {
+        const v = args[i + 1];
+        if (v !== undefined && !v.startsWith('--')) i++;
+        continue;
+      }
+    }
+    out.push(a);
+  }
+  return out;
+}
+
+interface BatchIo {
+  json: boolean;
+  now: () => string;
+  emit: (e: JobEvent, human: string) => void;
+  fail: (jobId: JobEvent['jobId'], code: string, message: string) => number;
+}
+
+/**
+ * `bake --all --root <dir>`: plan the whole roster, say what is stale and why,
+ * then bake what needs it.
+ *
+ * The plan is printed BEFORE any bake starts, always — including on a plain
+ * `--all` with no `--plan`. An overnight run that re-rendered everything is
+ * only diagnosable afterwards if the reasons were recorded up front, so
+ * `bake-plan.json` lands next to `roster.json` on every batch, not just the
+ * dry ones.
+ *
+ * Each character is baked by re-entering `runCli` with `--workspace`, so a
+ * batch bake and a hand-typed one are the same code path down to the writeback.
+ */
+async function runBakeAll(args: string[], io: CliIo, b: BatchIo): Promise<number> {
+  const bakeId = 'bake' as JobEvent['jobId'];
+  const root = flag(args, 'root');
+  if (!root) {
+    return b.fail(
+      bakeId,
+      'missing-arg',
+      '--all needs --root <dir>: the folder your character workspaces live in ' +
+        '(each is a directory holding a character.json)',
+    );
+  }
+  if (flag(args, 'workspace') !== undefined) {
+    return b.fail(
+      bakeId,
+      'bad-args',
+      '--all bakes every character under --root; --workspace names exactly one. Pass one or ' +
+        'the other - running both would silently ignore half of what you typed.',
+    );
+  }
+  let changedSince: Date | undefined;
+  const sinceRaw = flag(args, 'changed-since');
+  if (args.includes('--changed-since') && sinceRaw === undefined) {
+    return b.fail(
+      bakeId,
+      'bad-args',
+      '--changed-since needs an ISO timestamp, e.g. --changed-since 2026-08-01T00:00:00Z',
+    );
+  }
+  if (sinceRaw !== undefined) {
+    changedSince = new Date(sinceRaw);
+    if (Number.isNaN(changedSince.getTime())) {
+      return b.fail(bakeId, 'bad-args', `--changed-since "${sinceRaw}" is not a date`);
+    }
+  }
+
+  const { scanRoster, writeRosterManifest } = await import('@spritebook/core');
+  const { formatPlan, planRoster, toBake, writePlan } = await import('./batch.ts');
+  let roster;
+  try {
+    roster = await scanRoster(root, { now: b.now, ...(changedSince ? { changedSince } : {}) });
+  } catch (err) {
+    return b.fail(bakeId, 'no-root', err instanceof Error ? err.message : String(err));
+  }
+  await writeRosterManifest(roster);
+
+  // No adapter is not a refusal: a plan is a useful thing to take on a laptop.
+  // It does mean the renderer's own identity cannot be compared, and the plan
+  // says so per character rather than assuming nothing changed.
+  let renderSig: string | null = null;
+  try {
+    const { renderSignature } = await import('@spritebook/render');
+    renderSig = await renderSignature();
+  } catch {
+    renderSig = null;
+  }
+
+  const plan = await planRoster(roster, {
+    now: b.now,
+    renderSig,
+    resolve: async (workspace: string) => {
+      try {
+        return { ok: true as const, spec: (await resolveBake(args, workspace, b.now)).spec };
+      } catch (err) {
+        return {
+          ok: false as const,
+          error: err instanceof BakeResolveError
+            ? `${err.code}: ${err.message}`
+            : err instanceof Error
+            ? err.message
+            : String(err),
+        };
+      }
+    },
+  }, sinceRaw);
+  const planPath = await writePlan(plan);
+
+  const planOnly = args.includes('--plan');
+  if (b.json) {
+    // a plan is a query snapshot, like `doctor` and `models list`: one
+    // document, not a stream of job events
+    io.stdout(canonicalJson(plan));
+  } else {
+    for (const line of formatPlan(plan)) io.stdout(line);
+    io.stdout(`plan written to ${planPath}`);
+  }
+  if (planOnly) return plan.totals.blocked > 0 ? 1 : 0;
+
+  const targets = toBake(plan);
+  const pass = passthroughBakeArgs(args);
+  const failedIds: string[] = [];
+  for (const [i, c] of targets.entries()) {
+    b.emit(
+      {
+        t: 'progress',
+        jobId: bakeId,
+        at: b.now(),
+        step: `${c.displayName} (${c.id})`,
+        done: i,
+        total: targets.length,
+      },
+      `[${i + 1}/${targets.length}] ${c.displayName} (${c.id}) — ${c.staleFrames} frames`,
+    );
+    // One failure never ends the batch: a roster where character 4 has a bad
+    // mesh must still bake the other 99, and the 4 must be named at the end.
+    const code = await runCli(['bake', '--workspace', `${root}/${c.dir}`, ...pass], io);
+    if (code !== 0) failedIds.push(c.id);
+  }
+
+  const blockedIds = plan.characters.filter((c) => c.state === 'blocked').map((c) => c.id);
+  if (!b.json) {
+    io.stdout(
+      `baked ${targets.length - failedIds.length}/${targets.length}` +
+        `${failedIds.length > 0 ? ` — FAILED: ${failedIds.join(', ')}` : ''}` +
+        `${blockedIds.length > 0 ? ` — skipped (blocked): ${blockedIds.join(', ')}` : ''}`,
+    );
+  }
+  if (failedIds.length > 0 || blockedIds.length > 0) {
+    return b.fail(
+      bakeId,
+      failedIds.length > 0 ? 'batch-incomplete' : 'batch-blocked',
+      `${targets.length - failedIds.length} of ${targets.length} baked. ` +
+        `${failedIds.length > 0 ? `Failed: ${failedIds.join(', ')}. ` : ''}` +
+        `${blockedIds.length > 0 ? `Never started: ${blockedIds.join(', ')}. ` : ''}` +
+        `See ${planPath} for why each character was in the state it was.`,
+    );
+  }
+  b.emit(
+    { t: 'done', jobId: bakeId, at: b.now(), wallTimeS: 0 },
+    `all ${targets.length} baked`,
+  );
+  return 0;
+}
+
 export async function runCli(args: string[], io: CliIo): Promise<number> {
   const now = io.now ?? (() => new Date().toISOString());
   const json = args.includes('--json');
@@ -1912,183 +2331,19 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
 
   if (verb === 'bake') {
     const bakeId = 'bake' as JobEvent['jobId'];
-    // --workspace supplies the model, the character id, the output root, and
-    // the character's own look + clips; every one of those is still overridable
-    // by its flag. Optional, like `rig --workspace`: without it `bake` behaves
-    // exactly as it always has.
-    const workspace = flag(args, 'workspace');
-    let manifest: CharacterManifest | undefined;
-    if (workspace !== undefined) {
-      try {
-        manifest = await readWorkspace(workspace);
-      } catch (err) {
-        return fail(bakeId, 'no-workspace', err instanceof Error ? err.message : String(err));
-      }
-    }
-    const ws = workspace === undefined ? undefined : workspacePaths(workspace);
-    const model = flag(args, 'model') ?? ws?.canonicalModel;
-    const character = flag(args, 'character') ?? manifest?.id;
-    const out = flag(args, 'out') ?? ws?.bakesDir;
-    if (!model || !character || !out) {
-      return fail(
-        bakeId,
-        'missing-arg',
-        '--model <glb>, --character <id>, and --out <dir> are required - or --workspace <dir>, ' +
-          'which supplies all three from the character it holds',
-      );
-    }
-    const look = manifest?.look;
-    // The id as ASKED FOR, then the live preset it names. A character baked
-    // before a rename carries the old string in its look, so `asked` is what
-    // the user (or their manifest) said and `styleId` is what runs — every
-    // lookup below has to use the canonical one or an alias would die on
-    // `PRESETS[undefined]`.
-    const asked = stylePresetIdFor(args, look);
-    const styleId = canonicalStyleId(asked);
-    // Object.hasOwn: `--style __proto__` must be unknown-style, not a
-    // prototype-chain hit that dies later as a confusing TypeError (m7)
-    if (!Object.hasOwn(PRESETS, styleId)) {
-      return fail(
-        bakeId,
-        'unknown-style',
-        `Unknown style "${asked}"${
-          flag(args, 'style') === undefined ? " (from the character's look)" : ''
-        } - available: ${Object.keys(PRESETS).sort().join(', ')}` +
-          ` (retired ids that still resolve: ${Object.keys(STYLE_ALIASES).sort().join(', ')})`,
-      );
-    }
-    const aliasNote = styleAliasNote(asked);
-    const cameraId = cameraPresetIdFor(args, look);
-    if (!Object.hasOwn(CAMERA_PRESETS, cameraId)) {
-      return fail(
-        bakeId,
-        'unknown-camera',
-        `Unknown camera preset "${cameraId}"${
-          flag(args, 'camera') === undefined ? " (from the character's look)" : ''
-        } - available: ${Object.keys(CAMERA_PRESETS).sort().join(', ')}`,
-      );
-    }
-    // a valueless --clips must not silently bake the legacy idle stub, and a
-    // --pack with no clips to resolve changes nothing - both are user error
-    if (args.includes('--clips') && !flag(args, 'clips')) {
-      return fail(
-        bakeId,
-        'bad-args',
-        '--clips needs a value: clip:frames[@speed][!hold][,...] - see `spritebook anim --list`',
-      );
-    }
-    if (args.includes('--pack') && !flag(args, 'pack')) {
-      return fail(bakeId, 'bad-args', '--pack needs a directory path');
-    }
-    // naming both is a contradiction, and picking a winner would mean baking
-    // the opposite of half of what the user typed
-    if (args.includes('--mirror') && args.includes('--no-mirror')) {
-      return fail(
-        bakeId,
-        'bad-args',
-        '--mirror and --no-mirror contradict each other - pass one, or neither to use the ' +
-          "character's own setting",
-      );
-    }
-    const stored = manifest?.animationSet?.filter((c) => c.enabled) ?? [];
-    if (flag(args, 'pack') && !flag(args, 'clips') && stored.length === 0) {
-      return fail(
-        bakeId,
-        'bad-args',
-        '--pack only applies when there are clips to resolve: pass --clips, or point --workspace ' +
-          'at a character whose animationSet has enabled bindings',
-      );
-    }
-
-    // Which pack this bake reads. Resolved only when the answer is USED: to
-    // validate stored bindings against, and to record in the writeback. A bake
-    // with no workspace records nothing, and an idle-stub bake opens no pack at
-    // all — neither should start failing on a pack.json it never needed.
-    const packDir = flag(args, 'pack') ?? BUNDLED_PACK;
-    let packId: string | undefined;
-    if (workspace !== undefined && (flag(args, 'clips') !== undefined || stored.length > 0)) {
-      try {
-        const { loadPack } = await import('@spritebook/anim');
-        packId = (await loadPack(packDir)).id;
-      } catch (err) {
-        return fail(
-          bakeId,
-          'bad-pack',
-          `Cannot read an animation pack at "${packDir}": ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      }
-      // A stored binding names the pack its clip came FROM. Resolving it
-      // against a different pack renders a different animation under the same
-      // clip id and reports done, so the mismatch is refused rather than
-      // guessed at. Only stored bindings are checked: `--clips` is the user
-      // naming ids right now, against the pack they also named.
-      const foreign = flag(args, 'clips') === undefined
-        ? stored.find((c) => c.packId !== packId)
-        : undefined;
-      if (foreign) {
-        return fail(
-          bakeId,
-          'pack-mismatch',
-          `This character's clip "${foreign.clipId}" comes from pack "${foreign.packId}", but ` +
-            `this bake reads "${packId}" at "${packDir}". Pass --pack <dir> pointing at ` +
-            `"${foreign.packId}" - resolving the id against another pack would bake a ` +
-            `different animation under the same name.`,
-        );
-      }
-    }
-
-    let spec: BakeJobSpec;
+    if (args.includes('--all')) return await runBakeAll(args, io, { json, now, emit, fail });
+    let resolved: ResolvedBake;
     try {
-      spec = bakeSpecFromFlags(args, {
-        model,
-        character,
-        out,
-        look,
-        animationSet: stored,
-        mirroring: manifest?.mirroring.enabled,
-        provenance: provenanceOf(manifest),
-      });
+      resolved = await resolveBake(args, flag(args, 'workspace'), now);
     } catch (err) {
-      return fail(bakeId, 'bad-args', err instanceof Error ? err.message : String(err));
+      if (err instanceof BakeResolveError) return fail(bakeId, err.code, err.message);
+      throw err;
     }
-    // The rig's own deform check said no, and nothing has said yes since: both
-    // rig tracks write `accepted: false` and leave it "theirs to set", and no
-    // verb sets it yet. So this cannot be a refusal without dead-ending every
-    // rigged character — but the P3 exit run shipped 48 frames off a rig with
-    // 37 of 40 joints flagged and not one line said so at bake time. Loud warn.
-    if (manifest?.rig && !manifest.rig.accepted) {
-      const w: JobEvent = {
-        t: 'warn',
-        jobId: bakeId,
-        at: now(),
-        code: 'rig-unaccepted',
-        message: `this character's rig (${manifest.rig.jointCount} joints, track ` +
-          `${manifest.rig.track}) was never accepted - the deform check flagged joints when it ` +
-          `was made, and RigState.accepted is still false. The sprites will bake with that ` +
-          `skinning. Check deform-report.json in the rig output, repair with ` +
-          `\`spritebook rig --edits <patch.json>\` or \`--rerun-with-hints\`, or - if you have ` +
-          `looked and the sprites are fine - record that with \`spritebook rig --workspace ` +
-          `<dir> --accept\`. Baking continues; this is a warning, not a refusal.`,
-      };
-      emit(w, `warn [${w.code}]: ${w.message}`);
-    }
-    // A retired style id resolved rather than failing, and says so. Emitted here
-    // rather than thrown from resolveStyle because resolution returns a style
-    // and has no channel for a message — and because a manifest carrying an old
-    // id is a normal thing to own, not an error to fix.
-    if (aliasNote !== undefined) {
-      const w: JobEvent = {
-        t: 'warn',
-        jobId: bakeId,
-        at: now(),
-        code: 'style-alias',
-        message: `${aliasNote}${
-          flag(args, 'style') === undefined ? " The id came from the character's look." : ''
-        }`,
-      };
-      emit(w, `warn [${w.code}]: ${w.message}`);
+    const { spec, manifest, cameraId, styleId, packId } = resolved;
+    const workspace = flag(args, 'workspace');
+    for (const w of resolved.warnings) {
+      const e: JobEvent = { t: 'warn', jobId: bakeId, at: now(), code: w.code, message: w.message };
+      emit(e, `warn [${e.code}]: ${e.message}`);
     }
     let bakeDir: string | undefined;
     let code: number;

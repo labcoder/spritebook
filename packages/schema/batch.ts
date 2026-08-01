@@ -121,9 +121,14 @@ export const BakePlanEntrySchema = z.strictObject({
   displayName: z.string().min(1),
   state: PlanStateSchema,
   reasons: z.array(StaleReasonSchema),
-  /** frames the last bake produced — 0 when there was none */
+  /**
+   * Cells this bake would produce — directions × frames, summed over the
+   * enabled clips. The same count a BakeManifest reports as
+   * `metrics.framesTotal`, so a plan and the bake it predicted are directly
+   * comparable. 0 when the plan could not resolve a recipe at all.
+   */
   frames: z.int().nonnegative(),
-  /** frames this plan would re-render; today all-or-none, per cache.ts */
+  /** how many of those would re-render rather than hit cache — all-or-none */
   staleFrames: z.int().nonnegative(),
   lastBakeId: BakeIdSchema.optional(),
   lastBakedAt: IsoTimeSchema.optional(),

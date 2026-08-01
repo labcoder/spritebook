@@ -180,28 +180,32 @@ next bake records the live id, and the warning stops.
 
 ### `spritebook bake`
 
-| Flag                 | Default       | Meaning                                                         |
-| -------------------- | ------------- | --------------------------------------------------------------- |
-| `--workspace <dir>`  | (off)         | a character directory; supplies the four rows below it          |
-| `--model <path>`     | (required)    | rigged `.glb` to bake                                           |
-| `--character <id>`   | (required)    | immutable character slug; binds cache keys                      |
-| `--out <dir>`        | (required)    | bakes land at `<dir>/bake-<id>`                                 |
-| `--camera <id>`      | `standard-30` | `low-15`, `two-to-one`, `standard-30`, or `isometric`           |
-| `--style <id>`       | `pixel`       | `cel-2`, `pixel` (16 colours), or `painterly`                   |
-| `--directions <n>`   | `8`           | `2`, `4`, `8`, or `16`                                          |
-| `--frames <n>`       | `6`           | frames of the built-in idle pose (positive integer)             |
-| `--clips <spec>`     | (idle)        | `clip:frames[@speed][!hold][,...]` — bake real clips instead    |
-| `--pack <dir>`       | (bundled)     | animation pack the `--clips` ids resolve in                     |
-| `--cell <px\|WxH>`   | `64`          | output cell size; `64` is square, `96x128` is not               |
-| `--ppm <n>`          | `32`          | pixels per meter (world scale)                                  |
-| `--colors <n>`       | style's own   | palette size, 2–256; refines the style rather than replacing it |
-| `--elevation <deg>`  | `30`          | camera elevation angle                                          |
-| `--padding <px>`     | `6`           | transparent padding inside each cell                            |
-| `--cache <dir>`      | (off)         | input-hash frame cache; the bake always writes through when set |
-| `--only-invalidated` | (off)         | serve unchanged frames from the cache (all-or-none per bake)    |
-| `--mirror`           | (off)         | produce the back-half directions by flipping the front half     |
-| `--no-mirror`        | (off)         | force mirroring off, overriding the character's own setting     |
-| `--json`             | (off)         | NDJSON job events on stdout                                     |
+| Flag                    | Default       | Meaning                                                             |
+| ----------------------- | ------------- | ------------------------------------------------------------------- |
+| `--workspace <dir>`     | (off)         | a character directory; supplies the four rows below it              |
+| `--model <path>`        | (required)    | rigged `.glb` to bake                                               |
+| `--character <id>`      | (required)    | immutable character slug; binds cache keys                          |
+| `--out <dir>`           | (required)    | bakes land at `<dir>/bake-<id>`                                     |
+| `--camera <id>`         | `standard-30` | `low-15`, `two-to-one`, `standard-30`, or `isometric`               |
+| `--style <id>`          | `pixel`       | `cel-2`, `pixel` (16 colours), or `painterly`                       |
+| `--directions <n>`      | `8`           | `2`, `4`, `8`, or `16`                                              |
+| `--frames <n>`          | `6`           | frames of the built-in idle pose (positive integer)                 |
+| `--clips <spec>`        | (idle)        | `clip:frames[@speed][!hold][,...]` — bake real clips instead        |
+| `--pack <dir>`          | (bundled)     | animation pack the `--clips` ids resolve in                         |
+| `--cell <px\|WxH>`      | `64`          | output cell size; `64` is square, `96x128` is not                   |
+| `--ppm <n>`             | `32`          | pixels per meter (world scale)                                      |
+| `--colors <n>`          | style's own   | palette size, 2–256; refines the style rather than replacing it     |
+| `--elevation <deg>`     | `30`          | camera elevation angle                                              |
+| `--padding <px>`        | `6`           | transparent padding inside each cell                                |
+| `--cache <dir>`         | (off)         | input-hash frame cache; the bake always writes through when set     |
+| `--only-invalidated`    | (off)         | serve unchanged frames from the cache (all-or-none per bake)        |
+| `--mirror`              | (off)         | produce the back-half directions by flipping the front half         |
+| `--no-mirror`           | (off)         | force mirroring off, overriding the character's own setting         |
+| `--all`                 | (off)         | bake every character under `--root` (see below)                     |
+| `--root <dir>`          | —             | the folder your character workspaces live in; required by `--all`   |
+| `--changed-since <iso>` | (off)         | only characters whose manifest was written at or after this instant |
+| `--plan`                | (off)         | print the plan and stop — render nothing                            |
+| `--json`                | (off)         | NDJSON job events on stdout                                         |
 
 With `--workspace <dir>`, `--model`, `--character` and `--out` become optional: the model is the
 workspace's `canonical/model.glb`, the character is the id in its manifest, and bakes land in
@@ -232,6 +236,43 @@ Under `--workspace` the choice persists like the rest of the look: `--mirror` on
 `mirroring.enabled` on the character, and every later bake mirrors without the flag. That is not
 inference — it is the same explicit choice, made once and remembered, and the warning still fires
 every run. `--no-mirror` is how a character that has said yes says no for a single bake.
+
+#### Baking a whole roster
+
+```
+spritebook bake --all --root ./characters --plan
+```
+
+`--all` treats every directory under `--root` that holds a `character.json` as one character, and
+bakes each with exactly the flags you typed. Before anything renders it prints a **plan** — per
+character, whether a bake would do work, and which field of the recipe made it so:
+
+```
+plan for ./characters
+  Bulma (bulma) — STALE, 96 frames to render
+      · stylePresetHash: the style changed — a different preset, or an override on colors,
+        outline, dithering, or supersampling
+  Goku (goku) — fresh, 96 frames all cached
+  Trunks (trunks) — BLOCKED
+      · no canonical mesh on disk — generate one and pick it (`spritebook pick`) before baking
+1 to bake · 1 fresh · 1 blocked · 96 frames to render, 96 from cache
+```
+
+`--plan` stops there. Without it the same plan is printed and then acted on. Either way two
+documents land at the root: `roster.json` (the census) and `bake-plan.json` (what was decided and
+why) — an overnight run that re-rendered everything is only diagnosable afterwards if the reasons
+were written down beforehand.
+
+`--changed-since <iso>` is a cheap prefilter on the manifest's modification time. It answers "was
+this **touched**", which is a different question from "would its pixels **differ**" — a rename
+touches the manifest and reaches no cache key (D-011), so a renamed character appears under
+`--changed-since` and then plans as `fresh`. Both answers are correct and the plan shows both.
+
+Bakes run one at a time and there is no flag to change that: each saturates the GPU, and two in one
+process would interleave passes on shared render targets. One character failing never ends the run —
+the rest bake, the failures are named in the summary, and the exit code is non-zero. Blocked
+characters (no mesh, unreadable manifest, a look naming a preset that does not exist) are skipped
+the same way rather than being silently dropped from the count.
 
 ### `spritebook export`
 
