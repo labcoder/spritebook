@@ -12,6 +12,7 @@ export * from './journal.ts';
 export * from './workspace.ts';
 export * from './receipts.ts';
 export * from './roster.ts';
+export * from './vramlease.ts';
 export * from './cache.ts';
 export * from './presets.ts';
 export * from './stub-bake.ts';
