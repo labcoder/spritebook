@@ -588,7 +588,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
   export: ['bake', 'out', 'targets', 'fps'],
   undo: ['manifest'],
   redo: ['manifest'],
-  anim: ['list', 'packs', 'tag', 'category', 'import-pack', 'into'],
+  anim: ['list', 'packs', 'tag', 'category', 'import-pack', 'into', 'enable', 'disable', 'workspace'],
   gen: [
     'workspace',
     'out',
@@ -818,10 +818,140 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         else io.stdout(`imported pack "${pack.id}" (${pack.clips.length} clips) into ${into}`);
         return 0;
       }
+
+      // --enable / --disable: the BINDING half (P4-T2) — decisions recorded
+      // as one journaled patch each, like `rig --accept`, so undo takes a
+      // binding change back. Bake stays the only thing that samples frames;
+      // this only writes what the user chose.
+      const enableRaw = flag(args, 'enable');
+      const disableRaw = flag(args, 'disable');
+      if (enableRaw !== undefined || disableRaw !== undefined) {
+        if (enableRaw !== undefined && disableRaw !== undefined) {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'bad-args',
+            '--enable and --disable in one call would hide the order the journal needs - pass one',
+          );
+        }
+        if ((args.includes('--enable') && !enableRaw) || (args.includes('--disable') && !disableRaw)) {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'bad-args',
+            '--enable wants clip:frames[@speed][!hold][,...]; --disable wants clip[,clip...]',
+          );
+        }
+        const workspace = flag(args, 'workspace');
+        if (!workspace) {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'missing-arg',
+            'binding changes need --workspace <dir> (the character they belong to)',
+          );
+        }
+        const { readWorkspace, setAnimationSet } = await import('@spritebook/core');
+        const manifest = await readWorkspace(workspace);
+        const existing = manifest.animationSet ?? [];
+
+        if (enableRaw !== undefined) {
+          const specs = parseClips(enableRaw);
+          // resolve each clip's pack from the installed packs, --list's order
+          const packsRoot = flag(args, 'packs') ??
+            decodeURIComponent(
+              new URL('../anim/packs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+            );
+          const packDirs: string[] = [];
+          for await (const entry of Deno.readDir(packsRoot)) {
+            if (!entry.isDirectory) continue;
+            try {
+              await Deno.stat(`${packsRoot}/${entry.name}/pack.json`);
+              packDirs.push(`${packsRoot}/${entry.name}`);
+            } catch {
+              // not a pack dir
+            }
+          }
+          packDirs.sort();
+          const clipToPack = new Map<string, string>();
+          for (const dir of packDirs) {
+            const pack = await loadPack(dir);
+            for (const c of pack.clips) {
+              if (!clipToPack.has(c.id)) clipToPack.set(c.id, pack.id);
+            }
+          }
+          const unknown = specs.filter((s) => !clipToPack.has(s.clipId));
+          if (unknown.length > 0) {
+            return fail(
+              'anim' as JobEvent['jobId'],
+              'unknown-clip',
+              `no installed pack has ${
+                unknown.map((s) => `"${s.clipId}"`).join(', ')
+              } - \`spritebook anim --list\` shows what exists`,
+            );
+          }
+          // merge like the bake does: existing entries keep their position
+          const bySpec = new Map(specs.map((s) => [s.clipId, s]));
+          const next: ClipBinding[] = existing.map((prev) => {
+            const s = bySpec.get(prev.clipId);
+            if (s === undefined) return prev;
+            bySpec.delete(prev.clipId);
+            return {
+              ...prev,
+              enabled: true,
+              frames: s.frames,
+              speed: s.speed,
+              holdLast: s.holdLast,
+            };
+          });
+          for (const s of bySpec.values()) {
+            next.push({
+              clipId: s.clipId,
+              packId: clipToPack.get(s.clipId)!,
+              enabled: true,
+              frames: s.frames,
+              speed: s.speed,
+              holdLast: s.holdLast,
+            });
+          }
+          const label = specs.length === 1
+            ? `Enable clip ${specs[0].clipId} (${specs[0].frames} frames)`
+            : `Enable ${specs.length} clips`;
+          const m = await setAnimationSet(workspace, next, { label });
+          if (json) jsonOut({ animationSet: m.animationSet });
+          else {
+            io.stdout(
+              `${specs.length} clip${specs.length === 1 ? '' : 's'} enabled - ` +
+                `${m.animationSet!.filter((b) => b.enabled).length} enabled total`,
+            );
+          }
+          return 0;
+        }
+
+        // --disable: flip enabled off, keep the binding's numbers (a choice
+        // to leave a clip out is still a choice worth remembering)
+        const ids = disableRaw!.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+        const have = new Set(existing.map((b) => b.clipId));
+        const missing = ids.filter((id) => !have.has(id));
+        if (missing.length > 0) {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'no-binding',
+            `no binding for ${missing.map((i) => `"${i}"`).join(', ')} - ` +
+              `bindings: ${existing.map((b) => b.clipId).join(', ') || '(none)'}`,
+          );
+        }
+        const next = existing.map((b) => ids.includes(b.clipId) ? { ...b, enabled: false } : b);
+        const m = await setAnimationSet(workspace, next, {
+          label: ids.length === 1 ? `Disable clip ${ids[0]}` : `Disable ${ids.length} clips`,
+        });
+        if (json) jsonOut({ animationSet: m.animationSet });
+        else io.stdout(`${ids.length} clip${ids.length === 1 ? '' : 's'} disabled`);
+        return 0;
+      }
       return fail(
         'anim' as JobEvent['jobId'],
         'missing-arg',
-        'anim needs --list [--tag t] [--category c] or --import-pack <dir> --into <packsRoot>',
+        'anim needs --list [--tag t] [--category c], --enable <clip:frames[@speed][!hold]> ' +
+          '--workspace <dir>, --disable <clip> --workspace <dir>, or --import-pack <dir> --into ' +
+          '<packsRoot>',
       );
     } catch (err) {
       return fail(

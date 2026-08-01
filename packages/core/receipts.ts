@@ -265,6 +265,32 @@ export async function setRigState(
   }, opts.now);
 }
 
+/**
+ * Record the clip bindings (P4-T2), as a journaled patch: `anim --enable` and
+ * `--disable` are decisions exactly like `rig --accept`, and one undo takes a
+ * binding change back. Replaced wholesale for the same reason RigState is —
+ * the caller merged deliberately; a second merge here would double the policy.
+ */
+export async function setAnimationSet(
+  workspace: string,
+  bindings: ClipBinding[],
+  opts: ReceiptOptions & { label: string },
+): Promise<CharacterManifest> {
+  return await commit(workspace, (manifest) => {
+    if (canonicalJson(manifest.animationSet ?? null) === canonicalJson(bindings)) {
+      throw new Error('setAnimationSet was given the bindings the character already has.');
+    }
+    return {
+      op: [{
+        op: manifest.animationSet === undefined ? 'add' : 'replace',
+        path: '/animationSet',
+        value: bindings,
+      }],
+      label: opts.label,
+    };
+  }, opts.now);
+}
+
 export interface IdentityFields {
   detailLayers?: DetailLayer[];
   attachments?: Attachment[];
