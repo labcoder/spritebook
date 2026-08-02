@@ -35,10 +35,13 @@ Deno.test('standard-30 holds the values the bake flags default to', () => {
     directions: 8,
     yawOffsetDeg: 0,
     pixelsPerMeter: 32,
-    // 96, not 64, since D-032 — 64 was sized for an idle pose and a real clip
-    // set needs 85 x 73 px (measured, tools/proofs/framing.ts)
-    cellPx: { w: 96, h: 96 },
-    paddingPx: 6,
+    // Both measured, and they moved together because drawable width is
+    // cell - 2*padding. D-032: a real clip set needs 85 x 73 px, not the 37 x 63
+    // an idle needs. D-035: the ground band runs to +15 px below the pivot, and
+    // rows available there are paddingPx - 1, so 16 is what stops the clipping;
+    // 73 + 2*16 = 105 -> 112.
+    cellPx: { w: 112, h: 112 },
+    paddingPx: 16,
     pivot: 'feet-baseline',
     orthographic: true,
   });

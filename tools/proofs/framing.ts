@@ -191,7 +191,8 @@ try {
   );
 
   // ------------------------------------------------------------- the verdict
-  const pad = 6;
+  const { STANDARD_30 } = await import('../../packages/core/presets.ts');
+  const pad = STANDARD_30.paddingPx;
   const idle = perClip.get('idle-loop') ?? [];
   say('\n## what this means for the default preset');
   say(
@@ -202,10 +203,10 @@ try {
   say(
     `  the CLIP SET needs      ${left + right + 2 * pad} x ${above + below + 2 * pad} px`,
   );
-  const { STANDARD_30 } = await import('../../packages/core/presets.ts');
   say(
     `  the shipped default is  ${STANDARD_30.cellPx.w} x ${STANDARD_30.cellPx.h} px ` +
-      `(D-032 moved it from 64 on exactly this measurement)`,
+      `with ${pad} px padding (D-032 moved the cell off 64 on exactly this ` +
+      `measurement; D-035 moved the padding, and the cell again with it)`,
   );
   say('');
   if (below > pad) {
@@ -215,17 +216,24 @@ try {
         `  a GROUNDING fault. No cell size fixes it; the mesh has to be sat on Y=0.`,
     );
   } else {
-    say(`  BELOW the pivot: ${below} px — within the ${pad} px padding, so nothing is buried.`);
+    say(
+      `  BELOW the pivot: ${below} px of GROUND BAND, inside the ${pad} px padding ` +
+        `(${pad - 1} rows available) — nothing is buried and nothing is cut.`,
+    );
   }
   const widthNeed = left + right + 2 * pad;
-  if (widthNeed > 64) {
+  if (widthNeed > STANDARD_30.cellPx.w) {
     say(
       `\n  WIDTH: the clip set reaches ${left} px left and ${right} px right of the pivot, so it\n` +
-        `  needs ${widthNeed} px of cell against the default's 64. This is real overflow and a\n` +
-        `  cell/ppm decision, not a grounding one.`,
+        `  needs ${widthNeed} px of cell against the default's ${STANDARD_30.cellPx.w}. ` +
+        `That is real overflow: a cell/ppm decision, not a grounding one.`,
     );
   } else {
-    say(`\n  WIDTH: ${widthNeed} px needed, which the default 64 px cell already holds.`);
+    say(
+      `
+  WIDTH: ${widthNeed} px needed (silhouette ${left + right} + padding ${2 * pad}), ` +
+        `which the default ${STANDARD_30.cellPx.w} px cell holds.`,
+    );
   }
 } finally {
   await Deno.writeTextFile(

@@ -192,11 +192,11 @@ next bake records the live id, and the warning stops.
 | `--frames <n>`          | `6`           | frames of the built-in idle pose (positive integer)                 |
 | `--clips <spec>`        | (idle)        | `clip:frames[@speed][!hold][,...]` — bake real clips instead        |
 | `--pack <dir>`          | (bundled)     | animation pack the `--clips` ids resolve in                         |
-| `--cell <px\|WxH>`      | `96`          | output cell size; `96` is square, `96x128` is not                   |
+| `--cell <px\|WxH>`      | `112`         | output cell size; `112` is square, `96x128` is not                  |
 | `--ppm <n>`             | `32`          | pixels per meter (world scale)                                      |
 | `--colors <n>`          | style's own   | palette size, 2–256; refines the style rather than replacing it     |
 | `--elevation <deg>`     | `30`          | camera elevation angle                                              |
-| `--padding <px>`        | `6`           | transparent padding inside each cell                                |
+| `--padding <px>`        | `16`          | transparent padding inside each cell; also holds the ground band    |
 | `--cache <dir>`         | (off)         | input-hash frame cache; the bake always writes through when set     |
 | `--only-invalidated`    | (off)         | serve unchanged frames from the cache (all-or-none per bake)        |
 | `--mirror`              | (off)         | produce the back-half directions by flipping the front half         |
@@ -274,19 +274,35 @@ the rest bake, the failures are named in the summary, and the exit code is non-z
 characters (no mesh, unreadable manifest, a look naming a preset that does not exist) are skipped
 the same way rather than being silently dropped from the count.
 
-#### Why the default cell is 96 px
+#### Why the default cell is 112 px with 16 px of padding
 
-Sized for a CLIP SET, not for a standing idle. Measured on the bundled Track A body at 32 px/m: an
-idle pose needs a 37 x 63 px cell, while a six-clip set (idle, walk, jog, sprint, jab, death)
-reaches 37 px left and 36 px right of the pivot and needs **85 x 73** — a jab and a death reach
-sideways in a way a standing idle never does. 64 px fit the idle and clipped everything else, so the
-default moved to 96 (D-032). Drop back with `--cell 64` if you only ship idles; the choice is
-recorded on the character's look like any other.
+Both numbers are measured, and they answer two different problems.
 
-That is one body and one clip set — a sword-combo pack reaches further. If `bake` raises
-`silhouette-clipped` on the **left or right** edge, the character has outgrown the cell and `--cell`
-is the answer. On the **bottom** edge it is not a framing problem at all: the pivot row IS world
-Y=0, so silhouette below it is geometry under the floor, and no cell size helps.
+**The cell is sized for a CLIP SET, not a standing idle.** On the bundled Track A body at 32 px/m an
+idle pose needs 37 x 63 px, while a six-clip set (idle, walk, jog, sprint, jab, death) reaches 37 px
+left and 36 px right of the pivot and needs **85 x 73** — a jab and a death reach sideways in a way
+a standing idle never does.
+
+**The padding holds the GROUND BAND.** A `feet-baseline` pivot pins world Y=0 at one point — the
+character's bounds centre — so at elevation the ground plane is not a screen row but a _band_: a
+contact point `d` metres nearer the camera lands `d*sin(elevation)*pixelsPerMeter` pixels **below**
+the pivot row, with every vertex still on or above the floor. The rows available down there are
+`padding - 1`, **always**, whatever the cell height, because the pivot row is `h - padding`. A
+bigger cell adds room above the character and none below it. Measured across the starter clip set
+the band runs to 15 px below the pivot on a death animation, so 16 px of padding is what stops the
+clipping.
+
+The two interact: drawable width is `cell - 2*padding`, so 16 px of padding needs at least
+`73 + 32 = 105` px of cell, rounded to 112.
+
+One clip sets the padding budget — the death, because a body lying down has a footprint metres deep.
+If you ship no deaths and no sword combos, `--padding 9 --cell 96` is measurably enough and saves a
+third of the atlas. Both are recorded on the character's look like any other choice.
+
+**Reading the flag.** `silhouette-clipped` on the **left or right** edge means the character outgrew
+the cell — `--cell` is the answer. On the **bottom** edge it is the ground band: raise `--padding`,
+lower the elevation, or lower `--ppm`. A bigger cell will not help. Only if the mesh itself is below
+Y=0 in its bind pose is the character genuinely ungrounded, and the flag says how to check.
 
 ### `spritebook export`
 

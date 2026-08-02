@@ -869,8 +869,10 @@ Deno.test('--cell takes WxH, because cellPx always had two numbers', () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
   const resolved = { model: 'm.glb', character: 'c', out: 'o' };
 
-  // the preset's own default, which D-032 moved from 64 to 96
-  assertEquals(bakeSpecFromFlags(base, resolved).camera.cellPx, { w: 96, h: 96 });
+  // the preset's own default: D-032 moved it 64 -> 96 for clip-set WIDTH, then
+  // D-035 moved it 96 -> 112 because padding 16 (the ground band) eats 32 px of
+  // drawable width and the clip set still needs 73
+  assertEquals(bakeSpecFromFlags(base, resolved).camera.cellPx, { w: 112, h: 112 });
   assertEquals(
     bakeSpecFromFlags([...base, '--cell', '128'], resolved).camera.cellPx,
     { w: 128, h: 128 },
@@ -886,10 +888,12 @@ Deno.test('--cell takes WxH, because cellPx always had two numbers', () => {
     { w: 96, h: 128 },
   );
 
-  // the pivot follows the taller cell, which is the point of asking for one
+  // the pivot follows the taller cell, which is the point of asking for one:
+  // --cell moves cellPx and leaves paddingPx alone, so the pivot row (h - pad)
+  // tracks the new height. D-035 moved the preset's padding 6 -> 16.
   assertEquals(
     bakeSpecFromFlags([...base, '--cell', '96x128'], resolved).camera.paddingPx,
-    6,
+    16,
   );
 
   for (const bad of ['64xx', 'x64', '64x', 'big', '64x0']) {

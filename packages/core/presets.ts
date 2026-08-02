@@ -37,26 +37,46 @@ import {
 /**
  * Shared by every detent — see the module note on why these are not per-preset.
  *
- * `cellPx` is 96, not 64, because of D-032: 64 was sized for an IDLE POSE and
- * SpriteBook's output is animated sheets. Measured on the Track A body at
- * ppm 32 across a six-clip set (`tools/proofs/framing.ts`): an idle needs
- * 37 x 63 px and fits 64 comfortably, while the clip set reaches 37 px left and
- * 36 px right of the pivot and needs **85 x 73** — so every animated character
- * clipped on the shipped default, which is exactly what the 100-character
- * pivot found on 100 of 100. 96 holds it with 11 px of width to spare.
+ * `cellPx` 112 and `paddingPx` 16 are both MEASURED, and they are two different
+ * problems that happen to meet in this object.
  *
- * The measurement is ONE body and ONE clip set; a sword-combo pack reaches
- * further and `--cell` stays the escape hatch. Raising the cell rather than
- * lowering `pixelsPerMeter` is deliberate: px/m is the world-locked ruler the
- * whole roster shares, and shrinking the character to fit the frame would trade
- * a framing bug for a detail one.
+ * WIDTH (D-032): 64 was sized for an IDLE POSE and SpriteBook's output is
+ * animated sheets. On the Track A body at ppm 32 across a six-clip set
+ * (`tools/proofs/framing.ts`) an idle needs 37 x 63 px, while the clip set
+ * reaches 37 px left and 36 px right of the pivot and needs **85 x 73** — a jab
+ * and a death reach sideways in a way a standing idle never does.
+ *
+ * PADDING (D-035): a `feet-baseline` pivot pins world Y=0 at ONE point, the
+ * bounds centre, so at elevation the ground plane projects as a BAND and a
+ * contact point d metres nearer the camera lands d·sin(el)·ppm px BELOW the
+ * pivot row. The rows available down there are `paddingPx - 1` — always,
+ * whatever the cell height, because the pivot row IS `h - paddingPx`. Measured
+ * over 368 frames with nothing cut (`tools/proofs/pivotoptions.ts`), the band
+ * runs -9..+15 px, so padding 16 is what takes genuine clipping to zero. At
+ * padding 6 63 of those 368 frames were LOSING PIXELS.
+ *
+ * The two interact, which is why both moved together: drawable width is
+ * `cell - 2*padding`, so padding 16 needs `cell >= 73 + 32 = 105`, rounded to
+ * 112. That leaves 80 px each way against 73 and 56 needed, at +36% atlas area
+ * against 96 — cheaper than the 128 that also works.
+ *
+ * One clip sets the whole padding budget: death01, because a body lying down
+ * has a footprint metres deep. Without it the band tops out at 8 px and padding
+ * 9 would do. Sizing the DEFAULT for it is deliberate — a starter pack whose
+ * own death animation clips is not a default anyone should meet — and `--cell`
+ * and `--padding` stay the escape hatches for anyone who ships neither deaths
+ * nor sword combos.
+ *
+ * Raising the cell rather than lowering `pixelsPerMeter` is also deliberate:
+ * px/m is the world-locked ruler the whole roster shares, and shrinking the
+ * character to fit the frame would trade a framing bug for a detail one.
  */
 const COMMON = {
   directions: 8,
   yawOffsetDeg: 0,
   pixelsPerMeter: 32,
-  cellPx: { w: 96, h: 96 },
-  paddingPx: 6,
+  cellPx: { w: 112, h: 112 },
+  paddingPx: 16,
   pivot: 'feet-baseline',
   orthographic: true,
 } as const;
