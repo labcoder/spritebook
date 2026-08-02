@@ -17,9 +17,13 @@
  *   left    how far left of the pivot                       -> cell width need
  *   right   how far right                                   -> cell width need
  *
- * `below` is the interesting one. With a `feet-baseline` pivot the pivot row IS
- * world Y=0, so any silhouette below it is geometry under the ground plane —
- * a grounding fault, not a framing one, and no cell size fixes it.
+ * DO NOT TRUST THE `below` COLUMN (D-033). It reports 4–5 px for every clip,
+ * including clips whose skinned mesh provably never leaves the floor —
+ * `tools/proofs/meshfloor.ts` measures the geometry directly and is the
+ * instrument to use for the bottom edge. The disagreement between the two is
+ * unexplained and is its own open question; the left/right columns are sound
+ * (D-032's wider cell removed exactly the overflow they predicted, on a
+ * hundred characters).
  *
  * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/framing.ts
  */

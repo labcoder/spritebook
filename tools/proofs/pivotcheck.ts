@@ -14,6 +14,13 @@
  * bind-pose idle stub (no clips, no retarget) so nothing but the camera solver
  * and the pivot are in the picture.
  *
+ * WHAT IT FOUND, and the caveat (D-033): the four bind-pose cases land at
+ * exactly +0 — the camera solver and `pivotFor` agree. The clip case reads +3,
+ * but `tools/proofs/meshfloor.ts` shows that clip's skinned mesh sitting at
+ * +0.37 px, ABOVE the floor. So the +3 is not a sink, and what it IS remains
+ * unexplained. Treat this script as evidence about the bind pose only until
+ * that is resolved.
+ *
  * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/pivotcheck.ts
  */
 import { decode as decodePng } from 'npm:fast-png@6.2.0';
