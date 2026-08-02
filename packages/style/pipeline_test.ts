@@ -315,17 +315,17 @@ Deno.test('silhouette-clipped fires when the character runs out of cell', async 
   }
 });
 
-Deno.test('the bottom edge is a grounding fault, and is not blamed on the camera', async () => {
-  // The P3 exit measurement hit this on all 48 frames and the flag sent the
-  // user to pixelsPerMeter. It was grounding: rigging had discarded the
-  // border's placement and left the body centred on the origin, 16 px of it
-  // below the pivot row at 32 px/m. Shrinking the camera would have stopped the
-  // clipping by making a half-buried character smaller.
+Deno.test('the bottom edge is the ground band, and says so (D-034)', async () => {
+  // This test used to assert the flag said "standing IN the floor". That claim
+  // was FALSE and is retracted: `camera.ts` pins world Y=0 at the bounds centre
+  // only, so at elevation the ground plane projects as a BAND and a contact
+  // point d metres nearer the camera lands d*sin(el)*ppm px below the pivot row
+  // with every vertex still above Y=0. Measured: 1 row at 15 deg, 3 at 30, 4 at
+  // 35.264, while the skinned mesh sat at +0.37 px throughout.
   //
-  // camera.ts pins world Y=0 to `cellPx.h - paddingPx` for a feet-baseline
-  // preset and the model bounds never enter that solve, so silhouette below the
-  // pivot row IS geometry under the floor. That inference is what the flag owes
-  // the user.
+  // What the flag owes the user on this edge is therefore the band arithmetic
+  // and the fact that a bigger cell CANNOT help (rows below the pivot are
+  // always paddingPx - 1), not an accusation about the mesh.
   const sx = 32;
   const below = await Deno.makeTempDir();
   const wide = await Deno.makeTempDir();
@@ -347,14 +347,28 @@ Deno.test('the bottom edge is a grounding fault, and is not blamed on the camera
       const b = (await styleFromAovs(src(below), cam, PIXEL, outB)).flags
         .find((f) => f.code === 'silhouette-clipped');
       assert(b, 'a body below the baseline still raises the flag');
-      assert(/rig --feet-ground/.test(b!.message), `it names the knob: ${b!.message}`);
       assert(
-        /standing IN the floor/.test(b!.message),
-        `and says what is actually wrong: ${b!.message}`,
+        /GROUND BAND, not burial/.test(b!.message),
+        `it names the real mechanism: ${b!.message}`,
+      );
+      assert(
+        /A BIGGER CELL DOES NOT HELP/.test(b!.message),
+        `and the counter-intuitive part, which is the whole value: ${b!.message}`,
+      );
+      assert(
+        /paddingPx - 1/.test(b!.message),
+        `and why — rows below the pivot are paddingPx - 1: ${b!.message}`,
+      );
+      // grounding is still REACHABLE as a cause, but only as the thing to rule
+      // out by measuring, never as the assumed diagnosis
+      assert(/meshfloor\.ts/.test(b!.message), `it says how to check: ${b!.message}`);
+      assert(
+        /Only if the BIND POSE is below zero/.test(b!.message),
+        `and gates rig --feet-ground behind that check: ${b!.message}`,
       );
       assert(
         !/lower pixelsPerMeter or raise cellPx/.test(b!.message),
-        `and does NOT send the user to the camera: ${b!.message}`,
+        `and does NOT give the left/right remedy: ${b!.message}`,
       );
 
       // the other half: a genuine overflow keeps the camera advice, because

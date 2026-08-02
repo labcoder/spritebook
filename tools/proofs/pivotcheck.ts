@@ -14,12 +14,12 @@
  * bind-pose idle stub (no clips, no retarget) so nothing but the camera solver
  * and the pivot are in the picture.
  *
- * WHAT IT FOUND, and the caveat (D-033): the four bind-pose cases land at
- * exactly +0 — the camera solver and `pivotFor` agree. The clip case reads +3,
- * but `tools/proofs/meshfloor.ts` shows that clip's skinned mesh sitting at
- * +0.37 px, ABOVE the floor. So the +3 is not a sink, and what it IS remains
- * unexplained. Treat this script as evidence about the bind pose only until
- * that is resolved.
+ * WHAT IT FOUND (D-034): the four bind-pose cases land at exactly +0 — the
+ * camera solver and `pivotFor` agree. The clip case reads +3 and that is also
+ * correct: at 30° the ground plane projects as a BAND, and a foot ~0.19 m
+ * nearer the camera than the bounds centre lands 0.19·sin(30°)·32 ≈ 3 px below
+ * the pivot row with every vertex still above Y=0. The +3 is foreshortening,
+ * not a sink. An earlier note here called it unexplained; it is explained.
  *
  * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/pivotcheck.ts
  */

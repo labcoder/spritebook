@@ -191,9 +191,24 @@ function touchedEdges(rgba: Uint8Array, w: number, h: number): string[] {
  *
  * On a `feet-baseline` preset the camera pins world Y=0 onto the pivot row
  * (`cellPx.h - paddingPx`) BY CONSTRUCTION — camera.ts solves every direction
- * to hit that pixel, and the model bounds never enter the vertical solve. So
- * silhouette below the pivot row is geometry at or below the ground plane, and
- * the character is standing IN the floor rather than on it.
+ * to hit that pixel, and the model bounds never enter the vertical solve.
+ *
+ * It pins ONE POINT of the ground plane, though: the anchor is `[cx, 0, cz]`,
+ * the bounds centre. At any elevation above 0 the ground plane is not a screen
+ * ROW, it is a BAND — a ground point `d` metres nearer the camera than the
+ * anchor projects `d·sin(el)·ppm` pixels BELOW the pivot row. So silhouette
+ * below the pivot row is NOT evidence of geometry under the floor. Measured on
+ * the Track A body at 32 px/m: 1 row below at 15°, 3 at 30°, 4 at 35.264° —
+ * scaling as sin(el), with the skinned mesh sitting at +0.37 px ABOVE Y=0 the
+ * whole time (`tools/proofs/meshfloor.ts` measures the geometry; the elevation
+ * sweep is in D-034).
+ *
+ * The rows available below the pivot are `paddingPx - 1` — ALWAYS, because the
+ * pivot row is `h - paddingPx`. A taller cell adds room above the character and
+ * none below it. So a long footprint — a sprint stride, a body lying down —
+ * outgrows the budget no matter how big the cell is, and only `paddingPx`,
+ * `elevationDeg` or `pixelsPerMeter` move it. Measured over the six-clip set:
+ * padding 6 flags 69 frames, 8 flags 51, 10 flags 35.
  *
  * Shrinking the camera does not fix that. It was nonetheless what this flag
  * used to say, and it said it on the P3 exit measurement: all 48 frames hit the
@@ -221,18 +236,24 @@ function clippedFlag(
   const remedies: string[] = [];
   if (grounding) {
     const pivotRow = camera.cellPx.h - camera.paddingPx;
+    const rowsBelow = camera.paddingPx - 1;
+    const perMetre = Math.sin(camera.elevationDeg * Math.PI / 180) * camera.pixelsPerMeter;
+    const reach = perMetre > 0 ? (rowsBelow / perMetre) : Infinity;
     remedies.push(
-      `BOTTOM is not a framing problem on this preset: '${camera.id}' pins world Y=0 to row ` +
-        `${pivotRow} of a ${camera.cellPx.h} px cell, so silhouette below it is geometry under ` +
-        `the ground plane - the character is standing IN the floor. Lowering pixelsPerMeter ` +
-        `only makes a half-buried character smaller, and no cell size fixes it. MEASURE before ` +
-        `changing anything - \`deno run --allow-all tools/proofs/meshfloor.ts\` reports the ` +
-        `skinned mesh's minimum world Y per clip, which is the ground truth this flag is a ` +
-        `pixel-space shadow of. If the BIND POSE is below zero the mesh is ungrounded and ` +
-        `\`spritebook rig --feet-ground\` re-runs with the body sat on Y=0. If only some CLIPS ` +
-        `go below, look at which: a death or a slide compressing into the ground is the ` +
-        `animation doing its job, and the remedy is more padding, not a correction that would ` +
-        `make a body lying down hover.`,
+      `BOTTOM is the GROUND BAND, not burial. '${camera.id}' pins world Y=0 to row ${pivotRow} ` +
+        `of a ${camera.cellPx.h} px cell, but it pins ONE POINT of the ground plane - the ` +
+        `bounds centre. At ${camera.elevationDeg}deg elevation the ground plane is a band: a ` +
+        `contact point d metres nearer the camera lands d*${perMetre.toFixed(1)} px BELOW the ` +
+        `pivot row, so a stride or a body lying down legitimately reaches down there with every ` +
+        `vertex still at or above Y=0. This preset has ${rowsBelow} row(s) below the pivot ` +
+        `(paddingPx - 1), which holds a footprint reaching ${reach.toFixed(2)} m toward the ` +
+        `camera; past that it clips. A BIGGER CELL DOES NOT HELP - the pivot row is ` +
+        `h - paddingPx, so extra height goes above the character and none below. The knobs are ` +
+        `paddingPx (linear), a lower elevationDeg, or fewer pixelsPerMeter. Before assuming the ` +
+        `mesh is buried, measure it: \`deno run --allow-all tools/proofs/meshfloor.ts\` reports ` +
+        `the skinned mesh's minimum world Y per clip. Only if the BIND POSE is below zero is ` +
+        `the mesh actually ungrounded, and only then does \`spritebook rig --feet-ground\` ` +
+        `apply.`,
     );
   }
   if (overflow) {

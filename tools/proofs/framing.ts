@@ -17,13 +17,13 @@
  *   left    how far left of the pivot                       -> cell width need
  *   right   how far right                                   -> cell width need
  *
- * DO NOT TRUST THE `below` COLUMN (D-033). It reports 4–5 px for every clip,
- * including clips whose skinned mesh provably never leaves the floor —
- * `tools/proofs/meshfloor.ts` measures the geometry directly and is the
- * instrument to use for the bottom edge. The disagreement between the two is
- * unexplained and is its own open question; the left/right columns are sound
- * (D-032's wider cell removed exactly the overflow they predicted, on a
- * hundred characters).
+ * `below` is the GROUND BAND, not burial (D-034). At elevation the pivot pins
+ * world Y=0 at ONE point — the bounds centre — so a contact point d metres
+ * nearer the camera lands d·sin(el)·ppm pixels lower. The column is measuring
+ * that correctly; an earlier caveat here called it untrustworthy and was wrong.
+ * Cross-check against `tools/proofs/meshfloor.ts`, which measures the geometry:
+ * `below` large with meshfloor ≥ 0 is foreshortening, `below` large with
+ * meshfloor < 0 is a genuinely ungrounded mesh.
  *
  * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/framing.ts
  */
@@ -202,7 +202,11 @@ try {
   say(
     `  the CLIP SET needs      ${left + right + 2 * pad} x ${above + below + 2 * pad} px`,
   );
-  say(`  the shipped default is  64 x 64 px`);
+  const { STANDARD_30 } = await import('../../packages/core/presets.ts');
+  say(
+    `  the shipped default is  ${STANDARD_30.cellPx.w} x ${STANDARD_30.cellPx.h} px ` +
+      `(D-032 moved it from 64 on exactly this measurement)`,
+  );
   say('');
   if (below > pad) {
     say(
