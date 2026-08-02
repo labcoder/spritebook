@@ -315,6 +315,53 @@ Deno.test('silhouette-clipped fires when the character runs out of cell', async 
   }
 });
 
+Deno.test('the flag reports HOW WIDE the contact is (D-035)', async () => {
+  // Contact means the padding budget is spent; it never means pixels were lost,
+  // and from the cell alone the two are indistinguishable. So the flag reports
+  // the WIDTH rather than thresholding on it — that number is what separates
+  // "the tip of the ground band grazed the last row" from "a body is being
+  // sliced", and it used to be computed and thrown away.
+  const sx = 32;
+  const wide = await Deno.makeTempDir();
+  const narrow = await Deno.makeTempDir();
+  try {
+    // `bottom: 0` means the shape runs all the way to the bottom border
+    await writeSyntheticAov(wide, sx, { top: 8, bottom: 0, left: 0, right: 0 });
+    await writeSyntheticAov(narrow, sx, { top: 8, bottom: 0, left: 12, right: 12 });
+    const src = (framesDir: string): AovSource => ({
+      framesDir,
+      directions: 1,
+      frames: 1,
+      width: sx,
+      height: sx,
+    });
+    const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 } };
+    const outW = await Deno.makeTempDir();
+    const outN = await Deno.makeTempDir();
+    try {
+      const w = (await styleFromAovs(src(wide), cam, PIXEL, outW)).flags
+        .find((f) => f.code === 'silhouette-clipped');
+      const n = (await styleFromAovs(src(narrow), cam, PIXEL, outN)).flags
+        .find((f) => f.code === 'silhouette-clipped');
+      assert(w && n, 'both shapes reach the bottom border');
+      const px = (m: string) => Number(/bottom (\d+)px/.exec(m)?.[1] ?? -1);
+      assert(px(w!.message) > 0, `the width is reported, not just the edge: ${w!.message}`);
+      assert(px(n!.message) > 0, `and for the narrow shape too: ${n!.message}`);
+      assert(
+        px(w!.message) > px(n!.message),
+        `a wider contact reports a bigger number: ${px(w!.message)} vs ${px(n!.message)}`,
+      );
+      assert(/at its widest/.test(w!.message), 'and says the number is a maximum, not a total');
+    } finally {
+      await Deno.remove(outW, { recursive: true });
+      await Deno.remove(outN, { recursive: true });
+    }
+  } finally {
+    await Deno.remove(wide, { recursive: true });
+    await Deno.remove(narrow, { recursive: true });
+  }
+});
+
 Deno.test('the bottom edge is the ground band, and says so (D-034)', async () => {
   // This test used to assert the flag said "standing IN the floor". That claim
   // was FALSE and is retracted: `camera.ts` pins world Y=0 at the bounds centre

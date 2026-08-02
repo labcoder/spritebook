@@ -160,7 +160,7 @@ function finishAlpha(rgba: Uint8Array, style: StylePreset, w: number, h: number)
  * pixelsPerMeter x height exceeds cellPx ships decapitated in every frame of
  * every direction of every clip, and the only signal is looking at the pixels.
  */
-function touchedEdges(rgba: Uint8Array, w: number, h: number): string[] {
+function touchedEdges(rgba: Uint8Array, w: number, h: number): Map<string, number> {
   let top = 0, bottom = 0, left = 0, right = 0;
   for (let x = 0; x < w; x++) {
     if (rgba[x * 4 + 3] !== 0) top++;
@@ -170,12 +170,17 @@ function touchedEdges(rgba: Uint8Array, w: number, h: number): string[] {
     if (rgba[y * w * 4 + 3] !== 0) left++;
     if (rgba[(y * w + (w - 1)) * 4 + 3] !== 0) right++;
   }
-  const hit: string[] = [];
-  if (top) hit.push(`top:${top}px`);
-  if (bottom) hit.push(`bottom:${bottom}px`);
-  if (left) hit.push(`left:${left}px`);
-  if (right) hit.push(`right:${right}px`);
+  const hit = new Map<string, number>();
+  if (top) hit.set('top', top);
+  if (bottom) hit.set('bottom', bottom);
+  if (left) hit.set('left', left);
+  if (right) hit.set('right', right);
   return hit;
+}
+
+/** Keep the WIDEST contact seen per edge — see `clippedFlag` for why it matters. */
+function mergeEdges(into: Map<string, number>, from: Map<string, number>): void {
+  for (const [edge, px] of from) into.set(edge, Math.max(into.get(edge) ?? 0, px));
 }
 
 /**
@@ -225,11 +230,19 @@ function touchedEdges(rgba: Uint8Array, w: number, h: number): string[] {
  */
 function clippedFlag(
   refs: QAFlag['frameRefs'],
-  edges: Set<string>,
+  edges: Map<string, number>,
   camera: CameraPreset,
 ): QAFlag | null {
   if (refs.length === 0) return null;
-  const sides = [...edges].sort();
+  const sides = [...edges.keys()].sort();
+  // The WIDEST contact on each edge, carried into the message. This number is
+  // the difference between "the tip of the ground band grazed the last row"
+  // and "a body is being sliced", and until D-035 it was computed and thrown
+  // away — the flag said `bottom` where it could have said `bottom 2px`. It is
+  // reported rather than thresholded on purpose: from the cell alone, contact
+  // means the budget is SPENT, never that pixels were lost, and a threshold
+  // would fake the second claim (D-034).
+  const widths = sides.map((e) => `${e} ${edges.get(e)}px`).join(', ');
   const grounding = sides.includes('bottom') && camera.pivot === 'feet-baseline';
   const overflow = sides.some((e) => e !== 'bottom') || !grounding;
 
@@ -271,7 +284,9 @@ function clippedFlag(
     sourceStage: 'look',
     frameRefs: refs.slice(0, 8),
     message: `the silhouette reaches the cell edge on ${refs.length} frame` +
-      `${refs.length === 1 ? '' : 's'} (${sides.join(', ')}). The padding budget is exhausted ` +
+      `${
+        refs.length === 1 ? '' : 's'
+      } (${widths} at its widest). The padding budget is exhausted ` +
       `there, so anything further out is cut. ${remedies.join(' ')}`,
   };
 }
@@ -354,7 +369,7 @@ export async function styleClipsFromAovs(
   const flickerFrames: Uint8Array[] = [];
 
   const clipped: QAFlag['frameRefs'] = [];
-  const clippedEdges = new Set<string>();
+  const clippedEdges = new Map<string, number>();
   for (const src of srcs) {
     const aovs = perClip.get(src.clipId)!;
     const clipDir = `${styledDir}/${src.clipId}`;
@@ -366,9 +381,9 @@ export async function styleClipsFromAovs(
         prev = labels;
         finishAlpha(rgba, style, w1, h1);
         const hitM = touchedEdges(rgba, w1, h1);
-        if (hitM.length > 0) {
+        if (hitM.size > 0) {
           clipped.push({ clipId: src.clipId, direction: d, frame: f });
-          for (const e of hitM) clippedEdges.add(e.split(':')[0]);
+          mergeEdges(clippedEdges, hitM);
         }
         if (src === srcs[0] && d === 0) flickerFrames.push(rgba.slice());
         await Deno.writeFile(
@@ -435,7 +450,7 @@ export async function styleFromAovs(
 
   const idleFrames: Uint8Array[] = []; // direction 0's styled frames, for flicker
   const clipped: QAFlag['frameRefs'] = [];
-  const clippedEdges = new Set<string>();
+  const clippedEdges = new Map<string, number>();
   for (let d = 0; d < src.directions; d++) {
     let prev: Int32Array | null = null;
     for (let f = 0; f < src.frames; f++) {
@@ -443,9 +458,9 @@ export async function styleFromAovs(
       prev = labels;
       finishAlpha(rgba, style, w1, h1);
       const hitS = touchedEdges(rgba, w1, h1);
-      if (hitS.length > 0) {
+      if (hitS.size > 0) {
         clipped.push({ clipId: 'idle', direction: d, frame: f });
-        for (const e of hitS) clippedEdges.add(e.split(':')[0]);
+        mergeEdges(clippedEdges, hitS);
       }
       if (d === 0) idleFrames.push(rgba.slice());
       await Deno.writeFile(
