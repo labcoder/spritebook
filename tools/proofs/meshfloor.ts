@@ -1,13 +1,12 @@
 /**
  * How far does the SKINNED MESH actually go below the ground plane?
  *
- * Ground truth for the `silhouette-clipped` flag's `bottom` edge, and the tool
- * that should have been written first. `tools/proofs/framing.ts` measures the
- * silhouette in PIXELS out of a baked atlas, which is the right instrument for
- * the left/right edges (they are a cell-size question) and the wrong one for
- * the bottom: its `below` column reads 4–5 px for every clip, including clips
- * whose geometry provably never leaves the floor, so something between the
- * mesh and that column is not what it looks like. Do not trust it for `bottom`.
+ * Ground truth for the `silhouette-clipped` flag's `bottom` edge. It answers a
+ * different question from `tools/proofs/framing.ts`, and the pair is what makes
+ * either readable: framing measures how far the silhouette reaches below the
+ * PIVOT ROW, which at elevation includes the ground band (D-034); this measures
+ * how far the GEOMETRY goes below Y=0. `below` large with this at >= 0 is
+ * foreshortening; `below` large with this < 0 is a genuinely ungrounded mesh.
  *
  * This measures the thing itself. It retargets each clip onto the target
  * skeleton exactly as the bake does, samples the same frame grid, runs the
