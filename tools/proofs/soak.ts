@@ -15,6 +15,13 @@
  *                JS-side measurement.
  *   handles      Windows handle count. A file-descriptor or texture-view leak
  *                shows here first and is the earliest warning of the other two.
+ *   freeMb       free space on the drive under test. NOT a leak in the same
+ *                sense — an unbounded cache or a temp directory that is never
+ *                swept is an ACCUMULATION failure, invisible to every series
+ *                above, and it does not show as a trend at all: it shows as a
+ *                cliff when the volume fills. A soak that runs a bake sixteen
+ *                times and does not watch the disk is not watching the thing
+ *                most likely to end the run.
  *
  * Output is NDJSON, one sample per line, so a run that is killed halfway is
  * still readable. `--report <file.ndjson>` summarises an existing run:
@@ -38,6 +45,8 @@ interface Sample {
   handles: number;
   procs: number;
   vramMb: number | null;
+  /** free space on the sampled drive, MB; null where it could not be read */
+  freeMb: number | null;
 }
 
 async function run(cmd: string[]): Promise<string | null> {
@@ -62,23 +71,30 @@ async function run(cmd: string[]): Promise<string | null> {
  */
 async function sampleProcesses(
   name: string,
-): Promise<{ rssMb: number; handles: number; procs: number }> {
+  drive: string,
+): Promise<{ rssMb: number; handles: number; procs: number; freeMb: number | null }> {
   const isWindows = Deno.build.os === 'windows';
   if (isWindows) {
+    // free space rides the SAME PowerShell call as the process table — one
+    // subprocess per sample, not two, because the sampler must stay cheap
+    // enough that it is not itself part of what is being measured
     const ps = await run([
       'powershell',
       '-NoProfile',
       '-NonInteractive',
       '-Command',
       `$p = Get-Process -Name '${name}' -ErrorAction SilentlyContinue; ` +
-      `if ($p) { '{0} {1} {2}' -f (($p | Measure-Object WorkingSet64 -Sum).Sum), ` +
-      `(($p | Measure-Object HandleCount -Sum).Sum), @($p).Count } else { '0 0 0' }`,
+      `$d = (Get-PSDrive '${drive}' -ErrorAction SilentlyContinue).Free; ` +
+      `if ($p) { '{0} {1} {2} {3}' -f (($p | Measure-Object WorkingSet64 -Sum).Sum), ` +
+      `(($p | Measure-Object HandleCount -Sum).Sum), @($p).Count, $d } ` +
+      `else { '0 0 0 {0}' -f $d }`,
     ]);
-    const [ws, handles, procs] = (ps ?? '0 0 0').trim().split(/\s+/).map(Number);
+    const [ws, handles, procs, free] = (ps ?? '0 0 0 0').trim().split(/\s+/).map(Number);
     return {
       rssMb: Math.round((ws ?? 0) / 1024 / 1024),
       handles: handles ?? 0,
       procs: procs ?? 0,
+      freeMb: Number.isFinite(free) && free > 0 ? Math.round(free / 1024 / 1024) : null,
     };
   }
   const out = await run(['ps', '-o', 'rss=,comm=']);
@@ -91,7 +107,15 @@ async function sampleProcesses(
       procs++;
     }
   }
-  return { rssMb: Math.round(rssKb / 1024), handles: 0, procs };
+  const df = await run(['df', '-Pk', '.']);
+  const line = (df ?? '').split(/\r?\n/)[1]?.trim().split(/\s+/);
+  const freeKb = line ? Number(line[3]) : NaN;
+  return {
+    rssMb: Math.round(rssKb / 1024),
+    handles: 0,
+    procs,
+    freeMb: Number.isFinite(freeKb) ? Math.round(freeKb / 1024) : null,
+  };
 }
 
 async function sampleVramMb(): Promise<number | null> {
@@ -139,6 +163,9 @@ function report(samples: Sample[]): string[] {
     ['rss', (s) => s.rssMb, 'MB'],
     ['handles', (s) => s.handles, ''],
     ['vram', (s) => s.vramMb, 'MB'],
+    // free space FALLS as the run writes, so a NEGATIVE slope here is expected
+    // and the number to read is how much is left, not the trend
+    ['freeMb', (s) => s.freeMb, 'MB'],
   ];
   for (const [name, pick, unit] of series) {
     const vals = samples.map(pick).filter((v): v is number => v !== null);
@@ -188,6 +215,7 @@ if (arg('report')) {
   const out = arg('out', 'soak.ndjson');
   const everyS = Number(arg('every', '15'));
   const name = arg('proc', 'deno');
+  const drive = arg('drive', 'C');
   const untilS = Number(arg('for', '0')); // 0 = until killed
   const started = performance.now();
   console.log(
@@ -200,7 +228,7 @@ if (arg('report')) {
   const samples: Sample[] = [];
   for (;;) {
     const elapsedS = (performance.now() - started) / 1000;
-    const [proc, vramMb] = await Promise.all([sampleProcesses(name), sampleVramMb()]);
+    const [proc, vramMb] = await Promise.all([sampleProcesses(name, drive), sampleVramMb()]);
     const s: Sample = { t: Math.round(Date.now() / 1000), elapsedS, ...proc, vramMb };
     samples.push(s);
     await file.write(enc.encode(JSON.stringify(s) + '\n'));

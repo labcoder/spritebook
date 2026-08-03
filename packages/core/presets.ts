@@ -57,15 +57,19 @@ import {
  *
  * The two interact, which is why both moved together: drawable width is
  * `cell - 2*padding`, so padding 16 needs `cell >= 73 + 32 = 105`, rounded to
- * 112. That leaves 80 px each way against 73 and 56 needed, at +36% atlas area
- * against 96 — cheaper than the 128 that also works.
+ * 112. That leaves 80 px each way against 73 and 56 needed, and costs +36% of
+ * atlas AREA against 96 but ~nothing on disk — measured at 0.02 MB/char,
+ * because the extra area is transparent padding and PNG compresses it away
+ * (`tools/proofs/deathcost.ts`). The real cost is wall clock: +34%.
  *
  * One clip sets the whole padding budget: death01, because a body lying down
- * has a footprint metres deep. Without it the band tops out at 8 px and padding
- * 9 would do. Sizing the DEFAULT for it is deliberate — a starter pack whose
- * own death animation clips is not a default anyone should meet — and `--cell`
- * and `--padding` stay the escape hatches for anyone who ships neither deaths
- * nor sword combos.
+ * has a footprint metres deep. Sizing the DEFAULT for it was measured, not
+ * assumed: 96/9 still flags 12 frames a character with the death REMOVED, and
+ * 96/9 with a death added clips 48 frames a character at 11 px of contact —
+ * genuinely cut, with no warning until someone looks. A default that is only
+ * correct until you use the starter pack's own death clip is a trap, and the
+ * thing it saves is 0.02 MB. `--cell` and `--padding` stay the escape hatches
+ * for anyone who ships neither deaths nor sword combos.
  *
  * Raising the cell rather than lowering `pixelsPerMeter` is also deliberate:
  * px/m is the world-locked ruler the whole roster shares, and shrinking the
