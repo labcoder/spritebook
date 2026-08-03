@@ -320,11 +320,21 @@ function phaseReport(all: Sample[], phases: Phase[]): string[] {
         `RSS ${rssDrift >= 0 ? '+' : ''}${rssDrift.toFixed(1)} MB/cycle · ` +
         `handles ${hndDrift >= 0 ? '+' : ''}${hndDrift.toFixed(1)}/cycle`,
     );
+    // A leak has a SIGN. Only a RISING floor is one; a falling floor is the
+    // allocator returning more than it did last cycle, which is the opposite
+    // finding and must not be reported with the same word. The first draft of
+    // this check compared magnitudes and called -79 MB/cycle "the leak
+    // signature", which would have condemned a healthy run.
+    const rising = rssDrift > 25 || hndDrift > 5;
+    const flat = Math.abs(rssDrift) <= 25 && Math.abs(hndDrift) <= 5;
     lines.push(
       `  ${
-        Math.abs(rssDrift) < 25 && Math.abs(hndDrift) < 5
+        rising
+          ? 'RISING: the floor a cycle settles to is climbing - this is the leak signature.'
+          : flat
           ? 'FLAT: each cycle returns to the same floor, so the peaks are working set, not leak.'
-          : 'DRIFTING: the floor a cycle settles to is moving — this is the leak signature.'
+          : 'FALLING: each cycle settles LOWER than the last. Not a leak; check the window ' +
+            'does not include process exit, which reads as a floor of near zero.'
       }`,
     );
   }
@@ -368,7 +378,12 @@ if (arg('report')) {
     console.log(
       `phases from ${phaseLog} (subject started ${offsetS.toFixed(0)}s into the sampler):`,
     );
-    for (const line of phaseReport(all, phases)) console.log(line);
+    // the WINDOWED samples, not `all` — the last phase has no end marker and
+    // runs to the end of the series, so an unwindowed table swallows the tail
+    // after the subject exited and reports its floor as a near-zero RSS. The
+    // offset above still comes from `all`, because it is about when the
+    // SAMPLER started, which `--from` does not move.
+    for (const line of phaseReport(samples, phases)) console.log(line);
   }
 } else {
   const out = arg('out', 'soak.ndjson');
