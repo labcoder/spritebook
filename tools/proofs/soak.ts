@@ -193,6 +193,144 @@ function report(samples: Sample[]): string[] {
   return lines;
 }
 
+interface Phase {
+  name: string;
+  fromS: number;
+  toS: number;
+}
+
+/**
+ * Recover the subject's phase boundaries from a `roster100.ts` log.
+ *
+ * The sampler is deliberately blind to what it watches — it polls the OS and
+ * knows nothing about bakes — so attributing a trend to a PHASE means aligning
+ * two clocks. The log prints `(M min in)` against its own start; the NDJSON
+ * counts from the sampler's. `offsetS` is the second measured against the
+ * first, and everything here is that one addition.
+ *
+ * The build phase is not printed and has to be inferred: pivot 1 starts at
+ * `M1` and the cold batch ran for `coldDur` before it, so whatever came before
+ * `M1 - coldDur` was the build. Inferring it matters because the build is a
+ * `deno check` — a different program with a different memory profile — and a
+ * slope fitted across that step describes the step, not a leak.
+ */
+function parsePhases(log: string, offsetS: number): Phase[] {
+  const at = (min: number) => min * 60 + offsetS;
+  const pivots = [...log.matchAll(/^## pivot (\d+)\/\d+ .*?\((-?[\d.]+) min in\)/gm)]
+    .map((m) => ({ n: Number(m[1]), startMin: Number(m[2]) }));
+  const coldDurS = Number(/^cold batch ([\d.]+)s/m.exec(log)?.[1] ?? NaN);
+  const phases: Phase[] = [];
+  if (pivots.length > 0 && Number.isFinite(coldDurS)) {
+    const coldStartMin = pivots[0]!.startMin - coldDurS / 60;
+    if (coldStartMin > 0) phases.push({ name: 'build', fromS: offsetS, toS: at(coldStartMin) });
+    phases.push({ name: 'cold bake', fromS: at(coldStartMin), toS: at(pivots[0]!.startMin) });
+  }
+  for (let i = 0; i < pivots.length; i++) {
+    const next = pivots[i + 1];
+    phases.push({
+      name: `pivot ${pivots[i]!.n}`,
+      fromS: at(pivots[i]!.startMin),
+      // the last phase runs to the end of the series; the caller clamps
+      toS: next ? at(next.startMin) : Number.MAX_SAFE_INTEGER,
+    });
+  }
+  return phases;
+}
+
+/**
+ * The per-phase table, and the number that actually answers "is it leaking".
+ *
+ * A least-squares slope over a whole soak is a WEAK test: it is dominated by
+ * where in a cycle the run happened to stop, so the same healthy run reads
+ * +58 MB/h or -25 MB/h depending on the last few samples. The leak-sensitive
+ * measure is the FLOOR — the minimum a phase settles back to once its
+ * allocations are returned. A process that leaks cannot return to its previous
+ * floor; a process that merely works hard can, however high its peak went.
+ *
+ * So the headline here is the drift of per-cycle floors, in MB per cycle, and
+ * the peaks are reported beside them only to show the working set the floors
+ * are being recovered from.
+ */
+function phaseReport(all: Sample[], phases: Phase[]): string[] {
+  const lines: string[] = [];
+  lines.push('  phase        window (h)      samples   RSS floor/peak    handles floor/peak');
+  const floors: { name: string; rss: number; handles: number; samples: number }[] = [];
+  for (const p of phases) {
+    const inPhase = all.filter((s) => s.elapsedS >= p.fromS && s.elapsedS < p.toS);
+    if (inPhase.length === 0) continue;
+    const rss = inPhase.map((s) => s.rssMb);
+    const hnd = inPhase.map((s) => s.handles);
+    const lo = Math.min(...rss), hi = Math.max(...rss);
+    const hLo = Math.min(...hnd), hHi = Math.max(...hnd);
+    lines.push(
+      `  ${p.name.padEnd(12)} ${(p.fromS / 3600).toFixed(2)}-${
+        (Math.min(p.toS, all.at(-1)!.elapsedS) / 3600).toFixed(2)
+      }`.padEnd(30) +
+        `${String(inPhase.length).padStart(6)}   ` +
+        `${String(lo).padStart(6)}/${String(hi).padEnd(6)}   ` +
+        `${String(hLo).padStart(6)}/${String(hHi).padEnd(6)}`,
+    );
+    if (p.name.startsWith('pivot')) {
+      floors.push({ name: p.name, rss: lo, handles: hLo, samples: inPhase.length });
+    }
+  }
+  // A PARTIAL phase has no floor. The minimum of thirteen samples taken while a
+  // cycle is still working is not the value that cycle settles to — it is just
+  // the smallest number seen so far, and it reads high. Including one costs
+  // nothing but the verdict: on the first run of this report a cycle that was
+  // 6% in turned a flat series into "+166 MB/cycle, DRIFTING".
+  //
+  // So a cycle contributes a floor only once it has run at least half the
+  // median cycle's samples, and the ones dropped are NAMED rather than quietly
+  // skipped — a bisect that silently ignores cycles is how a real leak hides.
+  const lengths = floors.map((f) => f.samples).sort((a, b) => a - b);
+  const median = lengths[Math.floor(lengths.length / 2)] ?? 0;
+  const partial = floors.filter((f) => f.samples < median / 2);
+  const settled = floors.filter((f) => f.samples >= median / 2);
+  if (partial.length > 0) {
+    lines.push('');
+    lines.push(
+      `  excluded from the drift: ${
+        partial.map((f) => `${f.name} (${f.samples} samples)`).join(', ')
+      } - still running, so its minimum is not a floor`,
+    );
+  }
+  floors.length = 0;
+  floors.push(...settled);
+  if (floors.length >= 3) {
+    // regress the floors against cycle INDEX, not time: cycles are the unit a
+    // leak would repeat over, and they are near enough equal length that the
+    // two agree — but the index is what a reader can act on ("per cycle").
+    const drift = (pick: (f: typeof floors[number]) => number) => {
+      const n = floors.length;
+      const mx = (n - 1) / 2;
+      const my = floors.reduce((a, f) => a + pick(f), 0) / n;
+      let num = 0, den = 0;
+      floors.forEach((f, i) => {
+        num += (i - mx) * (pick(f) - my);
+        den += (i - mx) ** 2;
+      });
+      return den === 0 ? 0 : num / den;
+    };
+    const rssDrift = drift((f) => f.rss);
+    const hndDrift = drift((f) => f.handles);
+    lines.push('');
+    lines.push(
+      `  floor drift over ${floors.length} cycles: ` +
+        `RSS ${rssDrift >= 0 ? '+' : ''}${rssDrift.toFixed(1)} MB/cycle · ` +
+        `handles ${hndDrift >= 0 ? '+' : ''}${hndDrift.toFixed(1)}/cycle`,
+    );
+    lines.push(
+      `  ${
+        Math.abs(rssDrift) < 25 && Math.abs(hndDrift) < 5
+          ? 'FLAT: each cycle returns to the same floor, so the peaks are working set, not leak.'
+          : 'DRIFTING: the floor a cycle settles to is moving — this is the leak signature.'
+      }`,
+    );
+  }
+  return lines;
+}
+
 if (arg('report')) {
   const text = await Deno.readTextFile(arg('report'));
   const all = text.split('\n').filter(Boolean).map((l) => JSON.parse(l) as Sample);
@@ -211,6 +349,27 @@ if (arg('report')) {
     );
   }
   for (const line of report(samples)) console.log(line);
+
+  // `--phases <roster.log>` attributes the trend to a phase. The offset
+  // between the two clocks defaults to the log file's creation time measured
+  // against the first sample, which is right whenever the sampler was started
+  // first (the documented order); `--phase-offset` overrides it for a log
+  // copied off the machine, where birth time means nothing.
+  const phaseLog = arg('phases');
+  if (phaseLog) {
+    const log = await Deno.readTextFile(phaseLog);
+    let offsetS = Number(arg('phase-offset', 'NaN'));
+    if (!Number.isFinite(offsetS)) {
+      const birth = (await Deno.stat(phaseLog)).birthtime;
+      offsetS = birth ? birth.getTime() / 1000 - all[0]!.t + all[0]!.elapsedS : 0;
+    }
+    const phases = parsePhases(log, offsetS);
+    console.log('');
+    console.log(
+      `phases from ${phaseLog} (subject started ${offsetS.toFixed(0)}s into the sampler):`,
+    );
+    for (const line of phaseReport(all, phases)) console.log(line);
+  }
 } else {
   const out = arg('out', 'soak.ndjson');
   const everyS = Number(arg('every', '15'));
