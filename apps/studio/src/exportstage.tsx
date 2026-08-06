@@ -9,6 +9,7 @@ import { summarize } from './bakeprogress';
 import { t } from './i18n';
 import { CliTwin } from './gen';
 import { exportArgs } from './args';
+import { useLandFocus } from './focus';
 
 /** core's ExportTargetIdSchema, in its own order. */
 const TARGETS = ['godot', 'aseprite', 'texturepacker', 'strips'] as const;
@@ -40,6 +41,11 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
   const [artifacts, setArtifacts] = useState<string[]>([]);
   const [frames, setFrames] = useState<number | null>(null);
 
+  // a finished export mounts the Done section while focus sits on the Export
+  // button — land it on Open folder, the verb that matters once files exist;
+  // artifacts resets to [] at run start, so this only rises when a run lands
+  useLandFocus(artifacts.length > 0, '.openfolder');
+
   useEffect(() => {
     let live = true;
     bridge.readBakeAtlas(dir, 'lit').then((a) => {
@@ -60,6 +66,7 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
   const args = exportArgs(bakeDir, outDir, selected);
 
   const runExport = useCallback(async () => {
+    if (running) return; // the button stays focusable while running (aria-busy)
     setRunning(true);
     setFailed(false);
     setArtifacts([]);
@@ -74,7 +81,7 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
     setArtifacts(written);
     if (r.exitCode === 0) onChanged();
     else setFailed(true);
-  }, [bridge, args, onChanged]);
+  }, [bridge, args, onChanged, running]);
 
   const toggle = (id: string) =>
     setSelected((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
@@ -117,17 +124,22 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
 
       <section className='gensec'>
         <div className='genrow'>
+          {
+            /* disabled only for the INPUT blockers — disabling while running
+              drops keyboard focus to <body> (walkthrough finding) */
+          }
           <button
             type='button'
             className='btn primary'
-            disabled={running || bakeId === null || selected.length === 0}
+            disabled={bakeId === null || selected.length === 0}
+            aria-busy={running}
             onClick={runExport}
           >
             {running ? t('Exporting…') : t('Export selected')}
           </button>
           {selected.length === 0 && <span className='inote'>{t('pick at least one target')}</span>}
           {failed && (
-            <span className='mv-exit mono'>
+            <span className='mv-exit mono' role='status'>
               {t('failed — the log drawer has the verbatim reason')}
             </span>
           )}
@@ -148,7 +160,7 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
             </span>
             <button
               type='button'
-              className='btn mbtn'
+              className='btn mbtn openfolder'
               onClick={() => bridge.openFolder(outDir)}
             >
               {t('Open folder')}

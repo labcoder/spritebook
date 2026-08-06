@@ -125,6 +125,18 @@ export default function App() {
     }
     setOpenDirs((cur) => (cur.includes(created.raw.dir) ? cur : [...cur, created.raw.dir]));
     setActiveTab(created.raw.dir);
+    // the Generate form the user was focused in unmounts on this navigation;
+    // land keyboard focus on the new character's tab so the journey continues
+    // from something real (walkthrough finding). Iterate rather than build a
+    // selector: the dir is a Windows path and backslashes are CSS escapes.
+    requestAnimationFrame(() => {
+      for (const el of document.querySelectorAll<HTMLElement>('[data-tabid]')) {
+        if (el.dataset.tabid === created.raw.dir) {
+          el.focus();
+          break;
+        }
+      }
+    });
   }, [load]);
 
   // undo/redo act on the ACTIVE character's manifest through the core verbs
@@ -294,11 +306,17 @@ export default function App() {
           <button type='button' className='btn' onClick={load}>
             {t('Load')}
           </button>
+          {
+            /* aria-busy, not disabled: disabling the focused button drops
+              keyboard focus to <body> for the whole exam (walkthrough) */
+          }
           <button
             type='button'
             className='btn primary'
-            onClick={runExam}
-            disabled={exam.running}
+            onClick={() => {
+              if (!exam.running) runExam();
+            }}
+            aria-busy={exam.running}
           >
             {exam.running ? t('Examining…') : t('Run health exam')}
           </button>
@@ -345,7 +363,17 @@ export default function App() {
           )}
       </main>
 
-      <LogDrawer open={drawerOpen} bridge={bridge} />
+      <LogDrawer
+        open={drawerOpen}
+        bridge={bridge}
+        onRequestClose={() => {
+          setDrawerOpen(false);
+          // focus returns to the handle that owns the disclosure
+          requestAnimationFrame(() => {
+            document.querySelector<HTMLElement>('.loghandle')?.focus();
+          });
+        }}
+      />
       <StatusBar
         exam={exam}
         counts={{ characters: workspaces?.length ?? null, bridge: bridge.name }}

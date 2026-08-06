@@ -20,6 +20,7 @@ import type { StageKey } from './stages';
 import { t } from './i18n';
 import { CliTwin } from './gen';
 import { bakeArgs } from './args';
+import { useLandFocus } from './focus';
 
 const PASSES = ['lit', 'albedo', 'normal', 'depth', 'mask'] as const;
 
@@ -120,6 +121,13 @@ export function BakeStage({ bridge, dir, manifest, onChanged, onGoToStage }: {
   const [progress, setProgress] = useState<{ step: string; fraction: number } | null>(null);
   const [eta, setEta] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
+  // set only by a successful run — `summary !== null` alone also rises on a
+  // plain revisit, while the saved atlas loads
+  const [baked, setBaked] = useState(false);
+
+  // the first bake mounts the Review UI while focus sits on the Bake button —
+  // land it on the clip select, the control a keyboard user wants next
+  useLandFocus(baked && summary !== null, '#playclip');
 
   const loadBake = useCallback(async (wantPass: string) => {
     const a = await bridge.readBakeAtlas(dir, wantPass);
@@ -144,6 +152,7 @@ export function BakeStage({ bridge, dir, manifest, onChanged, onGoToStage }: {
   const args = bakeArgs(dir);
 
   const runBake = useCallback(async () => {
+    if (running) return; // the button stays focusable while running (aria-busy)
     setRunning(true);
     setFailed(false);
     setProgress(null);
@@ -159,9 +168,10 @@ export function BakeStage({ bridge, dir, manifest, onChanged, onGoToStage }: {
     setProgress(null);
     if (r.exitCode === 0) {
       await loadBake(pass);
+      setBaked(true);
       onChanged();
     } else setFailed(true);
-  }, [bridge, args, loadBake, pass, onChanged]);
+  }, [bridge, args, loadBake, pass, onChanged, running]);
 
   return (
     <div className='bakestage'>
@@ -171,7 +181,12 @@ export function BakeStage({ bridge, dir, manifest, onChanged, onGoToStage }: {
           <span className='ieyebrow mono'>05// BAKE</span>
         </div>
         <div className='genrow'>
-          <button type='button' className='btn primary' disabled={running} onClick={runBake}>
+          {
+            /* not disabled while running — disabling the focused button drops
+              keyboard focus to <body> for the whole run (walkthrough finding);
+              aria-busy + the handler guard cover it instead */
+          }
+          <button type='button' className='btn primary' aria-busy={running} onClick={runBake}>
             {running ? t('Baking…') : summary ? t('Re-bake') : t('Bake sheet')}
           </button>
           {running && progress && (
@@ -189,7 +204,7 @@ export function BakeStage({ bridge, dir, manifest, onChanged, onGoToStage }: {
             </span>
           )}
           {failed && (
-            <span className='mv-exit mono'>
+            <span className='mv-exit mono' role='status'>
               {t('failed — the log drawer has the verbatim reason')}
             </span>
           )}

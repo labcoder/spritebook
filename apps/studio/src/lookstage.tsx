@@ -21,6 +21,7 @@ import {
 } from './look';
 import { t } from './i18n';
 import { CliTwin } from './gen';
+import { useLandFocus, useRovingRadio } from './focus';
 
 interface BakeFrame {
   clipId: string;
@@ -116,6 +117,7 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
   const [draft, setDraft] = useState<LookDraft | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [applied, setApplied] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -182,18 +184,34 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
   const args = draft ? lookArgs(dir, draft, cameraBase, styleBase) : [];
 
   const apply = useCallback(async () => {
-    if (!draft) return;
+    if (busy || !draft) return; // the button stays focusable while recording (aria-busy)
     setBusy(true);
     setFailed(false);
     const r = await bridge.runCli([...args, '--json']);
     setBusy(false);
     if (r.exitCode === 0) {
+      setApplied(true);
       setDraft(null); // re-seed from the manifest the reload brings back
       onChanged();
     } else setFailed(true);
-  }, [bridge, args, draft, onChanged]);
+  }, [bridge, args, draft, onChanged, busy]);
 
   const set = (patch: Partial<LookDraft>) => setDraft((cur) => (cur ? { ...cur, ...patch } : cur));
+
+  // A successful record swaps the whole stage for the '…' placeholder and the
+  // focused button goes with it — when the reload re-seeds the draft, land
+  // the keyboard at the top of the stage (the walkthrough finding).
+  useLandFocus(applied && draft !== null && !dirty, '#lookcam');
+
+  // the radio-group keyboard contract the role announces
+  const styleRoving = useRovingRadio(
+    styles.length,
+    styles.findIndex((s) => s.id === draft?.stylePresetId),
+    (i) => {
+      const s = styles[i];
+      if (s) set({ stylePresetId: s.id, maxColors: s.maxColors, outlineWidthPx: s.outlineWidthPx });
+    },
+  );
 
   if (error) {
     return (
@@ -252,6 +270,22 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
             step={0.001}
             value={draft.elevationDeg}
             onChange={(e) => set({ elevationDeg: Number(e.target.value) })}
+            onKeyDown={(e) => {
+              // the native 0.001° step serves the pointer — end to end by
+              // arrow key is ~89000 presses, so keys move in half-degrees
+              const by = e.key === 'ArrowUp' || e.key === 'ArrowRight'
+                ? 0.5
+                : e.key === 'ArrowDown' || e.key === 'ArrowLeft'
+                ? -0.5
+                : e.key === 'PageUp'
+                ? 5
+                : e.key === 'PageDown'
+                ? -5
+                : null;
+              if (by === null) return;
+              e.preventDefault();
+              set({ elevationDeg: Math.min(89, Math.max(0, draft.elevationDeg + by)) });
+            }}
             className='lookslider'
           />
           <span className='mono lookval'>{draft.elevationDeg.toFixed(3)}°</span>
@@ -322,13 +356,14 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
           <span className='hud'>{t('Style')}</span>
         </div>
         <div className='backends' role='radiogroup' aria-label={t('Style')}>
-          {styles.map((s) => (
+          {styles.map((s, i) => (
             <button
               key={s.id}
               type='button'
               role='radio'
               aria-checked={draft.stylePresetId === s.id}
               className={`backend ${draft.stylePresetId === s.id ? 'on' : ''}`}
+              {...styleRoving(i)}
               onClick={() =>
                 set({
                   stylePresetId: s.id,
@@ -400,10 +435,16 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
           )}
         </div>
         <div className='genrow'>
+          {
+            /* !dirty is a real input blocker; busy is not — disabling the
+              focused button while the run flies drops keyboard focus to
+              <body> */
+          }
           <button
             type='button'
             className='btn primary'
-            disabled={!dirty || busy}
+            disabled={!dirty}
+            aria-busy={busy}
             onClick={apply}
           >
             {busy ? t('Recording…') : t('Record look')}
@@ -412,8 +453,15 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
             <button
               type='button'
               className='btn mbtn'
-              disabled={busy}
-              onClick={() => setDraft(recorded)}
+              onClick={() => {
+                if (busy) return; // the run in flight is recording this draft
+                setDraft(recorded);
+                // the reset clears `dirty`, which unmounts THIS button - land
+                // at the top of the stage rather than dropping to <body>
+                requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>('#lookcam')?.focus();
+                });
+              }}
             >
               {t('Reset to recorded')}
             </button>
@@ -421,7 +469,7 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
           {!dirty && <span className='inote'>{t('this is the recorded look')}</span>}
         </div>
         {failed && (
-          <span className='mv-exit mono'>
+          <span className='mv-exit mono' role='status'>
             {t('failed — the log drawer has the verbatim reason')}
           </span>
         )}

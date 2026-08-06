@@ -18,6 +18,7 @@ import { adjustArg, resolveOpDefaults, type SchemaField, schemaFields } from './
 import { t } from './i18n';
 import { genArgs, moreLikeArgs, pickArgs } from './args';
 import { Viewport } from './viewport/Viewport';
+import { useLandFocus, useRovingRadio } from './focus';
 
 /** slugProblem returns one of three known sentences — literal per branch so
  * the extractor sees every id (t(variable) is a refused callsite). */
@@ -155,7 +156,11 @@ export function CliTwin({ args }: { args: string[] }) {
   const line = `spritebook ${args.join(' ')}`;
   return (
     <div className='clitwin mono'>
-      <span className='clitwincmd' title={line} tabIndex={0} role='note' aria-label={t('CLI twin')}>
+      {
+        /* static text, NOT a tab stop: the walkthrough counted it as a dead
+          focus position before every Copy button on five surfaces */
+      }
+      <span className='clitwincmd' title={line} role='note' aria-label={t('CLI twin')}>
         $ {line}
       </span>
       <button
@@ -217,6 +222,18 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
 
   const model = models?.find((m) => m.id === modelId) ?? null;
   const version = model?.versions.find((v) => v.installed) ?? model?.versions[0] ?? null;
+  // the radio-group keyboard contract the role announces (walkthrough finding)
+  const backendRoving = useRovingRadio(
+    models?.length ?? 0,
+    models?.findIndex((m) => m.id === modelId) ?? -1,
+    (i) => {
+      const m = models?.[i];
+      if (m) {
+        setModelId(m.id);
+        setValues({});
+      }
+    },
+  );
   const resolved = useMemo(
     () => version ? resolveOpDefaults(version.defaults, version.operationDefaults, 'gen3d') : {},
     [version],
@@ -258,6 +275,7 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
   const ready = blocker === null && run?.running !== true;
 
   const generate = useCallback(async () => {
+    if (!ready) return; // the button stays focusable while running (aria-busy)
     setFailed(false);
     setRun({ running: true, lines: 0, last: t('starting…') });
     const r: CliRun = await bridge.runCli([...args, '--json'], (line) => {
@@ -275,7 +293,7 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
     setRun({ running: false, lines: r.lines.length, last: '' });
     if (r.exitCode === 0) onCreated(slug);
     else setFailed(true);
-  }, [bridge, args, slug, onCreated]);
+  }, [bridge, args, slug, onCreated, ready]);
 
   return (
     <div className='gennew'>
@@ -324,7 +342,7 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
         {catalogError && <div className='mdl-error mono'>{catalogError}</div>}
         {!models && !catalogError && <div className='inote'>…</div>}
         <div className='backends' role='radiogroup' aria-label={t('Backend')}>
-          {models?.map((m) => {
+          {models?.map((m, i) => {
             const v = m.versions.find((x) => x.installed) ?? m.versions[0];
             return (
               <button
@@ -333,6 +351,7 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
                 role='radio'
                 aria-checked={modelId === m.id}
                 className={`backend ${modelId === m.id ? 'on' : ''}`}
+                {...backendRoving(i)}
                 onClick={() => {
                   setModelId(m.id);
                   setValues({});
@@ -383,10 +402,17 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
       </section>
 
       <section className='gensec'>
+        {
+          /* disabled only for INPUT blockers. While the run is in flight the
+            button stays focusable with aria-busy - disabling the focused
+            element drops keyboard focus to <body> for the whole run, which
+            is the walkthrough's most-repeated finding */
+        }
         <button
           type='button'
           className='btn primary genbtn'
-          disabled={!ready}
+          disabled={blocker !== null}
+          aria-busy={run?.running === true}
           onClick={generate}
         >
           {run?.running ? t('Generating…') : t('Generate model')}
@@ -399,7 +425,7 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
           </span>
         )}
         {failed && (
-          <span className='mv-exit mono'>
+          <span className='mv-exit mono' role='status'>
             {t('failed — the log drawer has the verbatim reason')}
           </span>
         )}
@@ -444,21 +470,28 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
   const [busy, setBusy] = useState<string | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
 
+  // When the pick lands the checkpoint banner appears - put keyboard focus on
+  // it, because the button that was focused goes disabled and the user would
+  // otherwise be dropped to <body> (walkthrough finding).
+  useLandFocus(canonical, '.checkpoint');
+
   const pickFor = useCallback(
     (id: string) => pickArgs(dir, id, { reproject, colorMatch }),
     [dir, reproject, colorMatch],
   );
 
   const doPick = useCallback(async (id: string) => {
+    if (busy !== null) return;
     setBusy(id);
     setFailedId(null);
     const r = await bridge.runCli([...pickFor(id), '--json']);
     setBusy(null);
     if (r.exitCode === 0) onChanged();
     else setFailedId(id);
-  }, [bridge, pickFor, onChanged]);
+  }, [bridge, pickFor, onChanged, busy]);
 
   const moreLike = useCallback(async (id: string) => {
+    if (busy !== null) return;
     setBusy(id);
     setFailedId(null);
     // gen ALWAYS requires --character (the field test's first error)
@@ -466,7 +499,7 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
     setBusy(null);
     if (r.exitCode === 0) onChanged();
     else setFailedId(id);
-  }, [bridge, dir, characterId, onChanged]);
+  }, [bridge, dir, characterId, onChanged, busy]);
 
   return (
     <div className='cands'>
@@ -519,7 +552,8 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
               <button
                 type='button'
                 className='btn mbtn'
-                disabled={busy !== null}
+                disabled={busy !== null && busy !== r.id}
+                aria-busy={busy === r.id}
                 onClick={() => moreLike(r.id)}
                 title={t('re-runs this result’s recipe with a new seed')}
               >
@@ -534,14 +568,15 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
               <button
                 type='button'
                 className='btn mbtn primaryish'
-                disabled={busy !== null}
+                disabled={busy !== null && busy !== r.id}
+                aria-busy={busy === r.id}
                 onClick={() => doPick(r.id)}
               >
                 {t('Save as canonical mesh')}
               </button>
             </div>
             {failedId === r.id && (
-              <span className='mv-exit mono'>
+              <span className='mv-exit mono' role='status'>
                 {t('failed — the log drawer has the verbatim reason')}
               </span>
             )}

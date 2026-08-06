@@ -190,6 +190,13 @@ export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
               if (e.key === 'Delete' && tab.id !== 'gallery') {
                 e.preventDefault();
                 onClose(tab.id);
+                // the focused tab is about to unmount - without this the
+                // keyboard user falls to <body> and must re-tab from the top
+                // (walkthrough finding). The app falls back to the gallery
+                // tab, so focus follows the selection.
+                requestAnimationFrame(() => {
+                  listRef.current?.querySelector<HTMLElement>('[data-tabid="gallery"]')?.focus();
+                });
                 return;
               }
               onKeyDown(e);
@@ -200,6 +207,7 @@ export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
               <span
                 className='ctab-close'
                 title={`${t('Close')} (${t('Delete key')})`}
+                aria-hidden='true'
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose(tab.id);
@@ -241,7 +249,15 @@ const PASSES: Record<Filter, (s: Severity) => boolean> = {
   error: (s) => s === 'error',
 };
 
-export function LogDrawer({ open, bridge }: { open: boolean; bridge: StudioBridge }) {
+export function LogDrawer(
+  { open, bridge, onRequestClose }: {
+    open: boolean;
+    bridge: StudioBridge;
+    /** Escape inside the drawer closes it; the CALLER restores focus to the
+     * handle, because only it knows where the handle lives. */
+    onRequestClose?: () => void;
+  },
+) {
   const { lines } = useLog();
   const [filter, setFilter] = useState<Filter>('all');
   const [copied, setCopied] = useState(false);
@@ -262,6 +278,12 @@ export function LogDrawer({ open, bridge }: { open: boolean; bridge: StudioBridg
       log.append(jobId, line);
     }
     setReplayed('yes');
+    // the button disables itself on success and would drop keyboard focus to
+    // <body> (walkthrough finding) - the log content the user just replayed
+    // is the natural place to land
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('#log-drawer .logbody')?.focus();
+    });
   }, [bridge]);
   const endRef = useRef<HTMLDivElement>(null);
   const visible = lines.filter((l) => PASSES[filter](l.severity));
@@ -289,6 +311,12 @@ export function LogDrawer({ open, bridge }: { open: boolean; bridge: StudioBridg
       className='logdrawer'
       id='log-drawer'
       aria-label={t('Session log')}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && onRequestClose) {
+          e.stopPropagation();
+          onRequestClose();
+        }
+      }}
     >
       <div className='loghead'>
         <span className='hud'>{t('Session log')}</span>

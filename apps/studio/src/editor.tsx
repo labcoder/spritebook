@@ -46,20 +46,26 @@ function StageRail({ stages, active, onSelect }: {
   return (
     <nav className='rail' aria-label={t('Pipeline stages')}>
       {stages.map((s) => (
+        // aria-disabled, not disabled: a hard-disabled stage is skipped by
+        // Tab, so keyboard users could never reach the one place its lock
+        // REASON lives. Locked stages stay focusable, announce the reason,
+        // and simply do not switch (walkthrough finding).
         <button
           key={s.key}
           type='button'
           className={`stage st-${s.state} ${s.key === active ? 'on' : ''}`}
           aria-current={s.key === active ? 'step' : undefined}
-          disabled={s.state === 'locked'}
+          aria-disabled={s.state === 'locked'}
           title={s.note}
-          onClick={() => onSelect(s.key)}
+          onClick={() => {
+            if (s.state !== 'locked') onSelect(s.key);
+          }}
         >
           <span className='n mono'>{s.n}</span>
           <i className='hue' style={{ background: `var(${s.hueVar})` }} />
           <span className='nm hud'>{stageLabel(s.key)}</span>
           <i className={`dot ${s.state}`} aria-hidden='true' />
-          {s.state === 'locked' && <span className='sr-only'>{t('locked')}</span>}
+          {s.state === 'locked' && <span className='sr-only'>{t('locked')} — {s.note}</span>}
         </button>
       ))}
       <div className='railnote'>
@@ -299,6 +305,26 @@ export function Editor({ bridge, card, manifest, onChanged }: {
   // an active stage can become locked when switching characters — fall back
   const activeStage = stages.find((s) => s.key === active);
   const effective = activeStage && activeStage.state !== 'locked' ? active : 'gen';
+
+  // `effective` can change WITHOUT a user act: the pick unlocks Look and the
+  // default kicks in, or a character switch re-locks the active stage. Either
+  // way the whole panel — possibly holding focus — unmounts. If the switch
+  // orphaned focus onto <body>, land it on the new panel; if focus survived
+  // (a rail click keeps it on the rail), leave it alone (walkthrough finding).
+  const prevEffective = useRef(effective);
+  useEffect(() => {
+    if (prevEffective.current === effective) return;
+    prevEffective.current = effective;
+    const raf = requestAnimationFrame(() => {
+      if (document.activeElement && document.activeElement !== document.body) return;
+      const panel = document.querySelector<HTMLElement>('.center');
+      if (panel) {
+        panel.tabIndex = -1;
+        panel.focus();
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [effective]);
 
   return (
     <div className='editor'>

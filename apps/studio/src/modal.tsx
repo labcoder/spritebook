@@ -25,8 +25,14 @@ export function Modal(
     if (!open) return;
     restoreRef.current = document.activeElement as HTMLElement | null;
     const pop = popRef.current;
-    const target = (initialFocus ? pop?.querySelector<HTMLElement>(initialFocus) : null) ??
-      pop?.querySelector<HTMLElement>(FOCUSABLE);
+    // filter [disabled] exactly like the Tab trap below does: focus() on a
+    // disabled element silently no-ops and the aria-modal dialog opens with
+    // focus still BEHIND it (walkthrough audit)
+    const enabled = (el: HTMLElement | null | undefined) =>
+      el && !el.hasAttribute('disabled') ? el : null;
+    const target = enabled(initialFocus ? pop?.querySelector<HTMLElement>(initialFocus) : null) ??
+      [...(pop?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])]
+        .find((el) => !el.hasAttribute('disabled'));
     target?.focus();
     return () => restoreRef.current?.focus?.();
   }, [open, initialFocus]);

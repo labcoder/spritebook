@@ -12,6 +12,7 @@ import { CliTwin } from './gen';
 import { acceptRigArgs } from './args';
 import { Viewport } from './viewport/Viewport';
 import { editsFile, mergeEdits, mirrorPartner, type PendingEdit } from './viewport/picking';
+import { useLandFocus, useRovingRadio } from './focus';
 
 const BUNDLED_BODY = 'packages/rig/bodies/ubc-male';
 
@@ -25,6 +26,11 @@ function useRigRun(bridge: StudioBridge, onChanged: () => void) {
   const [run, setRun] = useState<RunState | null>(null);
   const [failed, setFailed] = useState(false);
   const exec = useCallback(async (args: string[]) => {
+    // every rig verb keeps its button focusable with aria-busy while the run
+    // is in flight - disabled would drop keyboard focus to <body>, the
+    // walkthrough's most-repeated finding - so a second press lands here and
+    // is a no-op (non-zero: nothing ran, callers must not treat it as success)
+    if (run?.running) return 1;
     setFailed(false);
     setRun({ running: true, lines: 0, last: t('starting…') });
     const r = await bridge.runCli([...args, '--json'], (line) => {
@@ -39,7 +45,7 @@ function useRigRun(bridge: StudioBridge, onChanged: () => void) {
     if (r.exitCode === 0) onChanged();
     else setFailed(true);
     return r.exitCode;
-  }, [bridge, onChanged]);
+  }, [bridge, onChanged, run]);
   return { run, failed, exec };
 }
 
@@ -53,6 +59,8 @@ function RunRig({ bridge, dir, onChanged }: {
   const [trackA, setTrackA] = useState(false);
   const [bodyDir, setBodyDir] = useState(BUNDLED_BODY);
   const { run, failed, exec } = useRigRun(bridge, onChanged);
+  // the radio-group keyboard contract the role announces
+  const trackRoving = useRovingRadio(2, trackA ? 1 : 0, (i) => setTrackA(i === 1));
   const args = rigRunArgs(dir, trackA ? { trackA: true, bodyDir } : {});
 
   return (
@@ -67,6 +75,7 @@ function RunRig({ bridge, dir, onChanged }: {
           role='radio'
           aria-checked={!trackA}
           className={`backend ${!trackA ? 'on' : ''}`}
+          {...trackRoving(0)}
           onClick={() => setTrackA(false)}
         >
           <span className='bname'>{t('Track B — predicted skeleton (UniRig)')}</span>
@@ -79,6 +88,7 @@ function RunRig({ bridge, dir, onChanged }: {
           role='radio'
           aria-checked={trackA}
           className={`backend ${trackA ? 'on' : ''}`}
+          {...trackRoving(1)}
           onClick={() => setTrackA(true)}
         >
           <span className='bname'>{t('Track A — canonical body fit')}</span>
@@ -103,7 +113,7 @@ function RunRig({ bridge, dir, onChanged }: {
         <button
           type='button'
           className='btn primary'
-          disabled={run?.running === true}
+          aria-busy={run?.running === true}
           onClick={() => exec(args)}
         >
           {run?.running ? t('Rigging…') : t('Run rig')}
@@ -114,7 +124,7 @@ function RunRig({ bridge, dir, onChanged }: {
           </span>
         )}
         {failed && (
-          <span className='mv-exit mono'>
+          <span className='mv-exit mono' role='status'>
             {t('failed — the log drawer has the verbatim reason')}
           </span>
         )}
@@ -188,6 +198,13 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
   const [selectedJoint, setSelectedJoint] = useState<string | null>(null);
   const { run, failed, exec } = useRigRun(bridge, onChanged);
 
+  // the first successful run unmounts RunRig under the focused button — land
+  // on the deform report that replaced it
+  useLandFocus(rig !== undefined, '.rigdeform');
+  // applying or discarding the pending edits unmounts the edits block under
+  // the focused button — land on the repair verbs, where the next act lives
+  useLandFocus(edits.length === 0, '.rigrerun');
+
   useEffect(() => {
     let live = true;
     setReport(null);
@@ -230,7 +247,8 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
         </div>
       )}
 
-      <section className='gensec'>
+      {/* .rigdeform is the landing target above — keep it stable */}
+      <section className='gensec rigdeform'>
         <div className='gensechead'>
           <span className='hud'>{t('Deform check')}</span>
           <span className='ieyebrow mono'>02// RIG</span>
@@ -255,7 +273,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           <button
             type='button'
             className='btn mbtn'
-            disabled={busy}
+            aria-busy={busy}
             onClick={() => exec(rigRunArgs(dir, { fixes: ['face-front'] }))}
           >
             {t('Face front')}
@@ -263,7 +281,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           <button
             type='button'
             className='btn mbtn'
-            disabled={busy}
+            aria-busy={busy}
             onClick={() => exec(rigRunArgs(dir, { fixes: ['feet-ground'] }))}
           >
             {t('Feet to ground')}
@@ -271,7 +289,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           <button
             type='button'
             className='btn mbtn'
-            disabled={busy}
+            aria-busy={busy}
             onClick={() => exec(rigRunArgs(dir, { fixes: ['center'] }))}
           >
             {t('Center')}
@@ -281,7 +299,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
               key={deg}
               type='button'
               className='btn mbtn'
-              disabled={busy}
+              aria-busy={busy}
               onClick={() => exec(rigRunArgs(dir, { fixes: [`rotate-${deg}`] }))}
             >
               {t('Rotate')} {deg}°
@@ -358,7 +376,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
               <button
                 type='button'
                 className='btn primary'
-                disabled={busy}
+                aria-busy={busy}
                 onClick={applyEdits}
               >
                 {busy ? t('Applying…') : t('Apply joint edits and re-rig')}
@@ -388,15 +406,15 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           <button
             type='button'
             className='btn mbtn'
-            disabled={busy}
+            aria-busy={busy}
             onClick={() => exec(rigRunArgs(dir, { autoHints: true }))}
           >
             {t('Auto-hint from this report and re-run')}
           </button>
           <button
             type='button'
-            className='btn mbtn'
-            disabled={busy}
+            className='btn mbtn rigrerun'
+            aria-busy={busy}
             onClick={() => exec(rigRunArgs(dir, {}))}
           >
             {t('Re-run rig')}
@@ -415,7 +433,8 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           <button
             type='button'
             className='btn mbtn'
-            disabled={busy || editsPath.length === 0}
+            disabled={editsPath.length === 0}
+            aria-busy={busy}
             onClick={() => exec(rigRunArgs(dir, { editsPath }))}
           >
             {t('Apply edits')}
@@ -423,7 +442,8 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           <button
             type='button'
             className='btn mbtn'
-            disabled={busy || editsPath.length === 0}
+            disabled={editsPath.length === 0}
+            aria-busy={busy}
             onClick={() => exec(rigRunArgs(dir, { editsPath, rerunWithHints: true }))}
           >
             {t('Re-run with edits as hints')}
@@ -435,7 +455,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           </span>
         )}
         {failed && (
-          <span className='mv-exit mono'>
+          <span className='mv-exit mono' role='status'>
             {t('failed — the log drawer has the verbatim reason')}
           </span>
         )}
@@ -456,7 +476,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           <button
             type='button'
             className={accepted ? 'btn mbtn' : 'btn primary'}
-            disabled={busy}
+            aria-busy={busy}
             onClick={() => exec(acceptArgs)}
           >
             {accepted ? t('Unaccept rig') : t('Accept rig')}
