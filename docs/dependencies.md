@@ -60,12 +60,40 @@ Autodesk License and Services Agreement (no redistribution). ✓ verified. Never
 
 ## Generation backends (catalog — installed on demand)
 
-| Backend       | License                   | Status                                               |
-| ------------- | ------------------------- | ---------------------------------------------------- |
-| Pixal3D       | MIT                       | ✓ · primary; pixel-aligned detail                    |
-| TRELLIS.2 4B  | MIT                       | ✓ · PBR; 16 GB VRAM                                  |
-| TripoSplat    | MIT                       | ✓ · gaussians; pairs with MIA                        |
-| Hunyuan3D 2.x | Tencent Community License | ✓ · **excludes EU/UK/KR** — territory gate mandatory |
+**Surveyed against four gates 2026-08-06 (D-036); transcript in
+[`docs/internal/proofs/backends.md`](internal/proofs/backends.md). The ✓ marks below were
+planning-era and described MODELS; the rows now describe STACKS, which is what ships.**
+
+| Backend          | License (model)           | Status                                                                                                                                                             |
+| ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **TRELLIS.2 4B** | MIT (weights)             | **⚠ shipping, stack encumbered** — see the CUDA-extension rows below. Measured **3.01 GiB** at shipped defaults, 16.53 GiB at `lowVram=false`                      |
+| Pixal3D          | MIT                       | ✗ **not viable**: requires the TRELLIS.2 base env (inherits everything below) **and** compiles NATTEN from source — wheels-only gate                               |
+| TripoSplat       | MIT                       | ✗ **not applicable**: emits gaussians, not a mesh (invariant 4)                                                                                                    |
+| Hunyuan3D 2.x    | Tencent Community License | ✗ **excludes EU/UK/KR** — territory carve-out; only ever a user-installed gated extra, never a default                                                             |
+| TripoSG          | MIT (repo only)           | ✗ `NOTICE` discloses HunyuanDiT + FlashVDM (Tencent community licences) and BRIA RMBG-1.4; shape-only                                                              |
+| Step1X-3D        | Apache-2.0                | ✗ source builds (`custom_rasterizer`, `differentiable_renderer`, PyTorch3D-from-git); Linux-only. **Best-licensed candidate — revisit if it ships Windows wheels** |
+| Direct3D-S2      | MIT                       | ✗ `torchsparse` builds from source; shape-only                                                                                                                     |
+| `fixture-gen`    | MIT (ours)                | ✓ weightless, CPU, all platforms — the reason macOS/win-arm64 degrade rather than break                                                                            |
+
+### TRELLIS.2 CUDA extension wheels (the runtime stack)
+
+Not bundled — `spikes/trellis2/wheels/*.whl` is gitignored, only the sha256 pins are committed and
+the user's machine fetches them, as with model weights. Licences below were read from each installed
+`dist-info/`, not from a project page.
+
+| Wheel                    | License                                                                                                           | Status                                                                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `nvdiffrast` 0.4.0       | **Nvidia Source Code License (1-Way Commercial)** — §3.3 non-commercial, _"research or evaluation purposes only"_ | **⚠ blocks commercial use.** On the happy path: `o_voxel.postprocess.to_glb` calls `dr.rasterize`/`dr.interpolate` for the texture bake |
+| `nvdiffrec_render` 0.0.0 | **NVIDIA Source Code License for nvdiffrec** — §3.3 same non-commercial limitation                                | **⚠ blocks commercial use**                                                                                                             |
+| `o_voxel` 0.0.1          | **none declared** (no LICENSE, no classifier) — defaults to all rights reserved                                   | **⚠ unlicensed**; the module our adapter imports directly                                                                               |
+| `cumesh` 1.0             | MIT                                                                                                               | ✓                                                                                                                                       |
+| `flex_gemm` 0.0.1        | MIT                                                                                                               | ✓                                                                                                                                       |
+| `utils3d`                | pinned to a git commit (no PyPI release)                                                                          | imports `nvdiffrast` in `torch/rasterization.py`                                                                                        |
+
+**Trap:** an MIT badge on a generative-3D repo describes the model, not the stack. Every candidate
+surveyed reaches NVIDIA's non-commercial rasterizer, because `nvdiffrast` is the differentiable
+rasterizer this whole field is built on. Check `NOTICE` and the installed `dist-info/`, not the
+README.
 
 ## Rigging
 
