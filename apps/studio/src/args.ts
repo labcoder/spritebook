@@ -54,6 +54,11 @@ export function animDisableArgs(workspace: string, clipIds: string[]): string[] 
   return ['anim', '--disable', clipIds.join(','), '--workspace', workspace];
 }
 
+/** D-038: core retargets the clip once and writes a small preview glb. */
+export function animPreviewArgs(workspace: string, clipId: string): string[] {
+  return ['anim', '--preview', clipId, '--workspace', workspace];
+}
+
 export function bakeArgs(workspace: string, opts: { onlyInvalidated?: boolean } = {}): string[] {
   const a = ['bake', '--workspace', workspace];
   if (opts.onlyInvalidated) a.push('--only-invalidated');

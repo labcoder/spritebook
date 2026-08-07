@@ -7,10 +7,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StudioBridge } from './bridge';
 import { t } from './i18n';
-import { CliTwin } from './gen';
+import { CliTwin, FailureNote, type JobFailure, lastFailure } from './gen';
 import { useLandFocus } from './focus';
 import { bindingSpec, framesMath } from './bindings';
-import { animDisableArgs, animEnableArgs } from './args';
+import { animDisableArgs, animEnableArgs, animPreviewArgs } from './args';
+import { Viewport } from './viewport/Viewport';
 
 interface ClipMeta {
   id: string;
@@ -80,6 +81,11 @@ export function AnimStage({ bridge, dir, manifest, onChanged }: {
   // the rows whose success should catch the keyboard (the useLandFocus calls)
   const [justEnabled, setJustEnabled] = useState<string | null>(null);
   const [recorded, setRecorded] = useState<string | null>(null);
+  // D-038: which clip's preview glb the canvas plays. The counter re-loads
+  // the SAME path after a re-run - core overwrites preview-<clip>.glb in
+  // place, so a path-keyed load would keep showing the previous retarget.
+  const [preview, setPreview] = useState<{ clipId: string; n: number } | null>(null);
+  const [previewFailure, setPreviewFailure] = useState<JobFailure | null>(null);
 
   const bound = useMemo(() => new Map(bindings.map((b) => [b.clipId, b])), [bindings]);
   const categories = useMemo(
@@ -153,200 +159,260 @@ export function AnimStage({ bridge, dir, manifest, onChanged }: {
     run(`enable:${clipId}`, animEnableArgs(dir, [bindingSpec({ clipId, ...d })]));
   };
 
+  // regenerate-when-you-look (D-038): every press re-runs the retarget in
+  // core; success hands the fresh glb to the canvas, failure names itself
+  const runPreview = useCallback(async (clipId: string) => {
+    if (busy !== null) return;
+    setBusy(`preview:${clipId}`);
+    setPreviewFailure(null);
+    const r = await bridge.runCli([...animPreviewArgs(dir, clipId), '--json']);
+    setBusy(null);
+    if (r.exitCode === 0) {
+      setPreview((cur) => ({ clipId, n: (cur?.n ?? 0) + 1 }));
+    } else {
+      setPreviewFailure(
+        lastFailure(r.lines) ?? { code: null, message: '' },
+      );
+    }
+  }, [bridge, dir, busy]);
+
   const math = framesMath(bindings, 8);
   const enabledTwin = bindings.filter((b) => b.enabled).map(bindingSpec).join(',');
 
   return (
-    <div className='animstage'>
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Enabled clips')}</span>
-          <span className='ieyebrow mono'>03// ANIM</span>
-        </div>
-        {bindings.length === 0
-          ? <div className='inote'>{t('nothing enabled — pick clips from the library below')}</div>
-          : (
-            <>
-              <div className='bindrows'>
-                {bindings.map((b) => {
-                  const d = draftFor(b.clipId);
-                  const dirty = dirtyFor(b);
-                  return (
-                    <div
-                      key={b.clipId}
-                      className={`bindrow ${b.enabled ? '' : 'off'}`}
-                      data-clip={b.clipId}
-                    >
-                      <span className='mono bindid'>{b.clipId}</span>
-                      <label className='bindnum'>
-                        {t('frames')}
-                        <input
-                          type='number'
-                          className='optnum mono bindframes'
-                          min={1}
-                          value={d.frames}
-                          aria-label={`${b.clipId} ${t('frames')}`}
-                          onChange={(e) =>
-                            editDraft(b.clipId, { frames: Number(e.target.value) || 1 })}
-                        />
-                      </label>
-                      <label className='bindnum'>
-                        {t('speed')}
-                        <input
-                          type='number'
-                          className='optnum mono'
-                          min={0.1}
-                          step={0.1}
-                          value={d.speed}
-                          aria-label={`${b.clipId} ${t('speed')}`}
-                          onChange={(e) =>
-                            editDraft(b.clipId, { speed: Number(e.target.value) || 1 })}
-                        />
-                      </label>
-                      <label className='bindhold'>
-                        <input
-                          type='checkbox'
-                          checked={d.holdLast}
-                          aria-label={`${b.clipId} ${t('hold last frame')}`}
-                          onChange={(e) => editDraft(b.clipId, { holdLast: e.target.checked })}
-                        />
-                        {t('hold last')}
-                      </label>
-                      {b.enabled
-                        ? (
-                          <span className='candacts'>
-                            {dirty && (
-                              /* disabled only blocks the rows that do NOT own
-                                 the run - the owning button keeps focus and
-                                 reports aria-busy instead */
+    <div className='animstage rigcols'>
+      <div className='rigmain'>
+        <section className='gensec'>
+          <div className='gensechead'>
+            <span className='hud'>{t('Enabled clips')}</span>
+            <span className='ieyebrow mono'>03// ANIM</span>
+          </div>
+          {bindings.length === 0
+            ? (
+              <div className='inote'>
+                {t('nothing enabled — pick clips from the library below')}
+              </div>
+            )
+            : (
+              <>
+                <div className='bindrows'>
+                  {bindings.map((b) => {
+                    const d = draftFor(b.clipId);
+                    const dirty = dirtyFor(b);
+                    return (
+                      <div
+                        key={b.clipId}
+                        className={`bindrow ${b.enabled ? '' : 'off'}`}
+                        data-clip={b.clipId}
+                      >
+                        <span className='mono bindid'>{b.clipId}</span>
+                        <label className='bindnum'>
+                          {t('frames')}
+                          <input
+                            type='number'
+                            className='optnum mono bindframes'
+                            min={1}
+                            value={d.frames}
+                            aria-label={`${b.clipId} ${t('frames')}`}
+                            onChange={(e) =>
+                              editDraft(b.clipId, { frames: Number(e.target.value) || 1 })}
+                          />
+                        </label>
+                        <label className='bindnum'>
+                          {t('speed')}
+                          <input
+                            type='number'
+                            className='optnum mono'
+                            min={0.1}
+                            step={0.1}
+                            value={d.speed}
+                            aria-label={`${b.clipId} ${t('speed')}`}
+                            onChange={(e) =>
+                              editDraft(b.clipId, { speed: Number(e.target.value) || 1 })}
+                          />
+                        </label>
+                        <label className='bindhold'>
+                          <input
+                            type='checkbox'
+                            checked={d.holdLast}
+                            aria-label={`${b.clipId} ${t('hold last frame')}`}
+                            onChange={(e) => editDraft(b.clipId, { holdLast: e.target.checked })}
+                          />
+                          {t('hold last')}
+                        </label>
+                        {b.enabled
+                          ? (
+                            <span className='candacts'>
                               <button
                                 type='button'
-                                className='btn mbtn primaryish'
+                                className='btn mbtn bindpreview'
+                                disabled={busy !== null && busy !== `preview:${b.clipId}`}
+                                aria-busy={busy === `preview:${b.clipId}`}
+                                onClick={() => runPreview(b.clipId)}
+                              >
+                                {t('Preview')}
+                              </button>
+                              {dirty && (
+                                /* disabled only blocks the rows that do NOT own
+                                 the run - the owning button keeps focus and
+                                 reports aria-busy instead */
+                                <button
+                                  type='button'
+                                  className='btn mbtn primaryish'
+                                  disabled={busy !== null && busy !== `enable:${b.clipId}`}
+                                  aria-busy={busy === `enable:${b.clipId}`}
+                                  onClick={() => {
+                                    setRecorded(b.clipId);
+                                    enable(b.clipId);
+                                  }}
+                                >
+                                  {t('Record change')}
+                                </button>
+                              )}
+                              <button
+                                type='button'
+                                className='btn mbtn binddisable'
+                                disabled={busy !== null && busy !== `disable:${b.clipId}`}
+                                aria-busy={busy === `disable:${b.clipId}`}
+                                onClick={() =>
+                                  run(`disable:${b.clipId}`, animDisableArgs(dir, [b.clipId]))}
+                              >
+                                {t('Disable')}
+                              </button>
+                            </span>
+                          )
+                          : (
+                            <span className='candacts'>
+                              <span className='mbadge'>{t('disabled')}</span>
+                              <button
+                                type='button'
+                                className='btn mbtn'
                                 disabled={busy !== null && busy !== `enable:${b.clipId}`}
                                 aria-busy={busy === `enable:${b.clipId}`}
                                 onClick={() => {
-                                  setRecorded(b.clipId);
+                                  // re-enabling swaps this button to Disable at
+                                  // the same child position, so React keeps the
+                                  // element and focus rides the swap - only the
+                                  // library path lands on the frames input
+                                  setJustEnabled(null);
                                   enable(b.clipId);
                                 }}
                               >
-                                {t('Record change')}
+                                {t('Re-enable')}
                               </button>
-                            )}
-                            <button
-                              type='button'
-                              className='btn mbtn binddisable'
-                              disabled={busy !== null && busy !== `disable:${b.clipId}`}
-                              aria-busy={busy === `disable:${b.clipId}`}
-                              onClick={() =>
-                                run(`disable:${b.clipId}`, animDisableArgs(dir, [b.clipId]))}
-                            >
-                              {t('Disable')}
-                            </button>
-                          </span>
-                        )
-                        : (
-                          <span className='candacts'>
-                            <span className='mbadge'>{t('disabled')}</span>
-                            <button
-                              type='button'
-                              className='btn mbtn'
-                              disabled={busy !== null && busy !== `enable:${b.clipId}`}
-                              aria-busy={busy === `enable:${b.clipId}`}
-                              onClick={() => {
-                                // re-enabling swaps this button to Disable at
-                                // the same child position, so React keeps the
-                                // element and focus rides the swap - only the
-                                // library path lands on the frames input
-                                setJustEnabled(null);
-                                enable(b.clipId);
-                              }}
-                            >
-                              {t('Re-enable')}
-                            </button>
-                          </span>
-                        )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className='framesmath mono' role='status'>
-                {math.clips} {t('clips')} × {math.directions} {t('directions')} × Ø
-                {math.meanFrames.toFixed(math.meanFrames % 1 === 0 ? 0 : 1)} {t('frames')} ={' '}
-                <b>{math.total}</b> {t('frames per bake pass')}
-              </div>
-            </>
+                            </span>
+                          )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className='framesmath mono' role='status'>
+                  {math.clips} {t('clips')} × {math.directions} {t('directions')} × Ø
+                  {math.meanFrames.toFixed(math.meanFrames % 1 === 0 ? 0 : 1)} {t('frames')} ={' '}
+                  <b>{math.total}</b> {t('frames per bake pass')}
+                </div>
+              </>
+            )}
+          {enabledTwin.length > 0 && <CliTwin args={animEnableArgs(dir, [enabledTwin])} />}
+          {failed && (
+            <span className='mv-exit mono' role='status'>
+              {t('failed — the log drawer has the verbatim reason')}
+            </span>
           )}
-        {enabledTwin.length > 0 && <CliTwin args={animEnableArgs(dir, [enabledTwin])} />}
-        {failed && (
-          <span className='mv-exit mono' role='status'>
-            {t('failed — the log drawer has the verbatim reason')}
-          </span>
-        )}
-      </section>
+        </section>
 
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Clip library')}</span>
-          {packId && <span className='mono dimtext'>{packId}</span>}
-          <span className='mono dimtext'>
-            {clips ? `${visible.length}/${clips.length}` : '…'}
-          </span>
-        </div>
-        {error && <div className='mdl-error mono'>{error}</div>}
-        <div className='genrow'>
-          <label htmlFor='clipsearch'>{t('Search')}</label>
-          <input
-            id='clipsearch'
-            className='rootinput'
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('name or tag…')}
-            spellCheck={false}
-          />
-          <label htmlFor='clipcat'>{t('Category')}</label>
-          <select
-            id='clipcat'
-            className='optnum mono'
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option value=''>{t('all')}</option>
-            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div className='cliplist'>
-          {visible.map((c) => (
-            <div key={c.id} className='cliprow'>
-              <span className='mono clipid'>{c.id}</span>
-              <span className='mbadge kind'>{c.category}</span>
-              <span className='mono clipmeta'>
-                {c.durationS.toFixed(1)}s{c.loop ? ` · ${t('loop')}` : ''}
-              </span>
-              <span className='cliptags mono' title={c.tags.join(', ')}>
-                {c.tags.slice(0, 4).join(' ')}
-              </span>
-              {bound.get(c.id)?.enabled === true
-                ? <span className='mbadge ok'>{t('enabled')}</span>
-                : (
-                  <button
-                    type='button'
-                    className='btn mbtn'
-                    disabled={busy !== null && busy !== `enable:${c.id}`}
-                    aria-busy={busy === `enable:${c.id}`}
-                    onClick={() => {
-                      // land on the binding row's frames input - the next
-                      // thing a keyboard user edits after enabling
-                      setJustEnabled(c.id);
-                      enable(c.id);
-                    }}
-                  >
-                    {t('Enable')}
-                  </button>
-                )}
-            </div>
-          ))}
-        </div>
-      </section>
+        <section className='gensec'>
+          <div className='gensechead'>
+            <span className='hud'>{t('Clip library')}</span>
+            {packId && <span className='mono dimtext'>{packId}</span>}
+            <span className='mono dimtext'>
+              {clips ? `${visible.length}/${clips.length}` : '…'}
+            </span>
+          </div>
+          {error && <div className='mdl-error mono'>{error}</div>}
+          <div className='genrow'>
+            <label htmlFor='clipsearch'>{t('Search')}</label>
+            <input
+              id='clipsearch'
+              className='rootinput'
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('name or tag…')}
+              spellCheck={false}
+            />
+            <label htmlFor='clipcat'>{t('Category')}</label>
+            <select
+              id='clipcat'
+              className='optnum mono'
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value=''>{t('all')}</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className='cliplist'>
+            {visible.map((c) => (
+              <div key={c.id} className='cliprow'>
+                <span className='mono clipid'>{c.id}</span>
+                <span className='mbadge kind'>{c.category}</span>
+                <span className='mono clipmeta'>
+                  {c.durationS.toFixed(1)}s{c.loop ? ` · ${t('loop')}` : ''}
+                </span>
+                <span className='cliptags mono' title={c.tags.join(', ')}>
+                  {c.tags.slice(0, 4).join(' ')}
+                </span>
+                {bound.get(c.id)?.enabled === true
+                  ? <span className='mbadge ok'>{t('enabled')}</span>
+                  : (
+                    <button
+                      type='button'
+                      className='btn mbtn'
+                      disabled={busy !== null && busy !== `enable:${c.id}`}
+                      aria-busy={busy === `enable:${c.id}`}
+                      onClick={() => {
+                        // land on the binding row's frames input - the next
+                        // thing a keyboard user edits after enabling
+                        setJustEnabled(c.id);
+                        enable(c.id);
+                      }}
+                    >
+                      {t('Enable')}
+                    </button>
+                  )}
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className='rigside'>
+        <section className='gensec'>
+          <div className='gensechead'>
+            <span className='hud'>{t('Motion preview')}</span>
+            <span className='inote'>
+              {t('core retargets the clip onto this character — the canvas only plays it')}
+            </span>
+          </div>
+          {preview !== null
+            ? (
+              <>
+                <Viewport
+                  bridge={bridge}
+                  meshPath={`${dir}/anim/preview-${preview.clipId}.glb`}
+                  contentKey={`${preview.clipId}:${preview.n}`}
+                />
+                <CliTwin args={animPreviewArgs(dir, preview.clipId)} />
+              </>
+            )
+            : (
+              <div className='inote'>
+                {t('press Preview on an enabled clip to see its motion here')}
+              </div>
+            )}
+          {previewFailure && <FailureNote failure={previewFailure} />}
+        </section>
+      </div>
     </div>
   );
 }

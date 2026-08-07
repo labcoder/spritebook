@@ -326,6 +326,13 @@ export const es: Record<string, string> = {
   'frame': 'fotograma',
   'Play': 'Reproducir',
   'Pause': 'Pausar',
+  'Preview': 'Vista previa',
+  'Motion preview': 'Vista previa del movimiento',
+  'Scrub the clip': 'Recorrer el clip',
+  'core retargets the clip onto this character — the canvas only plays it':
+    'core reorienta el clip a este personaje — el lienzo solo lo reproduce',
+  'press Preview on an enabled clip to see its motion here':
+    'pulsa Vista previa en un clip activado para ver su movimiento aquí',
   'fps': 'fps',
   'Pass': 'Pase',
   'nearest-neighbor · integer zoom · AOV pages share the lit layout':
