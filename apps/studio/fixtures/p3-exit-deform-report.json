@@ -1,0 +1,626 @@
+{
+  "schemaVersion": 2,
+  "at": "2026-08-07T04:20:10.167Z",
+  "poses": [
+    "bend+30deg",
+    "bend-30deg"
+  ],
+  "joints": [
+    {
+      "joint": "spine_01",
+      "influencedVertices": 39503,
+      "influencedEdges": 88867,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.04251362792063957,
+      "maxDisplacementM": 0.0841675245876194,
+      "maxEdgeStretch": 1.0000728583012934,
+      "flags": []
+    },
+    {
+      "joint": "spine_02",
+      "influencedVertices": 22393,
+      "influencedEdges": 49466,
+      "stretchedEdges": 278,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.01823950092374449,
+      "maxDisplacementM": 0.04742018884380238,
+      "maxEdgeStretch": 4.3239321513871625,
+      "flags": []
+    },
+    {
+      "joint": "spine_03",
+      "influencedVertices": 13244,
+      "influencedEdges": 29550,
+      "stretchedEdges": 200,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.012717544038821114,
+      "maxDisplacementM": 0.03988560775624907,
+      "maxEdgeStretch": 5.013771340760757,
+      "flags": []
+    },
+    {
+      "joint": "clavicle_l",
+      "influencedVertices": 25594,
+      "influencedEdges": 58669,
+      "stretchedEdges": 530,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.024484350319880766,
+      "maxDisplacementM": 0.05996306199062038,
+      "maxEdgeStretch": 7.4649799810697255,
+      "flags": []
+    },
+    {
+      "joint": "head",
+      "influencedVertices": 15892,
+      "influencedEdges": 35747,
+      "stretchedEdges": 157,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.027596586803486835,
+      "maxDisplacementM": 0.08139080936640257,
+      "maxEdgeStretch": 3.686010805466794,
+      "flags": []
+    },
+    {
+      "joint": "head_leaf",
+      "influencedVertices": 29500,
+      "influencedEdges": 66024,
+      "stretchedEdges": 32,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.043379256253088236,
+      "maxDisplacementM": 0.10091040591543461,
+      "maxEdgeStretch": 2.713277208008611,
+      "flags": []
+    },
+    {
+      "joint": "clavicle_r",
+      "influencedVertices": 8848,
+      "influencedEdges": 20140,
+      "stretchedEdges": 283,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.03023319309578427,
+      "maxDisplacementM": 0.07847447344685063,
+      "maxEdgeStretch": 7.55823922293452,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "upperarm_l",
+      "influencedVertices": 11801,
+      "influencedEdges": 25927,
+      "stretchedEdges": 33,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.03412582169415413,
+      "maxDisplacementM": 0.08725915105741106,
+      "maxEdgeStretch": 3.3081617646377763,
+      "flags": []
+    },
+    {
+      "joint": "lowerarm_l",
+      "influencedVertices": 4685,
+      "influencedEdges": 10375,
+      "stretchedEdges": 3,
+      "spannedComponents": 3,
+      "meanDisplacementM": 0.028775165945876518,
+      "maxDisplacementM": 0.07889363853836001,
+      "maxEdgeStretch": 2.6378120100884317,
+      "flags": []
+    },
+    {
+      "joint": "bone_9",
+      "influencedVertices": 1709,
+      "influencedEdges": 3940,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.014291116330594059,
+      "maxDisplacementM": 0.039300237382544394,
+      "maxEdgeStretch": 1.8388647472690343,
+      "flags": []
+    },
+    {
+      "joint": "bone_10",
+      "influencedVertices": 247,
+      "influencedEdges": 492,
+      "stretchedEdges": 20,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.006019396644544498,
+      "maxDisplacementM": 0.017742130385800227,
+      "maxEdgeStretch": 3.613298502025517,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "thumb_04_leaf_l",
+      "influencedVertices": 379,
+      "influencedEdges": 789,
+      "stretchedEdges": 2,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.007076502324718733,
+      "maxDisplacementM": 0.019316609473188216,
+      "maxEdgeStretch": 2.069966892677184,
+      "flags": []
+    },
+    {
+      "joint": "thumb_02_l",
+      "influencedVertices": 187,
+      "influencedEdges": 371,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.001795078526433659,
+      "maxDisplacementM": 0.0041861553096308075,
+      "maxEdgeStretch": 1.2706638623330566,
+      "flags": []
+    },
+    {
+      "joint": "thumb_03_l",
+      "influencedVertices": 229,
+      "influencedEdges": 442,
+      "stretchedEdges": 2,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.004992649666545981,
+      "maxDisplacementM": 0.017340683618866443,
+      "maxEdgeStretch": 2.4195360700518926,
+      "flags": []
+    },
+    {
+      "joint": "index_02_l",
+      "influencedVertices": 250,
+      "influencedEdges": 491,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0055971683720093006,
+      "maxDisplacementM": 0.015844986418094387,
+      "maxEdgeStretch": 1.939736524789469,
+      "flags": []
+    },
+    {
+      "joint": "index_01_l",
+      "influencedVertices": 110,
+      "influencedEdges": 214,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.003759554151656575,
+      "maxDisplacementM": 0.006817815246408926,
+      "maxEdgeStretch": 1.357959632356993,
+      "flags": []
+    },
+    {
+      "joint": "thumb_01_l",
+      "influencedVertices": 213,
+      "influencedEdges": 362,
+      "stretchedEdges": 5,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0031688698031501067,
+      "maxDisplacementM": 0.013141404724698868,
+      "maxEdgeStretch": 2.4195314474914786,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "middle_02_l",
+      "influencedVertices": 222,
+      "influencedEdges": 454,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.006032071808573897,
+      "maxDisplacementM": 0.017020359931017203,
+      "maxEdgeStretch": 1.7261976005352193,
+      "flags": []
+    },
+    {
+      "joint": "middle_01_l",
+      "influencedVertices": 103,
+      "influencedEdges": 208,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.002983811699698866,
+      "maxDisplacementM": 0.006120992766615679,
+      "maxEdgeStretch": 1.2607735693587436,
+      "flags": []
+    },
+    {
+      "joint": "pinky_03_l",
+      "influencedVertices": 119,
+      "influencedEdges": 198,
+      "stretchedEdges": 6,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.005158322959172209,
+      "maxDisplacementM": 0.015183254374566432,
+      "maxEdgeStretch": 2.7656217527167835,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "ring_02_l",
+      "influencedVertices": 275,
+      "influencedEdges": 536,
+      "stretchedEdges": 2,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.00521621601026314,
+      "maxDisplacementM": 0.01514482598478745,
+      "maxEdgeStretch": 2.2519735589432894,
+      "flags": []
+    },
+    {
+      "joint": "ring_01_l",
+      "influencedVertices": 80,
+      "influencedEdges": 156,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0030181852023698137,
+      "maxDisplacementM": 0.005105372979663076,
+      "maxEdgeStretch": 1.353840017577685,
+      "flags": []
+    },
+    {
+      "joint": "hand_l",
+      "influencedVertices": 14,
+      "influencedEdges": 9,
+      "stretchedEdges": 1,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.002577381874849428,
+      "maxDisplacementM": 0.006682782218616994,
+      "maxEdgeStretch": 2.9748276141955783,
+      "flags": []
+    },
+    {
+      "joint": "pinky_02_l",
+      "influencedVertices": 44,
+      "influencedEdges": 81,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0006163495096340243,
+      "maxDisplacementM": 0.001624738338448796,
+      "maxEdgeStretch": 1.4592525762352495,
+      "flags": []
+    },
+    {
+      "joint": "pinky_01_l",
+      "influencedVertices": 0,
+      "influencedEdges": 0,
+      "stretchedEdges": 0,
+      "spannedComponents": 0,
+      "meanDisplacementM": 0,
+      "maxDisplacementM": 0,
+      "maxEdgeStretch": 0,
+      "flags": [
+        "no-influence"
+      ]
+    },
+    {
+      "joint": "neck_01",
+      "influencedVertices": 6172,
+      "influencedEdges": 14050,
+      "stretchedEdges": 135,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.03829550678015445,
+      "maxDisplacementM": 0.08740569229490992,
+      "maxEdgeStretch": 4.055038752309276,
+      "flags": []
+    },
+    {
+      "joint": "upperarm_r",
+      "influencedVertices": 10255,
+      "influencedEdges": 22440,
+      "stretchedEdges": 23,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.03901134691417876,
+      "maxDisplacementM": 0.08909938848604888,
+      "maxEdgeStretch": 2.5517963010836904,
+      "flags": []
+    },
+    {
+      "joint": "lowerarm_r",
+      "influencedVertices": 3953,
+      "influencedEdges": 8849,
+      "stretchedEdges": 13,
+      "spannedComponents": 2,
+      "meanDisplacementM": 0.028277347377700955,
+      "maxDisplacementM": 0.07548373953140929,
+      "maxEdgeStretch": 3.3704370837100197,
+      "flags": []
+    },
+    {
+      "joint": "bone_28",
+      "influencedVertices": 1585,
+      "influencedEdges": 3656,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.019293131675685398,
+      "maxDisplacementM": 0.04271360457341768,
+      "maxEdgeStretch": 1.388465928318209,
+      "flags": []
+    },
+    {
+      "joint": "bone_29",
+      "influencedVertices": 212,
+      "influencedEdges": 413,
+      "stretchedEdges": 8,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.007955289634509444,
+      "maxDisplacementM": 0.01841965106960749,
+      "maxEdgeStretch": 3.0224204269326407,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "thumb_04_leaf_r",
+      "influencedVertices": 394,
+      "influencedEdges": 832,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.007725991812262006,
+      "maxDisplacementM": 0.02115622350874862,
+      "maxEdgeStretch": 1.5324423573328707,
+      "flags": []
+    },
+    {
+      "joint": "thumb_02_r",
+      "influencedVertices": 186,
+      "influencedEdges": 382,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0033793548247443056,
+      "maxDisplacementM": 0.009206186477307494,
+      "maxEdgeStretch": 1.4312657953150283,
+      "flags": []
+    },
+    {
+      "joint": "thumb_03_r",
+      "influencedVertices": 205,
+      "influencedEdges": 398,
+      "stretchedEdges": 1,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.00420014035267119,
+      "maxDisplacementM": 0.018819757099276416,
+      "maxEdgeStretch": 2.1343449346198837,
+      "flags": []
+    },
+    {
+      "joint": "index_02_r",
+      "influencedVertices": 279,
+      "influencedEdges": 574,
+      "stretchedEdges": 10,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.007519580514518589,
+      "maxDisplacementM": 0.018932460134701658,
+      "maxEdgeStretch": 3.588145779686131,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "index_01_r",
+      "influencedVertices": 132,
+      "influencedEdges": 265,
+      "stretchedEdges": 3,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.005505977390416681,
+      "maxDisplacementM": 0.0106979167079152,
+      "maxEdgeStretch": 2.197892799545922,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "thumb_01_r",
+      "influencedVertices": 158,
+      "influencedEdges": 238,
+      "stretchedEdges": 8,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0026946815581100608,
+      "maxDisplacementM": 0.01247745525692594,
+      "maxEdgeStretch": 3.479809487183381,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "middle_02_r",
+      "influencedVertices": 277,
+      "influencedEdges": 554,
+      "stretchedEdges": 20,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.004513186875660364,
+      "maxDisplacementM": 0.018194882213589815,
+      "maxEdgeStretch": 7.156404669742637,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "middle_01_r",
+      "influencedVertices": 29,
+      "influencedEdges": 39,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0003473809083900027,
+      "maxDisplacementM": 0.0008441837808113422,
+      "maxEdgeStretch": 1.0261382784812858,
+      "flags": []
+    },
+    {
+      "joint": "pinky_03_r",
+      "influencedVertices": 59,
+      "influencedEdges": 84,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.002899229606864837,
+      "maxDisplacementM": 0.009305377924811313,
+      "maxEdgeStretch": 1.7171414000438603,
+      "flags": []
+    },
+    {
+      "joint": "ring_02_r",
+      "influencedVertices": 223,
+      "influencedEdges": 419,
+      "stretchedEdges": 9,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0058689371474797535,
+      "maxDisplacementM": 0.015619783497729993,
+      "maxEdgeStretch": 2.87554406502587,
+      "flags": [
+        "excessive-stretch"
+      ]
+    },
+    {
+      "joint": "ring_01_r",
+      "influencedVertices": 173,
+      "influencedEdges": 317,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0030819676577447433,
+      "maxDisplacementM": 0.008169348330448759,
+      "maxEdgeStretch": 1.9960413175751257,
+      "flags": []
+    },
+    {
+      "joint": "hand_r",
+      "influencedVertices": 0,
+      "influencedEdges": 0,
+      "stretchedEdges": 0,
+      "spannedComponents": 0,
+      "meanDisplacementM": 0,
+      "maxDisplacementM": 0,
+      "maxEdgeStretch": 0,
+      "flags": [
+        "no-influence"
+      ]
+    },
+    {
+      "joint": "pinky_02_r",
+      "influencedVertices": 0,
+      "influencedEdges": 0,
+      "stretchedEdges": 0,
+      "spannedComponents": 0,
+      "meanDisplacementM": 0,
+      "maxDisplacementM": 0,
+      "maxEdgeStretch": 0,
+      "flags": [
+        "no-influence"
+      ]
+    },
+    {
+      "joint": "pinky_01_r",
+      "influencedVertices": 0,
+      "influencedEdges": 0,
+      "stretchedEdges": 0,
+      "spannedComponents": 0,
+      "meanDisplacementM": 0,
+      "maxDisplacementM": 0,
+      "maxEdgeStretch": 0,
+      "flags": [
+        "no-influence"
+      ]
+    },
+    {
+      "joint": "thigh_l",
+      "influencedVertices": 16467,
+      "influencedEdges": 38098,
+      "stretchedEdges": 298,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.030985004369746397,
+      "maxDisplacementM": 0.14763545677877782,
+      "maxEdgeStretch": 4.224666118182265,
+      "flags": []
+    },
+    {
+      "joint": "calf_l",
+      "influencedVertices": 8261,
+      "influencedEdges": 20032,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.06803483157072682,
+      "maxDisplacementM": 0.1273942141587565,
+      "maxEdgeStretch": 1.8794455859551882,
+      "flags": []
+    },
+    {
+      "joint": "foot_l",
+      "influencedVertices": 8372,
+      "influencedEdges": 20081,
+      "stretchedEdges": 8,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.02091352419835593,
+      "maxDisplacementM": 0.07064846202648387,
+      "maxEdgeStretch": 2.6376782550022777,
+      "flags": []
+    },
+    {
+      "joint": "ball_l",
+      "influencedVertices": 1489,
+      "influencedEdges": 3566,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0033259727043930274,
+      "maxDisplacementM": 0.010467623271372876,
+      "maxEdgeStretch": 1.3153775156638694,
+      "flags": []
+    },
+    {
+      "joint": "thigh_r",
+      "influencedVertices": 14396,
+      "influencedEdges": 33302,
+      "stretchedEdges": 265,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.032182889435122215,
+      "maxDisplacementM": 0.14686153208916175,
+      "maxEdgeStretch": 4.121019696273352,
+      "flags": []
+    },
+    {
+      "joint": "calf_r",
+      "influencedVertices": 8045,
+      "influencedEdges": 19711,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.0694330201777135,
+      "maxDisplacementM": 0.1310994534529592,
+      "maxEdgeStretch": 1.7753062366819297,
+      "flags": []
+    },
+    {
+      "joint": "foot_r",
+      "influencedVertices": 8254,
+      "influencedEdges": 19921,
+      "stretchedEdges": 9,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.01935555869088085,
+      "maxDisplacementM": 0.06824072968551004,
+      "maxEdgeStretch": 2.763913455281186,
+      "flags": []
+    },
+    {
+      "joint": "ball_r",
+      "influencedVertices": 1536,
+      "influencedEdges": 3710,
+      "stretchedEdges": 0,
+      "spannedComponents": 1,
+      "meanDisplacementM": 0.003431853468337879,
+      "maxDisplacementM": 0.011073906860342573,
+      "maxEdgeStretch": 1.2782046473363489,
+      "flags": []
+    }
+  ],
+  "flaggedJoints": [
+    "clavicle_r",
+    "bone_10",
+    "thumb_01_l",
+    "pinky_03_l",
+    "pinky_01_l",
+    "bone_29",
+    "index_02_r",
+    "index_01_r",
+    "thumb_01_r",
+    "middle_02_r",
+    "ring_02_r",
+    "hand_r",
+    "pinky_02_r",
+    "pinky_01_r"
+  ]
+}

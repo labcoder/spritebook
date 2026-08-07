@@ -1,0 +1,118 @@
+{
+  "animationSet": [
+    {
+      "clipId": "a-tpose-2",
+      "enabled": true,
+      "frames": 6,
+      "holdLast": false,
+      "packId": "ual",
+      "speed": 1
+    }
+  ],
+  "canonicalMesh": {
+    "colorMatched": true,
+    "gltfSha256": "219e666fab1535d5a3565eb04c23dc845c94657d8cf7a07d3447c8c72eafba0f",
+    "heightM": 1.003682,
+    "imageSha256": "dcdef23fe1b29f5e5ba1616860a5f661e781b4eb56b16e04c02ec43427a043f6",
+    "reprojected": true,
+    "texturedBy": "backend"
+  },
+  "createdAt": "2026-07-29T16:41:38.468Z",
+  "displayName": "bulma-fixed",
+  "generation": {
+    "pickedResultId": "r3",
+    "results": [
+      {
+        "backend": { "modelId": "trellis2-4b", "version": "af44b45f" },
+        "discarded": false,
+        "id": "r1",
+        "output": {
+          "gltfSha256": "b76650152d9397d6ba19d38284e545b678fdf5232022eab210cacc0a21d45052",
+          "kind": "mesh",
+          "textureRes": 2048,
+          "tris": 197908
+        },
+        "params": {
+          "guidanceStrength": 7.5,
+          "lowVram": true,
+          "pipelineType": "512",
+          "seed": 7,
+          "steps": 12,
+          "textureRetries": 2
+        },
+        "seed": 7,
+        "startedAt": "2026-07-29T16:41:38.336Z",
+        "wallTimeS": 124.446
+      },
+      {
+        "backend": { "modelId": "trellis2-4b", "version": "af44b45f" },
+        "discarded": false,
+        "id": "r2",
+        "output": {
+          "bodies": 1,
+          "gltfSha256": "64ec3af6772539044febf63fdce66776108005b03415c781157cadf40941c727",
+          "kind": "mesh",
+          "textureRes": 2048,
+          "tris": 199154
+        },
+        "params": {
+          "guidanceStrength": 7.5,
+          "lowVram": true,
+          "pipelineType": "512",
+          "seed": 7,
+          "steps": 12,
+          "textureGuidance": 3.5,
+          "textureGuidanceRescale": 0.2,
+          "textureRetries": 2
+        },
+        "seed": 7,
+        "startedAt": "2026-07-30T21:27:38.622Z",
+        "wallTimeS": 124.701
+      },
+      {
+        "backend": { "modelId": "trellis2-4b", "version": "af44b45f" },
+        "discarded": false,
+        "id": "r3",
+        "output": {
+          "bodies": 1,
+          "gltfSha256": "72f32d7e1525701fc9906615c549d0d88c8b4139ea03c446a3917c9c31b2746e",
+          "kind": "mesh",
+          "textureRes": 2048,
+          "tris": 190899
+        },
+        "params": {
+          "guidanceStrength": 7.5,
+          "lowVram": true,
+          "pipelineType": "512",
+          "seed": 8,
+          "steps": 12,
+          "textureGuidance": 3.5,
+          "textureGuidanceRescale": 0.2,
+          "textureRetries": 2
+        },
+        "seed": 9,
+        "startedAt": "2026-08-07T04:12:17.499Z",
+        "wallTimeS": 173.599
+      }
+    ]
+  },
+  "id": "bulma-fixed",
+  "lastBakeId": "704614bc",
+  "look": { "cameraPresetId": "standard-30", "stylePresetId": "pixel" },
+  "mirroring": { "enabled": false },
+  "rig": {
+    "accepted": true,
+    "backend": { "modelId": "unirig", "version": "36842e2b" },
+    "jointCount": 52,
+    "jointEdits": [],
+    "orientationFixes": ["center"],
+    "skeletonProfile": "generic",
+    "track": "B"
+  },
+  "schemaVersion": 3,
+  "source": {
+    "kind": "image",
+    "originalFilename": "bulma-front.png",
+    "sha256": "dcdef23fe1b29f5e5ba1616860a5f661e781b4eb56b16e04c02ec43427a043f6"
+  }
+}
