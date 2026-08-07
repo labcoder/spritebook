@@ -621,6 +621,7 @@ const VERB_FLAGS: Record<string, readonly string[]> = {
     'into',
     'enable',
     'disable',
+    'preview',
     'workspace',
   ],
   look: [
@@ -1455,6 +1456,86 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         if (json) jsonOut({ imported: pack.id, clips: pack.clips.length });
         else io.stdout(`imported pack "${pack.id}" (${pack.clips.length} clips) into ${into}`);
         return 0;
+      }
+
+      // --preview: the clip's motion BEFORE any bake (D-038) — the same five
+      // calls the bake makes when it emits its per-bake preview, so what this
+      // writes is exactly the motion a bake would render. Derived artifact:
+      // no manifest field, no cache, overwritten on every call.
+      const previewClip = flag(args, 'preview');
+      if (previewClip !== undefined) {
+        const workspace = flag(args, 'workspace');
+        if (!workspace || !previewClip) {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'bad-args',
+            '--preview wants a clip id and --workspace <dir>',
+          );
+        }
+        const modelPath = `${workspace}/canonical/model.glb`;
+        try {
+          await Deno.stat(modelPath);
+        } catch {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'no-canonical',
+            `no canonical mesh at "${modelPath}" - pick a result first`,
+          );
+        }
+        const { loadPackClip, loadSkeletonRestFromFile, retargetClip, UAL_HUMANOID } = await import(
+          '@spritebook/anim'
+        );
+        const { writePreviewGlb } = await import('@spritebook/anim');
+        const { BUNDLED_PACK } = await import('@spritebook/pack');
+        const packDir = flag(args, 'packs') ?? BUNDLED_PACK;
+        try {
+          const source = await loadPackClip(packDir, previewClip);
+          const sourceRest = await loadSkeletonRestFromFile(
+            `${packDir}/clips/${previewClip}.glb`,
+          );
+          const targetRest = await loadSkeletonRestFromFile(modelPath);
+          const { clip, report, stats } = retargetClip(
+            source,
+            sourceRest,
+            targetRest,
+            UAL_HUMANOID,
+          );
+          // the bake's own warnings, surfaced BEFORE a bake spends GPU time
+          const coreMissing = UAL_HUMANOID.core.filter((j) => !report.mapped.includes(j));
+          if (coreMissing.length) {
+            const msg = `clip "${previewClip}": ${coreMissing.length} core joints not driven ` +
+              `(${coreMissing.join(', ')}) - they hold the rest pose`;
+            emit({
+              t: 'warn',
+              jobId: 'anim' as JobEvent['jobId'],
+              at: new Date().toISOString(),
+              code: 'anim-unmapped-core',
+              message: msg,
+            }, `warn [anim-unmapped-core]: ${msg}`);
+          }
+          await Deno.mkdir(`${workspace}/anim`, { recursive: true });
+          const outPath = `${workspace}/anim/preview-${previewClip}.glb`;
+          await writePreviewGlb(modelPath, clip, outPath);
+          emit(
+            {
+              t: 'artifact',
+              jobId: 'anim' as JobEvent['jobId'],
+              at: new Date().toISOString(),
+              kind: 'anim-preview',
+              path: outPath,
+            },
+            `anim-preview: ${outPath} (foot contact err ${
+              (stats.footContactMaxErrM * 1000).toFixed(1)
+            }mm)`,
+          );
+          return 0;
+        } catch (err) {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'preview-failed',
+            err instanceof Error ? err.message : String(err),
+          );
+        }
       }
 
       // --enable / --disable: the BINDING half (P4-T2) — decisions recorded

@@ -1007,6 +1007,7 @@
       },
       "packages/cli": {
         "dependencies": [
+          "npm:@gltf-transform/core@4.4.1",
           "npm:fast-png@6.2.0"
         ]
       },
