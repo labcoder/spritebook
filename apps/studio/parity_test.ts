@@ -18,6 +18,7 @@ import {
   acceptRigArgs,
   animDisableArgs,
   animEnableArgs,
+  animPreviewArgs,
   bakeArgs,
   exportArgs,
   genArgs,
@@ -138,6 +139,15 @@ Deno.test('CLI-twin parity: the GUI actions execute verbatim', async () => {
     set = m.animationSet as typeof set;
     assertEquals(set[1]!.enabled, false);
     assertEquals(set[1]!.frames, 8, 'a disabled binding keeps what it said');
+
+    // 6b. Preview — refused HONESTLY here (D-038): the anim stage unlocks on
+    // the canonical mesh, but motion needs the rig's skeleton first
+    {
+      const o = io();
+      const code = await runCli([...animPreviewArgs(ws, 'idle-loop'), '--json'], o);
+      assertEquals(code, 1, 'preview on an unrigged character must refuse');
+      assert(o.out.join('\n').includes('no rig'), `named the reason: ${o.out.join('\n')}`);
+    }
 
     // 7. Undo — the Edit menu / Ctrl+Z, over the same journal
     await twin(journalArgs(ws, 'undo'), 'undo');
