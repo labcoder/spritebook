@@ -292,12 +292,15 @@ function Grip(
 
 /* ---------------- the frame ---------------- */
 
-export function Editor({ bridge, card, manifest, onChanged }: {
+export function Editor({ bridge, card, manifest, onChanged, onOpenModels, catalogEpoch }: {
   bridge: StudioBridge;
   card: CharacterCard;
   manifest: unknown;
   /** a verb changed the manifest — the projections must re-read */
   onChanged: () => void;
+  /** the Generate-more panel and failure banners open Manage models from here */
+  onOpenModels: () => void;
+  catalogEpoch?: number;
 }) {
   const stages = stageStates(manifest);
   const [active, setActive] = useState<StageKey>('look');
@@ -334,6 +337,8 @@ export function Editor({ bridge, card, manifest, onChanged }: {
           <div className='center genstage'>
             <Candidates
               bridge={bridge}
+              onOpenModels={onOpenModels}
+              catalogEpoch={catalogEpoch}
               dir={card.dir}
               manifest={manifest}
               onChanged={onChanged}

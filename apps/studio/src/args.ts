@@ -65,6 +65,12 @@ export function exportArgs(bakeDir: string, outDir: string, targets: string[]): 
   return ['export', '--bake', bakeDir, '--out', outDir, '--targets', targets.join(',')];
 }
 
+/** A NEW texture on an existing result's mesh - a new result card appears.
+ * Core bumps the seed per run, so calling it twice gives two textures. */
+export function retextureArgs(workspace: string, resultId: string): string[] {
+  return ['retexture', '--workspace', workspace, '--result', resultId];
+}
+
 export function acceptRigArgs(workspace: string, accepted: boolean): string[] {
   return ['rig', '--workspace', workspace, accepted ? '--unaccept' : '--accept'];
 }
