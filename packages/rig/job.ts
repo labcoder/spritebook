@@ -131,6 +131,27 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
     }, at);
     let meshPath = opts.modelPath;
 
+    // 0. strip any EXISTING skin first. Both tracks promote their skinned
+    // result to canonical, so the second rig of a character always receives
+    // a skinned mesh; predict tolerated it, applyRig refused, and re-rigging
+    // worked exactly once. Downstream of this line the pipeline only ever
+    // sees clean geometry.
+    const { stripSkinsFile } = await import('./strip.ts');
+    const stripped = await stripSkinsFile(meshPath, `${opts.outDir}/stripped.glb`);
+    if (stripped.result.skinsRemoved > 0) {
+      meshPath = stripped.path;
+      yield {
+        t: 'warn',
+        jobId,
+        at: at(),
+        code: 'mesh-already-skinned',
+        message: `"${opts.modelPath}" already contains skin data - a previous rig. SpriteBook ` +
+          `removed it (${stripped.result.attributesRemoved} vertex attributes, ` +
+          `${stripped.result.jointNodesRemoved} joint nodes) and rigs the geometry alone; ` +
+          `the old rig is replaced, never stacked.`,
+      };
+    }
+
     // 1. tier-2 fixes first when asked — they rewrite the mesh, so predicting
     // before them would rig a body that is about to move
     const fixes = opts.orientationFixes ?? [];
