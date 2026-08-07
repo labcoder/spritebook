@@ -1482,6 +1482,22 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
             `no canonical mesh at "${modelPath}" - pick a result first`,
           );
         }
+        // motion needs a skeleton: canonical is only skinned after `rig`
+        // records itself, so refuse by NAME instead of leaking a loader throw
+        let rigged = false;
+        try {
+          const manifest = JSON.parse(
+            await Deno.readTextFile(`${workspace}/character.json`),
+          );
+          rigged = manifest.rig !== undefined;
+        } catch { /* unreadable manifest = unrigged */ }
+        if (!rigged) {
+          return fail(
+            'anim' as JobEvent['jobId'],
+            'no-rig',
+            'no rig yet - run auto-rig in the Rig stage first, then preview',
+          );
+        }
         const { loadPackClip, loadSkeletonRestFromFile, retargetClip, UAL_HUMANOID } = await import(
           '@spritebook/anim'
         );
