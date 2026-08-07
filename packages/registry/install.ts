@@ -203,7 +203,17 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
         );
       }
       verified.push({ path: f.path, sha256: sha, bytes: size });
-      yield { t: 'progress', jobId, at: at(), step: 'download', done: i + 1, total };
+      // the step carries WHICH file, so a 22-file 16 GB install reads as
+      // motion instead of a repeating word (the UX pass called the bare
+      // 'download' lines "repetitive ... we should have some indication")
+      yield {
+        t: 'progress',
+        jobId,
+        at: at(),
+        step: `download:${f.path.split('/').at(-1)}`,
+        done: i + 1,
+        total,
+      };
     }
 
     // atomic finalize: rename staging into place, then write the receipt.
@@ -213,8 +223,30 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
     // and `models rm` (or the remnant sweep below) cleans it up.
     await Deno.mkdir(`${opts.root}/${entry.id}`, { recursive: true });
     if (await dirExists(finalDir)) {
-      // receiptless remnant from exactly that crash window (the receipt check
-      // above passed) — unverified bytes, safe and honest to sweep
+      // The sweep is for a receiptless remnant from exactly that crash window
+      // (the receipt check above returned null). Before deleting anything,
+      // RE-CHECK by direct stat: a field incident had resolveInstalled read
+      // null while the receipt file was on disk with valid July content - two
+      // filesystem views of one machine. If that happens here, the sweep
+      // would silently delete a healthy multi-GB install and re-download it.
+      // Refuse loudly instead; the message is the tripwire that names the
+      // contradiction the incident never surfaced.
+      let receiptStat: Deno.FileInfo | null = null;
+      try {
+        receiptStat = await Deno.stat(`${finalDir}/${RECEIPT_FILE}`);
+      } catch { /* truly absent - the remnant case */ }
+      if (receiptStat !== null) {
+        throw new JobFail(
+          'install-conflict',
+          `"${finalDir}/${RECEIPT_FILE}" EXISTS (${receiptStat.size} bytes, mtime ${
+            receiptStat.mtime?.toISOString() ?? 'unknown'
+          }) but was read as not-installed moments ago - two answers from one filesystem. ` +
+            `Refusing to delete the existing install. This is a known field incident under ` +
+            `investigation; please report how the app was launched. ` +
+            `\`spritebook models verify ${entry.id}\` audits the existing files.`,
+        );
+      }
+      // receiptless remnant confirmed - unverified bytes, safe and honest to sweep
       await Deno.remove(finalDir, { recursive: true });
     }
     await Deno.rename(staging, finalDir);

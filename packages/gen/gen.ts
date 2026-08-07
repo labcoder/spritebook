@@ -39,6 +39,7 @@ import {
   detectVramGb,
   gatePlatform,
   loadCatalog,
+  probeInstallState,
   resolveInstalled,
   versionDir,
 } from '@spritebook/registry';
@@ -143,10 +144,12 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     const root = opts.modelsRoot ?? defaultModelsRoot();
     const installed = await resolveInstalled(root, entry.id, opts.version);
     if (!installed) {
+      // the probe rides the error because a field incident read not-installed
+      // from a root whose receipt existed - see probeInstallState
       throw new GenFail(
         'not-installed',
         `Backend "${entry.id}" is not installed - run \`spritebook models install ${entry.id}\` ` +
-          `first (models root: ${root})`,
+          `first (models root: ${root}). Probe: ${await probeInstallState(root, entry.id)}`,
       );
     }
     const version = entry.versions.find((v) => v.version === installed.version);

@@ -63,6 +63,7 @@ import {
   detectVramGb,
   gatePlatform,
   loadCatalog,
+  probeInstallState,
   resolveInstalled,
   versionDir,
 } from '@spritebook/registry';
@@ -227,11 +228,15 @@ export async function* runRetextureJob(
     }
     if (!chosen) {
       const names = [...new Set(pool.map((c) => c.entry.id))];
+      // the probe rides the error because a field incident read not-installed
+      // from a root whose receipt existed - see probeInstallState
       throw new RetextureFail(
         'not-installed',
         `Nothing that can retexture is installed - run \`spritebook models install ${
           names[0]
-        }\` (capable backends: ${names.join(', ')}; models root: ${root})`,
+        }\` (capable backends: ${names.join(', ')}; models root: ${root}). Probe: ${
+          names[0] !== undefined ? await probeInstallState(root, names[0]) : '(no capable backends)'
+        }`,
       );
     }
     const { entry, version } = chosen;

@@ -52,9 +52,10 @@ Deno.test('install: happy path - verified files land, canonical receipt, events 
       events.map((e) => e.t),
       ['queued', 'started', 'progress', 'progress', 'artifact', 'done'],
     );
+    // the step names the file, so a long install reads as motion in the log
     assertEquals(
       ofType(events, 'progress').map((p) => [p.step, p.done, p.total]),
-      [['download', 1, 2], ['download', 2, 2]],
+      [['download:model.ckpt', 1, 2], ['download:config.yaml', 2, 2]],
     );
     const [art] = ofType(events, 'artifact');
     assertEquals(art.kind, 'install-receipt');
