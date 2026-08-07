@@ -11,7 +11,7 @@ import { t } from '../i18n';
 const MODES: ViewMode[] = ['textured', 'clay', 'wire'];
 
 export function Viewport(
-  { bridge, meshPath, contentKey, showSkeleton, onNudge, onJointSelected, height }: {
+  { bridge, meshPath, contentKey, focusJoint, showSkeleton, onNudge, onJointSelected, height }: {
     bridge: StudioBridge;
     /** canonical glTF in the workspace — never a raw upload */
     meshPath: string | null;
@@ -21,6 +21,10 @@ export function Viewport(
      * UX pass saw r2 with r3 picked. The manifest's `canonicalMesh.gltfSha256`
      * is re-pinned on every promotion, so callers pass that. */
     contentKey?: string;
+    /** Select-and-frame this joint in the canvas. The counter `n` makes the
+     * SAME joint focusable twice in a row — a plain string prop would eat the
+     * second click as "no change". */
+    focusJoint?: { name: string; n: number } | null;
     showSkeleton?: boolean;
     onNudge?: (e: NudgeEvent) => void;
     onJointSelected?: (joint: string | null) => void;
@@ -113,6 +117,12 @@ export function Viewport(
     vpRef.current?.setSkeletonVisible(showSkeleton === true);
     vpRef.current?.renderOnce();
   }, [showSkeleton, vpReady, state]);
+
+  // the deform report drives the canvas: a row's activation lands here
+  useEffect(() => {
+    if (!focusJoint || state !== 'ready') return;
+    vpRef.current?.focusJoint(focusJoint.name);
+  }, [focusJoint, state]);
 
   // the renderer's counters, mirrored onto the host as data attributes: the
   // canvas cannot be read back (cleared after present), so this is how the

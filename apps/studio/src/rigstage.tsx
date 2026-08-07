@@ -152,7 +152,11 @@ function flagClass(flag: string): string {
   return flag === 'excessive-stretch' ? 'sun' : 'signal';
 }
 
-function ReportTable({ view }: { view: RigReportView }) {
+function ReportTable({ view, onFocusJoint }: {
+  view: RigReportView;
+  /** a row's activation selects and frames that joint in the canvas */
+  onFocusJoint: (joint: string) => void;
+}) {
   return (
     <div className='rigreport'>
       <div className='inote'>
@@ -172,7 +176,16 @@ function ReportTable({ view }: { view: RigReportView }) {
         <tbody>
           {view.flagged.map((j) => (
             <tr key={j.joint}>
-              <td className='mono'>{j.joint}</td>
+              <td className='mono'>
+                <button
+                  type='button'
+                  className='linkish mono'
+                  title={t('select and frame this joint in the canvas')}
+                  onClick={() => onFocusJoint(j.joint)}
+                >
+                  {j.joint}
+                </button>
+              </td>
               <td>
                 {j.flags.map((f) => <span key={f} className={`mbadge ${flagClass(f)}`}>{f}</span>)}
                 {j.spannedComponents > 1 && (
@@ -213,6 +226,13 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
   const [edits, setEdits] = useState<PendingEdit[]>([]);
   const [mirror, setMirror] = useState(false);
   const [selectedJoint, setSelectedJoint] = useState<string | null>(null);
+  // a deform row's activation lands here; the counter re-fires repeat clicks
+  const [focusJoint, setFocusJoint] = useState<{ name: string; n: number } | null>(null);
+  // the re-run track DEFAULTS to the recorded one - before this, every
+  // re-run silently flipped a track-A character back to track B
+  const [rerunTrackA, setRerunTrackA] = useState((rig?.track ?? 'B') === 'A');
+  const [rerunBody, setRerunBody] = useState(BUNDLED_BODY);
+  const rerunOpts = rerunTrackA ? { trackA: true as const, bodyDir: rerunBody } : {};
   const { run, failed, exec } = useRigRun(bridge, onChanged);
 
   // the first successful run unmounts RunRig under the focused button — land
@@ -292,7 +312,12 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                   {t('every joint passed the test poses')}
                 </div>
               )
-              : <ReportTable view={report} />}
+              : (
+                <ReportTable
+                  view={report}
+                  onFocusJoint={(j) => setFocusJoint((cur) => ({ name: j, n: (cur?.n ?? 0) + 1 }))}
+                />
+              )}
           </section>
 
           <section className='gensec'>
@@ -349,13 +374,47 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           <section className='gensec'>
             <div className='gensechead'>
               <span className='hud'>{t('Repair')}</span>
+              <span className='inote'>
+                {t(
+                  'auto-hint turns this report into joint-position hints and re-runs; re-run repeats with no hints',
+                )}
+              </span>
+            </div>
+            <div className='genrow'>
+              <span className='m-seg' role='group' aria-label={t('Re-run track')}>
+                <button
+                  type='button'
+                  className='btn mbtn'
+                  aria-pressed={!rerunTrackA}
+                  onClick={() => setRerunTrackA(false)}
+                >
+                  {t('Track B')}
+                </button>
+                <button
+                  type='button'
+                  className='btn mbtn'
+                  aria-pressed={rerunTrackA}
+                  onClick={() => setRerunTrackA(true)}
+                >
+                  {t('Track A')}
+                </button>
+              </span>
+              {rerunTrackA && (
+                <input
+                  className='rootinput'
+                  aria-label={t('Body')}
+                  value={rerunBody}
+                  onChange={(e) => setRerunBody(e.target.value)}
+                  spellCheck={false}
+                />
+              )}
             </div>
             <div className='candacts'>
               <button
                 type='button'
                 className='btn mbtn'
                 aria-busy={busy}
-                onClick={() => exec(rigRunArgs(dir, { autoHints: true }))}
+                onClick={() => exec(rigRunArgs(dir, { ...rerunOpts, autoHints: true }))}
               >
                 {t('Auto-hint from this report and re-run')}
               </button>
@@ -363,7 +422,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                 type='button'
                 className='btn mbtn rigrerun'
                 aria-busy={busy}
-                onClick={() => exec(rigRunArgs(dir, {}))}
+                onClick={() => exec(rigRunArgs(dir, { ...rerunOpts }))}
               >
                 {t('Re-run rig')}
               </button>
@@ -383,7 +442,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                 className='btn mbtn'
                 disabled={editsPath.length === 0}
                 aria-busy={busy}
-                onClick={() => exec(rigRunArgs(dir, { editsPath }))}
+                onClick={() => exec(rigRunArgs(dir, { ...rerunOpts, editsPath }))}
               >
                 {t('Apply edits')}
               </button>
@@ -392,7 +451,8 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                 className='btn mbtn'
                 disabled={editsPath.length === 0}
                 aria-busy={busy}
-                onClick={() => exec(rigRunArgs(dir, { editsPath, rerunWithHints: true }))}
+                onClick={() =>
+                  exec(rigRunArgs(dir, { ...rerunOpts, editsPath, rerunWithHints: true }))}
               >
                 {t('Re-run with edits as hints')}
               </button>
@@ -453,6 +513,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                 (m.canonicalMesh as { gltfSha256?: string } | undefined)
                   ?.gltfSha256 ?? '',
               )}
+              focusJoint={focusJoint}
               showSkeleton
               onNudge={(e) =>
                 setEdits((cur) =>

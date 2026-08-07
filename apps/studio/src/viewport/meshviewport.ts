@@ -266,6 +266,24 @@ export class MeshViewport {
     return this.#selected;
   }
 
+  /**
+   * Select a joint BY NAME and bring the camera's orbit target to it — the
+   * deform report's rows call this, so a flagged joint is one activation away
+   * from being looked at instead of a name the user must hunt for by eye.
+   * No transition: the render loop is on-demand, and a smoothed move would
+   * need frames nothing schedules.
+   */
+  focusJoint(name: string): void {
+    this.selectJoint(name);
+    const bone = this.#bones.find((b) => b.name === name);
+    if (!bone || !this.#controls) return;
+    const p = new THREE.Vector3();
+    bone.getWorldPosition(p);
+    this.#controls.moveTo(p.x, p.y, p.z, false);
+    this.#controls.update(0);
+    this.renderOnce();
+  }
+
   /** Joint positions in canvas pixels — the pick space, and testable input. */
   screenJoints(): ScreenJoint[] {
     const rect = this.#renderer.domElement.getBoundingClientRect();
