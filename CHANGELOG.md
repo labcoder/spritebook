@@ -4,6 +4,75 @@ Notable changes to SpriteBook. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version, tag, and golden policy is in
 `docs/versioning.md` in the repository.
 
+## 0.9.0 - 2026-08-06
+
+The GUI release. SpriteBook Studio wraps the proven CLI in six guided stages, and the pipeline grew
+the batch verbs, the memory discipline, and the documentation a 1.0 needs. Not 1.0: the maintainer's
+own UX pass comes first, and the gen3d licensing finding below is unresolved.
+
+### Added
+
+- **SpriteBook Studio**, the desktop app (Tauri 2 + React 19 + Base UI). Six stage surfaces —
+  Generate, Rig, Animate, Look, Bake, Export — over a gallery and character tabs. Every screen is a
+  projection of the manifest, and every primary action shows the CLI line it runs.
+- **Stage 01 Generate**: backend cards from the real catalog with their license, VRAM and install
+  gates in context; the options form derived from each backend's own `paramsSchema`; candidates,
+  More-like-this, and the canonical-mesh checkpoint.
+- **Stage 02 Rig**: both tracks, the deform report verbatim, orientation fixes as one-click re-runs,
+  and acceptance as an explicit journaled act.
+- **Stage 03 Animate**: the 86-clip library with search and categories; bindings as journaled
+  decisions through the new `anim --enable` / `anim --disable` verbs.
+- **Stage 04 Look**: camera and style controls, pixel-truth direction strips sliced from the last
+  bake's own atlas at integer zoom, and the stale-frame count stated before you record.
+- **Stage 05 Bake**: segmented progress, a sprite player with direction and AOV toggles, and QA
+  flags that jump to the stage that owns the fix.
+- **Stage 06 Export**: every target over one bake manifest.
+- **3D viewports**: mesh inspection in Generate, and a bone overlay in Rig with joint picking and
+  gizmo nudge.
+- **Batch verbs**: `bake --all` and `bake --changed-since` over a roster manifest, with `--plan`
+  showing what is stale and why before anything runs.
+- **Cross-process VRAM lease**: concurrent jobs on one machine queue instead of competing, and the
+  job's own event stream says why a job is waiting.
+- **Command palette** (Ctrl+K), **Manage models** (Ctrl+M), undo and redo over the journal, a log
+  drawer that renders the CLI stream verbatim, dark and light themes, and English and Spanish.
+- **Documentation**: a Studio user guide, four engine import guides (Godot, Unity through
+  TexturePacker, Phaser, Aseprite), and a licensing explainer. All written to ASD-STE100 Simplified
+  Technical English.
+
+### Changed
+
+- **The default cell is 112 px with 16 px of padding**, up from 96 and 6 (D-032, D-035). The old
+  default was sized for an idle pose; a six-clip set reaches sideways and a lying-down death reaches
+  metres toward the camera. Measured over 368 frames, the new default takes clipped frames from 63
+  to zero. It costs 0.02 MB per character on disk and 34% of wall clock.
+- **Rig acceptance is out of the cache key** (D-031). Recording that you looked at a deform report
+  now re-bakes nothing.
+- Every existing bake re-keys once against the new camera preset, and appears as stale with
+  `cameraPresetHash` as the reason. Exported pivot numbers move; the pivot's MEANING does not.
+
+### Fixed
+
+- **Keyboard focus survives every operation.** Async buttons no longer disable themselves while
+  focused, so a keyboard user is not dropped to the top of the document after each run; focus lands
+  on the result content when success swaps a panel; and the radio groups implement the arrow-key
+  contract their role announces.
+- Locked pipeline stages are reachable, so the reason they are locked can be read.
+- The log drawer closes with Escape and returns focus to its handle.
+
+### Known limitations
+
+- **The TRELLIS.2 gen3d backend cannot be used for commercial work today.** Its weights are MIT, but
+  three of the five CUDA extension wheels its adapter needs are non-commercial (`nvdiffrast`,
+  `nvdiffrec_render`) or carry no license at all (`o_voxel`). SpriteBook does not bundle them — your
+  machine fetches them at install time — and the D-036 survey found no alternative backend that
+  passes all four ship gates. See `docs/licensing.md`. The `fixture-gen` backend and every other
+  stage are unaffected.
+- **AI generation and rigging need an NVIDIA GPU.** There is no CUDA on Windows on ARM, and none on
+  macOS. Those platforms run the whole app and the whole pipeline with the weightless `fixture-gen`
+  backend; they cannot run the downloaded models.
+- Joint nudge in the rig viewport needs a pointer. The keyboard path to joint edits is the
+  edits-file verbs, which is an alternative rather than an equivalent.
+
 ## 0.1.0-alpha.1 - 2026-07-18
 
 First alpha: the headless bake pipeline, end to end. A rigged 3D character goes in; deterministic,
