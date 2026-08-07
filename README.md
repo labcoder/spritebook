@@ -24,6 +24,16 @@ Headless-first: everything is a CLI verb driven by manifests; the desktop GUI is
 shows its CLI twin for every action. See [`docs/prd.md`](docs/prd.md) for the product spec and
 [`docs/architecture/architecture.md`](docs/architecture/architecture.md) for the system laws.
 
+## Documentation
+
+| Doc                                                                                                                                                     | For                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Quickstart](docs/quickstart.md)                                                                                                                        | the shortest path from a mesh to a spritesheet, on the CLI   |
+| [User guide](docs/guide.md)                                                                                                                             | SpriteBook Studio, stage by stage                            |
+| [Godot](docs/engines/godot.md) · [Unity](docs/engines/unity-texturepacker.md) · [Phaser](docs/engines/phaser.md) · [Aseprite](docs/engines/aseprite.md) | importing the exported files                                 |
+| [Licensing](docs/licensing.md)                                                                                                                          | what you can ship, what installs behind gates, and the traps |
+| [Platform support](docs/platform-support.md)                                                                                                            | what runs where                                              |
+
 ## Development
 
 The repo is a Deno workspace (`packages/*`; scaffolded at P1-T1, packages fill in over the roadmap
