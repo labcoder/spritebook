@@ -365,6 +365,8 @@ export default function App() {
           : activeWs
           ? (
             <Editor
+              onOpenModels={() => setModelsOpen(true)}
+              catalogEpoch={catalogEpoch}
               bridge={bridge}
               card={activeWs.card}
               manifest={activeWs.raw.manifest}

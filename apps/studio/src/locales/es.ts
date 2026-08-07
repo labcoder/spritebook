@@ -349,4 +349,30 @@ export const es: Record<string, string> = {
   'Done': 'Listo',
   'folders': 'carpetas',
   'Open folder': 'Abrir la carpeta',
+  'Candidates': 'Candidatos',
+  'Compare backends — one job per installed backend, the count split across them':
+    'Comparar backends — un trabajo por backend instalado, el número repartido entre ellos',
+  'Effort (polygon budget)': 'Esfuerzo (presupuesto de polígonos)',
+  'Generate': 'Generar',
+  'Generate more': 'Generar más',
+  'Re-run track': 'Track de re-ejecución',
+  'Re-texture': 'Re-texturizar',
+  'Track A': 'Track A',
+  'Track B': 'Track B',
+  'auto-hint turns this report into joint-position hints and re-runs; re-run repeats with no hints':
+    'auto-hint convierte este informe en pistas de posición y re-ejecuta; re-ejecutar repite sin pistas',
+  'each backend runs its own defaults; the cards below label every result':
+    'cada backend corre con sus propios valores; las tarjetas etiquetan cada resultado',
+  'effort': 'esfuerzo',
+  'failed': 'falló',
+  'full control — the source image is the one this character was made from':
+    'control total — la imagen fuente es la que creó este personaje',
+  'keeps this mesh, paints a new texture — a new card appears':
+    'conserva esta malla, pinta una textura nueva — aparece una tarjeta nueva',
+  'one job - the model loads once; candidate 2 runs at seed + 1000':
+    'un trabajo — el modelo se carga una vez; el candidato 2 usa seed + 1000',
+  'select and frame this joint in the canvas':
+    'seleccionar y encuadrar esta articulación en el lienzo',
+  'the log drawer has the verbatim reason': 'el cajón de registro tiene la razón literal',
+  'this workspace records no source image': 'este workspace no registra imagen fuente',
 };

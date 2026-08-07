@@ -16,7 +16,7 @@ import type { CliRun, StudioBridge } from './bridge';
 import { slugify, slugProblem } from './slug';
 import { adjustArg, resolveOpDefaults, type SchemaField, schemaFields } from './schemaform';
 import { t } from './i18n';
-import { genArgs, moreLikeArgs, pickArgs } from './args';
+import { genArgs, moreLikeArgs, pickArgs, retextureArgs } from './args';
 import { Viewport } from './viewport/Viewport';
 import { useLandFocus, useRovingRadio } from './focus';
 
@@ -52,6 +52,123 @@ interface CatalogModel {
     excludedTerritories?: string[];
   };
   versions: CatalogVersion[];
+}
+
+/* ---------------- backend cards (shared) ---------------- */
+
+function BackendCards({ models, selectedId, onSelect, dimUnselected }: {
+  models: CatalogModel[] | null;
+  selectedId: string;
+  onSelect: (id: string) => void;
+  /** compare mode: every installed card runs, so selection reads muted */
+  dimUnselected?: boolean;
+}) {
+  const roving = useRovingRadio(
+    models?.length ?? 0,
+    models?.findIndex((m) => m.id === selectedId) ?? -1,
+    (i) => {
+      const m = models?.[i];
+      if (m) onSelect(m.id);
+    },
+  );
+  return (
+    <div
+      className={`backends ${dimUnselected ? 'compareall' : ''}`}
+      role='radiogroup'
+      aria-label={t('Backend')}
+    >
+      {models?.map((m, i) => {
+        const v = m.versions.find((x) => x.installed) ?? m.versions[0];
+        return (
+          <button
+            key={m.id}
+            type='button'
+            role='radio'
+            aria-checked={selectedId === m.id}
+            className={`backend ${selectedId === m.id ? 'on' : ''}`}
+            {...roving(i)}
+            onClick={() => onSelect(m.id)}
+          >
+            <span className='bname'>{m.displayName}</span>
+            <span className='btags'>
+              <span className='mbadge'>{m.license.spdx ?? m.license.name}</span>
+              {m.license.requiresAcceptance && (
+                <span className='mbadge gate'>{t('license acceptance required')}</span>
+              )}
+              {(m.license.excludedTerritories?.length ?? 0) > 0 && (
+                <span className='mbadge gate'>
+                  {t('not available in')}: {m.license.excludedTerritories!.join(', ')}
+                </span>
+              )}
+              {v?.minVramGb !== undefined && (
+                <span className='mbadge'>≥{v.minVramGb} GiB VRAM</span>
+              )}
+              {v?.installed
+                ? <span className='mbadge ok'>{t('installed')}</span>
+                : <span className='mbadge gate'>{t('not installed')}</span>}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------- job failure, made legible ---------------- */
+
+export interface JobFailure {
+  code: string | null;
+  message: string;
+}
+
+/** The LAST error event in a finished run's lines - the sentence the user
+ * needs, instead of "the log drawer has the verbatim reason" and a hunt. */
+export function lastFailure(lines: string[]): JobFailure | null {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const e = JSON.parse(lines[i]!);
+      if (e.t === 'error') {
+        return {
+          code: typeof e.code === 'string' ? e.code : null,
+          message: String(e.message ?? ''),
+        };
+      }
+    } catch { /* human line */ }
+  }
+  return null;
+}
+
+/** Errors whose remedy lives in Manage models, so the banner offers the door. */
+const MODEL_PROBLEMS = new Set([
+  'not-installed',
+  'model-missing',
+  'backend-unavailable',
+  'unknown-model',
+  'unknown-version',
+  'vram-insufficient',
+  'install-conflict',
+]);
+
+export function FailureNote({ failure, onOpenModels }: {
+  failure: JobFailure;
+  onOpenModels?: () => void;
+}) {
+  const brief = failure.message.length > 220
+    ? failure.message.slice(0, 220) + '…'
+    : failure.message;
+  return (
+    <span className='mv-exit mono' role='status'>
+      {t('failed')}: {brief || t('the log drawer has the verbatim reason')}
+      {onOpenModels && failure.code !== null && MODEL_PROBLEMS.has(failure.code) && (
+        <>
+          {' '}
+          <button type='button' className='linkish' onClick={onOpenModels}>
+            {t('Manage models…')}
+          </button>
+        </>
+      )}
+    </span>
+  );
 }
 
 function useGenBackends(bridge: StudioBridge, open: boolean, catalogEpoch = 0) {
@@ -198,7 +315,11 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
   const [modelId, setModelId] = useState('fixture-gen');
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [run, setRun] = useState<{ running: boolean; lines: number; last: string } | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<JobFailure | null>(null);
+  // DEFAULT 2: one job, candidate i at seed + 1000*i, the model loads once -
+  // the UX pass asked for the choice up front, not buried in the options form
+  const [count, setCount] = useState(2);
+  const [compare, setCompare] = useState(false);
 
   const slug = slugify(name);
   const problem = slugProblem(slug);
@@ -224,24 +345,19 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
 
   const model = models?.find((m) => m.id === modelId) ?? null;
   const version = model?.versions.find((v) => v.installed) ?? model?.versions[0] ?? null;
-  // the radio-group keyboard contract the role announces (walkthrough finding)
-  const backendRoving = useRovingRadio(
-    models?.length ?? 0,
-    models?.findIndex((m) => m.id === modelId) ?? -1,
-    (i) => {
-      const m = models?.[i];
-      if (m) {
-        setModelId(m.id);
-        setValues({});
-      }
-    },
+  const installedGen = useMemo(
+    () => (models ?? []).filter((m) => m.versions.some((v) => v.installed)),
+    [models],
   );
   const resolved = useMemo(
     () => version ? resolveOpDefaults(version.defaults, version.operationDefaults, 'gen3d') : {},
     [version],
   );
   const fields = useMemo(
-    () => (version ? schemaFields(version.paramsSchema, resolved) : []),
+    () =>
+      (version ? schemaFields(version.paramsSchema, resolved) : [])
+        // the count has its own control above the form now
+        .filter((f) => f.key !== 'candidates'),
     [version, resolved],
   );
 
@@ -251,16 +367,15 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
     delete rest['seed'];
     delete rest['candidates'];
     const seed = values['seed'];
-    const cand = values['candidates'];
     return genArgs(workspace, {
       characterId: slug || '<id>',
       imagePath,
       modelId,
       adjust: adjustArg(rest, resolved),
       ...(seed !== undefined && seed !== resolved['seed'] ? { seed: Number(seed) } : {}),
-      ...(cand !== undefined ? { candidates: Number(cand) } : {}),
+      ...(count !== 1 ? { candidates: count } : {}),
     });
-  }, [workspace, slug, imagePath, modelId, values, resolved]);
+  }, [workspace, slug, imagePath, modelId, values, resolved, count]);
 
   // HALLWAY TEST finding: the button sat disabled and said nothing, so a
   // first-timer typed a name and had to GUESS that an image was also
@@ -278,9 +393,9 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
 
   const generate = useCallback(async () => {
     if (!ready) return; // the button stays focusable while running (aria-busy)
-    setFailed(false);
+    setFailure(null);
     setRun({ running: true, lines: 0, last: t('starting…') });
-    const r: CliRun = await bridge.runCli([...args, '--json'], (line) => {
+    const onLine = (line: string) => {
       let last = line;
       try {
         const e = JSON.parse(line);
@@ -291,11 +406,36 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
         lines: (cur?.lines ?? 0) + 1,
         last: String(last),
       }));
-    });
-    setRun({ running: false, lines: r.lines.length, last: '' });
-    if (r.exitCode === 0) onCreated(slug);
-    else setFailed(true);
-  }, [bridge, args, slug, onCreated, ready]);
+    };
+    // compare mode: one job per installed backend, the count SPLIT across
+    // them (first jobs take the remainder), each at its own defaults. The
+    // first job creates the workspace; the rest append results - and the
+    // VRAM lease already queues the GPU ones, so sequential await is honest.
+    const jobs = compare && installedGen.length > 1
+      ? installedGen.map((m, i) => {
+        const base = Math.floor(count / installedGen.length);
+        const n = i < count % installedGen.length ? base + 1 : base;
+        return genArgs(workspace, {
+          characterId: slug || '<id>',
+          imagePath,
+          modelId: m.id,
+          ...(Math.max(1, n) !== 1 ? { candidates: Math.max(1, n) } : {}),
+        });
+      })
+      : [args];
+    let created = false;
+    let fail: JobFailure | null = null;
+    for (const jobArgs of jobs) {
+      const r: CliRun = await bridge.runCli([...jobArgs, '--json'], onLine);
+      if (r.exitCode === 0) created = true;
+      else fail = lastFailure(r.lines) ?? { code: null, message: '' };
+    }
+    setRun({ running: false, lines: 0, last: '' });
+    if (fail) setFailure(fail);
+    // any successful job made results worth looking at - navigate even when
+    // a sibling backend failed; the banner travels via the drawer either way
+    if (created) onCreated(slug);
+  }, [bridge, args, slug, onCreated, ready, compare, installedGen, count, workspace, imagePath]);
 
   return (
     <div className='gennew'>
@@ -343,44 +483,47 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
         </div>
         {catalogError && <div className='mdl-error mono'>{catalogError}</div>}
         {!models && !catalogError && <div className='inote'>…</div>}
-        <div className='backends' role='radiogroup' aria-label={t('Backend')}>
-          {models?.map((m, i) => {
-            const v = m.versions.find((x) => x.installed) ?? m.versions[0];
-            return (
-              <button
-                key={m.id}
-                type='button'
-                role='radio'
-                aria-checked={modelId === m.id}
-                className={`backend ${modelId === m.id ? 'on' : ''}`}
-                {...backendRoving(i)}
-                onClick={() => {
-                  setModelId(m.id);
-                  setValues({});
-                }}
-              >
-                <span className='bname'>{m.displayName}</span>
-                <span className='btags'>
-                  <span className='mbadge'>{m.license.spdx ?? m.license.name}</span>
-                  {m.license.requiresAcceptance && (
-                    <span className='mbadge gate'>{t('license acceptance required')}</span>
-                  )}
-                  {(m.license.excludedTerritories?.length ?? 0) > 0 && (
-                    <span className='mbadge gate'>
-                      {t('not available in')}: {m.license.excludedTerritories!.join(', ')}
-                    </span>
-                  )}
-                  {v?.minVramGb !== undefined && (
-                    <span className='mbadge'>≥{v.minVramGb} GiB VRAM</span>
-                  )}
-                  {v?.installed
-                    ? <span className='mbadge ok'>{t('installed')}</span>
-                    : <span className='mbadge gate'>{t('not installed')}</span>}
-                </span>
-              </button>
-            );
-          })}
+        <BackendCards
+          models={models}
+          selectedId={modelId}
+          onSelect={(id) => {
+            setModelId(id);
+            setValues({});
+          }}
+          dimUnselected={compare && installedGen.length > 1}
+        />
+        <div className='genrow'>
+          <label htmlFor='gencount'>{t('Candidates')}</label>
+          <input
+            id='gencount'
+            className='optnum mono'
+            type='number'
+            min={1}
+            max={8}
+            value={count}
+            onChange={(e) => setCount(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
+          />
+          <span className='inote'>
+            {t('one job - the model loads once; candidate 2 runs at seed + 1000')}
+          </span>
         </div>
+        {installedGen.length > 1 && (
+          <div className='genrow'>
+            <label className='bindhold'>
+              <input
+                type='checkbox'
+                checked={compare}
+                onChange={(e) => setCompare(e.target.checked)}
+              />
+              {t('Compare backends — one job per installed backend, the count split across them')}
+            </label>
+            {compare && (
+              <span className='inote'>
+                {t('each backend runs its own defaults; the cards below label every result')}
+              </span>
+            )}
+          </div>
+        )}
         {model && version && !version.installed && (
           <div className='inote'>
             {t('this backend is not installed')} —{' '}
@@ -426,11 +569,7 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
             {run.lines} {t('events')} · {run.last}
           </span>
         )}
-        {failed && (
-          <span className='mv-exit mono' role='status'>
-            {t('failed — the log drawer has the verbatim reason')}
-          </span>
-        )}
+        {failure && <FailureNote failure={failure} onOpenModels={onOpenModels} />}
         <CliTwin args={args} />
         {bridge.name === 'browser-demo' && (
           <div className='inote'>{t('browser preview: generate needs the desktop shell')}</div>
@@ -453,11 +592,24 @@ interface ResultEntry {
   params?: { candidates?: number };
 }
 
-export function Candidates({ bridge, dir, manifest, onChanged }: {
+/** Where `gen` stored the source image: content-addressed under source/.
+ * Mirrors core's sourceImagePath - dot>0, so a dotfile keeps no extension. */
+function storedSourcePath(dir: string, m: Record<string, unknown>): string | null {
+  const src = m.source as { sha256?: string; originalFilename?: string } | undefined;
+  if (!src?.sha256 || !src.originalFilename) return null;
+  const dot = src.originalFilename.lastIndexOf('.');
+  const ext = dot > 0 ? src.originalFilename.slice(dot) : '';
+  return `${dir}/source/${src.sha256}${ext}`;
+}
+
+export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, catalogEpoch }: {
   bridge: StudioBridge;
   dir: string;
   manifest: unknown;
   onChanged: () => void;
+  onOpenModels: () => void;
+  /** bumped when Manage models closes - the panel's cards re-read the catalog */
+  catalogEpoch?: number;
 }) {
   const m = (manifest ?? {}) as Record<string, unknown>;
   const characterId = typeof m.id === 'string' ? m.id : '';
@@ -470,7 +622,7 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
   const [reproject, setReproject] = useState(true);
   const [colorMatch, setColorMatch] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [failedId, setFailedId] = useState<string | null>(null);
+  const [failures, setFailures] = useState<Record<string, JobFailure>>({});
 
   // When the pick lands the checkpoint banner appears - put keyboard focus on
   // it, because the button that was focused goes disabled and the user would
@@ -482,26 +634,32 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
     [dir, reproject, colorMatch],
   );
 
-  const doPick = useCallback(async (id: string) => {
+  const runFor = useCallback(async (key: string, cardId: string, cliArgs: string[]) => {
     if (busy !== null) return;
-    setBusy(id);
-    setFailedId(null);
-    const r = await bridge.runCli([...pickFor(id), '--json']);
+    setBusy(key);
+    setFailures({});
+    const r = await bridge.runCli([...cliArgs, '--json']);
     setBusy(null);
     if (r.exitCode === 0) onChanged();
-    else setFailedId(id);
-  }, [bridge, pickFor, onChanged, busy]);
+    else {
+      setFailures({ [cardId]: lastFailure(r.lines) ?? { code: null, message: '' } });
+    }
+  }, [bridge, onChanged, busy]);
 
-  const moreLike = useCallback(async (id: string) => {
-    if (busy !== null) return;
-    setBusy(id);
-    setFailedId(null);
-    // gen ALWAYS requires --character (the field test's first error)
-    const r = await bridge.runCli([...moreLikeArgs(dir, characterId, id), '--json']);
-    setBusy(null);
-    if (r.exitCode === 0) onChanged();
-    else setFailedId(id);
-  }, [bridge, dir, characterId, onChanged, busy]);
+  const doPick = useCallback(
+    (id: string) => runFor(id, id, pickFor(id)),
+    [runFor, pickFor],
+  );
+  // gen ALWAYS requires --character (the field test's first error)
+  const moreLike = useCallback(
+    (id: string) => runFor(id, id, moreLikeArgs(dir, characterId, id)),
+    [runFor, dir, characterId],
+  );
+  // a NEW texture on this result's mesh - core appends a new result card
+  const retexture = useCallback(
+    (id: string) => runFor(`retex:${id}`, id, retextureArgs(dir, id)),
+    [runFor, dir],
+  );
 
   return (
     <div className='cands'>
@@ -573,6 +731,16 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
               </button>
               <button
                 type='button'
+                className='btn mbtn'
+                disabled={busy !== null && busy !== `retex:${r.id}`}
+                aria-busy={busy === `retex:${r.id}`}
+                onClick={() => retexture(r.id)}
+                title={t('keeps this mesh, paints a new texture — a new card appears')}
+              >
+                {t('Re-texture')}
+              </button>
+              <button
+                type='button'
                 className='btn mbtn primaryish'
                 disabled={busy !== null && busy !== r.id}
                 aria-busy={busy === r.id}
@@ -581,10 +749,11 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
                 {t('Save as canonical mesh')}
               </button>
             </div>
-            {failedId === r.id && (
-              <span className='mv-exit mono' role='status'>
-                {t('failed — the log drawer has the verbatim reason')}
-              </span>
+            {failures[r.id] && (
+              <FailureNote
+                failure={failures[r.id]!}
+                onOpenModels={onOpenModels}
+              />
             )}
           </div>
         ))}
@@ -610,6 +779,168 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
           <CliTwin args={pickFor(results[0]?.id ?? 'rN')} />
         </div>
       )}
+      <GenerateMore
+        bridge={bridge}
+        dir={dir}
+        m={m}
+        characterId={characterId}
+        results={results}
+        busy={busy}
+        runFor={runFor}
+        failure={failures['genmore'] ?? null}
+        onOpenModels={onOpenModels}
+        catalogEpoch={catalogEpoch}
+      />
     </div>
+  );
+}
+
+/* ---------------- Generate more (the full-control panel) ---------------- */
+
+/** Effort as a polygon budget. The presets are UI shorthand over the raw
+ * field, which stays visible and editable - medium matches what the shipped
+ * defaults have produced in practice (~200k tris on the reference images). */
+const EFFORT_PRESETS = [
+  { key: 'low', label: 'low', decimationTarget: 50_000 },
+  { key: 'medium', label: 'medium', decimationTarget: 200_000 },
+  { key: 'high', label: 'high', decimationTarget: 800_000 },
+] as const;
+
+/** The curated knobs; everything else keeps its catalog default. */
+const MORE_FIELDS = new Set(['guidanceStrength', 'decimationTarget', 'tris', 'steps', 'seed']);
+
+function GenerateMore(
+  { bridge, dir, m, characterId, results, busy, runFor, failure, onOpenModels, catalogEpoch }: {
+    bridge: StudioBridge;
+    dir: string;
+    m: Record<string, unknown>;
+    characterId: string;
+    results: ResultEntry[];
+    busy: string | null;
+    runFor: (key: string, cardId: string, cliArgs: string[]) => Promise<void>;
+    failure: JobFailure | null;
+    onOpenModels: () => void;
+    catalogEpoch?: number;
+  },
+) {
+  const { models, error: catalogError } = useGenBackends(bridge, true, catalogEpoch);
+  // default to the backend that made the newest result - "more of what I
+  // just got" is the likeliest intent
+  const [modelId, setModelId] = useState(() => results.at(-1)?.backend?.modelId ?? 'fixture-gen');
+  const [count, setCount] = useState(2);
+  const [values, setValues] = useState<Record<string, unknown>>({});
+
+  const model = models?.find((x) => x.id === modelId) ?? null;
+  const version = model?.versions.find((v) => v.installed) ?? model?.versions[0] ?? null;
+  const resolved = useMemo(
+    () => version ? resolveOpDefaults(version.defaults, version.operationDefaults, 'gen3d') : {},
+    [version],
+  );
+  const fields = useMemo(
+    () =>
+      (version ? schemaFields(version.paramsSchema, resolved) : [])
+        .filter((f) => MORE_FIELDS.has(f.key)),
+    [version, resolved],
+  );
+  const hasDecimation = fields.some((f) => f.key === 'decimationTarget');
+  const source = storedSourcePath(dir, m);
+
+  const args = useMemo(() => {
+    const rest = { ...values };
+    delete rest['seed'];
+    const seed = values['seed'];
+    return genArgs(dir, {
+      characterId,
+      imagePath: source ?? '<source>',
+      modelId,
+      adjust: adjustArg(rest, resolved),
+      ...(seed !== undefined && seed !== resolved['seed'] ? { seed: Number(seed) } : {}),
+      ...(count !== 1 ? { candidates: count } : {}),
+    });
+  }, [dir, characterId, source, modelId, values, resolved, count]);
+
+  const ready = source !== null && version?.installed === true && busy === null;
+
+  return (
+    <section className='gensec gmore'>
+      <div className='gensechead'>
+        <span className='hud'>{t('Generate more')}</span>
+        <span className='inote'>
+          {t('full control — the source image is the one this character was made from')}
+        </span>
+      </div>
+      {catalogError && <div className='mdl-error mono'>{catalogError}</div>}
+      {!models && !catalogError && <div className='inote'>…</div>}
+      <BackendCards
+        models={models}
+        selectedId={modelId}
+        onSelect={(id) => {
+          setModelId(id);
+          setValues({});
+        }}
+      />
+      <div className='genrow'>
+        <label htmlFor='gmcount'>{t('Candidates')}</label>
+        <input
+          id='gmcount'
+          className='optnum mono'
+          type='number'
+          min={1}
+          max={8}
+          value={count}
+          onChange={(e) => setCount(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
+        />
+        {hasDecimation && (
+          <>
+            <span className='optkey mono'>{t('effort')}</span>
+            <span className='m-seg' role='group' aria-label={t('Effort (polygon budget)')}>
+              {EFFORT_PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  type='button'
+                  className='btn mbtn'
+                  aria-pressed={values['decimationTarget'] === p.decimationTarget}
+                  onClick={() =>
+                    setValues((cur) => ({ ...cur, decimationTarget: p.decimationTarget }))}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </span>
+          </>
+        )}
+      </div>
+      <OptionsForm
+        fields={fields}
+        values={values}
+        onChange={(k, v) => setValues((cur) => ({ ...cur, [k]: v }))}
+      />
+      <div className='genrow'>
+        <button
+          type='button'
+          className='btn primary'
+          disabled={!ready && busy === null}
+          aria-busy={busy === 'genmore'}
+          onClick={() => {
+            if (ready) runFor('genmore', 'genmore', args);
+          }}
+        >
+          {busy === 'genmore' ? t('Generating…') : `${t('Generate')} ${count}`}
+        </button>
+        {source === null && (
+          <span className='inote'>{t('this workspace records no source image')}</span>
+        )}
+        {version !== null && !version.installed && (
+          <span className='inote'>
+            {t('this backend is not installed')} —{' '}
+            <button type='button' className='linkish' onClick={onOpenModels}>
+              {t('Manage models…')}
+            </button>
+          </span>
+        )}
+      </div>
+      {failure && <FailureNote failure={failure} onOpenModels={onOpenModels} />}
+      <CliTwin args={args} />
+    </section>
   );
 }
