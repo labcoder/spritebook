@@ -59,14 +59,33 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
   const [confirming, setConfirming] = useState<'install' | 'rm' | null>(null);
   const [lastExit, setLastExit] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const [progress, setProgress] = useState<
+    { label: string; done: number; total: number } | null
+  >(null);
 
   const runAction = useCallback(async (action: 'install' | 'verify' | 'rm') => {
     setBusy(ref);
     setConfirming(null);
+    setProgress(null);
     const args = ['models', action, ref, '--json'];
     if (action === 'install' && accepted) args.push('--accept-license');
-    const r = await bridge.runCli(args);
+    // the install streams one progress event per file (step download:<name>);
+    // a 22-file 16 GB run must read as MOTION, not a frozen dialog - the UX
+    // pass installed blind and had only the raw drawer to guess from
+    const r = await bridge.runCli(args, (line) => {
+      try {
+        const e = JSON.parse(line);
+        if (e.t === 'progress' && typeof e.step === 'string') {
+          setProgress({
+            label: e.step.startsWith('download:') ? e.step.slice('download:'.length) : e.step,
+            done: Number(e.done ?? 0),
+            total: Number(e.total ?? 0),
+          });
+        }
+      } catch { /* non-JSON lines stay the drawer's business */ }
+    });
     setLastExit(r.exitCode);
+    setProgress(null);
     setBusy(null);
     refresh();
   }, [bridge, ref, accepted, setBusy, refresh]);
@@ -139,6 +158,19 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
             </button>
           ))}
       </span>
+      {isBusy && progress !== null && progress.total > 0 && (
+        <span className='mv-progress' role='status'>
+          <span className='mv-bar' aria-hidden='true'>
+            <span
+              className='mv-barfill'
+              style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+            />
+          </span>
+          <span className='mono dimtext'>
+            {progress.done}/{progress.total} · {progress.label}
+          </span>
+        </span>
+      )}
       {confirming === 'install' && needsAcceptance && (
         <label className='mv-accept'>
           <input

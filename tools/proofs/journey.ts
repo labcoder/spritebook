@@ -94,7 +94,13 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     cdp,
     'document.activeElement && document.activeElement.blur && document.activeElement.blur()',
   );
-  await reach((f) => f.id === 'root', 'projects root input', '#root');
+  // the app may be on ANY tab (a prior session persists) - a keyboard user
+  // gets home through the tab strip: the roving stop is the active tab, and
+  // Home selects+focuses the first tab, which is always the gallery
+  await reach((f) => f.role === 'tab', 'the tab strip', '[role=tab]', 40);
+  await press(cdp, 'Home');
+  await waitFor(cdp, `document.querySelector('#projectsroot')`, 'the gallery toolbar', 5_000);
+  await reach((f) => f.id === 'projectsroot', 'projects root input', '#projectsroot');
   await press(cdp, 'End');
   await evalJs(cdp, `document.activeElement.select()`);
   await typeText(cdp, opts.root);

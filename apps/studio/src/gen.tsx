@@ -519,16 +519,17 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
         </div>
       )}
       {(inspecting !== null || canonical) && (
-        <Viewport
-          bridge={bridge}
-          meshPath={inspecting !== null
-            ? `${dir}/results/${inspecting}/model.glb`
-            : `${dir}/canonical/model.glb`}
-          contentKey={String(
-            (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? '',
-          )}
-          height={320}
-        />
+        <div className='candvp'>
+          <Viewport
+            bridge={bridge}
+            meshPath={inspecting !== null
+              ? `${dir}/results/${inspecting}/model.glb`
+              : `${dir}/canonical/model.glb`}
+            contentKey={String(
+              (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? '',
+            )}
+          />
+        </div>
       )}
       <div className='candgrid'>
         {results.map((r) => (

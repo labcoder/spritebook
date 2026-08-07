@@ -301,9 +301,14 @@ export default function App() {
 
       {activeTab === 'gallery' && (
         <div className='toolbar'>
-          <label htmlFor='root'>{t('Projects root')}</label>
+          {
+            /* NOT id='root': index.html mounts React on <div id="root">, and
+              the duplicate id made querySelector('#root') answer with the
+              mount div - found when a driver tried to type into it */
+          }
+          <label htmlFor='projectsroot'>{t('Projects root')}</label>
           <input
-            id='root'
+            id='projectsroot'
             className='rootinput'
             value={root}
             onChange={(e) => setRoot(e.target.value)}

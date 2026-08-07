@@ -39,7 +39,11 @@ function useRigRun(bridge: StudioBridge, onChanged: () => void) {
         const e = JSON.parse(line);
         last = e.message ?? e.stage ?? e.t ?? line;
       } catch { /* verbatim */ }
-      setRun((cur) => ({ running: true, lines: (cur?.lines ?? 0) + 1, last: String(last) }));
+      setRun((cur) => ({
+        running: true,
+        lines: (cur?.lines ?? 0) + 1,
+        last: String(last),
+      }));
     });
     setRun({ running: false, lines: r.lines.length, last: '' });
     if (r.exitCode === 0) onChanged();
@@ -60,7 +64,11 @@ function RunRig({ bridge, dir, onChanged }: {
   const [bodyDir, setBodyDir] = useState(BUNDLED_BODY);
   const { run, failed, exec } = useRigRun(bridge, onChanged);
   // the radio-group keyboard contract the role announces
-  const trackRoving = useRovingRadio(2, trackA ? 1 : 0, (i) => setTrackA(i === 1));
+  const trackRoving = useRovingRadio(
+    2,
+    trackA ? 1 : 0,
+    (i) => setTrackA(i === 1),
+  );
   const args = rigRunArgs(dir, trackA ? { trackA: true, bodyDir } : {});
 
   return (
@@ -78,9 +86,13 @@ function RunRig({ bridge, dir, onChanged }: {
           {...trackRoving(0)}
           onClick={() => setTrackA(false)}
         >
-          <span className='bname'>{t('Track B — predicted skeleton (UniRig)')}</span>
+          <span className='bname'>
+            {t('Track B — predicted skeleton (UniRig)')}
+          </span>
           <span className='inote'>
-            {t('a fresh skeleton fitted to this mesh on the GPU — about two minutes')}
+            {t(
+              'a fresh skeleton fitted to this mesh on the GPU — about two minutes',
+            )}
           </span>
         </button>
         <button
@@ -164,7 +176,10 @@ function ReportTable({ view }: { view: RigReportView }) {
               <td>
                 {j.flags.map((f) => <span key={f} className={`mbadge ${flagClass(f)}`}>{f}</span>)}
                 {j.spannedComponents > 1 && (
-                  <span className='mbadge signal' title={t('no placement hint can repair this')}>
+                  <span
+                    className='mbadge signal'
+                    title={t('no placement hint can repair this')}
+                  >
                     {j.spannedComponents} {t('detached pieces')}
                   </span>
                 )}
@@ -172,7 +187,9 @@ function ReportTable({ view }: { view: RigReportView }) {
               <td className='mono num'>
                 {j.maxEdgeStretch > 0 ? `×${j.maxEdgeStretch.toFixed(2)}` : '—'}
               </td>
-              <td className='mono num'>{(j.meanDisplacementM * 1000).toFixed(0)} mm</td>
+              <td className='mono num'>
+                {(j.meanDisplacementM * 1000).toFixed(0)} mm
+              </td>
             </tr>
           ))}
         </tbody>
@@ -222,7 +239,10 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
   const applyEdits = async () => {
     if (edits.length === 0) return;
     try {
-      const path = await bridge.writeRigEdits(dir, JSON.stringify(editsFile(edits), null, 2));
+      const path = await bridge.writeRigEdits(
+        dir,
+        JSON.stringify(editsFile(edits), null, 2),
+      );
       const code = await exec(rigRunArgs(dir, { editsPath: path }));
       if (code === 0) setEdits([]);
     } catch {
@@ -247,246 +267,277 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
         </div>
       )}
 
-      {/* .rigdeform is the landing target above — keep it stable */}
-      <section className='gensec rigdeform'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Deform check')}</span>
-          <span className='ieyebrow mono'>02// RIG</span>
-        </div>
-        {report === null
-          ? (
-            <div className='inote'>
-              {t('no deform report on disk — re-run the rig to write one')}
+      {
+        /* report and verbs read LEFT; the canvas lives RIGHT and stays put
+          while the left column scrolls (the UX pass: "the canvas should be
+          on the right") */
+      }
+      <div className='rigcols'>
+        <div className='rigmain'>
+          {/* .rigdeform is the landing target above — keep it stable */}
+          <section className='gensec rigdeform'>
+            <div className='gensechead'>
+              <span className='hud'>{t('Deform check')}</span>
+              <span className='ieyebrow mono'>02// RIG</span>
             </div>
-          )
-          : report.flagged.length === 0
-          ? <div className='inote'>{t('every joint passed the test poses')}</div>
-          : <ReportTable view={report} />}
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Orientation')}</span>
-          <span className='inote'>{t('each fix re-runs the rig (~2 min)')}</span>
-        </div>
-        <div className='candacts'>
-          <button
-            type='button'
-            className='btn mbtn'
-            aria-busy={busy}
-            onClick={() => exec(rigRunArgs(dir, { fixes: ['face-front'] }))}
-          >
-            {t('Face front')}
-          </button>
-          <button
-            type='button'
-            className='btn mbtn'
-            aria-busy={busy}
-            onClick={() => exec(rigRunArgs(dir, { fixes: ['feet-ground'] }))}
-          >
-            {t('Feet to ground')}
-          </button>
-          <button
-            type='button'
-            className='btn mbtn'
-            aria-busy={busy}
-            onClick={() => exec(rigRunArgs(dir, { fixes: ['center'] }))}
-          >
-            {t('Center')}
-          </button>
-          {(['90', '180', '270'] as const).map((deg) => (
-            <button
-              key={deg}
-              type='button'
-              className='btn mbtn'
-              aria-busy={busy}
-              onClick={() => exec(rigRunArgs(dir, { fixes: [`rotate-${deg}`] }))}
-            >
-              {t('Rotate')} {deg}°
-            </button>
-          ))}
-        </div>
-        <div className='inote'>
-          {t(
-            'face-front first: every direction is derived from the front, so a wrong front makes all eight wrong',
-          )}
-        </div>
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Joints')}</span>
-          <span className='inote'>
-            {t('click a joint, drag the gizmo — W move · E rotate · Q local/world')}
-          </span>
-        </div>
-        <Viewport
-          bridge={bridge}
-          meshPath={`${dir}/rig/rigged.glb`}
-          contentKey={String(
-            (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? '',
-          )}
-          showSkeleton
-          height={340}
-          onNudge={(e) =>
-            setEdits((cur) =>
-              mergeEdits(cur, { joint: e.joint, delta: e.delta, mirrored: mirror })
-            )}
-          onJointSelected={setSelectedJoint}
-        />
-        <div className='genrow'>
-          <label className='bindhold'>
-            <input
-              type='checkbox'
-              checked={mirror}
-              onChange={(e) => setMirror(e.target.checked)}
-            />
-            {t('mirror to the other side')}
-          </label>
-          {selectedJoint && (
-            <span className='mono dimtext'>
-              {mirror && mirrorPartner(selectedJoint)
-                ? `${selectedJoint} + ${mirrorPartner(selectedJoint)}`
-                : mirror
-                ? `${selectedJoint} · ${t('no side partner — this joint moves alone')}`
-                : selectedJoint}
-            </span>
-          )}
-        </div>
-        {edits.length > 0 && (
-          <>
-            <div className='bindrows'>
-              {edits.map((e) => (
-                <div key={e.joint} className='bindrow'>
-                  <span className='mono bindid'>{e.joint}</span>
-                  <span className='mono clipmeta'>
-                    {e.delta.map((v) => `${(v * 1000).toFixed(1)}mm`).join(' · ')}
-                  </span>
-                  {e.mirrored && <span className='mbadge'>{t('mirrored')}</span>}
-                  <span className='candacts'>
-                    <button
-                      type='button'
-                      className='btn mbtn'
-                      onClick={() => setEdits((cur) => cur.filter((x) => x.joint !== e.joint))}
-                    >
-                      {t('Discard')}
-                    </button>
-                  </span>
+            {report === null
+              ? (
+                <div className='inote'>
+                  {t('no deform report on disk — re-run the rig to write one')}
                 </div>
-              ))}
+              )
+              : report.flagged.length === 0
+              ? (
+                <div className='inote'>
+                  {t('every joint passed the test poses')}
+                </div>
+              )
+              : <ReportTable view={report} />}
+          </section>
+
+          <section className='gensec'>
+            <div className='gensechead'>
+              <span className='hud'>{t('Orientation')}</span>
+              <span className='inote'>
+                {t('each fix re-runs the rig (~2 min)')}
+              </span>
             </div>
-            <div className='genrow'>
+            <div className='candacts'>
               <button
                 type='button'
-                className='btn primary'
+                className='btn mbtn'
                 aria-busy={busy}
-                onClick={applyEdits}
+                onClick={() => exec(rigRunArgs(dir, { fixes: ['face-front'] }))}
               >
-                {busy ? t('Applying…') : t('Apply joint edits and re-rig')}
+                {t('Face front')}
               </button>
               <button
                 type='button'
                 className='btn mbtn'
-                disabled={busy}
-                onClick={() => setEdits([])}
+                aria-busy={busy}
+                onClick={() => exec(rigRunArgs(dir, { fixes: ['feet-ground'] }))}
               >
-                {t('Discard all')}
+                {t('Feet to ground')}
               </button>
-              <span className='inote'>
-                {t('writes rig/joint-edits.json, then re-runs the rig')}
+              <button
+                type='button'
+                className='btn mbtn'
+                aria-busy={busy}
+                onClick={() => exec(rigRunArgs(dir, { fixes: ['center'] }))}
+              >
+                {t('Center')}
+              </button>
+              {(['90', '180', '270'] as const).map((deg) => (
+                <button
+                  key={deg}
+                  type='button'
+                  className='btn mbtn'
+                  aria-busy={busy}
+                  onClick={() => exec(rigRunArgs(dir, { fixes: [`rotate-${deg}`] }))}
+                >
+                  {t('Rotate')} {deg}°
+                </button>
+              ))}
+            </div>
+            <div className='inote'>
+              {t(
+                'face-front first: every direction is derived from the front, so a wrong front makes all eight wrong',
+              )}
+            </div>
+          </section>
+
+          <section className='gensec'>
+            <div className='gensechead'>
+              <span className='hud'>{t('Repair')}</span>
+            </div>
+            <div className='candacts'>
+              <button
+                type='button'
+                className='btn mbtn'
+                aria-busy={busy}
+                onClick={() => exec(rigRunArgs(dir, { autoHints: true }))}
+              >
+                {t('Auto-hint from this report and re-run')}
+              </button>
+              <button
+                type='button'
+                className='btn mbtn rigrerun'
+                aria-busy={busy}
+                onClick={() => exec(rigRunArgs(dir, {}))}
+              >
+                {t('Re-run rig')}
+              </button>
+            </div>
+            <div className='genrow'>
+              <label htmlFor='editspath'>{t('Joint edits file')}</label>
+              <input
+                id='editspath'
+                className='rootinput'
+                value={editsPath}
+                onChange={(e) => setEditsPath(e.target.value)}
+                placeholder='patch.json'
+                spellCheck={false}
+              />
+              <button
+                type='button'
+                className='btn mbtn'
+                disabled={editsPath.length === 0}
+                aria-busy={busy}
+                onClick={() => exec(rigRunArgs(dir, { editsPath }))}
+              >
+                {t('Apply edits')}
+              </button>
+              <button
+                type='button'
+                className='btn mbtn'
+                disabled={editsPath.length === 0}
+                aria-busy={busy}
+                onClick={() => exec(rigRunArgs(dir, { editsPath, rerunWithHints: true }))}
+              >
+                {t('Re-run with edits as hints')}
+              </button>
+            </div>
+            {run?.running && (
+              <span className='genprogress mono' role='status'>
+                {run.lines} {t('events')} · {run.last}
+              </span>
+            )}
+            {failed && (
+              <span className='mv-exit mono' role='status'>
+                {t('failed — the log drawer has the verbatim reason')}
+              </span>
+            )}
+          </section>
+
+          <section className='gensec'>
+            <div className='gensechead'>
+              <span className='hud'>
+                {accepted ? t('Acceptance') : t('Accept this rig')}
               </span>
             </div>
-            <CliTwin args={rigRunArgs(dir, { editsPath: `${dir}/rig/joint-edits.json` })} />
-          </>
-        )}
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Repair')}</span>
-        </div>
-        <div className='candacts'>
-          <button
-            type='button'
-            className='btn mbtn'
-            aria-busy={busy}
-            onClick={() => exec(rigRunArgs(dir, { autoHints: true }))}
-          >
-            {t('Auto-hint from this report and re-run')}
-          </button>
-          <button
-            type='button'
-            className='btn mbtn rigrerun'
-            aria-busy={busy}
-            onClick={() => exec(rigRunArgs(dir, {}))}
-          >
-            {t('Re-run rig')}
-          </button>
-        </div>
-        <div className='genrow'>
-          <label htmlFor='editspath'>{t('Joint edits file')}</label>
-          <input
-            id='editspath'
-            className='rootinput'
-            value={editsPath}
-            onChange={(e) => setEditsPath(e.target.value)}
-            placeholder='patch.json'
-            spellCheck={false}
-          />
-          <button
-            type='button'
-            className='btn mbtn'
-            disabled={editsPath.length === 0}
-            aria-busy={busy}
-            onClick={() => exec(rigRunArgs(dir, { editsPath }))}
-          >
-            {t('Apply edits')}
-          </button>
-          <button
-            type='button'
-            className='btn mbtn'
-            disabled={editsPath.length === 0}
-            aria-busy={busy}
-            onClick={() => exec(rigRunArgs(dir, { editsPath, rerunWithHints: true }))}
-          >
-            {t('Re-run with edits as hints')}
-          </button>
-        </div>
-        {run?.running && (
-          <span className='genprogress mono' role='status'>
-            {run.lines} {t('events')} · {run.last}
-          </span>
-        )}
-        {failed && (
-          <span className='mv-exit mono' role='status'>
-            {t('failed — the log drawer has the verbatim reason')}
-          </span>
-        )}
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{accepted ? t('Acceptance') : t('Accept this rig')}</span>
-        </div>
-        {!accepted && (
-          <div className='inote'>
-            {t(
-              'acceptance is yours, not a default: if you have looked and the sprites are fine, record it — the bake stops warning',
+            {!accepted && (
+              <div className='inote'>
+                {t(
+                  'acceptance is yours, not a default: if you have looked and the sprites are fine, record it — the bake stops warning',
+                )}
+              </div>
             )}
-          </div>
-        )}
-        <div className='genrow'>
-          <button
-            type='button'
-            className={accepted ? 'btn mbtn' : 'btn primary'}
-            aria-busy={busy}
-            onClick={() => exec(acceptArgs)}
-          >
-            {accepted ? t('Unaccept rig') : t('Accept rig')}
-          </button>
+            <div className='genrow'>
+              <button
+                type='button'
+                className={accepted ? 'btn mbtn' : 'btn primary'}
+                aria-busy={busy}
+                onClick={() => exec(acceptArgs)}
+              >
+                {accepted ? t('Unaccept rig') : t('Accept rig')}
+              </button>
+            </div>
+            <CliTwin args={acceptArgs} />
+          </section>
         </div>
-        <CliTwin args={acceptArgs} />
-      </section>
+
+        <div className='rigside'>
+          <section className='gensec'>
+            <div className='gensechead'>
+              <span className='hud'>{t('Joints')}</span>
+              <span className='inote'>
+                {t(
+                  'click a joint, drag the gizmo — W move · E rotate · Q local/world',
+                )}
+              </span>
+            </div>
+            <Viewport
+              bridge={bridge}
+              meshPath={`${dir}/rig/rigged.glb`}
+              contentKey={String(
+                (m.canonicalMesh as { gltfSha256?: string } | undefined)
+                  ?.gltfSha256 ?? '',
+              )}
+              showSkeleton
+              onNudge={(e) =>
+                setEdits((cur) =>
+                  mergeEdits(cur, {
+                    joint: e.joint,
+                    delta: e.delta,
+                    mirrored: mirror,
+                  })
+                )}
+              onJointSelected={setSelectedJoint}
+            />
+            <div className='genrow'>
+              <label className='bindhold'>
+                <input
+                  type='checkbox'
+                  checked={mirror}
+                  onChange={(e) => setMirror(e.target.checked)}
+                />
+                {t('mirror to the other side')}
+              </label>
+              {selectedJoint && (
+                <span className='mono dimtext'>
+                  {mirror && mirrorPartner(selectedJoint)
+                    ? `${selectedJoint} + ${mirrorPartner(selectedJoint)}`
+                    : mirror
+                    ? `${selectedJoint} · ${t('no side partner — this joint moves alone')}`
+                    : selectedJoint}
+                </span>
+              )}
+            </div>
+            {edits.length > 0 && (
+              <>
+                <div className='bindrows'>
+                  {edits.map((e) => (
+                    <div key={e.joint} className='bindrow'>
+                      <span className='mono bindid'>{e.joint}</span>
+                      <span className='mono clipmeta'>
+                        {e.delta.map((v) => `${(v * 1000).toFixed(1)}mm`).join(
+                          ' · ',
+                        )}
+                      </span>
+                      {e.mirrored && <span className='mbadge'>{t('mirrored')}</span>}
+                      <span className='candacts'>
+                        <button
+                          type='button'
+                          className='btn mbtn'
+                          onClick={() => setEdits((cur) => cur.filter((x) => x.joint !== e.joint))}
+                        >
+                          {t('Discard')}
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className='genrow'>
+                  <button
+                    type='button'
+                    className='btn primary'
+                    aria-busy={busy}
+                    onClick={applyEdits}
+                  >
+                    {busy ? t('Applying…') : t('Apply joint edits and re-rig')}
+                  </button>
+                  <button
+                    type='button'
+                    className='btn mbtn'
+                    disabled={busy}
+                    onClick={() => setEdits([])}
+                  >
+                    {t('Discard all')}
+                  </button>
+                  <span className='inote'>
+                    {t('writes rig/joint-edits.json, then re-runs the rig')}
+                  </span>
+                </div>
+                <CliTwin
+                  args={rigRunArgs(dir, {
+                    editsPath: `${dir}/rig/joint-edits.json`,
+                  })}
+                />
+              </>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
