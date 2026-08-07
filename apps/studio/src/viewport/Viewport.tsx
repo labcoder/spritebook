@@ -10,15 +10,23 @@ import { t } from '../i18n';
 
 const MODES: ViewMode[] = ['textured', 'clay', 'wire'];
 
-export function Viewport({ bridge, meshPath, showSkeleton, onNudge, onJointSelected, height }: {
-  bridge: StudioBridge;
-  /** canonical glTF in the workspace — never a raw upload */
-  meshPath: string | null;
-  showSkeleton?: boolean;
-  onNudge?: (e: NudgeEvent) => void;
-  onJointSelected?: (joint: string | null) => void;
-  height?: number;
-}) {
+export function Viewport(
+  { bridge, meshPath, contentKey, showSkeleton, onNudge, onJointSelected, height }: {
+    bridge: StudioBridge;
+    /** canonical glTF in the workspace — never a raw upload */
+    meshPath: string | null;
+    /** Changes when the BYTES behind meshPath change. The pick and the rig
+     * both rewrite `canonical/model.glb` IN PLACE, so a path-keyed load kept
+     * showing the old mesh after "Save as canonical mesh" — the maintainer's
+     * UX pass saw r2 with r3 picked. The manifest's `canonicalMesh.gltfSha256`
+     * is re-pinned on every promotion, so callers pass that. */
+    contentKey?: string;
+    showSkeleton?: boolean;
+    onNudge?: (e: NudgeEvent) => void;
+    onJointSelected?: (joint: string | null) => void;
+    height?: number;
+  },
+) {
   const hostRef = useRef<HTMLDivElement>(null);
   const vpRef = useRef<MeshViewport | null>(null);
   const [mode, setMode] = useState<ViewMode>('textured');
@@ -97,7 +105,9 @@ export function Viewport({ bridge, meshPath, showSkeleton, onNudge, onJointSelec
     return () => {
       live = false;
     };
-  }, [bridge, meshPath, vpReady]);
+    // contentKey re-runs the load when the bytes behind an UNCHANGED path
+    // change (in-place canonical rewrites) - see the prop's comment
+  }, [bridge, meshPath, contentKey, vpReady]);
 
   useEffect(() => {
     vpRef.current?.setSkeletonVisible(showSkeleton === true);

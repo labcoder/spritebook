@@ -49,6 +49,9 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
+  // bumped when Manage models closes, so the + tab's backend cards re-read
+  // the catalog in the very flow that installs
+  const [catalogEpoch, setCatalogEpoch] = useState(0);
 
   // side effects OUTSIDE the updaters: i18n.activate() sets state in
   // I18nProvider, and an updater runs during render — React refuses a
@@ -280,7 +283,13 @@ export default function App() {
       <ManageModels
         bridge={bridge}
         open={modelsOpen}
-        onClose={() => setModelsOpen(false)}
+        onClose={() => {
+          setModelsOpen(false);
+          // an install may have happened in there - the + tab's backend
+          // cards re-read the catalog, so "installed" is never stale in the
+          // very flow that installs (the UX pass hit exactly this)
+          setCatalogEpoch((e) => e + 1);
+        }}
       />
       <Tabs
         tabs={tabs}
@@ -345,6 +354,7 @@ export default function App() {
               projectsRoot={root}
               onCreated={onCreated}
               onOpenModels={() => setModelsOpen(true)}
+              catalogEpoch={catalogEpoch}
             />
           )
           : activeWs

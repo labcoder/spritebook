@@ -54,7 +54,7 @@ interface CatalogModel {
   versions: CatalogVersion[];
 }
 
-function useGenBackends(bridge: StudioBridge, open: boolean) {
+function useGenBackends(bridge: StudioBridge, open: boolean, catalogEpoch = 0) {
   const [models, setModels] = useState<CatalogModel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -80,7 +80,7 @@ function useGenBackends(bridge: StudioBridge, open: boolean) {
     return () => {
       live = false;
     };
-  }, [bridge, open]);
+  }, [bridge, open, catalogEpoch]);
   return { models, error };
 }
 
@@ -181,18 +181,20 @@ export function CliTwin({ args }: { args: string[] }) {
 
 /* ---------------- GenerateNew (the + tab) ---------------- */
 
-export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels }: {
+export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, catalogEpoch }: {
   bridge: StudioBridge;
   projectsRoot: string;
   /** called with the new CHARACTER ID after gen exits 0 - the App re-reads
    * the list and resolves the workspace dir in the shell's own notation */
   onCreated: (characterId: string) => void;
   onOpenModels: () => void;
+  /** bumped when Manage models closes - the backend cards re-read the catalog */
+  catalogEpoch?: number;
 }) {
   const [name, setName] = useState('');
   const [imagePath, setImagePath] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
-  const { models, error: catalogError } = useGenBackends(bridge, true);
+  const { models, error: catalogError } = useGenBackends(bridge, true, catalogEpoch);
   const [modelId, setModelId] = useState('fixture-gen');
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [run, setRun] = useState<{ running: boolean; lines: number; last: string } | null>(null);
@@ -522,6 +524,9 @@ export function Candidates({ bridge, dir, manifest, onChanged }: {
           meshPath={inspecting !== null
             ? `${dir}/results/${inspecting}/model.glb`
             : `${dir}/canonical/model.glb`}
+          contentKey={String(
+            (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? '',
+          )}
           height={320}
         />
       )}

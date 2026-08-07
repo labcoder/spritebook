@@ -323,6 +323,9 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
         <Viewport
           bridge={bridge}
           meshPath={`${dir}/rig/rigged.glb`}
+          contentKey={String(
+            (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? '',
+          )}
           showSkeleton
           height={340}
           onNudge={(e) =>
