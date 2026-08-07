@@ -38,6 +38,10 @@ export function Viewport(
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  // transport state mirrors the class (D-038: playback, never synthesis)
+  const [animDuration, setAnimDuration] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [atime, setAtime] = useState(0);
   // keep the callbacks fresh without re-creating the viewport
   const nudgeRef = useRef(onNudge);
   nudgeRef.current = onNudge;
@@ -95,7 +99,12 @@ export function Viewport(
       try {
         await vp.load(bytes.buffer);
         vp.renderOnce();
-        if (live) setState('ready');
+        if (live) {
+          setState('ready');
+          setAnimDuration(vp.animationDuration);
+          setPlaying(vp.animationPlaying);
+          setAtime(0);
+        }
       } catch (err) {
         if (!live) return;
         setState('error');
@@ -144,6 +153,16 @@ export function Viewport(
     return () => clearInterval(id);
   }, [state]);
 
+  // the scrub thumb follows the mixer while it plays; paused, the user owns it
+  useEffect(() => {
+    if (state !== 'ready' || animDuration <= 0 || !playing) return;
+    const id = setInterval(() => {
+      const vp = vpRef.current;
+      if (vp) setAtime(vp.animationTime);
+    }, 150);
+    return () => clearInterval(id);
+  }, [state, animDuration, playing]);
+
   const apply = useCallback((m: ViewMode) => {
     setMode(m);
     vpRef.current?.setMode(m);
@@ -187,6 +206,39 @@ export function Viewport(
         role='application'
         aria-label={t('Mesh inspection viewport')}
       />
+      {state === 'ready' && animDuration > 0 && (
+        <div className='vptransport'>
+          <button
+            type='button'
+            className='btn mbtn'
+            onClick={() => {
+              const vp = vpRef.current;
+              if (!vp) return;
+              const next = !playing;
+              vp.setAnimationPlaying(next);
+              setPlaying(next);
+            }}
+          >
+            {playing ? t('Pause') : t('Play')}
+          </button>
+          <input
+            type='range'
+            min={0}
+            max={animDuration}
+            step={0.05}
+            value={atime}
+            aria-label={t('Scrub the clip')}
+            onChange={(e) => {
+              const tSec = Number(e.currentTarget.value);
+              vpRef.current?.seekAnimation(tSec);
+              setAtime(tSec);
+            }}
+          />
+          <span className='mono dimtext'>
+            {atime.toFixed(1)}s / {animDuration.toFixed(1)}s
+          </span>
+        </div>
+      )}
       {state !== 'ready' && (
         <div className='vpstate inote'>
           {state === 'loading'

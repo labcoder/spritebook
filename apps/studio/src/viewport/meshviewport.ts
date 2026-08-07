@@ -69,6 +69,9 @@ export class MeshViewport {
   #skeletonHelper: THREE.SkeletonHelper | null = null;
   #bones: THREE.Bone[] = [];
   #selected: string | null = null;
+  #mixer: THREE.AnimationMixer | null = null;
+  #animPlaying = false;
+  #animDuration = 0;
   #gizmo: TransformControls | null = null;
   #gizmoHelper: THREE.Object3D | null = null;
   #proxy = new THREE.Object3D();
@@ -149,7 +152,11 @@ export class MeshViewport {
       this.#raf = requestAnimationFrame(loop);
       this.#frames++;
       this.#timer.update();
-      this.#controls?.update(this.#timer.getDelta());
+      const dt = this.#timer.getDelta();
+      this.#controls?.update(dt);
+      // playback rides the SAME loop the camera does - no second clock, and
+      // the hidden-window pause applies to motion exactly as it does to draws
+      if (this.#mixer && this.#animPlaying) this.#mixer.update(dt);
       try {
         this.#renderer.render(this.#scene, this.#camera);
       } catch (err) {
@@ -196,7 +203,41 @@ export class MeshViewport {
       this.#scene.add(this.#skeletonHelper);
     }
     this.setMode(this.#mode);
+    if (gltf.animations.length > 0) {
+      this.#mixer = new THREE.AnimationMixer(this.#model);
+      const clip = gltf.animations[0]!;
+      this.#animDuration = clip.duration;
+      this.#mixer.clipAction(clip).play();
+      this.#animPlaying = true; // the preview exists to SHOW motion
+    }
     this.frame();
+  }
+
+  /* ---- animation transport (D-038: playback, never synthesis) ---- */
+
+  get animationDuration(): number {
+    return this.#mixer ? this.#animDuration : 0;
+  }
+
+  get animationTime(): number {
+    return this.#mixer ? this.#mixer.time % Math.max(this.#animDuration, 1e-6) : 0;
+  }
+
+  get animationPlaying(): boolean {
+    return this.#animPlaying;
+  }
+
+  setAnimationPlaying(playing: boolean): void {
+    if (!this.#mixer) return;
+    this.#animPlaying = playing;
+    this.renderOnce();
+  }
+
+  /** Jump to `t` seconds - works paused, so the scrub IS the frame picker. */
+  seekAnimation(t: number): void {
+    if (!this.#mixer) return;
+    this.#mixer.setTime(Math.max(0, Math.min(t, this.#animDuration)));
+    this.renderOnce();
   }
 
   /**
@@ -374,6 +415,13 @@ export class MeshViewport {
       this.#scene.remove(this.#skeletonHelper);
       this.#skeletonHelper.dispose();
       this.#skeletonHelper = null;
+    }
+    if (this.#mixer) {
+      this.#mixer.stopAllAction();
+      if (this.#model) this.#mixer.uncacheRoot(this.#model);
+      this.#mixer = null;
+      this.#animPlaying = false;
+      this.#animDuration = 0;
     }
     if (!this.#model) return;
     this.#scene.remove(this.#model);

@@ -1565,3 +1565,13 @@ input {
 .vpstate {
   margin-top: -2px;
 }
+.vptransport {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.vptransport input[type='range'] {
+  flex: 1;
+  min-width: 120px;
+  accent-color: var(--sb-focus);
+}
