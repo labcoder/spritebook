@@ -5,7 +5,10 @@ packages/schema/fixtures/** text eol=lf
 # deno fmt always writes LF; pin all source/text to LF so Windows autocrlf
 # never produces phantom modifications or CI fmt drift.
 *.ts text eol=lf
+*.tsx text eol=lf
 *.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
 *.json text eol=lf
 *.jsonc text eol=lf
 *.md text eol=lf
