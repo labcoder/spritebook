@@ -88,6 +88,11 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
   say(`# Full-journey keyboard-only walkthrough`);
   say(`bridge: ${await evalJs(cdp, `(window.__TAURI__ ? 'tauri (real CLI)' : 'browser-demo')`)}`);
 
+  // a COLD app is still hydrating when CDP answers - vite compiles on the
+  // first request and React mounts after that. Tab into a blank page moves
+  // nothing, which reads as "everything unreachable"; wait for the chrome.
+  await waitFor(cdp, `document.querySelector('[role=tab]')`, 'the app to hydrate', 60_000);
+
   // ---------------------------------------------------------------- 0 gallery
   say('\n## 0 - gallery: set the projects root');
   await evalJs(
@@ -170,6 +175,10 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
       finding('fixture backend could only be selected by CLICK - bridged');
     }
   }
+  // the count control ships DEFAULT 2 - reach it and read the default back
+  await reach((f) => f.id === 'gencount', 'the candidates count', '#gencount', 20);
+  const countVal = await evalJs<string>(cdp, `document.activeElement.value`);
+  if (countVal !== '2') finding(`the candidates count defaults to ${countVal}, not 2`);
   await reach(
     (f) => f.tag === 'button' && hasText(f, 'Generate model'),
     'Generate model',
@@ -185,6 +194,26 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     180_000,
   );
   await focusAfter('the generate run (candidates are up)');
+
+  // ---------------------------------------------- 2b the new gen controls
+  say('\n## 2b - candidates: Re-texture and the Generate-more panel');
+  await reach(
+    (f) => f.tag === 'button' && f.text === 'Re-texture',
+    'a Re-texture button',
+    'button',
+    60,
+  );
+  // the panel reads the catalog asynchronously - wait for its fields the way
+  // a sighted user would, then sweep
+  await waitFor(cdp, `document.querySelector('.gmore #opt-seed')`, 'the panel catalog', 20_000);
+  await reach((f) => f.id === 'gmcount', 'Generate-more count', '#gmcount', 60);
+  await reach((f) => f.id === 'opt-seed', 'the seed field', '#opt-seed', 40);
+  await reach(
+    (f) => f.tag === 'button' && hasText(f, 'Generate'),
+    'the Generate-more button',
+    '.gmore .btn.primary',
+    40,
+  );
 
   // ------------------------------------------------------------------- 3 pick
   say('\n## 3 - pick: save r1 as canonical');
@@ -256,6 +285,13 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     300_000,
   );
   await focusAfter('the rig run');
+  // the re-run track choice the repair section now carries
+  await reach(
+    (f) => f.tag === 'button' && f.text === 'Track A',
+    'the re-run track choice',
+    'button',
+    60,
+  );
   await reach((f) => f.tag === 'button' && hasText(f, 'Accept rig'), 'Accept rig', 'button', 60);
   await press(cdp, 'Enter');
   await waitFor(
