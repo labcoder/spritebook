@@ -335,6 +335,44 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
   );
   await focusAfter('enabling the clip');
 
+  // D-038: the preview - core retargets the clip once, the canvas only plays
+  say('  preview: the clip in motion on this character');
+  await reach(
+    (f) => f.cls.includes('bindpreview'),
+    'Preview on the binding row',
+    '.bindpreview',
+    20,
+  );
+  await press(cdp, 'Enter');
+  await waitFor(
+    cdp,
+    `document.querySelector('.vptransport')`,
+    'the motion transport (retarget ran, canvas is playing)',
+    60_000,
+  );
+  await focusAfter('running the preview');
+  // the transport is native controls: the button and the range answer keys
+  await reach(
+    (f) => f.tag === 'button' && (f.text === 'Pause' || f.text === 'Play'),
+    'the transport Play/Pause',
+    '.vptransport button',
+    40,
+  );
+  const tpBefore = await evalJs<string>(cdp, `document.activeElement.textContent`);
+  await press(cdp, 'Enter');
+  const tpAfter = await evalJs<string>(cdp, `document.activeElement.textContent`);
+  if (tpBefore === tpAfter) finding('transport Play/Pause did not toggle on Enter');
+  await reach(
+    (f) => hasLabel(f, 'Scrub the clip'),
+    'the scrub slider',
+    '.vptransport input[type=range]',
+    10,
+  );
+  const scrubBefore = await evalJs<number>(cdp, `Number(document.activeElement.value)`);
+  await press(cdp, 'ArrowRight');
+  const scrubAfter = await evalJs<number>(cdp, `Number(document.activeElement.value)`);
+  if (!(scrubAfter > scrubBefore)) finding('scrub slider ignored ArrowRight');
+
   // ------------------------------------------------------------------- 6 look
   say('\n## 6 - look: keep the recorded defaults, verify reachability');
   await reach(
