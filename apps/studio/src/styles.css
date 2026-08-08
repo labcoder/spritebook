@@ -1243,6 +1243,9 @@ input {
   }
   .rigside {
     position: static;
+    /* stacked, the CANVAS comes first: the UX pass clicked deform rows and
+       ran previews against a viewport parked below the fold (F13) */
+    order: -1;
   }
   .rigside .vpwrap {
     height: 440px;

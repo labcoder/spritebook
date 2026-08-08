@@ -77,3 +77,19 @@ export function useRovingRadio(
     },
   });
 }
+
+/**
+ * Bring an element into view without stealing focus (W5c): below the
+ * two-column breakpoint the canvas stacks, and a deform-row click or a
+ * preview run acted on a viewport the user could not see. 'nearest' makes
+ * this a no-op when the element is already visible (the sticky two-column
+ * case), and reduced-motion users get an instant jump.
+ */
+export function scrollIntoViewPolitely(el: Element | null): void {
+  el?.scrollIntoView({
+    block: 'nearest',
+    behavior: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      ? 'auto'
+      : 'smooth',
+  });
+}

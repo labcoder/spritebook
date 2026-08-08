@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StudioBridge } from './bridge';
 import { t } from './i18n';
 import { CliTwin, FailureNote, type JobFailure, lastFailure } from './gen';
-import { useLandFocus } from './focus';
+import { scrollIntoViewPolitely, useLandFocus } from './focus';
 import { bindingSpec, framesMath } from './bindings';
 import { animDisableArgs, animEnableArgs, animPreviewArgs } from './args';
 import { Viewport } from './viewport/Viewport';
@@ -175,6 +175,14 @@ export function AnimStage({ bridge, dir, manifest, onChanged }: {
       );
     }
   }, [bridge, dir, busy]);
+
+  // a fresh preview must be SEEN: stacked layouts park the canvas below the
+  // fold, and the UX pass watched motion play off-screen (W5c)
+  useEffect(() => {
+    if (preview !== null) {
+      scrollIntoViewPolitely(document.querySelector('.animstage .rigside'));
+    }
+  }, [preview]);
 
   const math = framesMath(bindings, 8);
   const enabledTwin = bindings.filter((b) => b.enabled).map(bindingSpec).join(',');

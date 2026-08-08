@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StudioBridge } from '../bridge';
 import { MeshViewport, type NudgeEvent, type ViewMode } from './meshviewport';
 import { t } from '../i18n';
+import { scrollIntoViewPolitely } from '../focus';
 
 const MODES: ViewMode[] = ['textured', 'clay', 'wire'];
 
@@ -134,10 +135,13 @@ export function Viewport(
     vpRef.current?.renderOnce();
   }, [showSkeleton, vpReady, state]);
 
-  // the deform report drives the canvas: a row's activation lands here
+  // the deform report drives the canvas: a row's activation lands here. The
+  // polite scroll makes the gesture VISIBLE when the layout has stacked the
+  // canvas below the fold (W5c) - a no-op when it is already on screen.
   useEffect(() => {
     if (!focusJoint || state !== 'ready') return;
     vpRef.current?.focusJoint(focusJoint.name);
+    scrollIntoViewPolitely(hostRef.current);
   }, [focusJoint, state]);
 
   // the renderer's counters, mirrored onto the host as data attributes: the
