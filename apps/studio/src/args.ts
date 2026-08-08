@@ -15,12 +15,17 @@ export interface GenOptions {
   adjust?: string | null;
   seed?: number;
   candidates?: number;
+  /** declared standing height in metres (D-012); omitted = backend scale */
+  heightM?: number;
 }
 
 export function genArgs(workspace: string, o: GenOptions): string[] {
   const a = ['gen', '--workspace', workspace, '--character', o.characterId];
   if (o.imagePath) a.push('--image', o.imagePath);
   a.push('--model', o.modelId);
+  // the size every later stage believes: bake frames at pixelsPerMeter, so
+  // skipping this keeps the backend's unit-box scale and sprites bake tiny
+  if (o.heightM !== undefined) a.push('--height', String(o.heightM));
   if (o.seed !== undefined) a.push('--seed', String(o.seed));
   if (o.candidates !== undefined && o.candidates > 1) {
     a.push('--candidates', String(o.candidates));

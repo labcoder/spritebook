@@ -65,6 +65,8 @@ Deno.test('CLI-twin parity: the GUI actions execute verbatim', async () => {
         modelId: 'fixture-gen',
         adjust: null,
         candidates: 2,
+        // the GUI now always declares a height (wave 5) - pin the flag here
+        heightM: 1.7,
       }),
       'gen --candidates 2',
     );

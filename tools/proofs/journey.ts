@@ -175,6 +175,11 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
       finding('fixture backend could only be selected by CLICK - bridged');
     }
   }
+  // the height field ships DEFAULT 1.7 m (wave 5: a character generated
+  // without a height keeps the backend's unit-box scale and bakes ~30px)
+  await reach((f) => f.id === 'gheight', 'the height field', '#gheight', 20);
+  const heightVal = await evalJs<string>(cdp, `document.activeElement.value`);
+  if (heightVal !== '1.7') finding(`the height field defaults to "${heightVal}", not 1.7`);
   // the count control ships DEFAULT 2 - reach it and read the default back
   await reach((f) => f.id === 'gencount', 'the candidates count', '#gencount', 20);
   const countVal = await evalJs<string>(cdp, `document.activeElement.value`);

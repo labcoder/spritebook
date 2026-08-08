@@ -136,6 +136,11 @@ export const es: Record<string, string> = {
   'ids need at least 2 characters': 'los ids necesitan al menos 2 caracteres',
   'ids are lowercase letters, digits and dashes': 'los ids son minúsculas, dígitos y guiones',
   'Source image': 'Imagen de origen',
+  'Height (m)': 'Altura (m)',
+  'height must be metres between 0 and 10, or empty to keep the backend scale':
+    'la altura debe ser metros entre 0 y 10, o vacía para mantener la escala del backend',
+  'the size every stage believes — sprites frame at pixels-per-metre':
+    'el tamaño que cree cada etapa — los sprites se encuadran en píxeles por metro',
   'drop an image anywhere, or paste a path': 'suelta una imagen aquí, o pega una ruta',
   'Backend': 'Backend',
   'this backend is not installed': 'este backend no está instalado',

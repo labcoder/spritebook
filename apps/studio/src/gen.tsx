@@ -138,6 +138,17 @@ export function lastFailure(lines: string[]): JobFailure | null {
   return null;
 }
 
+/** The LAST warn event with this code - for warns a user must not miss. */
+export function lastWarnOf(lines: string[], code: string): string | null {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const e = JSON.parse(lines[i]!);
+      if (e.t === 'warn' && e.code === code) return String(e.message ?? '');
+    } catch { /* human line */ }
+  }
+  return null;
+}
+
 /** Errors whose remedy lives in Manage models, so the banner offers the door. */
 const MODEL_PROBLEMS = new Set([
   'not-installed',
@@ -320,6 +331,12 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
   // the UX pass asked for the choice up front, not buried in the options form
   const [count, setCount] = useState(2);
   const [compare, setCompare] = useState(false);
+  // the size every later stage believes (D-012): bake frames at
+  // pixelsPerMeter, so a character left at the backend's unit-box scale bakes
+  // ~30 px tall - wave 4's fifth finding. Default 1.7 m; emptying the field
+  // keeps the backend scale and the core warn below says what that means.
+  const [heightM, setHeightM] = useState('1.7');
+  const [scaleWarn, setScaleWarn] = useState<string | null>(null);
 
   const slug = slugify(name);
   const problem = slugProblem(slug);
@@ -362,6 +379,8 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
   );
 
   const workspace = `${projectsRoot}/${slug || '<id>'}`;
+  const heightVal = heightM.trim() === '' ? undefined : Number(heightM);
+  const heightBad = heightVal !== undefined && !(heightVal > 0 && heightVal < 10);
   const args = useMemo(() => {
     const rest = { ...values };
     delete rest['seed'];
@@ -372,10 +391,11 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
       imagePath,
       modelId,
       adjust: adjustArg(rest, resolved),
+      ...(heightVal !== undefined && !heightBad ? { heightM: heightVal } : {}),
       ...(seed !== undefined && seed !== resolved['seed'] ? { seed: Number(seed) } : {}),
       ...(count !== 1 ? { candidates: count } : {}),
     });
-  }, [workspace, slug, imagePath, modelId, values, resolved, count]);
+  }, [workspace, slug, imagePath, modelId, values, resolved, count, heightVal, heightBad]);
 
   // HALLWAY TEST finding: the button sat disabled and said nothing, so a
   // first-timer typed a name and had to GUESS that an image was also
@@ -388,12 +408,15 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
     ? t('pick a backend')
     : !version.installed
     ? t('that backend is not installed yet')
+    : heightBad
+    ? t('height must be metres between 0 and 10, or empty to keep the backend scale')
     : null;
   const ready = blocker === null && run?.running !== true;
 
   const generate = useCallback(async () => {
     if (!ready) return; // the button stays focusable while running (aria-busy)
     setFailure(null);
+    setScaleWarn(null);
     setRun({ running: true, lines: 0, last: t('starting…') });
     const onLine = (line: string) => {
       let last = line;
@@ -419,23 +442,42 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
           characterId: slug || '<id>',
           imagePath,
           modelId: m.id,
+          ...(heightVal !== undefined && !heightBad ? { heightM: heightVal } : {}),
           ...(Math.max(1, n) !== 1 ? { candidates: Math.max(1, n) } : {}),
         });
       })
       : [args];
     let created = false;
     let fail: JobFailure | null = null;
+    let warn: string | null = null;
     for (const jobArgs of jobs) {
       const r: CliRun = await bridge.runCli([...jobArgs, '--json'], onLine);
       if (r.exitCode === 0) created = true;
       else fail = lastFailure(r.lines) ?? { code: null, message: '' };
+      // the scale warn is the one a user must SEE before they build five
+      // stages on a unit-box character (wave 4's fifth finding)
+      warn = lastWarnOf(r.lines, 'scale-undeclared') ?? warn;
     }
     setRun({ running: false, lines: 0, last: '' });
     if (fail) setFailure(fail);
+    if (warn) setScaleWarn(warn);
     // any successful job made results worth looking at - navigate even when
     // a sibling backend failed; the banner travels via the drawer either way
     if (created) onCreated(slug);
-  }, [bridge, args, slug, onCreated, ready, compare, installedGen, count, workspace, imagePath]);
+  }, [
+    bridge,
+    args,
+    slug,
+    onCreated,
+    ready,
+    compare,
+    installedGen,
+    count,
+    workspace,
+    imagePath,
+    heightVal,
+    heightBad,
+  ]);
 
   return (
     <div className='gennew'>
@@ -469,6 +511,20 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
             placeholder={t('drop an image anywhere, or paste a path')}
             spellCheck={false}
           />
+        </div>
+        <div className='genrow'>
+          <label htmlFor='gheight'>{t('Height (m)')}</label>
+          <input
+            id='gheight'
+            className='optnum mono'
+            value={heightM}
+            onChange={(e) => setHeightM(e.target.value)}
+            inputMode='decimal'
+            spellCheck={false}
+          />
+          <span className='inote'>
+            {t('the size every stage believes — sprites frame at pixels-per-metre')}
+          </span>
         </div>
         {preview && (
           <div className='genpreview'>
@@ -570,6 +626,7 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
           </span>
         )}
         {failure && <FailureNote failure={failure} onOpenModels={onOpenModels} />}
+        {scaleWarn && <span className='mv-warn mono' role='status'>{scaleWarn}</span>}
         <CliTwin args={args} />
         {bridge.name === 'browser-demo' && (
           <div className='inote'>{t('browser preview: generate needs the desktop shell')}</div>
@@ -829,6 +886,9 @@ function GenerateMore(
   const [modelId, setModelId] = useState(() => results.at(-1)?.backend?.modelId ?? 'fixture-gen');
   const [count, setCount] = useState(2);
   const [values, setValues] = useState<Record<string, unknown>>({});
+  // same default as the + tab (D-012): a result generated without a height
+  // keeps the backend's unit-box scale and bakes ~30 px tall
+  const [heightM, setHeightM] = useState('1.7');
 
   const model = models?.find((x) => x.id === modelId) ?? null;
   const version = model?.versions.find((v) => v.installed) ?? model?.versions[0] ?? null;
@@ -845,6 +905,8 @@ function GenerateMore(
   const hasDecimation = fields.some((f) => f.key === 'decimationTarget');
   const source = storedSourcePath(dir, m);
 
+  const heightVal = heightM.trim() === '' ? undefined : Number(heightM);
+  const heightOk = heightVal === undefined || (heightVal > 0 && heightVal < 10);
   const args = useMemo(() => {
     const rest = { ...values };
     delete rest['seed'];
@@ -854,12 +916,13 @@ function GenerateMore(
       imagePath: source ?? '<source>',
       modelId,
       adjust: adjustArg(rest, resolved),
+      ...(heightVal !== undefined && heightOk ? { heightM: heightVal } : {}),
       ...(seed !== undefined && seed !== resolved['seed'] ? { seed: Number(seed) } : {}),
       ...(count !== 1 ? { candidates: count } : {}),
     });
-  }, [dir, characterId, source, modelId, values, resolved, count]);
+  }, [dir, characterId, source, modelId, values, resolved, count, heightVal, heightOk]);
 
-  const ready = source !== null && version?.installed === true && busy === null;
+  const ready = source !== null && version?.installed === true && busy === null && heightOk;
 
   return (
     <section className='gensec gmore'>
@@ -889,6 +952,15 @@ function GenerateMore(
           max={8}
           value={count}
           onChange={(e) => setCount(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
+        />
+        <label htmlFor='gmheight'>{t('Height (m)')}</label>
+        <input
+          id='gmheight'
+          className='optnum mono'
+          value={heightM}
+          onChange={(e) => setHeightM(e.target.value)}
+          inputMode='decimal'
+          spellCheck={false}
         />
         {hasDecimation && (
           <>
