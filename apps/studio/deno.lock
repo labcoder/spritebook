@@ -11,6 +11,7 @@
     "npm:@vitejs/plugin-react@5.1.4": "5.1.4_vite@8.1.4",
     "npm:axe-core@^4.12.1": "4.12.1",
     "npm:camera-controls@3.1.2": "3.1.2_three@0.185.1",
+    "npm:phaser@^3.87.0": "3.90.0",
     "npm:react-dom@19.2.7": "19.2.7_react@19.2.7",
     "npm:react@19.2.7": "19.2.7",
     "npm:three@0.185.1": "0.185.1",
@@ -784,6 +785,9 @@
     "escalade@3.2.0": {
       "integrity": "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
     },
+    "eventemitter3@5.0.4": {
+      "integrity": "sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw=="
+    },
     "fdir@6.5.0_picomatch@4.0.5": {
       "integrity": "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==",
       "dependencies": [
@@ -943,6 +947,12 @@
     },
     "normalize-path@3.0.0": {
       "integrity": "sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA=="
+    },
+    "phaser@3.90.0": {
+      "integrity": "sha512-/cziz/5ZIn02uDkC9RzN8VF9x3Gs3XdFFf9nkiMEQT3p7hQlWuyjy4QWosU802qqno2YSLn2BfqwOKLv/sSVfQ==",
+      "dependencies": [
+        "eventemitter3"
+      ]
     },
     "picocolors@1.1.1": {
       "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
@@ -1114,6 +1124,7 @@
         "npm:@vitejs/plugin-react@5.1.4",
         "npm:axe-core@^4.12.1",
         "npm:camera-controls@3.1.2",
+        "npm:phaser@^3.87.0",
         "npm:react-dom@19.2.7",
         "npm:react@19.2.7",
         "npm:three@0.185.1",
