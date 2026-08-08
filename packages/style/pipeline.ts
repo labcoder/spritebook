@@ -291,6 +291,41 @@ function clippedFlag(
   };
 }
 
+/**
+ * Subject-coverage floor (W4d): the fraction of cell pixels the subject's
+ * alpha must reach on AT LEAST ONE frame of the bake. UX pass 2 baked a
+ * retarget-collapsed character into a ~1.6%-coverage smear and the sheet
+ * raised no flags — flicker measures temporal stability, and a subject that
+ * is ABSENT is perfectly stable. A healthy character at the shipped defaults
+ * measures 10–30%; 3% is far below any intended sprite while still admitting
+ * deliberately tiny subjects.
+ */
+export const SUBJECT_COVERAGE_FLOOR = 0.03;
+
+/** fraction of pixels carrying any alpha at all */
+function alphaCoverage(rgba: Uint8Array): number {
+  let on = 0;
+  for (let i = 3; i < rgba.length; i += 4) if (rgba[i] !== 0) on++;
+  return on / (rgba.length / 4);
+}
+
+function coverageFlag(
+  best: { cov: number; ref: QAFlag['frameRefs'][number] } | null,
+): QAFlag | null {
+  if (best === null || best.cov >= SUBJECT_COVERAGE_FLOOR) return null;
+  return {
+    code: 'subject-degenerate',
+    severity: 'warn',
+    sourceStage: 'anim',
+    frameRefs: [best.ref],
+    message: `the subject covers at most ${(best.cov * 100).toFixed(1)}% of the cell on its ` +
+      `fullest frame (floor ${SUBJECT_COVERAGE_FLOOR * 100}%). A sheet this empty is a ` +
+      `collapsed or vanished character, not a small one. The usual cause is the retargeted ` +
+      `pose — the Anim stage's Preview plays the SAME motion this bake rendered, so look ` +
+      `there first; if the rest pose is already tiny, the mesh scale is off (gen --height).`,
+  };
+}
+
 function qaFlags(style: StylePreset, camera: CameraPreset): QAFlag[] {
   const flags: QAFlag[] = [];
   if (style.outline && style.outline.widthPx > camera.paddingPx) {
@@ -370,6 +405,7 @@ export async function styleClipsFromAovs(
 
   const clipped: QAFlag['frameRefs'] = [];
   const clippedEdges = new Map<string, number>();
+  let bestCov: { cov: number; ref: QAFlag['frameRefs'][number] } | null = null;
   for (const src of srcs) {
     const aovs = perClip.get(src.clipId)!;
     const clipDir = `${styledDir}/${src.clipId}`;
@@ -384,6 +420,10 @@ export async function styleClipsFromAovs(
         if (hitM.size > 0) {
           clipped.push({ clipId: src.clipId, direction: d, frame: f });
           mergeEdges(clippedEdges, hitM);
+        }
+        const cov = alphaCoverage(rgba);
+        if (bestCov === null || cov > bestCov.cov) {
+          bestCov = { cov, ref: { clipId: src.clipId, direction: d, frame: f } };
         }
         if (src === srcs[0] && d === 0) flickerFrames.push(rgba.slice());
         await Deno.writeFile(
@@ -407,6 +447,7 @@ export async function styleClipsFromAovs(
     flags: [
       ...qaFlags(style, camera),
       ...[clippedFlag(clipped, clippedEdges, camera)].filter((f) => f !== null),
+      ...[coverageFlag(bestCov)].filter((f) => f !== null),
     ],
     styledDir,
   };
@@ -451,6 +492,7 @@ export async function styleFromAovs(
   const idleFrames: Uint8Array[] = []; // direction 0's styled frames, for flicker
   const clipped: QAFlag['frameRefs'] = [];
   const clippedEdges = new Map<string, number>();
+  let bestCov: { cov: number; ref: QAFlag['frameRefs'][number] } | null = null;
   for (let d = 0; d < src.directions; d++) {
     let prev: Int32Array | null = null;
     for (let f = 0; f < src.frames; f++) {
@@ -461,6 +503,10 @@ export async function styleFromAovs(
       if (hitS.size > 0) {
         clipped.push({ clipId: 'idle', direction: d, frame: f });
         mergeEdges(clippedEdges, hitS);
+      }
+      const cov = alphaCoverage(rgba);
+      if (bestCov === null || cov > bestCov.cov) {
+        bestCov = { cov, ref: { clipId: 'idle', direction: d, frame: f } };
       }
       if (d === 0) idleFrames.push(rgba.slice());
       await Deno.writeFile(
@@ -482,6 +528,7 @@ export async function styleFromAovs(
     flags: [
       ...qaFlags(style, camera),
       ...[clippedFlag(clipped, clippedEdges, camera)].filter((f) => f !== null),
+      ...[coverageFlag(bestCov)].filter((f) => f !== null),
     ],
     styledDir,
   };

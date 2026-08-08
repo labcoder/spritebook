@@ -462,3 +462,55 @@ Deno.test('bottom clipping on a CENTER pivot is framing, because Y=0 is not pinn
     await Deno.remove(out, { recursive: true });
   }
 });
+
+Deno.test('subject-degenerate fires on a near-empty sheet, and only there (W4d)', async () => {
+  // UX pass 2 baked a retarget-collapsed character into a ~1.6%-coverage
+  // smear and QA said "no flags": flicker measures temporal stability, and a
+  // subject that is ABSENT is perfectly stable. Coverage is the missing axis.
+  const sx = 32; // superSample 4 -> an 8x8 cell
+  const smear = await Deno.makeTempDir();
+  const healthy = await Deno.makeTempDir();
+  try {
+    await writeSyntheticAov(smear, sx, 15); // a 2x2 speck: 1/256 = 0.4% at Sx
+    await writeSyntheticAov(healthy, sx, 8); // a 16x16 body: 25%
+    const src = (framesDir: string): AovSource => ({
+      framesDir,
+      directions: 1,
+      frames: 1,
+      width: sx,
+      height: sx,
+    });
+    const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 } };
+
+    const outSmear = await Deno.makeTempDir();
+    const outHealthy = await Deno.makeTempDir();
+    try {
+      const flagged = await styleFromAovs(src(smear), cam, PIXEL, outSmear);
+      const clean = await styleFromAovs(src(healthy), cam, PIXEL, outHealthy);
+
+      assertEquals(
+        clean.flags.find((f) => f.code === 'subject-degenerate'),
+        undefined,
+        'a healthy subject raises nothing',
+      );
+      const fired = flagged.flags.find((f) => f.code === 'subject-degenerate');
+      assert(
+        fired,
+        `a near-empty sheet raises the flag; got ${
+          JSON.stringify(flagged.flags.map((f) => f.code))
+        }`,
+      );
+      assertEquals(fired!.severity, 'warn');
+      assertEquals(fired!.sourceStage, 'anim', 'the pose is the usual culprit - route there');
+      assert(fired!.frameRefs.length === 1, 'names the fullest frame');
+      assert(/collapsed or vanished/.test(fired!.message), 'and says what it means');
+      assert(/Preview/.test(fired!.message), 'and points at the preview that shows it');
+    } finally {
+      await Deno.remove(outSmear, { recursive: true });
+      await Deno.remove(outHealthy, { recursive: true });
+    }
+  } finally {
+    await Deno.remove(smear, { recursive: true });
+    await Deno.remove(healthy, { recursive: true });
+  }
+});
