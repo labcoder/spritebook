@@ -17,6 +17,11 @@
  */
 import { renderDiagnostics } from '@spritebook/render';
 import { SidecarSession } from '@spritebook/core';
+import {
+  defaultModelsRoot,
+  detectAppDataVirtualization,
+  type VirtualizationReport,
+} from '@spritebook/registry';
 import { SPRITEBOOK_VERSION } from './version.ts';
 import type { CliIo } from './mod.ts';
 
@@ -79,11 +84,20 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
   }
 
   const sidecar = wantSidecar ? await examineSidecar() : undefined;
+  // D-039: where model installs land, and whether THIS process even sees the
+  // real filesystem there - the split-brain incident's whole story in two
+  // lines. Never throws; an unresolvable root is reported, not fatal.
+  let modelsRoot: string | null = null;
+  try {
+    modelsRoot = defaultModelsRoot();
+  } catch { /* no LOCALAPPDATA/HOME - the report line says so */ }
+  const virtualization: VirtualizationReport = await detectAppDataVirtualization();
   const report = {
     spritebook: SPRITEBOOK_VERSION,
     deno: Deno.version.deno,
     v8: Deno.version.v8,
     platform: `${Deno.build.os}-${Deno.build.arch}`,
+    models: { root: modelsRoot, virtualization },
     ...diag,
     ...(sidecar ? { sidecar } : {}),
   };
@@ -93,6 +107,16 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
   } else {
     io.stdout(`SpriteBook ${SPRITEBOOK_VERSION}`);
     io.stdout(`deno ${report.deno} - v8 ${report.v8} - ${report.platform}`);
+    io.stdout(
+      `models root: ${modelsRoot ?? '(unresolvable - set SPRITEBOOK_MODELS_DIR)'}`,
+    );
+    if (virtualization.virtualized) {
+      io.stdout(
+        `  CONTAINED: MSIX AppData virtualization is active - package ` +
+          `"${virtualization.pkg}" owns a private overlay of %LOCALAPPDATA%, so this ` +
+          `process and unpackaged processes see DIFFERENT models stores (D-039)`,
+      );
+    }
     io.stdout(`render pipeline ${diag.version}`);
     io.stdout(`backend env: DENO_WEBGPU_BACKEND=${diag.backendEnv}`);
     if (!diag.available) {
