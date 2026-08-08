@@ -313,14 +313,16 @@ export function Editor({ bridge, card, manifest, onChanged, onOpenModels, catalo
   const effective = activeStage && activeStage.state !== 'locked' ? active : 'gen';
 
   // picking a canonical advances the rail to the NEXT stage in order - the
-  // journey continues at Rig, not wherever a default happened to point
+  // journey continues at Rig, not wherever a default happened to point. On
+  // EVERY pick, not just the first: a re-picked canonical needs a re-rig,
+  // so Rig is the next stage either way.
   const canonicalSha = String(
     ((manifest ?? {}) as { canonicalMesh?: { gltfSha256?: string } }).canonicalMesh
       ?.gltfSha256 ?? '',
   );
   const prevSha = useRef(canonicalSha);
   useEffect(() => {
-    if (prevSha.current === '' && canonicalSha !== '' && active === 'gen') {
+    if (prevSha.current !== canonicalSha && canonicalSha !== '' && active === 'gen') {
       setActive('rig');
     }
     prevSha.current = canonicalSha;
