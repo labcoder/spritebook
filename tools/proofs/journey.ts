@@ -238,6 +238,15 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     120_000,
   );
   await focusAfter('the pick');
+  // W5d: the pick ADVANCES the rail to Rig by itself - the old 'look'
+  // default teleported the user two stages ahead the moment stages unlocked
+  const landed = await evalJs<string>(
+    cdp,
+    `document.querySelector('nav.rail button[aria-current=step]')?.textContent ?? '(none)'`,
+  );
+  if (!landed.includes('02')) {
+    finding(`after the pick the rail sits on "${landed}", not stage 02 (rig)`);
+  }
 
   // -------------------------------------------------------------------- 4 rig
   say('\n## 4 - rig: track A, run, accept');

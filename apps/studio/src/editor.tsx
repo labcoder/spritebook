@@ -303,11 +303,28 @@ export function Editor({ bridge, card, manifest, onChanged, onOpenModels, catalo
   catalogEpoch?: number;
 }) {
   const stages = stageStates(manifest);
-  const [active, setActive] = useState<StageKey>('look');
+  // 'gen', not 'look': the old default sat masked behind the locked-stage
+  // fallback and TELEPORTED the user two stages ahead the instant a pick
+  // unlocked the rail (UX pass 2, F10)
+  const [active, setActive] = useState<StageKey>('gen');
   const [inspW, setInspW] = useInspectorWidth();
   // an active stage can become locked when switching characters — fall back
   const activeStage = stages.find((s) => s.key === active);
   const effective = activeStage && activeStage.state !== 'locked' ? active : 'gen';
+
+  // picking a canonical advances the rail to the NEXT stage in order - the
+  // journey continues at Rig, not wherever a default happened to point
+  const canonicalSha = String(
+    ((manifest ?? {}) as { canonicalMesh?: { gltfSha256?: string } }).canonicalMesh
+      ?.gltfSha256 ?? '',
+  );
+  const prevSha = useRef(canonicalSha);
+  useEffect(() => {
+    if (prevSha.current === '' && canonicalSha !== '' && active === 'gen') {
+      setActive('rig');
+    }
+    prevSha.current = canonicalSha;
+  }, [canonicalSha, active]);
 
   // `effective` can change WITHOUT a user act: the pick unlocks Look and the
   // default kicks in, or a character switch re-locks the active stage. Either
