@@ -21,13 +21,17 @@ returned a pure white atlas while seed 777 returned a black one. That is why
 path returns a textured trimesh, not a decoded voxel mesh, so `mesh.attrs` does
 not exist. Same decoder and the same [0, 1] scale, so the thresholds carry.
 
-**No inverse transform, and that is a deliberate correction.** `preprocess_mesh`
-recenters, rescales and swaps axes, which looked like it would hand every
-character back rotated and rescaled — but `postprocess_mesh` inverts the swap at
-`trellis2_texturing.py:359` and the spike measured 2.7e-4 mean surface deviation
-across seeds. The frame check below stays as a GUARD rather than a correction:
-it is cheap, and it is exactly the assumption that would break silently against
-a different texturing backend.
+**A similarity restore, then the guard (W4b).** The spike concluded no inverse
+transform was needed - `postprocess_mesh` inverts the axis swap and drift
+measured 2.7e-4 - but that held only for the spike's origin-centred meshes.
+Core sends GROUNDED canonicals (feet at Y=0, D-012), and the pipeline hands
+them back in TRELLIS's own convention: recentred, half a height away - the
+50% frame-moved refusal UX pass 2 hit on the first real retexture. The fix is
+the bounded inverse: one uniform scale (largest-extent ratio) and one
+translation (bounds-centre delta) map the output back onto the input's frame.
+The frame check stays as a GUARD after the restore - a similarity cannot fake
+away an axis swap or a non-uniform rescale, so a backend change still refuses
+loudly.
 
 **Topology is preserved only if the input carries UVs.** `postprocess_mesh`
 reuses `mesh.visual.uv` when present and runs `cumesh.uv_unwrap` when it is not,
@@ -61,7 +65,7 @@ from .trellis2 import (
     vram_peaks,
 )
 
-RETEXTURE_ADAPTER_VERSION = "0.1.0"
+RETEXTURE_ADAPTER_VERSION = "0.2.0"  # 0.2.0: frame restore before the guard (W4b)
 
 # How far the output frame may move before we refuse. The spike measured 0.1% of
 # extent across seeds, so 2% is far above the noise while still catching the two
@@ -147,6 +151,31 @@ def as_mesh(loaded: Any) -> Any:
 
 def has_uv(mesh: Any) -> bool:
     return getattr(getattr(mesh, "visual", None), "uv", None) is not None
+
+
+def restore_frame(source: Any, textured: Any) -> tuple[float, Any]:
+    """Map the textured mesh back onto the source's frame, in place (W4b).
+
+    TRELLIS.2 normalises into its own unit frame for texturing and
+    `postprocess_mesh` restores TRELLIS's convention, not the caller's: a
+    GROUNDED canonical (feet at Y=0, D-012) comes back centred on the origin,
+    half a height away. The inverse is the similarity that maps the output
+    bounds onto the input bounds: ONE uniform scale (largest-extent ratio)
+    and one translation (bounds-centre delta). Deliberately not a per-axis
+    affine - an axis swap or non-uniform rescale must still trip the frame
+    guard, never be flattened away silently. Returns (scale, translation)
+    for the meta record.
+    """
+    import numpy as np
+
+    t_lo, t_hi = (np.asarray(b, dtype=float) for b in textured.bounds)
+    if not float((t_hi - t_lo).max()) > 0.0:
+        raise AdapterError("no-mesh", "the retextured mesh has zero extent")
+    s_lo, s_hi = (np.asarray(b, dtype=float) for b in source.bounds)
+    scale = float((s_hi - s_lo).max()) / float((t_hi - t_lo).max())
+    shift = (s_lo + s_hi) / 2.0 - scale * (t_lo + t_hi) / 2.0
+    textured.vertices = textured.vertices * scale + shift
+    return scale, shift
 
 
 def frame_shift(before: Any, after: Any) -> float:
@@ -338,9 +367,10 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     )
     run_seconds = round(time.perf_counter() - run_t0, 2)
     textured = as_mesh(out)
+    restore_scale, restore_shift = restore_frame(source, textured)
 
-    # The guard, not a correction. If this trips, the backend changed under us
-    # and every character it produced is silently misplaced.
+    # The guard, not a correction: after the similarity restore, any residual
+    # is a permuted or warped frame - the backend changed under us.
     shift = frame_shift(source, textured)
     if shift > FRAME_TOLERANCE:
         raise AdapterError(
@@ -370,6 +400,12 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
                 # what the caller needs to know before trusting an existing rig
                 "topologyPreserved": not unwrapped,
                 "frameShift": round(shift, 6),
+                # the similarity that put the output back into the input's
+                # frame (W4b) - identity-ish when the backend behaves
+                "frameRestore": {
+                    "scale": round(restore_scale, 6),
+                    "translation": [round(float(v), 6) for v in restore_shift],
+                },
                 "loadSeconds": load_seconds,
                 "runSeconds": run_seconds,
                 **vram_peaks(),

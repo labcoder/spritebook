@@ -1474,6 +1474,34 @@ def test_retexture_frame_guard() -> None:
     except AdapterError as err:
         ok(err.code == "bad-input", f"bad-input, got {err.code}")
 
+    # W4b: the similarity restore puts a recentred, rescaled output back into
+    # the input's frame - the exact state the field failure arrived in (a
+    # grounded canonical returned centred on the origin in the unit box).
+    class _VertexMesh:
+        def __init__(self, vertices: Any) -> None:
+            self.vertices = np.asarray(vertices, dtype=float)
+
+        @property
+        def bounds(self) -> Any:
+            return np.stack([self.vertices.min(axis=0), self.vertices.max(axis=0)])
+
+    grounded = _VertexMesh([[-0.4, 0.0, -0.2], [0.4, 1.6, 0.2]])  # feet at Y=0
+    span = grounded.vertices.max(axis=0) - grounded.vertices.min(axis=0)
+    unit = _VertexMesh(
+        (grounded.vertices - (grounded.bounds[0] + grounded.bounds[1]) / 2.0)
+        / float(span.max())
+    )
+    ok(rt.frame_shift(grounded, unit) > rt.FRAME_TOLERANCE, "the field state trips the guard raw")
+    scale, shift = rt.restore_frame(grounded, unit)
+    ok(rt.frame_shift(grounded, unit) < 1e-9, f"restored exactly (scale {scale})")
+    ok(abs(scale - float(span.max())) < 1e-9, "the scale is the normalize's inverse")
+
+    # ...and the restore cannot fake away an axis swap: extents stay permuted,
+    # so the guard still refuses a genuinely changed backend
+    swapped_v = _VertexMesh([[-0.2, 0.0, -0.4], [0.2, 1.6, 0.4]])
+    rt.restore_frame(grounded, swapped_v)
+    ok(rt.frame_shift(grounded, swapped_v) > rt.FRAME_TOLERANCE, "a swap survives the restore")
+
 
 def test_retexture_params_and_uv() -> None:
     from .adapters import trellis2_retexture as rt
