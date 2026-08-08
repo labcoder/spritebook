@@ -17,7 +17,7 @@
  *   mismatch: UAL rests with a ~4° knee pre-bend, fixture rigs rest straight)
  * - A_TPose null transfer: 0 rad deviation, pelvis dev < 3e-8 m
  */
-import { assert, assertAlmostEquals, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertAlmostEquals, assertEquals, assertThrows } from 'jsr:@std/assert@1';
 import { NodeIO } from '@gltf-transform/core';
 import type { Clip, RetargetResult, SkeletonRest } from './contracts.ts';
 import { loadClip, loadSkeletonRest, UAL_HUMANOID } from './profile.ts';
@@ -469,4 +469,51 @@ Deno.test('non-unit rest scale fails loud, naming the joint (review F7)', async 
     assert(String(err).includes('rest scale'), `names the cause: ${err}`);
   }
   assert(threw, 'non-unit rest scale must be rejected, not silently mis-measured');
+});
+
+// ---------------------------------------------------------------------------
+// D-040: dialect targets resolve through profile aliases
+// ---------------------------------------------------------------------------
+
+function renamed(rest: SkeletonRest, ren: Record<string, string>): SkeletonRest {
+  const nn = (n: string) => ren[n] ?? n;
+  const parents = new Map<string, string>();
+  const locals = new Map<string, Float32Array>();
+  for (const [j, p] of rest.parents) parents.set(nn(j), nn(p));
+  for (const [j, m] of rest.locals) locals.set(nn(j), m);
+  return { parents, locals };
+}
+
+Deno.test('D-040: a hips/head dialect target maps through aliases, keeping its own names', async () => {
+  const f = await fx();
+  const canonical = f.targets.find(([n]) => n === 'normal')![1];
+  const dialect = renamed(canonical, { pelvis: 'hips', Head: 'head' });
+
+  const base = retargetClip(f.walk, f.ualRest, canonical, UAL_HUMANOID);
+  const res = retargetClip(f.walk, f.ualRest, dialect, UAL_HUMANOID);
+
+  // the target's OWN names are what the output speaks - a preview glb whose
+  // tracks named joints the nodes don't carry would animate nothing
+  assert(res.report.mapped.includes('hips'), 'hips mapped under its dialect name');
+  assert(res.report.mapped.includes('head'), 'head mapped under its dialect name');
+  assert(!res.report.mapped.includes('pelvis'), 'no phantom canonical names in the output');
+  assertEquals(res.report.aliases, { hips: 'pelvis', head: 'Head' });
+
+  // the motion is the SAME motion: rotations and root translation transfer
+  // exactly as they do onto the canonically-named twin
+  const hipsTrack = res.clip.tracks.get('hips')!;
+  const pelvisTrack = base.clip.tracks.get('pelvis')!;
+  assert(hipsTrack.translations, 'root motion flowed through the alias');
+  assertEquals([...hipsTrack.translations!], [...pelvisTrack.translations!]);
+  assertEquals([...hipsTrack.rotations!], [...pelvisTrack.rotations!]);
+  assertEquals([...res.clip.tracks.get('head')!.rotations!], [
+    ...base.clip.tracks.get('Head')!.rotations!,
+  ]);
+  assertAlmostEquals(res.stats.hipScale, base.stats.hipScale, 1e-12);
+  assertAlmostEquals(res.stats.footContactMaxErrM, base.stats.footContactMaxErrM, 1e-12);
+
+  // and a rig missing hips under EVERY name still refuses, naming the aliases
+  const noHips = renamed(canonical, { pelvis: 'sacrum' });
+  const err = assertThrows(() => retargetClip(f.walk, f.ualRest, noHips, UAL_HUMANOID), Error);
+  assert(err.message.includes('aliases tried'), err.message);
 });

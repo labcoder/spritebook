@@ -302,15 +302,42 @@ export function retargetClip(
   const src = buildRestSkeleton(sourceRest, 'source');
   const tgt = buildRestSkeleton(targetRest, 'target');
 
+  // D-040: the TARGET may speak a dialect - Mesh2Motion's lowercase `head`,
+  // the generic `hips` for `pelvis`. Resolve the profile's aliases against
+  // the target ONCE; srcNameOf maps a target joint to the canonical name
+  // whose source track drives it. Resolution, never renaming: everything the
+  // target owns - output tracks included - keeps the target's own names.
+  const aliasToCanon = new Map<string, string>();
+  for (const [canon, alts] of Object.entries(profile.aliases ?? {})) {
+    if (tgt.local.has(canon)) continue; // the canonical name wins outright
+    for (const a of alts) {
+      if (tgt.local.has(a)) {
+        aliasToCanon.set(a, canon);
+        break;
+      }
+    }
+  }
+  const srcNameOf = (n: string): string => aliasToCanon.get(n) ?? n;
+  const tgtNameOf = (canon: string): string => {
+    if (tgt.local.has(canon)) return canon;
+    for (const [a, c] of aliasToCanon) if (c === canon) return a;
+    return canon; // absent under every name - callers keep their checks
+  };
+
   const hips = profile.hips;
+  const tgtHips = tgtNameOf(hips);
   if (!src.local.has(hips)) {
     throw new Error(`retarget: source skeleton is missing the hips joint "${hips}"`);
   }
-  if (!tgt.local.has(hips)) {
-    throw new Error(`retarget: target skeleton is missing the hips joint "${hips}"`);
+  if (!tgt.local.has(tgtHips)) {
+    const alts = profile.aliases?.[hips]?.join('", "');
+    throw new Error(
+      `retarget: target skeleton is missing the hips joint "${hips}"` +
+        (alts ? ` (aliases tried: "${alts}")` : ''),
+    );
   }
   const srcHipY = src.worldPos.get(hips)![1];
-  const tgtHipY = tgt.worldPos.get(hips)![1];
+  const tgtHipY = tgt.worldPos.get(tgtHips)![1];
   if (!(srcHipY > 1e-6)) {
     throw new Error(
       `retarget: source hips rest height is ${srcHipY} m — cannot derive hipScale ` +
@@ -332,21 +359,22 @@ export function retargetClip(
   const yawQ = qAxisAngle([0, 1, 0], yaw);
   const yawQInv = qConj(yawQ);
 
-  // name-based mapping over the profile namespace — report, never guess
-  const mapped = tgt.order.filter((n) => source.tracks.has(n));
+  // name-based mapping over the profile namespace — report, never guess.
+  // Aliased target joints map to their canonical source track (D-040).
+  const mapped = tgt.order.filter((n) => source.tracks.has(srcNameOf(n)));
   const mappedSet = new Set(mapped);
-  const unmappedTarget = tgt.order.filter((n) => !source.tracks.has(n));
-  const unmappedSource = [...source.tracks.keys()].filter((n) => !tgt.local.has(n));
+  const unmappedTarget = tgt.order.filter((n) => !source.tracks.has(srcNameOf(n)));
+  const unmappedSource = [...source.tracks.keys()].filter((n) => !tgt.local.has(tgtNameOf(n)));
 
   // one shared key-time grid: union of the mapped source tracks' key times
   const timeSet = new Set<number>();
-  for (const n of mapped) for (const t of source.tracks.get(n)!.times) timeSet.add(t);
+  for (const n of mapped) for (const t of source.tracks.get(srcNameOf(n))!.times) timeSet.add(t);
   const grid = [...timeSet].sort((a, b) => a - b);
   const nF = grid.length;
 
   // feet usable for ground correction: profile feet present on BOTH skeletons
-  const feet = profile.feet.filter((f) => src.local.has(f) && tgt.local.has(f));
-  const hipsMapped = mappedSet.has(hips);
+  const feet = profile.feet.filter((f) => src.local.has(f) && tgt.local.has(tgtNameOf(f)));
+  const hipsMapped = mappedSet.has(tgtHips);
 
   const rotOut = new Map<string, Float64Array>();
   for (const n of mapped) rotOut.set(n, new Float64Array(nF * 4));
@@ -373,13 +401,14 @@ export function retargetClip(
       let localPos = j.pos;
       if (mappedSet.has(n)) {
         // tgtWorld = Y ⊗ (srcWorld ⊗ conj(srcRestWorld)) ⊗ conj(Y) ⊗ tgtRestWorld
-        const delta = qMul(pose.rot.get(n)!, qConj(src.worldRot.get(n)!));
+        const sn = srcNameOf(n);
+        const delta = qMul(pose.rot.get(sn)!, qConj(src.worldRot.get(sn)!));
         const tgtWorld = qMul(yawQ, qMul(delta, qMul(yawQInv, tgt.worldRot.get(n)!)));
         localRot = qNormalize(qMul(qConj(pRot), tgtWorld));
         rotOut.get(n)!.set(localRot, f * 4);
-        if (n === hips) {
+        if (n === tgtHips) {
           const deltaPos = vSub(pose.pos.get(hips)!, src.worldPos.get(hips)!);
-          const goal = vAdd(tgt.worldPos.get(hips)!, vScale(qRotate(yawQ, deltaPos), hipScale));
+          const goal = vAdd(tgt.worldPos.get(tgtHips)!, vScale(qRotate(yawQ, deltaPos), hipScale));
           localPos = qRotate(qConj(pRot), vSub(goal, pPos));
           hipGoal.push(goal);
           hipParentRot.push(pRot);
@@ -391,7 +420,7 @@ export function retargetClip(
     }
     for (const foot of feet) {
       srcFootY.get(foot)![f] = pose.pos.get(foot)![1];
-      tgtFootY.get(foot)![f] = worldPos.get(foot)![1];
+      tgtFootY.get(foot)![f] = worldPos.get(tgtNameOf(foot))![1];
     }
   }
 
@@ -406,7 +435,7 @@ export function retargetClip(
       for (const foot of feet) {
         const grounded = srcFootY.get(foot)![f] <= src.worldPos.get(foot)![1] + CONTACT_EPS_M;
         if (!grounded) continue;
-        const rel = tgtFootY.get(foot)![f] - tgt.worldPos.get(foot)![1];
+        const rel = tgtFootY.get(foot)![f] - tgt.worldPos.get(tgtNameOf(foot))![1];
         if (rel < bestRel) bestRel = rel;
       }
       if (bestRel < Infinity) {
@@ -476,14 +505,16 @@ export function retargetClip(
       rotations: Float32Array.from(rots),
       interpolation: 'LINEAR',
     };
-    if (n === hips) track.translations = Float32Array.from(hipLocal);
+    if (n === tgtHips) track.translations = Float32Array.from(hipLocal);
     tracks.set(n, track);
   }
 
+  const aliasEntries = [...aliasToCanon].filter(([a]) => mappedSet.has(a));
   const report: MappingReport = {
     mapped: [...mapped].sort(),
     unmappedTarget: [...unmappedTarget].sort(),
     unmappedSource: [...unmappedSource].sort(),
+    ...(aliasEntries.length ? { aliases: Object.fromEntries(aliasEntries) } : {}),
   };
 
   return {

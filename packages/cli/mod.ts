@@ -1517,7 +1517,11 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
             UAL_HUMANOID,
           );
           // the bake's own warnings, surfaced BEFORE a bake spends GPU time
-          const coreMissing = UAL_HUMANOID.core.filter((j) => !report.mapped.includes(j));
+          // compare in canonical space: an aliased target joint (D-040) is
+          // driven even though its own name is not the profile's
+          const coreMissing = UAL_HUMANOID.core.filter(
+            (c) => !report.mapped.some((m) => (report.aliases?.[m] ?? m) === c),
+          );
           if (coreMissing.length) {
             const msg = `clip "${previewClip}": ${coreMissing.length} core joints not driven ` +
               `(${coreMissing.join(', ')}) - they hold the rest pose`;

@@ -408,7 +408,11 @@ async function prepareClips(
       `${packDir}/clips/${binding.clipId}.glb`,
     );
     const { clip, report, stats } = retargetClip(source, sourceRest, targetRest, UAL_HUMANOID);
-    const coreMissing = UAL_HUMANOID.core.filter((j) => !report.mapped.includes(j));
+    // canonical-space comparison: an aliased target joint (D-040) is driven
+    // even though its own name is not the profile's
+    const coreMissing = UAL_HUMANOID.core.filter(
+      (c) => !report.mapped.some((m) => (report.aliases?.[m] ?? m) === c),
+    );
     if (coreMissing.length) {
       warnings.push({
         code: 'anim-unmapped-core',

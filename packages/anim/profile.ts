@@ -97,6 +97,15 @@ export const UAL_HUMANOID: HumanoidProfile = {
   sidePairs: SIDE_STEMS.map((s) => [`${s}_l`, `${s}_r`] as const),
   hips: 'pelvis',
   feet: ['foot_l', 'foot_r'],
+  // D-040: dialects a real target rig actually speaks. UniRig's naming pass
+  // uses the Mesh2Motion reference, which says lowercase `head`; `hips` is
+  // the near-universal convention for what UAL calls `pelvis`. Verified
+  // against a real track-B skeleton (kira, 53 joints) - everything else it
+  // names already matches UAL verbatim.
+  aliases: {
+    Head: ['head'],
+    pelvis: ['hips', 'Hips'],
+  },
 };
 
 // ---------------------------------------------------------------------------

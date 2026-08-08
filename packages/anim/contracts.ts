@@ -47,6 +47,13 @@ export interface HumanoidProfile {
   /** the hips/root-motion joint and the ground-contact joints */
   hips: string;
   feet: readonly string[];
+  /**
+   * accepted synonyms per canonical name (D-040): a TARGET skeleton may speak
+   * another rig convention's dialect — Mesh2Motion's lowercase `head`, the
+   * generic `hips` for `pelvis`. Resolution happens at retarget time and the
+   * target keeps its own names; nothing is ever renamed.
+   */
+  aliases?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** Per-joint mapping outcome; `unmapped` is a report, never a guess. */
@@ -56,6 +63,12 @@ export interface MappingReport {
   unmappedTarget: string[];
   /** source tracks with no target joint — dropped */
   unmappedSource: string[];
+  /**
+   * target joints mapped through a profile alias (D-040): target name ->
+   * the canonical name whose track drives it. Absent when no alias fired,
+   * so pre-alias consumers read the report unchanged.
+   */
+  aliases?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
