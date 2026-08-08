@@ -63,9 +63,9 @@ import {
   detectVramGb,
   gatePlatform,
   loadCatalog,
-  probeInstallState,
   resolveInstalled,
   versionDir,
+  virtualizationNote,
 } from '@spritebook/registry';
 import { importToCanonical } from '@spritebook/importer';
 import { describeMesh, readEffectiveSeed, sha256Hex } from './gen.ts';
@@ -228,15 +228,14 @@ export async function* runRetextureJob(
     }
     if (!chosen) {
       const names = [...new Set(pool.map((c) => c.entry.id))];
-      // the probe rides the error because a field incident read not-installed
-      // from a root whose receipt existed - see probeInstallState
+      // when this process's %LOCALAPPDATA% is a container overlay, SAY SO (D-039)
       throw new RetextureFail(
         'not-installed',
         `Nothing that can retexture is installed - run \`spritebook models install ${
           names[0]
-        }\` (capable backends: ${names.join(', ')}; models root: ${root}). Probe: ${
-          names[0] !== undefined ? await probeInstallState(root, names[0]) : '(no capable backends)'
-        }`,
+        }\` (capable backends: ${
+          names.join(', ')
+        }; models root: ${root}).${await virtualizationNote()}`,
       );
     }
     const { entry, version } = chosen;

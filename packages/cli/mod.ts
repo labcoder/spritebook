@@ -2231,16 +2231,12 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
       const root = flag(args, 'models-dir') ?? registry.defaultModelsRoot();
       const installed = await registry.resolveInstalled(root, backend);
       if (!installed) {
-        // the probe rides the error because a field incident read
-        // not-installed from a root whose receipt existed - probeInstallState
+        // when this process's %LOCALAPPDATA% is a container overlay, SAY SO (D-039)
         return fail(
           'rig' as JobEvent['jobId'],
           'model-missing',
           `Rig backend "${backend}" is not installed - run \`spritebook models install ${backend}\` ` +
-            `first (models root: ${root}). Probe: ${await registry.probeInstallState(
-              root,
-              backend,
-            )}`,
+            `first (models root: ${root}).${await registry.virtualizationNote()}`,
         );
       }
       const sidecarDir = flag(args, 'sidecar') ?? Deno.env.get('SPRITEBOOK_SIDECAR_DIR') ??

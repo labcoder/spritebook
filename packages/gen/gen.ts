@@ -39,9 +39,9 @@ import {
   detectVramGb,
   gatePlatform,
   loadCatalog,
-  probeInstallState,
   resolveInstalled,
   versionDir,
+  virtualizationNote,
 } from '@spritebook/registry';
 import { defaultModelsRoot, detectPlatform } from '@spritebook/registry';
 import { componentsOfFile, disconnectedWarning, importToCanonical } from '@spritebook/importer';
@@ -144,12 +144,12 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     const root = opts.modelsRoot ?? defaultModelsRoot();
     const installed = await resolveInstalled(root, entry.id, opts.version);
     if (!installed) {
-      // the probe rides the error because a field incident read not-installed
-      // from a root whose receipt existed - see probeInstallState
+      // when this process's %LOCALAPPDATA% is a container overlay, SAY SO -
+      // that split is what the old blind probe never caught (D-039)
       throw new GenFail(
         'not-installed',
         `Backend "${entry.id}" is not installed - run \`spritebook models install ${entry.id}\` ` +
-          `first (models root: ${root}). Probe: ${await probeInstallState(root, entry.id)}`,
+          `first (models root: ${root}).${await virtualizationNote()}`,
       );
     }
     const version = entry.versions.find((v) => v.version === installed.version);

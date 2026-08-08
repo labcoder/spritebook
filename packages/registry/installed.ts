@@ -155,50 +155,8 @@ function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-/**
- * One forensic line about WHY a model resolves as not-installed, built from
- * direct filesystem probes at the moment of the failure.
- *
- * Exists because of a field incident this cannot yet explain: a rig preflight
- * read "not installed" from a root whose receipt was on disk before and after
- * (July mtimes, valid content), the reinstall re-downloaded 16 GB, and every
- * later read agreed the model was installed - while a second shell reading
- * the same paths saw the July receipts the whole time. Two internally
- * consistent views of one filesystem. Whatever the mechanism (an env
- * difference, a virtualized view, a transient FS error surfaced as NotFound),
- * the next occurrence must hand over the evidence instead of a bare sentence:
- * this line states what each path probe returned RIGHT THEN, from inside the
- * failing process.
- */
-export async function probeInstallState(root: string, id: string): Promise<string> {
-  const parts: string[] = [];
-  const envOverride = Deno.env.get('SPRITEBOOK_MODELS_DIR');
-  parts.push(envOverride ? `SPRITEBOOK_MODELS_DIR=${envOverride}` : 'models root from OS default');
-  const probeDir = async (label: string, path: string): Promise<string[] | null> => {
-    try {
-      const entries = (await Array.fromAsync(Deno.readDir(path))).map((e) =>
-        e.isDirectory ? `${e.name}/` : e.name
-      );
-      parts.push(`${label}: ${entries.length === 0 ? '(empty)' : entries.sort().join(' ')}`);
-      return entries;
-    } catch (err) {
-      parts.push(`${label}: ${(err as Error).name ?? 'error'} (${message(err)})`);
-      return null;
-    }
-  };
-  const rootEntries = await probeDir('root', root);
-  if (rootEntries?.includes(`${id}/`)) {
-    const versions = await probeDir(`${id}/`, `${root}/${id}`);
-    for (const v of versions ?? []) {
-      if (!v.endsWith('/')) continue;
-      const rp = `${root}/${id}/${v.slice(0, -1)}/${RECEIPT_FILE}`;
-      try {
-        const st = await Deno.stat(rp);
-        parts.push(`${v}${RECEIPT_FILE}: ${st.size}B mtime ${st.mtime?.toISOString() ?? '?'}`);
-      } catch (err) {
-        parts.push(`${v}${RECEIPT_FILE}: ${(err as Error).name ?? 'error'}`);
-      }
-    }
-  }
-  return parts.join(' · ');
-}
+// The forensic probeInstallState that used to live here is gone: the field
+// incident it existed to catch is root-caused (D-039, MSIX AppData
+// virtualization), and a directory-listing probe was blind to it by
+// construction - it read through the very overlay it needed to detect. The
+// honest replacement is virtualization.ts's write probe.
