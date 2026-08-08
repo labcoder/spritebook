@@ -76,6 +76,21 @@ Deno.test('anim --preview writes the retargeted clip onto the rigged character',
     // unmapped joints are dropped, never dangled
     for (const ch of channels) assert(ch.getTargetNode() !== null);
 
+    // W4c: SEPARATE vertex layout, pinned at the byte level - interleaved
+    // mixed-type buffers defeat the studio viewport's WebGPU vertex formats
+    // (the 'unorm32x4' empty canvas), so a per-attribute bufferView may
+    // stride at most one element (float32 VEC4 = 16 bytes)
+    const glbBytes = await Deno.readFile(glbPath);
+    const dv = new DataView(glbBytes.buffer, glbBytes.byteOffset);
+    const jsonLen = dv.getUint32(12, true);
+    const gjson = JSON.parse(new TextDecoder().decode(glbBytes.subarray(20, 20 + jsonLen)));
+    for (const bv of gjson.bufferViews ?? []) {
+      assert(
+        (bv.byteStride ?? 0) <= 16,
+        `interleaved bufferView: stride ${bv.byteStride} spans multiple attributes`,
+      );
+    }
+
     // regenerate-on-demand: a second call overwrites without complaint (D-038)
     const again = await cli(['anim', '--preview', 'idle-loop', '--workspace', ws]);
     assertEquals(again.code, 0);

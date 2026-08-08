@@ -66,6 +66,13 @@ export function Viewport(
         setSelected(j);
         selRef.current?.(j);
       });
+      // a render-loop throw must be VISIBLE, not just a dataset attribute:
+      // UX pass 2 watched a transport play over an empty canvas because the
+      // pipeline error only reached the in-pane checks (F16a)
+      v.on('error', (message) => {
+        setState('error');
+        setError(t('the canvas failed to draw: ') + message);
+      });
       setState('idle');
     }, (err) => {
       if (!live) return;

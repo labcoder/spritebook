@@ -5,7 +5,7 @@
  * the parity acceptance samples this GLB's tracks and compares joint locals
  * against the poses file, frame for frame.
  */
-import { type Document, NodeIO } from '@gltf-transform/core';
+import { type Document, NodeIO, VertexLayout } from '@gltf-transform/core';
 import type { Clip } from './contracts.ts';
 
 /** Add `clip` as an animation named `name` on the target document's nodes. */
@@ -48,7 +48,13 @@ export async function writePreviewGlb(
   clip: Clip,
   outPath: string,
 ): Promise<void> {
-  const io = new NodeIO();
+  // SEPARATE, not gltf-transform's default interleaved layout (W4c): the
+  // studio viewport's three.js WebGPU backend derives vertex formats from
+  // interleaved mixed-type buffers that WebGPU does not have ('unorm32x4'),
+  // and the canvas renders NOTHING while the transport plays. Every other
+  // glb writer in the repo emits plain per-attribute buffers and renders;
+  // the preview must too.
+  const io = new NodeIO().setVertexLayout(VertexLayout.SEPARATE);
   const doc = await io.readBinary(await Deno.readFile(targetModelPath));
   addClipToDocument(doc, clip, clip.id);
   await Deno.writeFile(outPath, await io.writeBinary(doc));

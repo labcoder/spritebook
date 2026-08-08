@@ -329,6 +329,7 @@ export const es: Record<string, string> = {
   'Preview': 'Vista previa',
   'Motion preview': 'Vista previa del movimiento',
   'Scrub the clip': 'Recorrer el clip',
+  'the canvas failed to draw: ': 'el lienzo no pudo dibujar: ',
   'core retargets the clip onto this character — the canvas only plays it':
     'core reorienta el clip a este personaje — el lienzo solo lo reproduce',
   'press Preview on an enabled clip to see its motion here':
