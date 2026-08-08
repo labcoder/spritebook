@@ -33,6 +33,9 @@ export type { LightFrame } from './renderer.ts';
 // render identity + health as plain data (D-004-safe; no GPU object crosses)
 export { renderDiagnostics, renderSignature } from './diagnostics.ts';
 export type { RenderDiagnostics } from './diagnostics.ts';
+// the honest availability probe, for best-effort callers (gen thumbnails):
+// returns null instead of throwing when no adapter exists
+export { tryGetGpu } from './gpu.ts';
 
 /** Render one canonical model to per-direction AOV pages + a throughput report. */
 export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent> {

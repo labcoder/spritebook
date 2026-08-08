@@ -70,6 +70,7 @@ import {
 import { importToCanonical } from '@spritebook/importer';
 import { describeMesh, readEffectiveSeed, sha256Hex } from './gen.ts';
 import { heightOf } from './pick.ts';
+import { writeResultThumb } from './thumb.ts';
 
 const RETEXTURE: Capability = 'retexture';
 
@@ -355,6 +356,14 @@ export async function* runRetextureJob(
     }
     await Deno.writeFile(rp.model, canonical.bytes);
     await Deno.writeTextFile(rp.preflight, JSON.stringify(canonical.report, null, 2) + '\n');
+
+    // W5b: a repaint earns a card too - same best-effort front view as gen
+    const thumbPath = `${rp.dir}/thumb.png`;
+    if (
+      await writeResultThumb(rp.model, await heightOf(canonical.bytes), thumbPath) === 'written'
+    ) {
+      yield { t: 'artifact', jobId, at: at(), kind: 'gen-thumb', path: thumbPath };
+    }
 
     // 7. the receipt, naming its parent
     const gltfSha256 = await sha256Hex(canonical.bytes);

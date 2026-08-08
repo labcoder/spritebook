@@ -48,6 +48,7 @@ import { componentsOfFile, disconnectedWarning, importToCanonical } from '@sprit
 import { NodeIO } from '@gltf-transform/core';
 import { decode as decodePng } from 'fast-png';
 import { heightOf } from './pick.ts';
+import { writeResultThumb } from './thumb.ts';
 import { rankCandidates, rankingMessage } from './candidates.ts';
 
 export interface GenJobOptions extends GenJobSpec {
@@ -360,6 +361,15 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
       }
       await Deno.writeFile(crp.model, canonical.bytes);
       await Deno.writeTextFile(crp.preflight, JSON.stringify(canonical.report, null, 2) + '\n');
+
+      // W5b: the candidates screen judges meshes, not numbers - a front-view
+      // lit render per result, through the bake's own pipeline. Best-effort:
+      // no GPU or a render failure means no thumb, never a failed gen.
+      const thumbPath = `${crp.dir}/thumb.png`;
+      const thumbHeight = await heightOf(canonical.bytes);
+      if (await writeResultThumb(crp.model, thumbHeight, thumbPath) === 'written') {
+        yield { t: 'artifact', jobId, at: at(), kind: 'gen-thumb', path: thumbPath };
+      }
 
       // 7. the receipt, pinned to the CANONICAL bytes
       const gltfSha256 = await sha256Hex(canonical.bytes);
