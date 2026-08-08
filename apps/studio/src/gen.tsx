@@ -114,6 +114,20 @@ function BackendCards({ models, selectedId, onSelect, dimUnselected }: {
   );
 }
 
+/** A result's front-view thumb (core output, W5b); absent file = no img. */
+function CandThumb({ bridge, path }: { bridge: StudioBridge; path: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    bridge.readImage(path).then((s) => live && setSrc(s), () => {});
+    return () => {
+      live = false;
+    };
+  }, [bridge, path]);
+  if (!src) return null;
+  return <img className='candthumb' src={src} alt='' />;
+}
+
 /* ---------------- job failure, made legible ---------------- */
 
 export interface JobFailure {
@@ -735,6 +749,9 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
       )}
       {(inspecting !== null || canonical) && (
         <div className='candvp'>
+          <div className='candvplabel mono' role='status'>
+            {t('inspecting')}: {inspecting ?? t('canonical mesh')}
+          </div>
           <Viewport
             bridge={bridge}
             meshPath={inspecting !== null
@@ -748,12 +765,19 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
       )}
       <div className='candgrid'>
         {results.map((r) => (
-          <div key={r.id} className={`cand ${picked === r.id ? 'picked' : ''}`}>
+          <div
+            key={r.id}
+            className={`cand ${picked === r.id ? 'picked' : ''} ${
+              inspecting === r.id ? 'inspecting' : ''
+            }`}
+          >
             <div className='candhead'>
               <span className='mono candid'>{r.id}</span>
               {picked === r.id && <span className='mbadge ok'>{t('picked')}</span>}
+              {inspecting === r.id && <span className='mbadge'>{t('inspecting')}</span>}
               {r.discarded && <span className='mbadge'>{t('discarded')}</span>}
             </div>
+            <CandThumb bridge={bridge} path={`${dir}/results/${r.id}/thumb.png`} />
             <div className='candmeta mono'>
               {t('seed')} {r.seed}
               {r.backend?.modelId ? ` · ${r.backend.modelId}` : ''}

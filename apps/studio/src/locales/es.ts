@@ -137,6 +137,8 @@ export const es: Record<string, string> = {
   'ids are lowercase letters, digits and dashes': 'los ids son minúsculas, dígitos y guiones',
   'Source image': 'Imagen de origen',
   'Height (m)': 'Altura (m)',
+  'inspecting': 'inspeccionando',
+  'canonical mesh': 'malla canónica',
   'height must be metres between 0 and 10, or empty to keep the backend scale':
     'la altura debe ser metros entre 0 y 10, o vacía para mantener la escala del backend',
   'the size every stage believes — sprites frame at pixels-per-metre':
