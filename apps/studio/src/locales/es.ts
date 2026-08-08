@@ -138,6 +138,17 @@ export const es: Record<string, string> = {
   'Source image': 'Imagen de origen',
   'Height (m)': 'Altura (m)',
   'inspecting': 'inspeccionando',
+  'Canonical mesh': 'Malla canónica',
+  'less': 'menos',
+  'show all': 'mostrar todo',
+  'lowVram is off — the health exam found': 'lowVram desactivado — el examen de salud encontró',
+  'nothing recorded yet — Record look writes these values':
+    'nada registrado todavía — Registrar look escribe estos valores',
+  'the folder may have been moved or deleted — point at another, or':
+    'la carpeta pudo moverse o borrarse — apunta a otra, o',
+  'use the default location': 'usar la ubicación por defecto',
+  'what the rig will be fitted to — the mesh you just picked':
+    'a lo que se ajustará el rig — la malla que acabas de elegir',
   'canonical mesh': 'malla canónica',
   'height must be metres between 0 and 10, or empty to keep the backend scale':
     'la altura debe ser metros entre 0 y 10, o vacía para mantener la escala del backend',

@@ -178,12 +178,27 @@ export function FailureNote({ failure, onOpenModels }: {
   failure: JobFailure;
   onOpenModels?: () => void;
 }) {
-  const brief = failure.message.length > 220
-    ? failure.message.slice(0, 220) + '…'
-    : failure.message;
+  // the truncation used to cut messages at their remedy clause (F9); the
+  // full sentence is one press away now, and collapses back the same way
+  const [expanded, setExpanded] = useState(false);
+  const long = failure.message.length > 220;
+  const brief = expanded || !long ? failure.message : failure.message.slice(0, 220) + '…';
   return (
     <span className='mv-exit mono' role='status'>
       {t('failed')}: {brief || t('the log drawer has the verbatim reason')}
+      {long && (
+        <>
+          {' '}
+          <button
+            type='button'
+            className='linkish'
+            aria-expanded={expanded}
+            onClick={() => setExpanded((e) => !e)}
+          >
+            {expanded ? t('less') : t('show all')}
+          </button>
+        </>
+      )}
       {onOpenModels && failure.code !== null && MODEL_PROBLEMS.has(failure.code) && (
         <>
           {' '}
@@ -323,16 +338,20 @@ export function CliTwin({ args }: { args: string[] }) {
 
 /* ---------------- GenerateNew (the + tab) ---------------- */
 
-export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, catalogEpoch }: {
-  bridge: StudioBridge;
-  projectsRoot: string;
-  /** called with the new CHARACTER ID after gen exits 0 - the App re-reads
-   * the list and resolves the workspace dir in the shell's own notation */
-  onCreated: (characterId: string) => void;
-  onOpenModels: () => void;
-  /** bumped when Manage models closes - the backend cards re-read the catalog */
-  catalogEpoch?: number;
-}) {
+export function GenerateNew(
+  { bridge, projectsRoot, onCreated, onOpenModels, catalogEpoch, vramGb }: {
+    bridge: StudioBridge;
+    projectsRoot: string;
+    /** called with the new CHARACTER ID after gen exits 0 - the App re-reads
+     * the list and resolves the workspace dir in the shell's own notation */
+    onCreated: (characterId: string) => void;
+    onOpenModels: () => void;
+    /** bumped when Manage models closes - the backend cards re-read the catalog */
+    catalogEpoch?: number;
+    /** the health exam's measured VRAM (F3) - null until an exam has run */
+    vramGb?: number | null;
+  },
+) {
   const [name, setName] = useState('');
   const [imagePath, setImagePath] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
@@ -392,6 +411,16 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
     [version, resolved],
   );
 
+  // F3: a card the health exam measured at >= 16 GiB should not pay the
+  // lowVram tax by default. The flip is an EXPLICIT value, so it travels in
+  // --adjust exactly like a hand change, and flipping it back sticks (the
+  // `in` guard never overrides a user's own choice).
+  useEffect(() => {
+    if ((vramGb ?? 0) >= 16 && resolved['lowVram'] === true) {
+      setValues((cur) => ('lowVram' in cur ? cur : { ...cur, lowVram: false }));
+    }
+  }, [vramGb, resolved]);
+
   const workspace = `${projectsRoot}/${slug || '<id>'}`;
   const heightVal = heightM.trim() === '' ? undefined : Number(heightM);
   const heightBad = heightVal !== undefined && !(heightVal > 0 && heightVal < 10);
@@ -436,7 +465,11 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
       let last = line;
       try {
         const e = JSON.parse(line);
-        last = e.message ?? e.stage ?? e.t ?? line;
+        // a progress event NAMES its step (download:model.ckpt, sample,
+        // border...) - "3 events · progress" told the user nothing (F5)
+        last = e.t === 'progress' && e.step
+          ? `${e.step} ${e.done}/${e.total}`
+          : e.message ?? e.stage ?? e.t ?? line;
       } catch { /* verbatim */ }
       setRun((cur) => ({
         running: true,
@@ -609,11 +642,35 @@ export function GenerateNew({ bridge, projectsRoot, onCreated, onOpenModels, cat
           <span className='hud'>{t('Options')}</span>
           <span className='inote'>{t('defaults are the catalog’s — only changes travel')}</span>
         </div>
+        {fields.some((f) => f.key === 'decimationTarget') && (
+          <div className='genrow'>
+            <span className='optkey mono'>{t('effort')}</span>
+            <span className='m-seg' role='group' aria-label={t('Effort (polygon budget)')}>
+              {EFFORT_PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  type='button'
+                  className='btn mbtn'
+                  aria-pressed={values['decimationTarget'] === p.decimationTarget}
+                  onClick={() =>
+                    setValues((cur) => ({ ...cur, decimationTarget: p.decimationTarget }))}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </span>
+          </div>
+        )}
         <OptionsForm
           fields={fields}
           values={values}
           onChange={(k, v) => setValues((cur) => ({ ...cur, [k]: v }))}
         />
+        {(vramGb ?? 0) >= 16 && values['lowVram'] === false && resolved['lowVram'] === true && (
+          <span className='inote'>
+            {t('lowVram is off — the health exam found')} {vramGb} GiB
+          </span>
+        )}
       </section>
 
       <section className='gensec'>
