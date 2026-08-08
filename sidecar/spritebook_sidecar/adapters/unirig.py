@@ -157,6 +157,20 @@ NAME_MIRROR_MARGIN = 0.005
 #: fraction of joints that must take a reference name before the skeleton is
 #: called semantically named
 SEMANTIC_MIN_FRACTION = 0.5
+#: reference joints the retarget cannot run without (the UAL core, minus the
+#: `root` UniRig never predicts). The greedy global threshold can name twenty
+#: finger tips and leave the pelvis or a hand as ``bone_N`` (UX pass 2, kira:
+#: both hands and a clavicle lost to fingers; pelvis borderline run-to-run),
+#: and no downstream alias can name an unnamed joint — so these get a second
+#: chance under a looser, still-bounded radius. D-040.
+CORE_RESCUE_NAMES = (
+    "pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head",
+    "clavicle_l", "upperarm_l", "lowerarm_l", "hand_l",
+    "clavicle_r", "upperarm_r", "lowerarm_r", "hand_r",
+    "thigh_l", "calf_l", "foot_l", "thigh_r", "calf_r", "foot_r",
+)
+#: rescue radius: twice the strict threshold, in the same unit-height space
+CORE_RESCUE_THRESHOLD = 2.0 * NAME_MATCH_THRESHOLD
 
 PARAMS_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -777,11 +791,40 @@ def semantic_names(
     names = list(fallback)
     for ti, (ri, _d) in pairs.items():
         names[ti] = ref_names[ri]
+
+    # Core rescue (D-040): the retarget-critical joints re-match under a
+    # looser, still-bounded radius — but ONLY when the greedy pass already
+    # cleared the humanoid bar. Rescue completes an evidently-humanoid match;
+    # it never creates one (the giraffe stays a giraffe). Each rescue records
+    # its measured distance: report, never guess.
+    rescued: dict[str, float] = {}
+    if len(pairs) >= SEMANTIC_MIN_FRACTION * stats["total"]:
+        probe = normalized * np.array([-1.0, 1.0, 1.0]) if use_mirror else normalized
+        used_t = set(pairs.keys())
+        used_r = {ri for ri, _ in pairs.values()}
+        for name in CORE_RESCUE_NAMES:
+            ri = ref_names.index(name)
+            if ri in used_r:
+                continue
+            free = [ti for ti in range(probe.shape[0]) if ti not in used_t]
+            if not free:
+                break
+            d = np.linalg.norm(probe[free] - reference[ri][None, :], axis=1)
+            best = int(np.argmin(d))
+            if float(d[best]) > CORE_RESCUE_THRESHOLD:
+                continue
+            ti = free[best]
+            used_t.add(ti)
+            used_r.add(ri)
+            names[ti] = name
+            rescued[name] = round(float(d[best]), 4)
+
     stats.update(
-        matched=len(pairs),
+        matched=len(pairs) + len(rescued),
         mirrored=bool(use_mirror),
         directMatched=len(direct),
         mirroredMatched=len(mirrored),
+        rescued=rescued,
     )
     return names, stats
 

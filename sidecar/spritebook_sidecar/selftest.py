@@ -853,6 +853,18 @@ def test_unirig_naming() -> None:
     ok(names[ref_names.index("foot_r")] == "foot_r", "right stays right")
     ok(stats["mirrored"] is False, "an unmirrored skeleton is not flipped")
 
+    # D-040 core rescue: a pelvis displaced beyond the strict threshold but
+    # inside the rescue radius still takes its name — retarget-critical joints
+    # must not stay bone_N while finger tips match (UX pass 2, kira).
+    displaced = joints.copy()
+    pi = ref_names.index("pelvis")
+    displaced[pi, 1] -= 0.15 * 1.7  # unit-space 0.15: past 0.12, inside 0.24
+    r_names, r_stats = unirig.semantic_names(displaced, fallback)
+    ok(r_names[pi] == "pelvis", f"the displaced pelvis is rescued: {r_stats}")
+    ok("pelvis" in r_stats["rescued"], "the rescue is recorded, not silent")
+    ok(abs(r_stats["rescued"]["pelvis"] - 0.15) < 0.02, "with its measured distance")
+    ok(r_stats["matched"] == len(ref_names), "rescue completes the match")
+
     # D-008 / catalog item 6: on a symmetric character the mirrored hypothesis
     # ties the direct one on float noise, and a tie must NOT swap sides.
     mirrored_input = joints * np.array([-1.0, 1.0, 1.0])
