@@ -865,6 +865,30 @@ def test_unirig_naming() -> None:
     ok(abs(r_stats["rescued"]["pelvis"] - 0.15) < 0.02, "with its measured distance")
     ok(r_stats["matched"] == len(ref_names), "rescue completes the match")
 
+    # D-040 topology rescue: the chain-shift seen twice in the field - the hip
+    # prediction lands ON spine_01's reference (a skirted character), takes
+    # that slot, and "pelvis" goes unassigned with the real spine_01 too far
+    # to matter. The thighs' shared parent IS the pelvis by definition.
+    shifted = joints.copy()
+    pel = ref_names.index("pelvis")
+    sp1 = ref_names.index("spine_01")
+    shifted[pel] = reference[sp1] * 1.7  # the hip sits on spine_01's spot
+    # the real spine_01 strays INSIDE the body envelope (an outlier outside it
+    # would poison the unit-height normalization and fail the humanoid gate)
+    # but > the rescue radius from every free reference
+    shifted[sp1] = np.array([0.45, 0.45, 0.0]) * 1.7
+    parents = np.full(len(ref_names), -1, dtype=np.int64)
+    parents[ref_names.index("thigh_l")] = pel
+    parents[ref_names.index("thigh_r")] = pel
+    t_names, t_stats = unirig.semantic_names(shifted, fallback, parents=parents)
+    ok(t_names[pel] == "pelvis", f"the thighs' parent is named pelvis: {t_stats}")
+    ok(
+        t_stats["pelvisByTopology"]["replaced"] == "spine_01",
+        "the released positional name is recorded",
+    )
+    ok("pelvis" in t_stats["rescued"], "with its measured (large) distance")
+    ok("spine_01" not in t_names, "the freed name is not silently reassigned")
+
     # D-008 / catalog item 6: on a symmetric character the mirrored hypothesis
     # ties the direct one on float noise, and a tie must NOT swap sides.
     mirrored_input = joints * np.array([-1.0, 1.0, 1.0])

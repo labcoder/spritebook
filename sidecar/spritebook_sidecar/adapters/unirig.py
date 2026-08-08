@@ -761,7 +761,7 @@ def _greedy_assign(
 
 
 def semantic_names(
-    joints: np.ndarray, fallback: list[str]
+    joints: np.ndarray, fallback: list[str], parents: np.ndarray | None = None
 ) -> tuple[list[str], dict[str, Any]]:
     """Name predicted joints from the humanoid reference, or admit it did not.
 
@@ -819,8 +819,33 @@ def semantic_names(
             names[ti] = name
             rescued[name] = round(float(d[best]), 4)
 
+        # The hips outranks position (D-040): a skirted or high-waisted
+        # character lands its hip prediction nearer spine_01's reference,
+        # chain-shifting the trunk and leaving "pelvis" unassigned - the
+        # exact field failure, twice. Topology is the profile's own
+        # DEFINITION of hips (the joint the legs branch from), so when both
+        # thighs are named and share a parent, that parent IS the pelvis;
+        # a positional name it took is released and recorded. One
+        # warn-level spine hole beats an unretargetable rig.
+        if parents is not None and "pelvis" not in set(names):
+            named_idx = {n: i for i, n in enumerate(names)}
+            tl = named_idx.get("thigh_l")
+            tr = named_idx.get("thigh_r")
+            if tl is not None and tr is not None:
+                pl, pr = int(parents[tl]), int(parents[tr])
+                if pl == pr and pl >= 0:
+                    replaced = names[pl] if names[pl] != fallback[pl] else None
+                    names[pl] = "pelvis"
+                    ri = ref_names.index("pelvis")
+                    d = float(np.linalg.norm(probe[pl] - reference[ri]))
+                    rescued["pelvis"] = round(d, 4)
+                    stats["pelvisByTopology"] = {"replaced": replaced}
+
     stats.update(
-        matched=len(pairs) + len(rescued),
+        # the truth of the final assignment, whatever path produced it - the
+        # topology rescue can REPLACE a positional name, so counting pairs
+        # plus rescues would double-count that joint
+        matched=sum(1 for i, n in enumerate(names) if n != fallback[i]),
         mirrored=bool(use_mirror),
         directMatched=len(direct),
         mirroredMatched=len(mirrored),
@@ -1337,7 +1362,11 @@ def _predict(
 
     align = np.load(align_npz, allow_pickle=True)
     unirig_names = [str(n) for n in list(align["names"])]
-    names, naming = semantic_names(np.asarray(align["joints"], dtype=np.float64), unirig_names)
+    names, naming = semantic_names(
+        np.asarray(align["joints"], dtype=np.float64),
+        unirig_names,
+        parents=np.asarray(align["parents"], dtype=np.int64),
+    )
     #: bone_7 -> upperarm_l, carried by NAME so a later reorder cannot shuffle it
     name_map = dict(zip(unirig_names, names, strict=True))
 
