@@ -20,6 +20,7 @@ import { SidecarSession } from '@spritebook/core';
 import {
   defaultModelsRoot,
   detectAppDataVirtualization,
+  detectVramGb,
   type VirtualizationReport,
 } from '@spritebook/registry';
 import { SPRITEBOOK_VERSION } from './version.ts';
@@ -92,11 +93,15 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
     modelsRoot = defaultModelsRoot();
   } catch { /* no LOCALAPPDATA/HOME - the report line says so */ }
   const virtualization: VirtualizationReport = await detectAppDataVirtualization();
+  // the exam is where the GUI learns the card's capacity (W6: a 24 GiB card
+  // should not default to lowVram) - null when nvidia-smi is absent
+  const vramGb = await detectVramGb();
   const report = {
     spritebook: SPRITEBOOK_VERSION,
     deno: Deno.version.deno,
     v8: Deno.version.v8,
     platform: `${Deno.build.os}-${Deno.build.arch}`,
+    vramGb,
     models: { root: modelsRoot, virtualization },
     ...diag,
     ...(sidecar ? { sidecar } : {}),
@@ -107,6 +112,7 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
   } else {
     io.stdout(`SpriteBook ${SPRITEBOOK_VERSION}`);
     io.stdout(`deno ${report.deno} - v8 ${report.v8} - ${report.platform}`);
+    io.stdout(`vram: ${vramGb === null ? 'unknown (no nvidia-smi)' : `${vramGb} GiB detected`}`);
     io.stdout(
       `models root: ${modelsRoot ?? '(unresolvable - set SPRITEBOOK_MODELS_DIR)'}`,
     );
