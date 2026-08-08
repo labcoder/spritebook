@@ -41,7 +41,8 @@ You need the TexturePacker Importer package from the Unity Asset Store. It is fr
 1. Install the TexturePacker Importer package in your Unity project.
 
 2. Rename `<characterId>.tp.json` to `<characterId>.json`. The Unity importer looks for a `.json`
-   file beside the PNG. Keep the base name the same as the PNG base name.
+   file beside the PNG. The JSON's `meta.image` field names the PNG, so the two files link by that
+   field, not by a shared base name.
 
 3. Copy the renamed JSON and the `atlas_lit_*.png` file into your `Assets` folder. Put both files in
    one folder.
@@ -91,8 +92,8 @@ the rate in the bake manifest, not in this file.
 ## Faults
 
 **The sprites import as one image.** **Sprite Mode** is still **Single**, or the JSON is not beside
-the PNG. Fix: set **Sprite Mode** to **Multiple**, put both files in one folder, and give them the
-same base name.
+the PNG. Fix: set **Sprite Mode** to **Multiple**, and put both files in one folder. The JSON's
+`meta.image` field must name the PNG file exactly.
 
 **The character sinks into the floor, or floats above it.** The pivot was overwritten in the Sprite
 Editor. Fix: delete the sprite metadata and import again. Do not open the Sprite Editor. The exact

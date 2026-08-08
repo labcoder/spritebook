@@ -47,12 +47,12 @@ Healthy output shows the product and render-pipeline versions, your adapter, the
 (`render probe: OK`):
 
 ```
-SpriteBook 0.1.0-alpha.1
+SpriteBook 0.9.0
 deno 2.9.2 - v8 14.9.207.2-rusty - windows-x86_64
-render pipeline spritebook-render@0.4.0
+render pipeline spritebook-render@0.5.0
 backend env: DENO_WEBGPU_BACKEND=(unset - wgpu default)
 adapter: NVIDIA GeForce RTX 3090 (vendor 4318, device 8708)
-render signature: spritebook-render@0.4.0#<adapter>
+render signature: spritebook-render@0.5.0#<adapter>
 features: (none)
 limits: maxColorAttachments=8 maxColorAttachmentBytesPerSample=32 maxTextureDimension2D=8192 maxBufferSize=268435456
 render probe: OK (checksum 5f70bf18a0860070)
@@ -121,7 +121,7 @@ One subdirectory per target:
 | Target           | Files                                                          | Point your engine at it                                                                                                                                                            |
 | ---------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `godot/`         | `hero.tres` + `atlas_lit_*.png`                                | copy both into a Godot 4 project; assign `hero.tres` as the SpriteFrames of an `AnimatedSprite2D`; animations are named `idle_d00` ... `idle_d07`; leave `centered` on — see below |
-| `aseprite/`      | `hero.ase.json` + `atlas_lit_*.png`                            | Aseprite: **File -> Import Sprite Sheet** honors the JSON                                                                                                                          |
+| `aseprite/`      | `hero.ase.json` + `atlas_lit_*.png`                            | Aseprite: **File -> Import Sprite Sheet** on the PNG; the JSON is your reference for tags and durations                                                                            |
 | `texturepacker/` | `hero.tp.json` + `atlas_lit_*.png`                             | Phaser 3: `this.load.atlas('hero', 'atlas_lit_0.png', 'hero.tp.json')`; frame names are `idle_d00_f000` etc.; set `frameRate` at anim creation (this format carries no durations)  |
 | `strips/`        | `hero-idle-d<DD>-strip.png` per direction + `hero-strips.json` | hand-rolled loaders; the JSON carries cell size, per-direction pivots, and each strip's own `fps` and `loop` (top-level `fps` is only the default for untimed clips)               |
 
@@ -149,7 +149,7 @@ you need it, and the TexturePacker and strips exports carry it too.
 | `pixel`     | classic pixel art               | adaptive, max 16 (OKLab) | 4x4 ordered | 0.5 px  | 1-bit |
 | `painterly` | soft edges, larger tonal range  | adaptive, max 32 (OKLab) | none        | none    | soft  |
 
-All three render supersampled and downsample with temporal stabilization (texel snapping, palette
+All four render supersampled and downsample with temporal stabilization (texel snapping, palette
 hysteresis), so frames do not shimmer in motion.
 
 **The snapshot recipe** — the truthful first look at a generation, before any styling:
@@ -187,7 +187,7 @@ next bake records the live id, and the warning stops.
 | `--character <id>`      | (required)    | immutable character slug; binds cache keys                          |
 | `--out <dir>`           | (required)    | bakes land at `<dir>/bake-<id>`                                     |
 | `--camera <id>`         | `standard-30` | `low-15`, `two-to-one`, `standard-30`, or `isometric`               |
-| `--style <id>`          | `pixel`       | `cel-2`, `pixel` (16 colours), or `painterly`                       |
+| `--style <id>`          | `pixel`       | `cel-2`, `clean`, `pixel` (16 colours), or `painterly`              |
 | `--directions <n>`      | `8`           | `2`, `4`, `8`, or `16`                                              |
 | `--frames <n>`          | `6`           | frames of the built-in idle pose (positive integer)                 |
 | `--clips <spec>`        | (idle)        | `clip:frames[@speed][!hold][,...]` — bake real clips instead        |
@@ -341,8 +341,8 @@ Y=0 in its bind pose is the character genuinely ungrounded, and the flag says ho
 
 ## Performance
 
-Reference numbers for the step-4 workload (bake 8 directions x 6 frames at 64 px `pixel-8`, then
-export all four targets) — the roadmap bar is <=10 minutes cold:
+Reference numbers for the step-4 workload (bake 8 directions x 6 frames at the 112 px default,
+`pixel` style, then export all four targets) — the roadmap bar is <=10 minutes cold:
 
 - Dev GPU (RTX 3090, Vulkan, Windows, compiled binary): **~4.4 s** (bake 4.17 s + export 0.07 s).
 - CI software rasterizer (ubuntu-latest, Mesa lavapipe): measured by the release workflow's Linux

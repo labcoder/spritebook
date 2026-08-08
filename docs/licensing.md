@@ -25,7 +25,7 @@ sets the rule for clips: bundle CC0 clips only.
 
 | Bundled item                                                         | Content                                                                                                   | License                      |
 | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Universal Animation Library (UAL) 1 and 2, free tiers, by Quaternius | about 120–130 clips, with 8-direction locomotion and root motion                                          | CC0                          |
+| Universal Animation Library (UAL) 1 and 2, free tiers, by Quaternius | 86 clips as bundled, with 8-direction locomotion and root motion                                          | CC0                          |
 | Canonical Track A bodies                                             | two rigged bodies at `packages/rig/bodies/`, seeded from the Universal Base Characters pack by Quaternius | ours; the source pack is CC0 |
 | Test-pose pack                                                       | poses for rig deform checks                                                                               | CC0, derived from the UAL    |
 | `fixture-gen`                                                        | a synthetic gen3d backend: no download, no GPU, no weights                                                | MIT, part of SpriteBook      |

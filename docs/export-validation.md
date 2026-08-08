@@ -42,4 +42,5 @@ the expected animations. It is skipped (loudly, as `ignored`) when `GODOT4_BIN` 
 6. Toggle nearest-neighbor filtering on the texture; verify no bleed from neighboring atlas cells at
    the sprite edges.
 7. Repeat 3–5 in Phaser 3 with the TexturePacker JSON (`this.load.atlas`) and in Aseprite
-   (`File → Import Sprite Sheet` honors the JSON) as consumer spot-checks.
+   (`File → Import Sprite Sheet` on the PNG; Aseprite does not read the JSON — see
+   docs/engines/aseprite.md) as consumer spot-checks.

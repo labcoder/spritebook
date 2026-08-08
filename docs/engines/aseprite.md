@@ -57,8 +57,12 @@ carry the loop flag directly.
 
 6. Select **Import**. Aseprite lays the cells out as frames.
 
-7. Select **Sprite > Frame Tag Properties** to add the tags. Use the `frameTags` array in the JSON
-   for each tag's name, `from`, and `to`.
+7. Delete the trailing empty frames. The spritesheet page is square, so the cell grid holds more
+   cells than frames. The `frames` array in the JSON gives the real count. Aseprite imports the
+   empty cells as blank frames after the real ones.
+
+8. Select **Sprite > Frame Tag Properties** to add the tags. Use the `frameTags` array under `meta`
+   in the JSON for each tag's name, `from`, and `to`.
 
 Aseprite does not read the JSON file itself on import. The JSON is the record of the frame names,
 the tags, and the durations. Read it as you set the tags, or feed it to another tool.
