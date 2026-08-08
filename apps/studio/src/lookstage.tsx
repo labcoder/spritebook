@@ -466,7 +466,15 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
               {t('Reset to recorded')}
             </button>
           )}
-          {!dirty && <span className='inote'>{t('this is the recorded look')}</span>}
+          {!dirty && (
+            <span className='inote'>
+              {look !== undefined
+                ? t('this is the recorded look')
+                // F11: the note claimed a recording that did not exist while
+                // the inspector said "no look recorded" one panel over
+                : t('nothing recorded yet — Record look writes these values')}
+            </span>
+          )}
         </div>
         {failed && (
           <span className='mv-exit mono' role='status'>

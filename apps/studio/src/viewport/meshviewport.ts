@@ -321,6 +321,11 @@ export class MeshViewport {
     const p = new THREE.Vector3();
     bone.getWorldPosition(p);
     this.#controls.moveTo(p.x, p.y, p.z, false);
+    // F14: centering alone left a x10-stretch clavicle inspected from across
+    // the room. Dolly to a close-up - near enough to judge one joint, far
+    // enough to keep its neighborhood - but never dolly OUT past where the
+    // user already is (their zoom is their choice).
+    this.#controls.dollyTo(Math.min(this.#controls.distance, 0.65), false);
     this.#controls.update(0);
     this.renderOnce();
   }

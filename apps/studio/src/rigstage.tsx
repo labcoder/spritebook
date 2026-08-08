@@ -72,77 +72,97 @@ function RunRig({ bridge, dir, onChanged }: {
   const args = rigRunArgs(dir, trackA ? { trackA: true, bodyDir } : {});
 
   return (
-    <section className='gensec'>
-      <div className='gensechead'>
-        <span className='hud'>{t('Rig this character')}</span>
-        <span className='ieyebrow mono'>02// RIG</span>
-      </div>
-      <div className='backends' role='radiogroup' aria-label={t('Rig track')}>
-        <button
-          type='button'
-          role='radio'
-          aria-checked={!trackA}
-          className={`backend ${!trackA ? 'on' : ''}`}
-          {...trackRoving(0)}
-          onClick={() => setTrackA(false)}
-        >
-          <span className='bname'>
-            {t('Track B — predicted skeleton (UniRig)')}
-          </span>
-          <span className='inote'>
-            {t(
-              'a fresh skeleton fitted to this mesh on the GPU — about two minutes',
+    <div className='rigcols'>
+      <div className='rigmain'>
+        <section className='gensec'>
+          <div className='gensechead'>
+            <span className='hud'>{t('Rig this character')}</span>
+            <span className='ieyebrow mono'>02// RIG</span>
+          </div>
+          <div className='backends' role='radiogroup' aria-label={t('Rig track')}>
+            <button
+              type='button'
+              role='radio'
+              aria-checked={!trackA}
+              className={`backend ${!trackA ? 'on' : ''}`}
+              {...trackRoving(0)}
+              onClick={() => setTrackA(false)}
+            >
+              <span className='bname'>
+                {t('Track B — predicted skeleton (UniRig)')}
+              </span>
+              <span className='inote'>
+                {t(
+                  'a fresh skeleton fitted to this mesh on the GPU — about two minutes',
+                )}
+              </span>
+            </button>
+            <button
+              type='button'
+              role='radio'
+              aria-checked={trackA}
+              className={`backend ${trackA ? 'on' : ''}`}
+              {...trackRoving(1)}
+              onClick={() => setTrackA(true)}
+            >
+              <span className='bname'>{t('Track A — canonical body fit')}</span>
+              <span className='inote'>
+                {t('the bundled body fitted to the mesh — deterministic, no GPU')}
+              </span>
+            </button>
+          </div>
+          {trackA && (
+            <div className='genrow'>
+              <label htmlFor='rigbody'>{t('Body')}</label>
+              <input
+                id='rigbody'
+                className='rootinput'
+                value={bodyDir}
+                onChange={(e) => setBodyDir(e.target.value)}
+                spellCheck={false}
+              />
+            </div>
+          )}
+          <div className='genrow'>
+            <button
+              type='button'
+              className='btn primary'
+              aria-busy={run?.running === true}
+              onClick={() => exec(args)}
+            >
+              {run?.running ? t('Rigging…') : t('Run rig')}
+            </button>
+            {run?.running && (
+              <span className='genprogress mono' role='status'>
+                {run.lines} {t('events')} · {run.last}
+              </span>
             )}
-          </span>
-        </button>
-        <button
-          type='button'
-          role='radio'
-          aria-checked={trackA}
-          className={`backend ${trackA ? 'on' : ''}`}
-          {...trackRoving(1)}
-          onClick={() => setTrackA(true)}
-        >
-          <span className='bname'>{t('Track A — canonical body fit')}</span>
-          <span className='inote'>
-            {t('the bundled body fitted to the mesh — deterministic, no GPU')}
-          </span>
-        </button>
+            {failed && (
+              <span className='mv-exit mono' role='status'>
+                {t('failed — the log drawer has the verbatim reason')}
+              </span>
+            )}
+          </div>
+          <CliTwin args={args} />
+        </section>
       </div>
-      {trackA && (
-        <div className='genrow'>
-          <label htmlFor='rigbody'>{t('Body')}</label>
-          <input
-            id='rigbody'
-            className='rootinput'
-            value={bodyDir}
-            onChange={(e) => setBodyDir(e.target.value)}
-            spellCheck={false}
-          />
-        </div>
-      )}
-      <div className='genrow'>
-        <button
-          type='button'
-          className='btn primary'
-          aria-busy={run?.running === true}
-          onClick={() => exec(args)}
-        >
-          {run?.running ? t('Rigging…') : t('Run rig')}
-        </button>
-        {run?.running && (
-          <span className='genprogress mono' role='status'>
-            {run.lines} {t('events')} · {run.last}
-          </span>
-        )}
-        {failed && (
-          <span className='mv-exit mono' role='status'>
-            {t('failed — the log drawer has the verbatim reason')}
-          </span>
-        )}
+
+      <div className='rigside'>
+        <section className='gensec'>
+          <div className='gensechead'>
+            <span className='hud'>{t('Canonical mesh')}</span>
+            <span className='inote'>
+              {t('what the rig will be fitted to — the mesh you just picked')}
+            </span>
+          </div>
+          {
+            /* F12: the pre-rig screen was two-thirds blank while the mesh the
+              user picked ten seconds earlier sat unseen on disk */
+          }
+          <Viewport bridge={bridge} meshPath={`${dir}/canonical/model.glb`} />
+        </section>
       </div>
-      <CliTwin args={args} />
-    </section>
+    </div>
   );
 }
 
