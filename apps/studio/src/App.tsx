@@ -30,12 +30,17 @@ interface Workspace {
   card: CharacterCard;
 }
 
+/** The repo's demo roster - where a cold open lands before any choice, and
+ * the recovery target when a remembered root has vanished (F1: temp dirs,
+ * ejected drives, renamed folders are expectable states, not dead ends). */
+const DEFAULT_ROOT = 'spikes/trellis2/out/p3-exit';
+
 export default function App() {
   // useLingui subscribes this tree to locale changes — t() re-renders live
   useLingui();
   const [theme, setThemeState] = useState(prefs.theme());
   const [locale, setLocaleState] = useState(prefs.locale());
-  const [root, setRoot] = useState(() => prefs.projectsRoot('spikes/trellis2/out/p3-exit'));
+  const [root, setRoot] = useState(() => prefs.projectsRoot(DEFAULT_ROOT));
   const [workspaces, setWorkspaces] = useState<Workspace[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exam, setExam] = useState<ExamState>({
@@ -350,6 +355,7 @@ export default function App() {
               cards={workspaces?.map((w) => w.card) ?? null}
               loadError={loadError}
               onOpen={openCharacter}
+              onUseDefault={() => setRoot(DEFAULT_ROOT)}
             />
           )
           : activeTab === '__new__'
@@ -360,6 +366,7 @@ export default function App() {
               onCreated={onCreated}
               onOpenModels={() => setModelsOpen(true)}
               catalogEpoch={catalogEpoch}
+              vramGb={typeof exam.report?.vramGb === 'number' ? exam.report.vramGb : null}
             />
           )
           : activeWs

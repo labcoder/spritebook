@@ -75,11 +75,14 @@ export function Card(
   );
 }
 
-export function Gallery({ bridge, cards, loadError, onOpen }: {
+export function Gallery({ bridge, cards, loadError, onOpen, onUseDefault }: {
   bridge: StudioBridge;
   cards: CharacterCard[] | null;
   loadError: string | null;
   onOpen: (dir: string) => void;
+  /** F1: a remembered root that vanished is an expectable state, not a dead
+   * end - one press points the app back at the repo's demo roster */
+  onUseDefault?: () => void;
 }) {
   return (
     <div className='gallery'>
@@ -87,6 +90,14 @@ export function Gallery({ bridge, cards, loadError, onOpen }: {
         <div className='empty'>
           <p>{t('Could not read that root.')}</p>
           <p className='mono'>{loadError}</p>
+          <p className='inote'>
+            {t('the folder may have been moved or deleted — point at another, or')}{' '}
+            {onUseDefault && (
+              <button type='button' className='linkish' onClick={onUseDefault}>
+                {t('use the default location')}
+              </button>
+            )}
+          </p>
         </div>
       )}
       {cards && cards.length === 0 && (
