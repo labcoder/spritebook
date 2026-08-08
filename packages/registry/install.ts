@@ -44,6 +44,11 @@ import {
   resolveInstalled,
   versionDir,
 } from './installed.ts';
+import {
+  detectAppDataVirtualization,
+  rootUnderLocalAppData,
+  type VirtualizationReport,
+} from './virtualization.ts';
 import { hashFile } from './hash.ts';
 
 /** Injectable downloader: fetch `url` into `destPath`, optionally reporting bytes so far. */
@@ -116,7 +121,11 @@ export interface InstallJobOpts {
   /** injectable for tests — the default downloads over the network */
   fetcher?: Fetcher;
   /** injectable detection results (tests); omitted fields run the real probes */
-  detected?: { platform?: Platform; vramGb?: number | null };
+  detected?: {
+    platform?: Platform;
+    vramGb?: number | null;
+    virtualization?: VirtualizationReport;
+  };
 }
 
 /**
@@ -154,6 +163,27 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
     const vram = gateVram(version, vramGb);
     if (vram.status === 'unknown' || vram.status === 'below-min') {
       yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
+    }
+
+    // D-039: an install run inside an MSIX container lands in that package's
+    // private LocalCache overlay, invisible to every unpackaged process on
+    // the machine. Warn BEFORE the download - the July poisoning that led to
+    // the split-brain incident would have announced itself right here.
+    const virt = opts.detected?.virtualization ??
+      (rootUnderLocalAppData(opts.root)
+        ? await detectAppDataVirtualization()
+        : { virtualized: false });
+    if (virt.virtualized) {
+      yield {
+        t: 'warn',
+        jobId,
+        at: at(),
+        code: 'models-root-virtualized',
+        message: `This process runs inside the "${virt.pkg}" MSIX container: ` +
+          `%LOCALAPPDATA% is virtualized, so this install lands in the container-private ` +
+          `overlay and is INVISIBLE to unpackaged processes (D-039). Install from a normal ` +
+          `terminal, or set SPRITEBOOK_MODELS_DIR outside AppData.`,
+      };
     }
 
     const finalDir = versionDir(opts.root, entry.id, version.version);
@@ -225,12 +255,11 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
     if (await dirExists(finalDir)) {
       // The sweep is for a receiptless remnant from exactly that crash window
       // (the receipt check above returned null). Before deleting anything,
-      // RE-CHECK by direct stat: a field incident had resolveInstalled read
-      // null while the receipt file was on disk with valid July content - two
-      // filesystem views of one machine. If that happens here, the sweep
-      // would silently delete a healthy multi-GB install and re-download it.
-      // Refuse loudly instead; the message is the tripwire that names the
-      // contradiction the incident never surfaced.
+      // RE-CHECK by direct stat: on a diverged filesystem view (D-039, MSIX
+      // AppData virtualization) resolveInstalled can read null while a valid
+      // receipt sits on disk, and the sweep would silently delete a healthy
+      // multi-GB install. Refuse loudly instead - the refusal is correct on
+      // ANY divergence, whatever its next cause turns out to be.
       let receiptStat: Deno.FileInfo | null = null;
       try {
         receiptStat = await Deno.stat(`${finalDir}/${RECEIPT_FILE}`);
@@ -241,8 +270,10 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
           `"${finalDir}/${RECEIPT_FILE}" EXISTS (${receiptStat.size} bytes, mtime ${
             receiptStat.mtime?.toISOString() ?? 'unknown'
           }) but was read as not-installed moments ago - two answers from one filesystem. ` +
-            `Refusing to delete the existing install. This is a known field incident under ` +
-            `investigation; please report how the app was launched. ` +
+            `The known cause is MSIX AppData virtualization: a packaged process (an AI ` +
+            `agent's embedded shell, a Store app) sees a container-private overlay of ` +
+            `%LOCALAPPDATA% (D-039). Refusing to delete the existing install. ` +
+            `\`spritebook doctor\` reports this process's containment; ` +
             `\`spritebook models verify ${entry.id}\` audits the existing files.`,
         );
       }

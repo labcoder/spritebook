@@ -8,6 +8,7 @@
  */
 export * from './catalog.ts';
 export * from './installed.ts';
+export * from './virtualization.ts';
 export * from './pins.ts';
 export * from './gates.ts';
 export * from './hash.ts';

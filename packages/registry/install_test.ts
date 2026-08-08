@@ -29,7 +29,13 @@ import {
   URL_A,
 } from './_testutil.ts';
 
-const DETECTED = { platform: 'windows-cuda' as Platform, vramGb: 24 };
+const DETECTED = {
+  platform: 'windows-cuda' as Platform,
+  vramGb: 24,
+  // a dev shell can itself be MSIX-contained (D-039) - pin the probe so
+  // event sequences never depend on the machine running the suite
+  virtualization: { virtualized: false },
+};
 
 function install(rig: InstallRig, over: Partial<InstallJobOpts> = {}) {
   return runInstallJob({
@@ -256,7 +262,7 @@ Deno.test('install: VRAM warns (below-min and unknown) but NEVER blocks', async 
   const below = await installRig({}, { minVramGb: 10 });
   try {
     const events = await collect(
-      install(below, { detected: { platform: 'windows-cuda', vramGb: 8 } }),
+      install(below, { detected: { platform: 'windows-cuda', vramGb: 8 , virtualization: { virtualized: false } } }),
     );
     const [warn] = ofType(events, 'warn');
     assertEquals(warn.code, 'vram-below-min');
@@ -272,7 +278,7 @@ Deno.test('install: VRAM warns (below-min and unknown) but NEVER blocks', async 
   const unknown = await installRig({}, { minVramGb: 10 });
   try {
     const events = await collect(
-      install(unknown, { detected: { platform: 'windows-cuda', vramGb: null } }),
+      install(unknown, { detected: { platform: 'windows-cuda', vramGb: null , virtualization: { virtualized: false } } }),
     );
     assertEquals(ofType(events, 'warn')[0].code, 'vram-unknown');
     assertEquals(events.at(-1)!.t, 'done');
