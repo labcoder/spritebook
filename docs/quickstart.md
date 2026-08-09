@@ -6,6 +6,11 @@ way when behavior changes; never hand-write them. -->
 
 Bake a rigged 3D character into engine-ready 2D spritesheets, locally, in five minutes.
 
+Starting from an IMAGE instead of a rigged model? That path is `gen`, `pick`,
+and `rig`, and it needs an installed AI backend. `docs/cli.md` walks it
+command by command; the guide covers the same flow in Studio. This file's
+five minutes start where a rigged `.glb` already exists.
+
 ## 1. Download
 
 Grab the zip for your platform from the GitHub release: `win-x64`, `mac-arm64`, `mac-x64`, or
@@ -20,6 +25,10 @@ sample/asymmetric.glb          a small rigged test character (deliberately one-a
 quickstart.md                  this file
 CHANGELOG.md                   what is in this release
 ```
+
+The alpha zips carry the CLI only. SpriteBook Studio, the desktop app the
+guide describes, ships with the 1.0 bundle. Until then, every Studio action
+has a CLI twin, and this file plus `docs/cli.md` cover them all.
 
 ## 2. First run on each OS
 
@@ -36,7 +45,7 @@ alike (in classic `cmd.exe`, type `.\spritebook` instead).
 
 ## 3. Check your GPU
 
-Baking renders on your GPU through WebGPU. Verify the machine first:
+Baking renders on your GPU through WebGPU. Make sure the machine is ready first:
 
 ```
 ./spritebook doctor
@@ -61,6 +70,19 @@ render probe: OK (checksum 5f70bf18a0860070)
 `doctor` exits 0 only when an adapter exists **and** the probe passes. If it prints `adapter: NONE`,
 see Troubleshooting below.
 
+## What the stages need
+
+| Work                          | Needs                                                            |
+| ----------------------------- | ---------------------------------------------------------------- |
+| bake, style, export           | any WebGPU adapter — NVIDIA, AMD, Intel, Apple, or Mesa lavapipe |
+| AI generation (`trellis2-4b`) | NVIDIA GPU with CUDA, 12 GiB VRAM, 16.4 GB disk                  |
+| auto-rig (`unirig`, Track B)  | NVIDIA GPU with CUDA, 17.4 GiB VRAM, 5.8 GB disk                 |
+| Track A rig, `fixture-gen`    | nothing extra — no GPU, no download                              |
+
+The VRAM floors are measured, and the install warns on a smaller card. The
+performance numbers later in this file come from one reference machine, an
+RTX 3090; treat them as that machine's numbers, not promises.
+
 ## 4. Bake
 
 ```
@@ -81,7 +103,7 @@ done in 4.17s
 
 The bake lands in a content-addressed directory, `bakes/bake-<id>/`. The id is the first 8 hex of
 the recipe hash, and the recipe includes the render signature above — which is composed with an
-identity hash of your GPU adapter (D-023). So the same model and flags give you the same id every
+identity hash of your GPU adapter, because a driver change can change pixels. So the same model and flags give you the same id every
 time on one machine, and a different one on a machine with a different adapter. That is deliberate:
 two adapters can rasterize the same scene differently, and sharing a cache entry between them would
 serve pixels that were never rendered from this recipe here.
@@ -90,7 +112,7 @@ serve pixels that were never rendered from this recipe here.
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `manifest.json`                                                                  | the canonical BakeManifest: every frame's atlas rect and pivot, provenance (inputs, render signature), metrics |
 | `atlas_lit_0.png`                                                                | the styled spritesheet page(s) — what your game draws                                                          |
-| `atlas_albedo_0.png` `atlas_normal_0.png` `atlas_depth_0.png` `atlas_mask_0.png` | AOV pages, rect-identical to the lit page — for dynamic lighting, outlines, custom shaders                     |
+| `atlas_albedo_0.png` `atlas_normal_0.png` `atlas_depth_0.png` `atlas_mask_0.png` | AOV pages (arbitrary output variables: albedo, normal, depth, mask), rect-identical to the lit page — for dynamic lighting, outlines, custom shaders                     |
 | `style-result.json`                                                              | the style stage's artifact: palette, flicker metric, warnings                                                  |
 | `contact-idle.gif`                                                               | animated contact sheet for eyeballing the bake — review-only, not a game asset                                 |
 
@@ -265,7 +287,7 @@ were written down beforehand.
 
 `--changed-since <iso>` is a cheap prefilter on the manifest's modification time. It answers "was
 this **touched**", which is a different question from "would its pixels **differ**" — a rename
-touches the manifest and reaches no cache key (D-011), so a renamed character appears under
+touches the manifest and reaches no cache key, so a renamed character appears under
 `--changed-since` and then plans as `fresh`. Both answers are correct and the plan shows both.
 
 Bakes run one at a time and there is no flag to change that: each saturates the GPU, and two in one
@@ -273,6 +295,14 @@ process would interleave passes on shared render targets. One character failing 
 the rest bake, the failures are named in the summary, and the exit code is non-zero. Blocked
 characters (no mesh, unreadable manifest, a look naming a preset that does not exist) are skipped
 the same way rather than being silently dropped from the count.
+
+#### The character must know its height
+
+The cell math below assumes a character measured in metres. A generated mesh
+keeps its backend's own scale unless `gen --height <metres>` declared one, and
+a one-unit character bakes about 30 px tall at 32 px/m. The job warns when no
+height was given and states what the character measures. Declare the height at
+generation; see `docs/cli.md`.
 
 #### Why the default cell is 112 px with 16 px of padding
 
@@ -329,10 +359,8 @@ Y=0 in its bind pose is the character genuinely ungrounded, and the flag says ho
   - headless Linux / CI: install Mesa lavapipe (`mesa-vulkan-drivers`) for a software adapter.
 - **`render probe: FAILED`** — an adapter exists but a minimal render pass failed; the error text is
   in the output. Update drivers or try the other backend for your OS.
-- **`SPRITEBOOK_REQUIRE_GPU=1`** (repo/CI concern, not needed day-to-day): in the source repo's test
-  suites it turns a missing adapter into a hard error so a broken CI lane cannot pass as "skipped,
-  green". In the binary it only sharpens `doctor`'s failure message; `bake` always errors without an
-  adapter regardless.
+- **`SPRITEBOOK_REQUIRE_GPU=1`** — a repo/CI switch, not needed day-to-day. In the binary it only
+  sharpens `doctor`'s failure message; `bake` always errors without an adapter.
 - **Same model, different machine, different pixels** — expected. Pixels are deterministic per
   (pipeline version, adapter, driver); an adapter change deliberately misses the whole cache.
   `doctor` prints the render signature that identifies your combination. One caveat: a
