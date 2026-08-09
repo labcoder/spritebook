@@ -53,7 +53,7 @@ hashes. Four gates run at install time:
 | Platform           | A CUDA-only version is refused on a machine without an NVIDIA GPU, with both sides named.                                                                                                                     |
 | VRAM               | The catalog carries measured floors, never README claims. At install time this gate warns only; the job-time preflight is the hard gate.                                                                      |
 
-You see the terms before an install. `spritebook models catalog` lists each entry with its license
+You see the terms before an install. `spritebook models list` lists each entry with its license
 and its excluded territories. The models pane in the GUI shows the license and, when acceptance is
 needed, an acceptance box. A failed gate prints a message that names the exact flag to use.
 

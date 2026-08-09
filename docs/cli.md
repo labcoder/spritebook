@@ -30,7 +30,7 @@ spritebook gen --workspace ./characters/hero --character hero \
 | `--height <metres>`     | the character's standing height. CAUTION: without it the mesh keeps the backend's own scale, and a one-unit character bakes about 30 px tall at the default 32 px/m. The job warns and states the measured height. |
 | `--seed <n>`            | reproducibility; candidate `i` runs at seed + 1000·i                                            |
 | `--candidates <1..8>`   | candidates in ONE job; the model loads once                                                     |
-| `--adjust k=v,k=v`      | backend knobs that diverge from the catalog defaults                                            |
+| `--adjust k=v,k=v`      | backend knobs that diverge from the catalog defaults; the roster is below                       |
 | `--more-like <rN>`      | re-run result rN's recorded recipe with a new seed                                              |
 | `--sidecar <dir>`       | the sidecar (the local Python helper that runs the AI models); the bundled one otherwise        |
 | `--models-dir <dir>`    | the models root; the OS default otherwise                                                       |
@@ -47,6 +47,37 @@ Set your expectation for `fixture-gen`: it turns the image's OUTLINE into a
 lathe-like solid body. The geometry and texture depend on the image, so it
 exercises the whole pipeline, but it is a stand-in, not a likeness. A likeness
 needs `trellis2-4b`, which needs an NVIDIA GPU.
+
+### The knobs `--adjust` takes
+
+Each backend declares its own. These are the ones `gen` accepts.
+
+`trellis2-4b`:
+
+| Knob                     | Default | Range                          |
+| ------------------------ | ------- | ------------------------------ |
+| `steps`                  | 12      | 1 to 50                        |
+| `pipelineType`           | `512`   | `512`, `1024`, `1024_cascade`  |
+| `guidanceStrength`       | 7.5     | 0 to 20                        |
+| `textureGuidance`        | 3.5     | 1 to 20                        |
+| `textureGuidanceRescale` | 0.2     | 0 to 1                         |
+| `textureSize`            | 2048    | 1024, 2048, 4096               |
+| `textureRetries`         | 2       | 0 to 12                        |
+| `decimationTarget`       | 200000  | 10000 to 2000000               |
+| `candidates`             | 1       | 1 to 8 (or use `--candidates`) |
+| `lowVram`                | true    | true, false                    |
+
+`fixture-gen`: `tris` (2000; 64 to 20000), `textureSize` (512; 256, 512,
+1024), and `candidates`.
+
+Two rules. The seed has its own flag, so `--adjust seed=5` is refused.
+`resolution` belongs to `retexture`, not to `gen` — a knob one operation takes
+and the other does not is named in the refusal, with the roster the operation
+DOES take.
+
+`spritebook models list --json` carries each version's knob sets and their
+bounds verbatim, from the catalog your machine actually runs. A refused
+`--adjust` prints the roster too.
 
 ## pick — bless one result as the canonical mesh
 
@@ -160,7 +191,7 @@ with transparency needs no prep; `gen` takes it directly.
 ## models — install, verify, remove
 
 ```
-spritebook models catalog
+spritebook models list
 spritebook models list --installed
 spritebook models install trellis2-4b
 spritebook models verify trellis2-4b

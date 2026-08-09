@@ -580,8 +580,11 @@ export function mergeAnimationSet(
  * rendered directions believing 3 were flips. A typo (`--framse 4`) did the
  * same thing more quietly. Keep a verb's row in sync with the flags its branch
  * actually reads; a flag missing here is a flag the user cannot type.
+ *
+ * Exported so docs/cli.md can be checked against it: the page is written by
+ * reading this table, and docsknobs_test.ts makes that permanent.
  */
-const VERB_FLAGS: Record<string, readonly string[]> = {
+export const VERB_FLAGS: Record<string, readonly string[]> = {
   bake: [
     'all',
     'root',
