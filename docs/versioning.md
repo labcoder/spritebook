@@ -1,5 +1,8 @@
 # Versioning & releases
 
+This page is for contributors working in the repository. The release zips do not
+include the repository, and the commands here assume a checkout.
+
 How SpriteBook versions the product, the render pipeline, and the golden sets — and how the three
 move together.
 

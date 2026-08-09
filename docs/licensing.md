@@ -5,7 +5,7 @@ SpriteBook's own license, the bundled assets, the on-demand models, and the know
 
 ## 1. Your sprites are yours
 
-SpriteBook's own license is AGPL-3.0-only with an output exception. Decision D-019 records this
+SpriteBook's own license is AGPL-3.0-only with an output exception. The project records this
 license. The exception says: "spritesheets/atlases/manifests/models produced by running SpriteBook
 are not subject to the AGPL". In plain terms: the output you bake is yours. You can sell it. The
 AGPL applies to SpriteBook's code, not to your spritesheets.
@@ -20,7 +20,7 @@ The `NOTICE` file carries these items:
 
 ## 2. What ships in the box
 
-Everything bundled with SpriteBook is under MIT, Apache-2.0, BSD, ISC, OFL, or CC0. Decision D-013
+Everything bundled with SpriteBook is under MIT, Apache-2.0, BSD, ISC, OFL, or CC0. A standing rule
 sets the rule for clips: bundle CC0 clips only.
 
 | Bundled item                                                         | Content                                                                                                   | License                      |
@@ -35,7 +35,7 @@ is the reason a macOS or win-arm64 user gets a working app with no AI generation
 
 ## 3. Models install on demand, behind gates
 
-AI model weights are never bundled. Decision D-009 makes each backend catalog data, never a
+AI model weights are never bundled. Each backend is catalog data, never a
 hardcoded integration. Each catalog entry carries these facts:
 
 - the license, whether it needs acceptance, and its excluded territories
@@ -49,7 +49,7 @@ hashes. Four gates run at install time:
 | Gate               | What it means                                                                                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | License acceptance | When a license needs explicit acceptance, the install stops until you pass `--accept-license`. Your acceptance is recorded in the install receipt.                                                            |
-| Territory          | When a license excludes territories, declare yours with `--territory <ISO code>`. The declaration is recorded; SpriteBook never geolocates you (D-027). A declared territory on the excluded list is refused. |
+| Territory          | When a license excludes territories, declare yours with `--territory <ISO code>`. The declaration is recorded; SpriteBook never geolocates you. A declared territory on the excluded list is refused. |
 | Platform           | A CUDA-only version is refused on a machine without an NVIDIA GPU, with both sides named.                                                                                                                     |
 | VRAM               | The catalog carries measured floors, never README claims. At install time this gate warns only; the job-time preflight is the hard gate.                                                                      |
 
@@ -94,11 +94,11 @@ output as cleared for commercial work today. SpriteBook's output exception canno
 restriction is the licensor's, and only the licensor can lift it.
 
 This is not special to TRELLIS.2. An MIT badge on a generative-3D repo describes the model, not the
-stack. The D-036 survey found no gen3d backend that passes all four ship gates. Every alternative
+stack. A survey of the field found no gen3d backend that passes all four ship gates. Every alternative
 fails earlier: territory carve-outs, Tencent components, or source-only builds. The survey rows are
 in [`docs/dependencies.md`](./dependencies.md).
 
-Decision D-036, item 4, records a replacement for the encumbered stage as future work, not as done
+A replacement for the encumbered stage is recorded as future work, not as done
 work. `o_voxel.postprocess.to_glb` is the single nvdiffrast call site on our path. The function does
 a UV unwrap and a texture bake. SpriteBook already has a WebGPU render core and a glTF pipeline for
 that work. Until that replacement lands, the limitation above stands.
@@ -112,7 +112,7 @@ with DINOv3".
 
 The Mixamo terms let you use the clips in your projects. The terms do not let anyone redistribute
 the clips. Thus SpriteBook never bundles Mixamo clips. You import your own Mixamo clips, and
-SpriteBook uses them in your workspace only. Decision D-013 records the rule: user imports are used,
+SpriteBook uses them in your workspace only. The rule: user imports are used,
 never redistributed.
 
 | Source                       | Terms                                   | SpriteBook posture                                  |

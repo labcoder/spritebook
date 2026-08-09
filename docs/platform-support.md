@@ -1,6 +1,9 @@
 # Platform support & targets
 
-Standing constraint (maintainer, 2026-07): ship **Windows x64, Windows ARM64, and macOS**;
+This page is for contributors working in the repository. The release zips do not
+include the repository, and the commands here assume a checkout.
+
+Standing constraint: ship **Windows x64, Windows ARM64, and macOS**;
 prioritize the Windows dev box today, but make decisions with macOS in mind. Linux is tier-2 until
 the webview validation spike runs (see D-005 riders).
 
