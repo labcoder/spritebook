@@ -89,6 +89,20 @@ export const ModelVersionSchema = z.strictObject({
    * zod 4 and would demand a block for every capability that exists. */
   operationDefaults: z.partialRecord(CapabilitySchema, z.record(z.string(), z.unknown()))
     .optional(),
+  /** The knobs ONE operation accepts, when `paramsSchema` is a union across
+   * several.
+   *
+   * trellis2-4b generates and retextures behind one schema, and that union
+   * reads as a menu: `resolution` belongs to the retexture sampler alone, but
+   * nothing said so. A `gen --adjust resolution=1024` was refused by the
+   * sidecar's own schema with no useful sentence, and the Studio's options
+   * form — rendered from the same union — OFFERED the knob first. Declaring
+   * the sets makes the narrower schema derivable (`paramsSchemaFor`), so the
+   * gate, the error message, and the form all agree.
+   *
+   * Absent means "every property", which is right for every single-capability
+   * backend in the roster. */
+  operationParams: z.partialRecord(CapabilitySchema, z.array(z.string()).min(1)).optional(),
   /** Which SIDECAR ADAPTER runs each operation.
    *
    * "The catalog id is the adapter id" was the rule, and it was never true:
@@ -149,6 +163,43 @@ export function adapterFor(entryId: string, v: ModelVersion, op: Capability): st
   return v.adapters?.[op] ?? entryId;
 }
 
+/** Narrowed schemas are derived, and core caches compiled validators by schema
+ * IDENTITY — so the same (version, op) must hand back the same object or every
+ * job would recompile its own copy. */
+const narrowed = new WeakMap<ModelVersion, Map<Capability, JSONSchema>>();
+
+/** The paramsSchema for ONE operation: the version's, with the properties that
+ * operation does not accept removed.
+ *
+ * This is the schema to validate against and the schema to render a form from.
+ * A version that declares no `operationParams` for `op` gets its own schema
+ * back unchanged — the common single-capability case pays nothing. */
+export function paramsSchemaFor(v: ModelVersion, op: Capability): JSONSchema {
+  const allow = v.operationParams?.[op];
+  if (!allow) return v.paramsSchema;
+  let byOp = narrowed.get(v);
+  if (!byOp) narrowed.set(v, byOp = new Map());
+  const hit = byOp.get(op);
+  if (hit) return hit;
+  const props = (v.paramsSchema as { properties?: Record<string, unknown> }).properties ?? {};
+  const kept: Record<string, unknown> = {};
+  for (const key of allow) if (key in props) kept[key] = props[key];
+  const schema: JSONSchema = { ...v.paramsSchema, properties: kept };
+  byOp.set(op, schema);
+  return schema;
+}
+
+/** Which operations accept `key` — the answer behind "resolution is a
+ * retexture-only knob". Empty when the version declares no sets at all, which
+ * reads correctly as "this backend has nothing to disambiguate". */
+export function operationsAccepting(v: ModelVersion, key: string): Capability[] {
+  const sets = v.operationParams;
+  if (!sets) return [];
+  return (Object.keys(sets) as Capability[])
+    .filter((op) => sets[op]?.includes(key))
+    .sort();
+}
+
 export const ModelEntrySchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
   kind: z.enum(['gen3d', 'rig', 'imageprep']),
@@ -169,13 +220,29 @@ export const ModelEntrySchema = z.strictObject({
     // that READS as configuration — the failure is a user setting a retry
     // budget under the wrong key and watching nothing change.
     const can = versionCapabilities(entry.kind, v);
-    for (const field of ['operationDefaults', 'adapters'] as const) {
+    for (const field of ['operationDefaults', 'adapters', 'operationParams'] as const) {
       for (const op of Object.keys(v[field] ?? {})) {
         if (!can.has(op as Capability)) {
           ctx.addIssue({
             code: 'custom',
             path: ['versions', i, field, op],
             message: `${field} for "${op}", which this version does not declare it can do`,
+          });
+        }
+      }
+    }
+    // A knob nobody declares is a knob nobody can set: the narrowed schema
+    // drops it, so a typo here would silently DELETE a parameter rather than
+    // fail. Both directions are checked — a listed key must exist, and a
+    // declared operation must account for every property it wants to keep.
+    const props = Object.keys((v.paramsSchema as { properties?: object }).properties ?? {});
+    for (const [op, keys] of Object.entries(v.operationParams ?? {})) {
+      for (const key of keys ?? []) {
+        if (!props.includes(key)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['versions', i, 'operationParams', op],
+            message: `operationParams lists "${key}", which paramsSchema does not describe`,
           });
         }
       }

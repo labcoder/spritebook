@@ -13,6 +13,8 @@ import {
   defaultsFor,
   ModelCatalogSchema,
   type ModelEntry,
+  operationsAccepting,
+  paramsSchemaFor,
   versionCan,
   versionCapabilities,
 } from '@spritebook/schema';
@@ -83,7 +85,9 @@ Deno.test('every entry can actually RUN every operation it declares', async () =
     for (const v of m.versions) {
       for (const op of versionCapabilities(m.kind, v)) {
         const params = defaultsFor(v, op);
-        const check = validateParams(v.paramsSchema, params);
+        // the OPERATION's schema, not the union: a default parked under a knob
+        // its own operation does not accept is the same class of dead data
+        const check = validateParams(paramsSchemaFor(v, op), params);
         assert(
           check.ok,
           `${m.id}@${v.version} cannot run "${op}": its own paramsSchema rejects its own ` +
@@ -92,6 +96,66 @@ Deno.test('every entry can actually RUN every operation it declares', async () =
       }
     }
   }
+});
+
+Deno.test('one schema, two operations: each sees only the knobs it accepts', async () => {
+  // The field report: `gen --adjust resolution=1024` was refused with "params
+  // must NOT have additional properties", because trellis2's union schema
+  // carries the retexture sampler's knob and nothing said whose it was.
+  const cat = await loadCatalog();
+  const v = cat.models.find((m) => m.id === 'trellis2-4b')!.versions[0];
+  const knobs = (op: Capability) => Object.keys(paramsSchemaFor(v, op).properties as object).sort();
+
+  assert(!knobs('gen3d').includes('resolution'), "resolution is the retexture sampler's");
+  assertEquals(operationsAccepting(v, 'resolution'), ['retexture']);
+  for (const genOnly of ['candidates', 'decimationTarget', 'pipelineType', 'steps']) {
+    assert(!knobs('retexture').includes(genOnly), `${genOnly} does not survive a retexture`);
+    assertEquals(operationsAccepting(v, genOnly), ['gen3d']);
+  }
+  // and the genuinely shared ones stay shared, or this proves nothing
+  assertEquals(operationsAccepting(v, 'textureSize'), ['gen3d', 'retexture']);
+
+  // the union is exactly the two sets: a knob in neither would be unreachable
+  // from every operation, which is how a live parameter goes quietly dead
+  assertEquals(
+    [...new Set([...knobs('gen3d'), ...knobs('retexture')])].sort(),
+    Object.keys(v.paramsSchema.properties as object).sort(),
+  );
+});
+
+Deno.test('the narrowed schema is stable by identity, so core caches it once', async () => {
+  // core compiles ajv validators keyed by schema IDENTITY (packages/core/params.ts) —
+  // a fresh object per call would recompile the same schema on every job
+  const cat = await loadCatalog();
+  const t = cat.models.find((m) => m.id === 'trellis2-4b')!.versions[0];
+  assert(paramsSchemaFor(t, 'gen3d') === paramsSchemaFor(t, 'gen3d'));
+  assert(paramsSchemaFor(t, 'gen3d') !== paramsSchemaFor(t, 'retexture'));
+  // a single-capability backend declares no sets and pays nothing: same object
+  const unirig = cat.models.find((m) => m.id === 'unirig')!.versions[0];
+  assert(paramsSchemaFor(unirig, 'rig') === unirig.paramsSchema);
+  assertEquals(operationsAccepting(unirig, 'anything'), []);
+});
+
+Deno.test('a knob set that names an undescribed property is refused', () => {
+  // the typo that would otherwise DELETE a parameter: the narrowed schema drops
+  // what it does not find, so a misspelling silently removes the real knob
+  const withSet = (keys: string[]) =>
+    ModelCatalogSchema.safeParse({
+      schemaVersion: 2,
+      models: [toyEntry({
+        versions: [toyVersion({
+          paramsSchema: { type: 'object', properties: { seed: { type: 'integer' } } },
+          operationParams: { rig: keys },
+        })],
+      })],
+    });
+  const bad = withSet(['sed']);
+  assert(!bad.success);
+  assert(
+    JSON.stringify(bad.error.issues).includes('paramsSchema does not describe'),
+    `message must name the cause: ${JSON.stringify(bad.error.issues)}`,
+  );
+  assert(withSet(['seed']).success, 'a described knob is admitted');
 });
 
 Deno.test('defaults for an operation the version cannot do are refused', () => {
