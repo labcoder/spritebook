@@ -13,6 +13,9 @@
  * quality=banana` costs nothing), and the sidecar client checks the adapter's
  * own schema again at the wire. The entry's schema is the D-009 contract the
  * GUI will render forms from; the adapter's is what the code actually runs.
+ * The first check asks for THIS operation's knobs (checkOpParams), so the two
+ * locks refuse the same set and a retexture-only knob is named here rather
+ * than dying vaguely a process later.
  */
 import {
   adapterFor,
@@ -23,7 +26,6 @@ import {
   type JobEvent,
   preflightVram,
 } from '@spritebook/schema';
-import { validateParams } from '@spritebook/core';
 import {
   appendGenerationResult,
   createWorkspace,
@@ -50,6 +52,7 @@ import { decode as decodePng } from 'fast-png';
 import { heightOf } from './pick.ts';
 import { writeResultThumb } from './thumb.ts';
 import { rankCandidates, rankingMessage } from './candidates.ts';
+import { checkOpParams } from './opparams.ts';
 
 export interface GenJobOptions extends GenJobSpec {
   /** N candidates in ONE sidecar job (the model loads once); every candidate
@@ -191,19 +194,14 @@ export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     // `defaultsFor`, not `version.defaults`: a parameter can differ per
     // operation on one model (trellis2's seed-retry budget is 2 here and 5 for
     // retexture, because the same decoder fails 7x more often there).
-    const params = {
+    const check = checkOpParams(entry.id, version, 'gen3d', {
       ...defaultsFor(version, 'gen3d'),
       ...opts.params,
       seed: opts.seed,
       ...(opts.candidates !== undefined ? { candidates: opts.candidates } : {}),
-    };
-    const check = validateParams(version.paramsSchema, params);
-    if (!check.ok) {
-      throw new GenFail(
-        'invalid-params',
-        `Parameters rejected by "${entry.id}": ${check.errors.join('; ')}`,
-      );
-    }
+    });
+    if (!check.ok) throw new GenFail('invalid-params', check.message);
+    const params = check.params;
 
     // 4. workspace + content-addressed source
     const paths = workspacePaths(opts.workspace);

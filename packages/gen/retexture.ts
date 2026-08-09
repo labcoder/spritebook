@@ -47,7 +47,6 @@ import {
   RAW_MODEL,
   versionCan,
 } from '@spritebook/schema';
-import { validateParams } from '@spritebook/core';
 import {
   appendGenerationResult,
   nextResultId,
@@ -68,6 +67,7 @@ import {
   virtualizationNote,
 } from '@spritebook/registry';
 import { importToCanonical } from '@spritebook/importer';
+import { checkOpParams } from './opparams.ts';
 import { describeMesh, readEffectiveSeed, sha256Hex } from './gen.ts';
 import { heightOf } from './pick.ts';
 import { writeResultThumb } from './thumb.ts';
@@ -254,14 +254,13 @@ export async function* runRetextureJob(
     }
 
     // 4. params: the RETEXTURE defaults, which are not the gen ones
-    const params = { ...defaultsFor(version, RETEXTURE), ...opts.params, seed: opts.seed };
-    const check = validateParams(version.paramsSchema, params);
-    if (!check.ok) {
-      throw new RetextureFail(
-        'invalid-params',
-        `Parameters rejected by "${entry.id}": ${check.errors.join('; ')}`,
-      );
-    }
+    const check = checkOpParams(entry.id, version, RETEXTURE, {
+      ...defaultsFor(version, RETEXTURE),
+      ...opts.params,
+      seed: opts.seed,
+    });
+    if (!check.ok) throw new RetextureFail('invalid-params', check.message);
+    const params = check.params;
 
     const resultId = nextResultId(manifest);
     const rp = resultPaths(opts.workspace, resultId);
