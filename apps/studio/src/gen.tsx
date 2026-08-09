@@ -38,6 +38,8 @@ interface CatalogVersion {
   paramsSchema: unknown;
   defaults: Record<string, unknown>;
   operationDefaults?: Record<string, Record<string, unknown>>;
+  /** the knobs each operation accepts; the form renders only gen3d's */
+  operationParams?: Record<string, string[]>;
   capabilities?: string[];
 }
 
@@ -405,7 +407,7 @@ export function GenerateNew(
   );
   const fields = useMemo(
     () =>
-      (version ? schemaFields(version.paramsSchema, resolved) : [])
+      (version ? schemaFields(version.paramsSchema, resolved, version.operationParams?.gen3d) : [])
         // the count has its own control above the form now
         .filter((f) => f.key !== 'candidates'),
     [version, resolved],
@@ -979,7 +981,7 @@ function GenerateMore(
   );
   const fields = useMemo(
     () =>
-      (version ? schemaFields(version.paramsSchema, resolved) : [])
+      (version ? schemaFields(version.paramsSchema, resolved, version.operationParams?.gen3d) : [])
         .filter((f) => MORE_FIELDS.has(f.key)),
     [version, resolved],
   );

@@ -33,11 +33,22 @@ export function resolveOpDefaults(
   return { ...defaults, ...(operationDefaults?.[op] ?? {}) };
 }
 
+/** The form for ONE operation.
+ *
+ * `allowed` is the catalog's `operationParams[op]`. A backend that does two
+ * jobs behind one schema (trellis2 generates AND retextures) would otherwise
+ * offer the other operation's knobs here — and a user who set one watched the
+ * CLI refuse a value this form had shown them as available. Absent means the
+ * schema describes one operation and every property belongs. */
 export function schemaFields(
   schema: unknown,
   resolvedDefaults: Record<string, unknown>,
+  allowed?: string[],
 ): SchemaField[] {
-  const props = (schema as JsonSchemaish | null)?.properties ?? {};
+  const all = (schema as JsonSchemaish | null)?.properties ?? {};
+  const props = allowed
+    ? Object.fromEntries(Object.entries(all).filter(([key]) => allowed.includes(key)))
+    : all;
   return Object.entries(props).map(([key, p]) => {
     const type = typeof p.type === 'string' ? p.type : undefined;
     const enumValues = Array.isArray(p.enum) ? p.enum.map(String) : undefined;

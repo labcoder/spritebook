@@ -497,6 +497,9 @@ export interface ListedVersion {
   paramsSchema: ModelVersion['paramsSchema'];
   defaults: Record<string, unknown>;
   operationDefaults?: ModelVersion['operationDefaults'];
+  /** which knobs each operation accepts — a form rendering the union offers
+   * the other operation's knobs, which is how a user comes to type one */
+  operationParams?: ModelVersion['operationParams'];
   capabilities?: ModelVersion['capabilities'];
 }
 
@@ -547,6 +550,7 @@ export async function runListQuery(
       paramsSchema: v.paramsSchema,
       defaults: v.defaults,
       ...(v.operationDefaults !== undefined ? { operationDefaults: v.operationDefaults } : {}),
+      ...(v.operationParams !== undefined ? { operationParams: v.operationParams } : {}),
       ...(v.capabilities !== undefined ? { capabilities: v.capabilities } : {}),
     })),
   }));

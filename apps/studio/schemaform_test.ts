@@ -41,6 +41,33 @@ Deno.test('only divergence travels: --adjust is empty at pure defaults', () => {
   assertEquals(adjustArg({ steps: undefined }, resolved), null, 'cleared field does not travel');
 });
 
+Deno.test('the gen form never offers a knob only retexture accepts', async () => {
+  // Where the field report started: the form rendered the UNION of trellis2's
+  // two operations, so `resolution` was an editable option on a GENERATE
+  // screen — and the CLI then refused it. The form asks for gen3d's set now.
+  const catalog = JSON.parse(
+    await Deno.readTextFile(
+      new URL('../../packages/registry/catalog/models.json', import.meta.url),
+    ),
+  );
+  const v = catalog.models.find((m: { id: string }) => m.id === 'trellis2-4b').versions[0];
+  const resolved = resolveOpDefaults(v.defaults, v.operationDefaults, 'gen3d');
+
+  const union = schemaFields(v.paramsSchema, resolved).map((f) => f.key);
+  assert(union.includes('resolution'), 'the union is what the form used to show');
+
+  const gen = schemaFields(v.paramsSchema, resolved, v.operationParams.gen3d).map((f) => f.key);
+  assert(!gen.includes('resolution'), `gen3d form offers only its own knobs: ${gen.join(', ')}`);
+  for (const key of ['steps', 'decimationTarget', 'pipelineType']) {
+    assert(gen.includes(key), `${key} is still on the form`);
+  }
+});
+
+Deno.test('an absent knob set leaves every field, for single-operation backends', () => {
+  const fields = schemaFields({ properties: { a: { type: 'integer' } } }, {}, undefined);
+  assertEquals(fields.map((f) => f.key), ['a']);
+});
+
 Deno.test('unknown schema shapes degrade to labeled rows, never wrong widgets', () => {
   const fields = schemaFields(
     { properties: { weird: { type: 'array' }, plain: { type: 'boolean' } } },
