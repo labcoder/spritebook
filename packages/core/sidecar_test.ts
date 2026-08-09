@@ -240,7 +240,9 @@ Deno.test('validateParams: strict, allErrors, actionable messages', () => {
   assert(!bad.ok);
   if (!bad.ok) {
     assert(bad.errors.some((e) => e.includes('steps')), bad.errors.join('; '));
-    assert(bad.errors.some((e) => e.includes('additional')), bad.errors.join('; '));
+    // "actionable" means NAMING the key: this used to accept ajv's own "must
+    // NOT have additional properties", which never says which one (params_test)
+    assert(bad.errors.some((e) => e.includes('unknown param(s) extra')), bad.errors.join('; '));
   }
   assert(validateParams(ECHO.paramsSchema, withDefaults(ECHO.defaults, { steps: 3 })).ok);
 });
