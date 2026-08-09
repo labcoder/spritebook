@@ -24,7 +24,7 @@ spritebook gen --workspace ./characters/hero --character hero \
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | `--workspace <dir>`     | the character folder; created on first use                                                      |
 | `--character <id>`      | the character id: lowercase letters, digits, dashes                                             |
-| `--image <file>`        | the source image; stored content-addressed in the workspace                                     |
+| `--image <file>`        | the source image; stored content-addressed in the workspace. `trellis2-4b` needs a cut-out RGBA — run `prep` first when the image has a background |
 | `--model <id>`          | the gen3d backend: `trellis2-4b` (real, CUDA) or `fixture-gen` (synthetic, no GPU)              |
 | `--model-version <v>`   | pin a backend version; the highest installed one otherwise                                      |
 | `--height <metres>`     | the character's standing height. CAUTION: without it the mesh keeps the backend's own scale, and a one-unit character bakes about 30 px tall at the default 32 px/m. The job warns and states the measured height. |
@@ -149,12 +149,13 @@ all.
 ## prep — cut the subject out of a busy image
 
 ```
-spritebook prep --image photo.png --out hero-cutout.png
+spritebook prep --image photo.png --out ./prep
 ```
 
 `prep` removes the background with the `rembg-u2net` model (0.2 GB, CPU).
-Use it when your source image has a background. A clean PNG with
-transparency needs no prep; `gen` takes it directly.
+`--out` names a folder. The cut-out lands there as `cutout.png`, beside a
+small preflight report. Feed that `cutout.png` to `gen --image`. A clean PNG
+with transparency needs no prep; `gen` takes it directly.
 
 ## models — install, verify, remove
 
