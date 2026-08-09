@@ -14,8 +14,7 @@ five minutes start where a rigged `.glb` already exists.
 ## 1. Download
 
 Grab the zip for your platform from the GitHub release: `win-x64`, `mac-arm64`, `mac-x64`, or
-`linux-x64`. On Windows-on-ARM use `win-x64` — it runs under x64 emulation (see
-`docs/platform-support.md` in the repo).
+`linux-x64`. On Windows-on-ARM use `win-x64` — it runs under x64 emulation.
 
 Unzip it anywhere. Contents:
 
@@ -121,6 +120,10 @@ serve pixels that were never rendered from this recipe here.
 ```
 ./spritebook export --bake bakes/bake-<id> --out exports --targets godot,aseprite,texturepacker,strips
 ```
+
+CAUTION: before you sell work made with a downloaded AI backend, read
+[Licensing](licensing.md). TRELLIS.2 output is not cleared for commercial
+use today; bakes of `fixture-gen` output and of your own meshes are yours.
 
 (`bakes/bake-<id>` is the bake directory printed by step 4.)
 

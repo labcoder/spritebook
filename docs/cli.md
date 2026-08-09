@@ -32,12 +32,16 @@ spritebook gen --workspace ./characters/hero --character hero \
 | `--candidates <1..8>`   | candidates in ONE job; the model loads once                                                     |
 | `--adjust k=v,k=v`      | backend knobs that diverge from the catalog defaults                                            |
 | `--more-like <rN>`      | re-run result rN's recorded recipe with a new seed                                              |
-| `--sidecar <dir>`       | the Python sidecar project; the bundled one otherwise                                           |
+| `--sidecar <dir>`       | the sidecar (the local Python helper that runs the AI models); the bundled one otherwise        |
 | `--models-dir <dir>`    | the models root; the OS default otherwise                                                       |
 | `--catalog <file>`      | a catalog override; the bundled one otherwise                                                   |
 
 Each candidate becomes a result `r1`, `r2`, … with a receipt, a canonical
 mesh, and a front-view `thumb.png`. Nothing is chosen yet.
+
+CAUTION: read [Licensing](licensing.md) before you sell work made with a
+downloaded backend. The catalog badge names the MODEL license, not the whole
+stack; TRELLIS.2 output is not cleared for commercial use today.
 
 Set your expectation for `fixture-gen`: it turns the image's OUTLINE into a
 lathe-like solid body. The geometry and texture depend on the image, so it
@@ -102,7 +106,7 @@ spritebook anim --preview idle-loop --workspace ./characters/hero
 | ----------------------- | ----------------------------------------------------------------------- |
 | `--list`                | the bundled library: 86 clips with categories and tags                 |
 | `--tag <t>` `--category <c>` | filter the listing                                                |
-| `--enable <specs>`      | bind clips: `clip:frames[@speed][!hold]`, comma-separated              |
+| `--enable <specs>`      | bind clips: `clip:frames[@speed][!hold]`, comma-separated. `speed` is a playback multiplier: `@1.5` plays the clip 1.5 times as fast. |
 | `--disable <clipIds>`   | disable bindings; their numbers are kept                               |
 | `--preview <clipId>`    | retarget the clip onto this character once and write `anim/preview-<clip>.glb` for the viewport |
 | `--import-pack <dir>` `--into <dir>` | import an external clip pack                              |
@@ -141,6 +145,16 @@ spritebook retexture --workspace ./characters/hero --result r1
 The output is a NEW result with a new card. The surface is preserved; the
 vertex buffer is not. Rebuild anything bound per-vertex, skin weights above
 all.
+
+## prep — cut the subject out of a busy image
+
+```
+spritebook prep --image photo.png --out hero-cutout.png
+```
+
+`prep` removes the background with the `rembg-u2net` model (0.2 GB, CPU).
+Use it when your source image has a background. A clean PNG with
+transparency needs no prep; `gen` takes it directly.
 
 ## models — install, verify, remove
 

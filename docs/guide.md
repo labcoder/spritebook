@@ -1,5 +1,8 @@
 # SpriteBook Studio user guide
 
+NOTE: Studio ships with the 1.0 bundle. The alpha zips carry the CLI only,
+and every action below has a CLI twin — see [the CLI reference](cli.md).
+
 SpriteBook turns a character image into engine-ready 2D spritesheets. It runs on your machine.
 Nothing goes to a server.
 
