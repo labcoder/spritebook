@@ -47,7 +47,7 @@ export interface StudioBridge {
   ): Promise<DoctorRun>;
   /** Every `<root>/<ws>/character.json`, verbatim — manifest-as-interface. */
   listWorkspaces(root: string): Promise<RawWorkspace[]>;
-  /** Newest bake's contact gif for a workspace dir, as a data URL, if any. */
+  /** Selected bake's contact gif for a workspace dir, as a data URL, if any. */
   readThumb(dir: string): Promise<string | null>;
   /** A source image as a data URL for preview (extension-allowlisted). */
   readImage(path: string): Promise<string | null>;
@@ -55,7 +55,7 @@ export interface StudioBridge {
   prevSession(maxLines: number): Promise<string[] | null>;
   /** rig/deform-report.json, verbatim, when a rig has been run. */
   readRigReport(dir: string): Promise<unknown | null>;
-  /** The newest bake's atlas page + manifest (pages are rect-identical). */
+  /** The selected bake's atlas page + manifest (pages are rect-identical). */
   readBakeAtlas(
     dir: string,
     pass?: string,

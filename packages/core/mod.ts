@@ -27,3 +27,5 @@ export {
   withManifestWrite,
   workspaceJob,
 } from './persistence.ts';
+
+export * from './queries.ts';

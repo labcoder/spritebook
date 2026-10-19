@@ -554,7 +554,8 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
     'no-mirror',
     'light-frame',
   ],
-  export: ['bake', 'out', 'targets', 'fps'],
+  export: ['bake', 'workspace', 'out', 'targets', 'fps'],
+  workspace: ['root', 'workspace', 'roster', 'bake', 'thumb', 'atlas', 'pass'],
   undo: ['manifest'],
   redo: ['manifest'],
   anim: [
@@ -654,6 +655,31 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
 
 /** Accepted everywhere. */
 const GLOBAL_FLAGS = ['json', 'log-append'] as const;
+
+const BOOLEAN_FLAGS: Record<string, readonly string[]> = {
+  bake: ['all', 'plan', 'only-invalidated', 'mirror', 'no-mirror'],
+  anim: ['list'],
+  look: ['list'],
+  pick: ['reproject', 'no-reproject', 'no-color-match'],
+  rig: ['track-a', 'rerun-with-hints', 'auto-hints', 'accept', 'unaccept', 'no-deform-check'],
+  models: ['installed', 'accept-license'],
+  doctor: ['sidecar'],
+  workspace: ['roster', 'bake', 'thumb', 'atlas'],
+};
+
+function valuedFlagError(verb: string, args: string[]): string | undefined {
+  if (!Object.hasOwn(VERB_FLAGS, verb)) return;
+  const booleans = new Set(['json', ...(BOOLEAN_FLAGS[verb] ?? [])]);
+  const seen = new Set<string>();
+  for (const [i, token] of args.entries()) {
+    if (!token.startsWith('--') || booleans.has(token.slice(2))) continue;
+    if (seen.has(token)) return `${token} was repeated - pass one value`;
+    seen.add(token);
+    if (args[i + 1] === undefined || args[i + 1].startsWith('--') || args[i + 1] === '') {
+      return `${token} needs a value${token === '--changed-since' ? ' (an ISO timestamp)' : ''}`;
+    }
+  }
+}
 
 /**
  * The `--`-prefixed tokens this verb does not accept. Only `--` tokens are
@@ -1186,6 +1212,49 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         unknown.join(', ')
       }${hint} - accepted: ${accepted}`,
     );
+  }
+
+  const flagError = valuedFlagError(verb, args);
+  if (flagError) return fail(verb as JobEvent['jobId'], 'bad-args', flagError);
+
+  if (verb === 'workspace') {
+    try {
+      const { listWorkspaces, readCurrentBake, readBakeArtifact, scanRoster } = await import(
+        '@spritebook/core'
+      );
+      const root = flag(args, 'root'), workspace = flag(args, 'workspace');
+      const modes = ['roster', 'bake', 'thumb', 'atlas'].filter((k) => args.includes(`--${k}`));
+      if (
+        !!root === !!workspace || modes.length > 1 ||
+        (root && modes.some((k) => k !== 'roster')) || (workspace && modes.includes('roster')) ||
+        (flag(args, 'pass') && !modes.includes('atlas'))
+      ) {
+        return fail(
+          'workspace' as JobEvent['jobId'],
+          'bad-args',
+          'Choose --root <dir> [--roster] or --workspace <dir> [--bake | --thumb | --atlas [--pass <pass>]]',
+        );
+      }
+      const result = root
+        ? (modes.includes('roster') ? await scanRoster(root) : await listWorkspaces(root))
+        : modes.includes('bake')
+        ? await readCurrentBake(workspace!)
+        : modes.includes('thumb') || modes.includes('atlas')
+        ? await readBakeArtifact(
+          workspace!,
+          modes.includes('thumb') ? 'thumb' : 'atlas',
+          flag(args, 'pass'),
+        )
+        : await readWorkspace(workspace!);
+      io.stdout(canonicalJson(result).trimEnd());
+      return 0;
+    } catch (e) {
+      return fail(
+        'workspace' as JobEvent['jobId'],
+        'workspace-query-failed',
+        e instanceof Error ? e.message : String(e),
+      );
+    }
   }
 
   const workspace = flag(args, 'workspace') ??
@@ -2520,14 +2589,22 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
   }
 
   if (verb === 'export') {
-    const bakeDir = flag(args, 'bake');
+    let bakeDir = flag(args, 'bake');
+    const workspace = flag(args, 'workspace');
+    if (bakeDir && workspace) {
+      return fail(
+        'export' as JobEvent['jobId'],
+        'bad-args',
+        'Choose --bake or --workspace, not both',
+      );
+    }
     const out = flag(args, 'out');
     const targetsRaw = flag(args, 'targets');
-    if (!bakeDir || !out || !targetsRaw) {
+    if ((!bakeDir && !workspace) || !out || !targetsRaw) {
       return fail(
         'export' as JobEvent['jobId'],
         'missing-arg',
-        '--bake <bakeDir>, --out <dir>, and --targets <a,b,...> are required',
+        '--bake <bakeDir> or --workspace <dir>, plus --out <dir> and --targets <a,b,...>, are required',
       );
     }
     let targets: ExportTargetId[];
@@ -2545,10 +2622,22 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     // the same arg-error-to-event discipline as the bake branch (M4): a bad
     // --fps must become an NDJSON error event, never a raw throw out of runCli
     try {
+      if (workspace) {
+        const { readCurrentBake } = await import('@spritebook/core');
+        const selected = await readCurrentBake(workspace);
+        if (!selected) {
+          return fail(
+            'export' as JobEvent['jobId'],
+            'no-bake',
+            'This character has no selected bake - bake it first',
+          );
+        }
+        bakeDir = selected.dir;
+      }
       return await pump(
         runExportJob({
           jobId: 'export',
-          bakeDir,
+          bakeDir: bakeDir!,
           outDir: out,
           targets,
           fps: numFlag(args, 'fps', 8),
@@ -2570,7 +2659,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       'unknown-verb',
       `Unknown verb "${
         verb ?? ''
-      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, models, anim, look, bake, export, doctor, undo, redo (--version)`,
+      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, models, anim, look, bake, export, workspace, doctor, undo, redo (--version)`,
     );
   }
 

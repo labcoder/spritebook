@@ -4,7 +4,7 @@ This page covers the verbs that take an image to a rigged, animated character:
 `gen`, `pick`, `rig`, `anim`, `look`, `retexture`, and `models`. The
 [quickstart](quickstart.md) covers `bake`, `export`, and `doctor`.
 
-Every verb accepts `--json` (machine-readable event lines) and
+Every verb accepts `--json` (jobs emit NDJSON events; queries emit one JSON document) and
 `--log-append <file>` (append every event to a file). SpriteBook Studio runs
 these exact commands. Each primary button in Studio shows the command it runs,
 with a **Copy** button.
@@ -230,3 +230,29 @@ sidecar's download uses that authentication.
 
 The floors are measured, not copied from READMEs. An install on a smaller
 card warns; the job-time preflight is the hard gate.
+
+## Workspace queries and selected exports
+
+Core owns workspace reads and recovers any committed pending transaction before returning data. The
+shell uses these commands rather than scanning files or choosing a bake by directory age:
+
+```sh
+spritebook workspace --root ./characters --json
+spritebook workspace --root ./characters --roster --json
+spritebook workspace --workspace ./characters/hero --json
+spritebook workspace --workspace ./characters/hero --bake --json
+spritebook workspace --workspace ./characters/hero --thumb --json
+spritebook workspace --workspace ./characters/hero --atlas --pass normal --json
+spritebook export --workspace ./characters/hero --out ./export --targets godot --json
+```
+
+`workspace` returns one JSON document: workspace cards (including malformed manifests as `null` with
+an error), a roster, a recovered character manifest, the selected bake and directory, or base64
+display artifacts. `--thumb` returns a string or `null`; `--atlas` returns `{manifest, png}` or
+`null`. A character without `lastBakeId` has no selected bake. A missing or invalid selected bake is
+an error; core never substitutes another directory. Thumbnail clip names come from the selected
+BakeManifest. Preview and export therefore follow undo/redo consistently.
+
+The existing `export --bake <dir>` remains available for exporting a specific historical bake.
+Choose either `--workspace` or `--bake`. All valued flags require one nonempty, space-separated
+value; missing or repeated valued flags fail before jobs or workspace writes start.

@@ -196,7 +196,7 @@ Deno.test('bake --clips arg validation fails fast, before any GPU work', async (
   const cases: Array<[string[], string]> = [
     // valueless --clips must NOT silently bake the legacy idle stub (review F9)
     [[...base, '--clips'], '--clips needs a value'],
-    [[...base, '--pack'], '--pack needs a directory'],
+    [[...base, '--pack'], '--pack needs a value'],
     [[...base, '--pack', 'somewhere'], '--pack only applies when there are clips'],
     // duplicates fail here, not after a full render (review F4)
     [[...base, '--clips', 'walk-loop:2,walk-loop:4'], 'twice'],

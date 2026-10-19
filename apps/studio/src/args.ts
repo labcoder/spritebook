@@ -70,9 +70,9 @@ export function bakeArgs(workspace: string, opts: { onlyInvalidated?: boolean } 
   return a;
 }
 
-export function exportArgs(bakeDir: string, outDir: string, targets: string[]): string[] {
-  // --bake takes the bake DIRECTORY; core appends its own manifest.json
-  return ['export', '--bake', bakeDir, '--out', outDir, '--targets', targets.join(',')];
+export function exportArgs(workspace: string, outDir: string, targets: string[]): string[] {
+  // Core selects the accepted lastBakeId, including after undo.
+  return ['export', '--workspace', workspace, '--out', outDir, '--targets', targets.join(',')];
 }
 
 /** A NEW texture on an existing result's mesh - a new result card appears.

@@ -142,71 +142,55 @@ fn cancel_cli(jobs: tauri::State<'_, Arc<Jobs>>, job_id: String) {
     jobs.cancel(job_id);
 }
 
-#[derive(serde::Serialize)]
-struct RawWorkspace {
-    dir: String,
-    manifest: serde_json::Value,
+fn core_query(args: &[&str]) -> Result<serde_json::Value, String> {
+    let root = repo_root();
+    let mut cmd = Command::new("deno");
+    cmd.arg("run")
+        .arg("-A")
+        .arg(display_path(&root.join("packages/cli/mod.ts")))
+        .arg("workspace")
+        .args(args)
+        .arg("--json")
+        .current_dir(root)
+        .stdin(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let output = cmd.output().map_err(|e| format!("workspace query: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|e| format!("workspace query returned invalid JSON: {e}"))
 }
 
 #[tauri::command]
-fn list_workspaces(root: String) -> Result<Vec<RawWorkspace>, String> {
-    let base = {
-        let p = PathBuf::from(&root);
-        if p.is_absolute() {
-            p
-        } else {
-            repo_root().join(p)
-        }
-    };
-    let entries =
-        std::fs::read_dir(&base).map_err(|e| format!("cannot read {}: {e}", base.display()))?;
-    let mut out = Vec::new();
-    for entry in entries.flatten() {
-        let manifest_path = entry.path().join("character.json");
-        let Ok(bytes) = std::fs::read(&manifest_path) else {
-            continue; // not a workspace — fine, roots hold other dirs too
-        };
-        // verbatim passthrough: a malformed manifest still yields a card that
-        // SAYS it is malformed, instead of silently vanishing from the gallery
-        let manifest = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
-        out.push(RawWorkspace {
-            dir: display_path(&entry.path()),
-            manifest,
-        });
-    }
-    out.sort_by(|a, b| a.dir.cmp(&b.dir));
-    Ok(out)
+async fn list_workspaces(root: String) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        core_query(&["--root", &display_path(Path::new(&root))])
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn read_thumb(dir: String) -> Result<Option<String>, String> {
-    use base64::Engine;
-    let bakes = Path::new(&dir).join("bakes");
-    let Ok(entries) = std::fs::read_dir(&bakes) else {
-        return Ok(None);
-    };
-    // newest bake dir by modification time that actually holds a contact gif
-    let mut candidates: Vec<(std::time::SystemTime, PathBuf)> = entries
-        .flatten()
-        .filter_map(|e| {
-            let gif = e.path().join("contact-idle.gif");
-            if !gif.is_file() {
-                return None;
-            }
-            let t = e.metadata().and_then(|m| m.modified()).ok()?;
-            Some((t, gif))
-        })
-        .collect();
-    candidates.sort_by(|a, b| b.0.cmp(&a.0));
-    match candidates.first() {
-        Some((_, gif)) => {
-            let bytes = std::fs::read(gif).map_err(|e| e.to_string())?;
-            Ok(Some(
-                base64::engine::general_purpose::STANDARD.encode(bytes),
-            ))
-        }
-        None => Ok(None),
-    }
+async fn read_thumb(dir: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        serde_json::from_value(core_query(&[
+            "--workspace",
+            &display_path(Path::new(&dir)),
+            "--thumb",
+        ])?)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Lines of the newest session file BEFORE this run's — the drawer's replay.
@@ -247,56 +231,24 @@ fn read_rig_report(dir: String) -> Result<Option<serde_json::Value>, String> {
     }
 }
 
-/// The newest bake's LIT atlas plus its manifest — what the Look stage draws
-/// its pixel-truth direction strips from. Core produced both; the webview
-/// only slices the atlas it is given, at integer zoom.
+/// Core selects lastBakeId and reads its artifact under the workspace recovery lock.
 #[tauri::command]
-fn read_bake_atlas(dir: String, pass: Option<String>) -> Result<Option<serde_json::Value>, String> {
-    use base64::Engine;
-    let bakes = Path::new(&dir).join("bakes");
-    let Ok(entries) = std::fs::read_dir(&bakes) else {
-        return Ok(None);
-    };
-    let mut candidates: Vec<(std::time::SystemTime, PathBuf)> = entries
-        .flatten()
-        .filter_map(|e| {
-            let manifest = e.path().join("manifest.json");
-            if !manifest.is_file() {
-                return None;
-            }
-            let t = e.metadata().and_then(|m| m.modified()).ok()?;
-            Some((t, e.path()))
-        })
-        .collect();
-    candidates.sort_by(|a, b| b.0.cmp(&a.0));
-    let Some((_, bake_dir)) = candidates.first() else {
-        return Ok(None);
-    };
-    let manifest: serde_json::Value = serde_json::from_slice(
-        &std::fs::read(bake_dir.join("manifest.json")).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| format!("bake manifest is not JSON: {e}"))?;
-    // the lit page is the one the sheet ships; AOV pages are RECT-IDENTICAL
-    // (D-010), so the same frame rects address every pass
-    let want = pass.unwrap_or_else(|| "lit".to_string());
-    let png_name = manifest
-        .get("atlases")
-        .and_then(|a| a.as_array())
-        .and_then(|a| {
-            a.iter()
-                .find(|x| x.get("pass").and_then(|p| p.as_str()) == Some(&want))
-        })
-        .and_then(|x| x.get("png"))
-        .and_then(|p| p.as_str())
-        .unwrap_or("atlas_lit_0.png")
-        .to_string();
-    let Ok(bytes) = std::fs::read(bake_dir.join(&png_name)) else {
-        return Ok(None);
-    };
-    Ok(Some(serde_json::json!({
-        "manifest": manifest,
-        "png": base64::engine::general_purpose::STANDARD.encode(bytes),
-    })))
+async fn read_bake_atlas(
+    dir: String,
+    pass: Option<String>,
+) -> Result<Option<serde_json::Value>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let value = core_query(&[
+            "--workspace",
+            &display_path(Path::new(&dir)),
+            "--atlas",
+            "--pass",
+            pass.as_deref().unwrap_or("lit"),
+        ])?;
+        Ok(if value.is_null() { None } else { Some(value) })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Source-image preview bytes. Read-only, and only image extensions — the

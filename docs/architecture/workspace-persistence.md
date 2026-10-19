@@ -63,3 +63,12 @@ gate. Abrupt Unix shell death is not claimed to have Windows kernel job-object c
 Stdout remains the CLI's original query document or NDJSON stream. Stderr has a distinct per-job
 channel and diagnostic file; the log drawer displays its lines verbatim with error severity. Failed
 rig/fit acceptance is a terminal error even when intermediate output files were retained.
+
+## Read projections (F1-T4)
+
+`listWorkspaces`, `readCurrentBake` and `readBakeArtifact` are core queries exposed through
+`workspace`. Artifact selection and byte reads share the short recovery lock. `lastBakeId` is the
+only implicit bake selection; its manifest must match the selected id and character. Artifact paths
+cannot escape the bake directory. Missing selections return null; corrupt selections fail rather
+than choosing a newer directory. The Tauri shell delegates gallery/thumbnail/atlas selection to
+these queries. `export --workspace` uses the same selection; explicit `export --bake` is preserved.

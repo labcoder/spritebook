@@ -231,7 +231,7 @@ Deno.test('CLI-twin parity: bake and export (GPU)', async () => {
 
     // 13. Export selected — over that bake, in the shape the stage builds
     const out = `${ws}/export`;
-    await twin(exportArgs(`${ws}/bakes/bake-${bakeId}`, out, ['godot', 'strips']), 'export');
+    await twin(exportArgs(ws, out, ['godot', 'strips']), 'export');
     // each target produced its folder, which is what the done state lists
     for (const target of ['godot', 'strips']) {
       const stat = await Deno.stat(`${out}/${target}`);

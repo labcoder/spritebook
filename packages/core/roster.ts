@@ -1,3 +1,4 @@
+import { readCurrentBake } from './queries.ts';
 import { relative, resolve } from 'node:path';
 /**
  * Roster operations: `clone` and `rename` (P3-T4).
@@ -25,7 +26,6 @@ import type {
   RosterManifest,
 } from '@spritebook/schema';
 import {
-  BakeManifestSchema,
   canonicalJson,
   CharacterIdSchema,
   CharacterManifestSchema,
@@ -39,6 +39,7 @@ import { ManifestJournal } from './journal.ts';
 import {
   commitManifest,
   initializeManifest,
+  withManifestLock,
   withManifestWrite,
   writeAtomic,
 } from './persistence.ts';
@@ -274,45 +275,42 @@ export async function scanRoster(
     const updatedAt = (stat.mtime ?? new Date(0)).toISOString();
     if (opts.changedSince && (stat.mtime ?? new Date(0)) < opts.changedSince) continue;
 
-    let manifest: CharacterManifest;
     try {
-      manifest = await readWorkspace(dir);
+      await withManifestLock(paths.manifest, async () => {
+        const manifest = await readWorkspace(dir);
+        // `ready` asks the disk, not the manifest: a manifest can carry a
+        // canonicalMesh record whose file was deleted underneath it, and finding
+        // that out at frame 1 of an overnight run is the expensive way to learn it
+        let ready = manifest.canonicalMesh !== undefined;
+        if (ready) {
+          try {
+            await Deno.stat(paths.canonicalModel);
+          } catch {
+            ready = false;
+          }
+        }
+        let lastBakedAt: string | undefined;
+        if (manifest.lastBakeId !== undefined) {
+          try {
+            lastBakedAt = (await readCurrentBake(dir))?.manifest.createdAt;
+          } catch {
+            // the id points at a bake that is gone or unreadable; the plan will
+            // call that never-baked, which is the honest and safe reading
+          }
+        }
+        characters.push({
+          id: manifest.id,
+          dir: entry.name,
+          displayName: manifest.displayName,
+          updatedAt,
+          ready,
+          ...(manifest.lastBakeId !== undefined ? { lastBakeId: manifest.lastBakeId } : {}),
+          ...(lastBakedAt !== undefined ? { lastBakedAt } : {}),
+        });
+      });
     } catch (err) {
       unreadable.push({ dir: entry.name, error: err instanceof Error ? err.message : String(err) });
-      continue;
     }
-    // `ready` asks the disk, not the manifest: a manifest can carry a
-    // canonicalMesh record whose file was deleted underneath it, and finding
-    // that out at frame 1 of an overnight run is the expensive way to learn it
-    let ready = manifest.canonicalMesh !== undefined;
-    if (ready) {
-      try {
-        await Deno.stat(paths.canonicalModel);
-      } catch {
-        ready = false;
-      }
-    }
-    let lastBakedAt: string | undefined;
-    if (manifest.lastBakeId !== undefined) {
-      try {
-        const baked = JSON.parse(
-          await Deno.readTextFile(`${paths.bakesDir}/bake-${manifest.lastBakeId}/manifest.json`),
-        );
-        lastBakedAt = parseWith(BakeManifestSchema, baked, 'BakeManifest').createdAt;
-      } catch {
-        // the id points at a bake that is gone or unreadable; the plan will
-        // call that never-baked, which is the honest and safe reading
-      }
-    }
-    characters.push({
-      id: manifest.id,
-      dir: entry.name,
-      displayName: manifest.displayName,
-      updatedAt,
-      ready,
-      ...(manifest.lastBakeId !== undefined ? { lastBakeId: manifest.lastBakeId } : {}),
-      ...(lastBakedAt !== undefined ? { lastBakedAt } : {}),
-    });
   }
 
   // sorted so two scans of an unchanged root are byte-identical

@@ -59,11 +59,7 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
   }, [bridge, dir, bakeId]);
 
   const outDir = `${dir}/export`;
-  const bakeDir = bakeId ? `${dir}/bakes/bake-${bakeId}` : `${dir}/bakes/<bake>`;
-  // --bake takes the bake DIRECTORY, not its manifest (the parity run caught
-  // this: core appends /manifest.json itself, so passing the file produced
-  // ".../manifest.json/manifest.json" and a path error)
-  const args = exportArgs(bakeDir, outDir, selected);
+  const args = exportArgs(dir, outDir, selected);
 
   const runExport = useCallback(async () => {
     if (running) return; // the button stays focusable while running (aria-busy)
