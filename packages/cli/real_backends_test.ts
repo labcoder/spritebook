@@ -18,7 +18,7 @@ import { runCli } from './mod.ts';
 const WANTED = Deno.env.get('SPRITEBOOK_REAL_BACKENDS') === '1';
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const IMAGE = `${REPO}spikes/trellis2/refs/bulma-front.png`;
+const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 
 function io() {
   const out: string[] = [];

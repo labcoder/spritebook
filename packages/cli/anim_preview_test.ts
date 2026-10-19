@@ -19,7 +19,7 @@ async function cli(args: string[]): Promise<{ code: number; out: string[] }> {
 }
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const IMAGE = `${REPO}spikes/trellis2/refs/bulma-front.png`;
+const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const BODY = `${REPO}packages/rig/bodies/ubc-male`;
 
 Deno.test('anim --preview writes the retargeted clip onto the rigged character', async () => {

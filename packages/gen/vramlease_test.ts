@@ -20,7 +20,7 @@ import { vramCommittedGb } from '@spritebook/core';
 import { runGenJob } from './gen.ts';
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const IMAGE = `${REPO}spikes/trellis2/refs/bulma-front.png`;
+const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const CATALOG = `${REPO}packages/registry/catalog/models.json`;
 const SIDECAR = `${REPO}sidecar`;
 

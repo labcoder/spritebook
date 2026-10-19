@@ -1,8 +1,0 @@
-# Reproducible from wheels.lock.json + REPORT.md; several GB of it is not history.
-.venv/
-code/
-out/
-# The wheels themselves are 5.5 MB of third-party binaries. The LOCK is the pin;
-# fetch_wheels.py re-downloads and verifies against it, and refuses on mismatch.
-wheels/*.whl
-__pycache__/

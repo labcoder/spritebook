@@ -34,7 +34,7 @@ import { runCli } from '../../packages/cli/mod.ts';
 import { BakeManifestSchema, type FrameRecord, parseWith } from '../../packages/schema/mod.ts';
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const IMAGE = `${REPO}spikes/trellis2/refs/bulma-front.png`;
+const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const BODY = `${REPO}packages/rig/bodies/ubc-male`;
 
 /** The same clip set the roster proof uses — the thing that actually clipped. */

@@ -34,7 +34,7 @@ import { editsFile } from './src/viewport/picking.ts';
 import { JointEditsFileSchema, parseWith } from '@spritebook/schema';
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const IMAGE = `${REPO}spikes/trellis2/refs/bulma-front.png`;
+const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 
 function io() {
   const out: string[] = [];

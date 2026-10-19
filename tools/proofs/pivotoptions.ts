@@ -28,7 +28,7 @@ import { BakeManifestSchema, parseWith } from '../../packages/schema/mod.ts';
 import { STANDARD_30 } from '../../packages/core/presets.ts';
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const IMAGE = `${REPO}spikes/trellis2/refs/bulma-front.png`;
+const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const BODY = `${REPO}packages/rig/bodies/ubc-male`;
 const CLIPS = 'idle-loop:8,walk-loop:8,jog-fwd-loop:8,sprint-loop:6,punch-jab:6,death01:10';
 /** big enough that the band cannot be cut: 96 rows below the pivot */

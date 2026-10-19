@@ -96,8 +96,8 @@ const gltf = {
 };
 await Deno.writeTextFile(new URL('vrm0-arrow.gltf', here), JSON.stringify(gltf, null, 2) + '\n');
 
-// --- skinned-column.glb: reuse the hermetic P0-T2 spike asset ---------------
-const src = new URL('../../../spikes/webgpu/assets/skinned-column.glb', here);
+// --- skinned-column.glb: reuse the committed renderer fixture ---------------
+const src = new URL('../../render/fixtures/skinned-column.glb', here);
 await Deno.writeFile(new URL('skinned-column.glb', here), await Deno.readFile(src));
 
 console.log('importer fixtures written: cube.obj, vrm0-arrow.gltf, skinned-column.glb');

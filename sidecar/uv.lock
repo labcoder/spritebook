@@ -105,7 +105,7 @@ wheels = [
 [[package]]
 name = "cumesh"
 version = "1.0"
-source = { path = "../spikes/trellis2/wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" }
+source = { path = "wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" }
 dependencies = [
     { name = "torch" },
     { name = "tqdm" },
@@ -149,7 +149,7 @@ wheels = [
 [[package]]
 name = "flex-gemm"
 version = "0.0.1"
-source = { path = "../spikes/trellis2/wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" }
+source = { path = "wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" }
 dependencies = [
     { name = "filelock" },
     { name = "numpy" },
@@ -529,7 +529,7 @@ wheels = [
 [[package]]
 name = "nvdiffrast"
 version = "0.4.0"
-source = { path = "../spikes/trellis2/wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" }
+source = { path = "wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -543,7 +543,7 @@ requires-dist = [{ name = "numpy" }]
 [[package]]
 name = "nvdiffrec-render"
 version = "0.0.0"
-source = { path = "../spikes/trellis2/wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" }
+source = { path = "wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" }
 wheels = [
     { filename = "nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:2bc74423d15cce8dc7ee2db3741e6cc71e700f485cb51fd86f26c53b2755cab1" },
 ]
@@ -551,7 +551,7 @@ wheels = [
 [[package]]
 name = "o-voxel"
 version = "0.0.1"
-source = { path = "../spikes/trellis2/wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" }
+source = { path = "wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" }
 dependencies = [
     { name = "easydict" },
     { name = "numpy" },
@@ -981,18 +981,18 @@ trellis2 = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cumesh", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "../spikes/trellis2/wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" },
+    { name = "cumesh", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" },
     { name = "easydict", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
-    { name = "flex-gemm", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "../spikes/trellis2/wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" },
+    { name = "flex-gemm", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" },
     { name = "imageio", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "imageio-ffmpeg", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "kornia", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "lpips", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "ninja", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "numpy", specifier = "==2.4.6" },
-    { name = "nvdiffrast", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "../spikes/trellis2/wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" },
-    { name = "nvdiffrec-render", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "../spikes/trellis2/wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" },
-    { name = "o-voxel", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "../spikes/trellis2/wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" },
+    { name = "nvdiffrast", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" },
+    { name = "nvdiffrec-render", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" },
+    { name = "o-voxel", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" },
     { name = "onnxruntime", specifier = "==1.27.0" },
     { name = "opencv-python-headless", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "pandas", marker = "sys_platform == 'win32' and extra == 'trellis2'" },

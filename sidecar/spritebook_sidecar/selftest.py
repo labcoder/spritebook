@@ -1282,7 +1282,7 @@ def test_trellis2_code_dir(tmp: Path) -> None:
     # and without it, the repo's own checkout path - relative to THIS file, not
     # to the process cwd, which is whatever core happened to spawn us in
     default = t2._code_dir()
-    ok(default.name == "code" and default.parent.name == "trellis2",
+    ok(default.name == "trellis2" and default.parent.name == ".deps",
        f"defaults into the repo checkout: {default}")
     ok(default.is_absolute(), "absolute, so the cwd cannot move it")
 

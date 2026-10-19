@@ -1,5 +1,0 @@
-# P0-T4 render spike deps (separate from the UniRig env's requirements-win.txt).
-# bpy 4.2.x = Blender-as-pip-module; needs Python 3.11 on Windows.
-bpy==4.2.*
-# pillow stitches the per-cell renders into the single contact-sheet PNG.
-pillow>=10.0

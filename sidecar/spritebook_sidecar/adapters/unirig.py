@@ -246,7 +246,7 @@ def resolve_backend(home: Path, python: Path) -> None:
         raise AdapterError(
             "backend-missing",
             f"The UniRig Python environment is not installed at '{python}'. Create it with the "
-            "recipe in spikes/autorig/README.md (uv, prebuilt wheels only), or point "
+            "uv with prebuilt wheels matching your Torch/CUDA versions, or point "
             f"{ENV_PYTHON} at an existing interpreter. The sidecar's own environment "
             "deliberately has no torch and cannot run UniRig in-process.",
             False,

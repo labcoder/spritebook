@@ -1,6 +1,6 @@
 # P1-T1 CI: enforce the working agreements on every push/PR.
 # Kept free & simple: standard hosted runners only. Deno pinned per the
-# D-004 canary rider (upgrade deliberately; re-run spikes/webgpu first).
+# D-004 canary rider (upgrade deliberately; re-run the GPU test lane first).
 name: ci
 
 on:

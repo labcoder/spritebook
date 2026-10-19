@@ -1,10 +1,10 @@
 /**
- * The Bake stage's arithmetic, pinned against the REAL p3-exit bake: reading
+ * The Bake stage's arithmetic: reading
  * core's own progress events, an ETA that refuses to speak before it can, the
  * player's frame selection, and the flag→stage jump.
  */
 import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { etaSeconds, flagStage, playFrames, readProgress, summarize } from './src/bakeprogress.ts';
+import { etaSeconds, flagStage, readProgress, summarize } from './src/bakeprogress.ts';
 
 Deno.test('readProgress takes core progress events and nothing else', () => {
   assertEquals(
@@ -34,35 +34,6 @@ Deno.test('the ETA stays silent until it can be honest', () => {
   assertEquals(etaSeconds(10, p(4)), null, 'finished is not an estimate');
   assertEquals(etaSeconds(10, p(1)), 30, 'a quarter done in 10s: ~30s left');
   assertEquals(etaSeconds(10, p(2)), 10);
-});
-
-Deno.test('the real p3-exit bake summarizes into what the player needs', async () => {
-  let raw: string;
-  try {
-    raw = await Deno.readTextFile(
-      new URL(
-        '../../spikes/trellis2/out/p3-exit/bulma-fixed/bakes/bake-704614bc/manifest.json',
-        import.meta.url,
-      ),
-    );
-  } catch {
-    console.log('skip: exit workspace not present on this machine');
-    return;
-  }
-  const s = summarize(JSON.parse(raw))!;
-  assertEquals(s.bakeId, '704614bc');
-  assertEquals(s.frames.length, 48);
-  assertEquals(s.clips, ['idle']);
-  assertEquals(s.directions, [0, 1, 2, 3, 4, 5, 6, 7], 'eight directions, in order');
-  assertEquals(s.passes, ['lit', 'albedo', 'normal', 'depth', 'mask'], 'every AOV page is offered');
-  assertEquals(s.cacheHitPct, 0);
-  assert(s.flickerPct > 0 && s.flickerPct < 1, `the real flicker rides along (${s.flickerPct})`);
-
-  // 48 frames / 8 directions = 6 per direction, in frame order
-  const strip = playFrames(s, 'idle', 3);
-  assertEquals(strip.length, 6);
-  assertEquals(strip.map((f) => f.frame), [0, 1, 2, 3, 4, 5]);
-  assert(strip.every((f) => f.atlas.w > 0), 'each frame carries its atlas rect');
 });
 
 Deno.test('summarize refuses garbage instead of half-rendering it', () => {

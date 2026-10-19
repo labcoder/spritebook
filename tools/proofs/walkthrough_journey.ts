@@ -14,7 +14,7 @@ import { Cdp } from './walkthrough.ts';
 import { runJourney } from './journey.ts';
 
 const ROOT = 'C:\\dev\\Mighty\\tools\\spritebook\\.proof-ux\\projects';
-const IMAGE = 'C:\\dev\\Mighty\\tools\\spritebook\\spikes\\trellis2\\refs\\bulma-front.png';
+const IMAGE = 'C:\\dev\\Mighty\\tools\\spritebook\\tests\\fixtures\\bulma-front.png';
 const NAME = Deno.args[0] ?? 'kb-hero';
 
 const cdp = await Cdp.connect(Number(Deno.env.get('SPRITEBOOK_CDP_PORT') ?? '9223'));

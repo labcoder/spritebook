@@ -262,8 +262,7 @@ def _code_dir() -> Path:
     override = os.environ.get(CODE_DIR_ENV)
     if override:
         return Path(override)
-    # .../sidecar/spritebook_sidecar/adapters/trellis2.py -> repo root
-    return Path(__file__).resolve().parents[3] / "spikes" / "trellis2" / "code"
+    return Path(__file__).resolve().parents[2] / ".deps" / "trellis2"
 
 
 def _ensure_importable() -> None:

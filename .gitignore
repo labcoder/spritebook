@@ -20,19 +20,12 @@ tests/failures/
 # Render throughput probe output (uploaded as a CI artifact; a trend signal, not a golden)
 .render-bench/
 
-# Spike outputs (measurements go in REPORT.md; pixels are throwaway)
-spikes/*/out/
-spikes/shell/tauri/src-tauri/target/
+# Retired experiments stay local; their history remains in Git.
+/spikes/
 apps/studio/src-tauri/target/
 apps/studio/src-tauri/gen/
-spikes/shell/tauri/src-tauri/gen/
-spikes/shell/build/
-
-# P0-T4 autorig spike: upstream clones, python env, working files (evidence goes in REPORT.md)
-spikes/autorig/UniRig/
-spikes/autorig/SkinTokens/
-spikes/autorig/.venv/
-spikes/autorig/work/
+sidecar/wheels/*.whl
+sidecar/.deps/
 
 # Model weights & caches (installed per-machine via the registry)
 .spritebook/

@@ -28,7 +28,7 @@ Deno.test('full-journey keyboard-only walkthrough: zero findings', async () => {
   // a fresh root per run - the journey creates a character and must not
   // collide with an earlier one
   const root = await Deno.makeTempDir({ prefix: 'sb-walkthrough-' });
-  const image = new URL('../../spikes/trellis2/refs/bulma-front.png', import.meta.url).pathname
+  const image = new URL('../../tests/fixtures/bulma-front.png', import.meta.url).pathname
     .replace(/^\/([A-Za-z]:)/, '$1').replaceAll('/', '\\');
 
   let cdp: Cdp;

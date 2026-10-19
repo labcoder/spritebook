@@ -77,7 +77,7 @@ async function fittedBody(into: string): Promise<string> {
     '--character',
     'meshfloor',
     '--image',
-    `${REPO}spikes/trellis2/refs/bulma-front.png`,
+    `${REPO}tests/fixtures/bulma-front.png`,
     '--model',
     'fixture-gen',
   ], 'gen');

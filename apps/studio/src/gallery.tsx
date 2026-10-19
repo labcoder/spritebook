@@ -81,7 +81,7 @@ export function Gallery({ bridge, cards, loadError, onOpen, onUseDefault }: {
   loadError: string | null;
   onOpen: (dir: string) => void;
   /** F1: a remembered root that vanished is an expectable state, not a dead
-   * end - one press points the app back at the repo's demo roster */
+   * end - one press points the app back at its working directory */
   onUseDefault?: () => void;
 }) {
   return (

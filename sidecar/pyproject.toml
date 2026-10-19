@@ -39,7 +39,7 @@ trellis2 = [
     "xformers==0.0.32.post2 ; sys_platform == 'win32'",
     "transformers==5.14.1 ; sys_platform == 'win32'",
     # the five prebuilt CUDA extensions, sha256-pinned in
-    # spikes/trellis2/wheels/wheels.lock.json and resolved from disk below
+    # sidecar/wheels/wheels.lock.json and resolved from disk below
     "cumesh==1.0 ; sys_platform == 'win32'",
     "flex-gemm==0.0.1 ; sys_platform == 'win32'",
     "nvdiffrast==0.4.0 ; sys_platform == 'win32'",
@@ -78,12 +78,12 @@ xformers = { index = "pytorch-cu128" }
 # Vendored, and verified before install: these are community builds from a
 # single maintainer's raw.githubusercontent URL that can move under us, so the
 # bytes are pinned by sha256 and checked with
-# `python spikes/trellis2/fetch_wheels.py --verify` BEFORE `uv sync`.
-cumesh = { path = "../spikes/trellis2/wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" }
-flex-gemm = { path = "../spikes/trellis2/wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" }
-nvdiffrast = { path = "../spikes/trellis2/wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" }
-nvdiffrec-render = { path = "../spikes/trellis2/wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" }
-o-voxel = { path = "../spikes/trellis2/wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" }
+# `python sidecar/fetch_wheels.py --verify` BEFORE `uv sync`.
+cumesh = { path = "wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" }
+flex-gemm = { path = "wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" }
+nvdiffrast = { path = "wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" }
+nvdiffrec-render = { path = "wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" }
+o-voxel = { path = "wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" }
 # no PyPI release; the pin is the commit
 utils3d = { git = "https://github.com/EasternJournalist/utils3d.git", rev = "9a4eb15e4021b67b12c460c7057d642626897ec8" }
 

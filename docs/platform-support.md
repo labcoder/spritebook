@@ -1,11 +1,11 @@
 # Platform support & targets
 
-This page is for contributors working in the repository. The release zips do not
-include the repository, and the commands here assume a checkout.
+This page is for contributors working in the repository. The release zips do not include the
+repository, and the commands here assume a checkout.
 
-Standing constraint: ship **Windows x64, Windows ARM64, and macOS**;
-prioritize the Windows dev box today, but make decisions with macOS in mind. Linux is tier-2 until
-the webview validation spike runs (see D-005 riders).
+Standing constraint: ship **Windows x64, Windows ARM64, and macOS**; prioritize the Windows dev box
+today, but make decisions with macOS in mind. Linux is tier-2 until the webview validation spike
+runs (see D-005 riders).
 
 ## Target matrix (state as of 2026-07-12, Deno 2.9.2)
 
@@ -30,6 +30,6 @@ the webview validation spike runs (see D-005 riders).
 
 1. Deno adds `aarch64-pc-windows-msvc` to `deno compile` → add native win-arm64 CLI builds.
 2. Repo goes public → enable the `windows-11-arm` runner lane.
-3. Mac hardware (or GPU CI) available → run `deno task spike:webgpu` on Metal and record numbers
-   next to the Windows baselines in `spikes/webgpu/REPORT.md`.
-4. Any Deno upgrade → re-run the webgpu spike first (D-004 canary rider).
+3. Mac hardware (or GPU CI) available → run `deno task test:gpu` on Metal and record results
+   alongside the Windows baselines. Retired spike measurements remain available in Git history.
+4. Any Deno upgrade → re-run `deno task test:gpu` first (D-004 canary rider).

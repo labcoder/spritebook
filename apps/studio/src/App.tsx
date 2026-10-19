@@ -30,10 +30,10 @@ interface Workspace {
   card: CharacterCard;
 }
 
-/** The repo's demo roster - where a cold open lands before any choice, and
+/** The current directory - where a cold open lands before any choice, and
  * the recovery target when a remembered root has vanished (F1: temp dirs,
  * ejected drives, renamed folders are expectable states, not dead ends). */
-const DEFAULT_ROOT = 'spikes/trellis2/out/p3-exit';
+const DEFAULT_ROOT = '.';
 
 export default function App() {
   // useLingui subscribes this tree to locale changes — t() re-renders live

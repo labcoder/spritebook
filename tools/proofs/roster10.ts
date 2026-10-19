@@ -23,7 +23,7 @@ import { runCli } from '../../packages/cli/mod.ts';
 import { type BakePlan, BakePlanSchema } from '../../packages/schema/mod.ts';
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const IMAGE = `${REPO}spikes/trellis2/refs/bulma-front.png`;
+const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const KEEP = Deno.args.includes('--keep');
 
 const NAMES = [
