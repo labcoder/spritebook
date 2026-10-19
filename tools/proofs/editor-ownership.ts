@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 /** F1-T3: real Editor mount in the desktop WebView; delayed jobs prove stale-completion guards.
  * Launch the dev shell with WebView2 CDP, then:
- * deno run --allow-net=127.0.0.1 --allow-read --allow-write tools/proofs/editor-ownership.ts 9224
+ * node tools/run.mjs tools/proofs/editor-ownership.ts 9224
  * Native descendant death is covered by cargo test; this proof injects delayed bridge responses.
  */
 import { Cdp } from './walkthrough.ts';
@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 const c = await Cdp.connect(Number(process.argv.slice(2)[0] ?? 9224));
 const root = await fs.mkdtemp(join(tmpdir(), 'sb-desktop-owner-'));
 try {
+  const models = join(root, 'models');
   const args = [
     'gen',
     '--workspace',
@@ -23,6 +24,8 @@ try {
     fileURLToPath(
       new URL('../../tests/fixtures/bulma-front.png', import.meta.url),
     ),
+    '--models-dir',
+    models,
     '--json',
   ];
   const r = await c.call('Runtime.evaluate', {
@@ -35,6 +38,10 @@ try {
  if(native.name!=='tauri')throw new Error('This proof requires the real Tauri shell');
  const args=${JSON.stringify(args)};
  const rosterRoot=${JSON.stringify(root)};
+ const install=await native.runCli(['models','install','fixture-gen','--models-dir',${
+      JSON.stringify(models)
+    }]);
+ if(install.exitCode!==0)throw new Error('Fixture install failed: '+install.lines.join('\\n'));
  const first=await native.runCli(args);
  if(first.exitCode!==0)throw new Error('Native fixture generation failed: '+first.lines.join('\\n'));
  const before=JSON.stringify((await native.listWorkspaces(rosterRoot))[0].manifest);
@@ -48,7 +55,9 @@ try {
  const retry=await native.runCli([...args,'--seed','2']);
  if(retry.exitCode!==0)throw new Error('Native retry failed: '+retry.lines.join('\\n'));
  if((await native.listWorkspaces(rosterRoot))[0].manifest.generation.results.length!==2)throw new Error('Native retry did not append exactly one result');
- const failure=await native.runCli(['undo','--manifest','__missing_ownership_fixture__/character.json']);
+ const failure=await native.runCli(['undo','--manifest',${
+      JSON.stringify(join(root, 'missing/character.json'))
+    }]);
  if(failure.exitCode===0)throw new Error('Missing workspace succeeded');
  const diagnostics=log.snapshot().lines.filter(l=>l.stream==='stderr');
  if(!diagnostics.length || diagnostics.some(d=>failure.lines.includes(d.line)))throw new Error('stderr missing or mixed into stdout');

@@ -1,0 +1,416 @@
+{
+  "date": "2026-10-19",
+  "platform": "Windows x64",
+  "node": "24.22.0",
+  "dawn": "0.6.2",
+  "backend": "vulkan",
+  "hardware": "NVIDIA GeForce RTX 3090, 610.88, 24576",
+  "controlSource": "b201f85",
+  "controlBuilderSource": "7f098c6",
+  "measuredRuntimeReceiptSha256": "d4134359f429fad8ffdc0d6642180d1996807b2befd5dc14feeed47fd2f33a91",
+  "timing": {
+    "backend": "vulkan",
+    "timings": [
+      {
+        "sample": 1,
+        "coldDeno": 4.3245211999999995,
+        "coldNode": 3.7887060999999993,
+        "warmDeno": 2.4109521999999997,
+        "warmNode": 2.075415499999999,
+        "coldRegressionPct": -12.390160094486301,
+        "warmRegressionPct": -13.917185915174946
+      },
+      {
+        "sample": 2,
+        "coldDeno": 5.905769899999999,
+        "coldNode": 5.017502800000002,
+        "warmDeno": 2.401535299999996,
+        "warmNode": 2.1164015,
+        "coldRegressionPct": -15.040665570123169,
+        "warmRegressionPct": -11.872979755908508
+      },
+      {
+        "sample": 4,
+        "coldDeno": 11.126922099999996,
+        "coldNode": 9.598605899999995,
+        "warmDeno": 2.4649560000000057,
+        "warmNode": 2.0866922999999953,
+        "coldRegressionPct": -13.735300618308466,
+        "warmRegressionPct": -15.345657285566539
+      }
+    ],
+    "budgetMet": true,
+    "measurements": 46,
+    "hardware": "NVIDIA GeForce RTX 3090, 610.88, 24576",
+    "gpuMemoryMeaning": "whole-GPU sampled use, including desktop; not process allocation or VRAM admission"
+  },
+  "images": {
+    "pages": 40,
+    "pixelExact": 40,
+    "f0PixelExact": 15,
+    "pngByteExact": 0,
+    "comparisons": [
+      {
+        "id": "pixel-s1-r1",
+        "pass": "lit",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s1-r1",
+        "pass": "albedo",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s1-r1",
+        "pass": "normal",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s1-r1",
+        "pass": "depth",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s1-r1",
+        "pass": "mask",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s2-r1",
+        "pass": "lit",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s2-r1",
+        "pass": "albedo",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s2-r1",
+        "pass": "normal",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s2-r1",
+        "pass": "depth",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s2-r1",
+        "pass": "mask",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s4-r1",
+        "pass": "lit",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s4-r1",
+        "pass": "albedo",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s4-r1",
+        "pass": "normal",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s4-r1",
+        "pass": "depth",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "pixel-s4-r1",
+        "pass": "mask",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true,
+        "legacyExact": false,
+        "legacyPixelsExact": true
+      },
+      {
+        "id": "asymmetric-pixel",
+        "pass": "lit",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-pixel",
+        "pass": "albedo",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-pixel",
+        "pass": "normal",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-pixel",
+        "pass": "depth",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-pixel",
+        "pass": "mask",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-cel-2",
+        "pass": "lit",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-cel-2",
+        "pass": "albedo",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-cel-2",
+        "pass": "normal",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-cel-2",
+        "pass": "depth",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-cel-2",
+        "pass": "mask",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-painterly",
+        "pass": "lit",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-painterly",
+        "pass": "albedo",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-painterly",
+        "pass": "normal",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-painterly",
+        "pass": "depth",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-painterly",
+        "pass": "mask",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-clean",
+        "pass": "lit",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-clean",
+        "pass": "albedo",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-clean",
+        "pass": "normal",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-clean",
+        "pass": "depth",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "asymmetric-clean",
+        "pass": "mask",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "mirrored",
+        "pass": "lit",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "mirrored",
+        "pass": "albedo",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "mirrored",
+        "pass": "normal",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "mirrored",
+        "pass": "depth",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      },
+      {
+        "id": "mirrored",
+        "pass": "mask",
+        "exact": false,
+        "pixelsExact": true,
+        "worstFraction": 0,
+        "ok": true
+      }
+    ]
+  },
+  "rawEvidence": ".render-bench/f4/paired-2",
+  "initialPortableEvidence": ".render-bench/f4/portable-check-1",
+  "conversionEvidence": ".render-bench/f4/conversion-3",
+  "freshSidecarEvidence": ".render-bench/f4/fresh-sidecar.json",
+  "limits": [
+    "Same Windows machine, OS/driver caches not flushed",
+    "GPU memory samples include the desktop",
+    "No remote CI or additional native targets executed",
+    "Full TRELLIS.2/UniRig provisioning and commercial-stack gates remain open",
+    "Installer/signing/native-notice and clean-machine qualification tracked separately"
+  ]
+}
