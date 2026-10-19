@@ -39,6 +39,13 @@ load the system copy by basename. The Vulkan payload excludes FXC, DXC and their
 experiments with DXC are separate from that artifact. PE imports also require the Microsoft VC++
 runtime on the machine; it is not silently copied from Visual Studio.
 
+The Windows proof merges a process-local UTF-8 `activeCodePage` into its **app-owned copy** of
+Node's PE manifest, using the Windows SDK's build-time `mt.exe`. Dawn's ANSI loader otherwise cannot
+resolve a Unicode installation directory on the tested code page 1252 host. Upstream manifest
+settings are retained; input/output hashes and the merged manifest are recorded. This modification
+invalidates upstream executable signing, so release signing must happen afterward. No system
+executable, registry code page or locale is changed.
+
 The qualified-candidate PNG writer uses Node's built-in `zlib` and CRC32, retaining `fast-png`
 decoding. This is a proof-only build substitution; production still uses the original codec. The
 copied Node license includes its native third-party notices. The artifact audit also exposes the

@@ -365,7 +365,7 @@ fn open_folder(path: String) -> Result<(), String> {
 
 #[cfg(feature = "renderer-qualification")]
 fn main() {
-    qualification::run();
+    std::process::exit(qualification::run());
 }
 
 #[cfg(not(feature = "renderer-qualification"))]

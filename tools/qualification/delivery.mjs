@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -32,7 +32,10 @@ async function run(name, args, expectedCode = 0, dir = `${out}/${name}`) {
   const report = JSON.parse(await readFile(`${dir}/tauri-launch.json`, 'utf8'));
   assert.equal(report.code, expectedCode);
   assert.equal(report.path, '');
-  assert(resolve(report.node).startsWith(dirname(exe) + '\\'), 'runtime must be app-owned');
+  assert(
+    (await realpath(report.node)).startsWith((await realpath(dirname(exe))) + '\\'),
+    'runtime must be app-owned',
+  );
   results[name] = report;
   await writeFile(`${out}/${name}.ndjson`, await readFile(`${dir}/stdout.ndjson`));
   await writeFile(`${out}/${name}.stderr`, await readFile(`${dir}/stderr.log`));
@@ -103,11 +106,21 @@ try {
     execFileSync('powershell.exe', [
       '-NoProfile',
       '-Command',
-      `@(Get-CimInstance Win32_Process -Filter "ParentProcessId=${owner.pid}" | Select-Object ProcessId,ExecutablePath) | ConvertTo-Json -Compress`,
+      `[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); @(Get-CimInstance Win32_Process -Filter "ParentProcessId=${owner.pid}" | Select-Object ProcessId,ExecutablePath) | ConvertTo-Json -Compress`,
     ], { encoding: 'utf8' }),
   );
   const workers = Array.isArray(children) ? children : [children];
-  assert(workers.some((child) => resolve(child.ExecutablePath) === resolve(results.bake.node)));
+  const expectedNode = await realpath(results.bake.node);
+  for (const child of workers) child.ExecutablePath = await realpath(child.ExecutablePath);
+  const nodeWorker = workers.find((child) => child.ExecutablePath === expectedNode);
+  assert(nodeWorker, 'owner must have an app-owned Node child');
+  results.nativeModules = JSON.parse(
+    execFileSync('powershell.exe', [
+      '-NoProfile',
+      '-Command',
+      `[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); @((Get-Process -Id ${nodeWorker.ProcessId}).Modules | Where-Object { $_.ModuleName -match 'MSVCP140|VCRUNTIME140|vulkan-1|dawn.node|^node.exe$' } | Select-Object -ExpandProperty FileName) | ConvertTo-Json -Compress`,
+    ], { encoding: 'utf8' }),
+  );
   owner.kill();
   await ownerClosed;
   for (const worker of workers) {

@@ -4,12 +4,15 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 use tauri::Manager;
 
-pub fn run() {
+pub fn run() -> i32 {
+    let exit_code = Arc::new(AtomicI32::new(1));
+    let recorded_code = exit_code.clone();
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(move |app| {
             let args: Vec<String> = std::env::args().skip(1).collect();
             let out = PathBuf::from(args.first().ok_or("expected output directory")?);
             if !out.is_absolute() {
@@ -75,10 +78,13 @@ pub fn run() {
                     serde_json::to_vec_pretty(&report).unwrap(),
                 );
                 drop(job);
-                handle.exit(if recorded.is_ok() { code } else { 1 });
+                let code = if recorded.is_ok() { code } else { 1 };
+                recorded_code.store(code, Ordering::SeqCst);
+                handle.exit(code);
             });
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("renderer qualification launch failed");
+    exit_code.load(Ordering::SeqCst)
 }

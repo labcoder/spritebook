@@ -34,6 +34,31 @@ const payload = `${out}/runtime`;
 await mkdir(payload);
 const nodeDist = `${out}/node-dist/node-v${nodeVersion}-win-x64`;
 await copy(`${nodeDist}/node.exe`, `${payload}/node.exe`);
+const nodeOriginalSha256 = sha(await readFile(`${payload}/node.exe`));
+// Dawn uses ANSI Win32 loader paths; opt this app-owned runtime into UTF-8.
+const mt = process.env.SPRITEBOOK_MT_EXE ?? join(
+  process.env['ProgramFiles(x86)'],
+  'Windows Kits/10/bin/10.0.26100.0/x64/mt.exe',
+);
+execFileSync(mt, ['-nologo', `-inputresource:${payload}/node.exe;#1`, `-out:${out}/node.manifest`]);
+execFileSync(mt, [
+  '-nologo',
+  '-manifest',
+  `${out}/node.manifest`,
+  `${here}/utf8.manifest`,
+  `-outputresource:${payload}/node.exe;#1`,
+]);
+await mkdir(`${payload}/notices`);
+execFileSync(mt, [
+  '-nologo',
+  `-inputresource:${payload}/node.exe;#1`,
+  `-out:${payload}/notices/Node-runtime.manifest.xml`,
+]);
+assert(
+  (await readFile(`${payload}/notices/Node-runtime.manifest.xml`, 'utf8')).includes(
+    'UTF-8</activeCodePage>',
+  ),
+);
 await copy(`${nodeDist}/LICENSE`, `${payload}/notices/Node-LICENSE`);
 const pngMap = `${out}/png-import-map.json`;
 const imports = {};
@@ -215,9 +240,11 @@ await writeFile(
       sourceDirty: execFileSync('git', ['status', '--porcelain'], { cwd: repo, encoding: 'utf8' }),
       nodeVersion,
       nodeZipSha256,
+      nodeOriginalSha256,
       vulkanVersion,
       vulkanZipSha256,
       webgpuVersion: '0.6.2',
+      nodeManifest: 'UTF-8 activeCodePage merged with upstream manifest; requires fresh signing',
       files,
     },
     null,
