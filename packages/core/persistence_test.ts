@@ -18,7 +18,7 @@ async function append(workspace: string, id: string, hash = 'a'.repeat(64)) {
 }
 
 function child(workspace: string, mode: string) {
-  return new Deno.Command(Deno.execPath(), {
+  return new Deno.Command('deno', {
     args: ['run', '--allow-read', '--allow-write', import.meta.filename!, workspace, mode],
     stdout: 'piped',
     stderr: 'piped',
