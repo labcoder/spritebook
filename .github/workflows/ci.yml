@@ -18,6 +18,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
       - uses: denoland/setup-deno@v2
         with:
           deno-version: ${{ env.DENO_VERSION }}
@@ -27,7 +30,7 @@ jobs:
         run: deno lint
       - name: commit lint (PR range)
         if: github.event_name == 'pull_request'
-        run: deno run --allow-run tools/ci/commit-lint.ts --range origin/${{ github.base_ref }}..HEAD
+        run: node tools/ci/commit-lint.mjs --range origin/${{ github.base_ref }}..HEAD
       - name: tests required (PR)
         if: github.event_name == 'pull_request'
         run: deno run --allow-run tools/ci/tests-required.ts --base origin/${{ github.base_ref }}

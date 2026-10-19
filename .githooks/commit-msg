@@ -1,3 +1,3 @@
 #!/bin/sh
-# Conventional-commit gate (enable once: `deno task hooks:install`)
-exec deno run --allow-read tools/ci/commit-lint.ts --file "$1"
+# Conventional-commit gate (enable once: `npm run hooks:install`)
+exec node tools/ci/commit-lint.mjs --file "$1"
