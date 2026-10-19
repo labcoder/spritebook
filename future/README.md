@@ -11,8 +11,9 @@ policy and implementation remain in force while the migration is planned.
 **Repository strategy approved:** migrate this repository incrementally, preserving its packages,
 tests, fixtures and history. See the [accepted strategy](migration-strategy.md) and
 [migration roadmap](roadmap.md). The plan targets supported Node LTS and qualifies Node/Dawn first;
-exact dependency pins and renderer adoption still require the stated checks. Implementation has not
-started; the roadmap is now the single route for migration work.
+exact dependency pins and renderer adoption still require the stated checks. F0 baseline capture is
+complete; [the evidence and preservation matrix](baseline.md) records the current Windows control,
+known failures and unverified targets. F1 safety repairs and runtime migration have not started.
 
 ## Recommendation in one paragraph
 
@@ -36,6 +37,7 @@ migration problems either.
 | [Desktop and language decisions](technology-options.md)  | What is settled about Tauri and TypeScript, what still needs validation, and which alternatives are now historical research? |
 | [Hugging Face and model management](model-management.md) | What HF integration exists, should we retain it, and how should authentication, caches, pins and offline inference work?     |
 | [Migration roadmap](roadmap.md)                          | What is the required execution order, what evidence closes each task, and which model/UX improvements come later?            |
+| [F0 preservation and control](baseline.md)               | Which contracts and platform targets must survive, what ran, and how do we replay the legacy control safely?                 |
 
 ## Findings that change the decision
 
@@ -57,14 +59,15 @@ migration problems either.
 
 ## How this review was done
 
-Validation for this documentation change: Markdown formatting, local link/anchor checks, source
+Validation for the original research change: Markdown formatting, local link/anchor checks, source
 spot-checks, and one isolated CPU-only reproduction through the real CLI implementation. The
 historical repo performance/proof logs were read, not rerun. No model download, GPU benchmark,
 Mac/ARM run, native toolkit build, desktop installation, or live screen-reader audit was performed.
 Upstream branches and terms are moving targets; pin/review them again when implementing.
 
-The next implementation task is **F0-T4/F0-T1: capture the control and conformance baseline**, then
-the shared writer/recovery fix in **F1-T2**. Follow the
-[roadmap's ordered changes](roadmap.md#first-implementation-changes).
+F0 subsequently ran the current Windows suite/control and source build checks; its
+[baseline report](baseline.md) distinguishes passes, setup-dependent failures, diagnostic failures
+and unverified platforms. The next implementation task is the shared writer/recovery fix in
+**F1-T2**. Follow the [roadmap's ordered changes](roadmap.md#first-implementation-changes).
 [D-041 and D-042](../docs/internal/decisions.md) record the stack and repository decisions. Model
 selection and hardware support remain qualification work, not newly certified by this plan.

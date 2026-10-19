@@ -1,0 +1,89 @@
+{
+  "animationSet": [
+    {
+      "clipId": "idle-loop",
+      "enabled": true,
+      "frames": 4,
+      "holdLast": false,
+      "packId": "ual",
+      "speed": 1
+    },
+    {
+      "clipId": "walk-loop",
+      "enabled": true,
+      "frames": 4,
+      "holdLast": false,
+      "packId": "ual",
+      "speed": 1
+    },
+    {
+      "clipId": "punch-jab",
+      "enabled": true,
+      "frames": 4,
+      "holdLast": false,
+      "packId": "ual",
+      "speed": 1
+    }
+  ],
+  "canonicalMesh": {
+    "colorMatched": true,
+    "gltfSha256": "038592e373fdf32916b4a799e21ecceada8703754ddf56d0bb728f7f4050ebef",
+    "heightM": 1.7000000476837158,
+    "imageSha256": "dcdef23fe1b29f5e5ba1616860a5f661e781b4eb56b16e04c02ec43427a043f6",
+    "reprojected": true,
+    "texturedBy": "backend"
+  },
+  "createdAt": "2026-10-19T15:01:15.688Z",
+  "displayName": "migration-control",
+  "generation": {
+    "pickedResultId": "r1",
+    "results": [
+      {
+        "backend": { "modelId": "fixture-gen", "version": "1.0.0" },
+        "discarded": false,
+        "id": "r1",
+        "output": {
+          "bodies": 1,
+          "gltfSha256": "7a5769d5374b049830b7b6493e62e2777c82a487e116264958e6d5d8d4bb7760",
+          "kind": "mesh",
+          "textureRes": 512,
+          "tris": 1972
+        },
+        "params": { "seed": 7, "textureSize": 512, "tris": 2000 },
+        "seed": 7,
+        "startedAt": "2026-10-19T15:01:15.557Z",
+        "wallTimeS": 1.129
+      }
+    ]
+  },
+  "id": "migration-control",
+  "lastBakeId": "fb8420a0",
+  "look": {
+    "cameraOverrides": { "cellPx": { "h": 128, "w": 100 } },
+    "cameraPresetId": "standard-30",
+    "stylePresetId": "pixel"
+  },
+  "mirroring": { "enabled": false },
+  "rig": {
+    "accepted": true,
+    "jointCount": 65,
+    "jointEdits": [],
+    "orientationFixes": [],
+    "skeletonProfile": "ual-humanoid",
+    "sockets": [
+      { "bone": "hand_r", "id": "hand-r", "localOffset": [0, 0, 0] },
+      { "bone": "hand_l", "id": "hand-l", "localOffset": [0, 0, 0] },
+      { "bone": "Head", "id": "head", "localOffset": [0, 0, 0] },
+      { "bone": "spine_03", "id": "back", "localOffset": [0, 0, 0] },
+      { "bone": "thigh_l", "id": "hip-l", "localOffset": [0, 0, 0] },
+      { "bone": "thigh_r", "id": "hip-r", "localOffset": [0, 0, 0] }
+    ],
+    "track": "A"
+  },
+  "schemaVersion": 3,
+  "source": {
+    "kind": "image",
+    "originalFilename": "bulma-front.png",
+    "sha256": "dcdef23fe1b29f5e5ba1616860a5f661e781b4eb56b16e04c02ec43427a043f6"
+  }
+}

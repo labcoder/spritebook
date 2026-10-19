@@ -1,0 +1,587 @@
+{
+  "sourceCommit": "8c52ea616af19079f353267693cc6328d228ec4a",
+  "startedAt": "2026-10-19T15:01:13.515Z",
+  "finishedAt": "2026-10-19T15:01:57.100Z",
+  "runtime": {
+    "deno": "2.9.2",
+    "v8": "14.9.207.2-rusty",
+    "typescript": "6.0.3"
+  },
+  "platform": {
+    "target": "x86_64-pc-windows-msvc",
+    "arch": "x86_64",
+    "os": "windows",
+    "vendor": "pc",
+    "env": "msvc",
+    "standalone": false
+  },
+  "backend": "vulkan",
+  "fixtureBackend": "fixture-gen (not model inference)",
+  "coldMeaning": "empty frame cache per supersample; fresh CLI process per verb; OS/driver caches untouched",
+  "inputs": {
+    "deno.json": "23d28b3391f762c5c936e3278171d73208fcb14c7023bbdfca312cc089ed61be",
+    "deno.lock": "e5de6882a89bee3aa01492ff6676f7778d9438ec82579b08fd0d3385bd6ec770",
+    "tools/proofs/migration-baseline.ts": "8c49d9bf95d20e4985f7087fd908d696e0a26654c4b82a709d057d5010d9a849",
+    "tests/fixtures/bulma-front.png": "dcdef23fe1b29f5e5ba1616860a5f661e781b4eb56b16e04c02ec43427a043f6",
+    "packages/style/fixtures/asymmetric.glb": "04be6fee7a78f340979b854ca88f6928047d3bd3a526c79d054ea2dcf89161b6",
+    "packages/render/fixtures/skinned-column.glb": "702b8e8085bde2ae7fa485347fb5c888e602970ae630f1d1e58c6c3119b43989",
+    "packages/render/shaders.wgsl": "9cc23eabf173224bdb8b4c7251eac6ebcda94aa3ddd6daf24334e1e13457445a",
+    "packages/rig/bodies/ubc-male/body.glb": "cd45f23d027a29084fe3724c2988e51de81030f0d127000c3a9e86946264f64a",
+    "packages/rig/bodies/ubc-male/body.json": "83c53f68d65d0132ee85ade54123b0679a68756eec1dedff634cdf27c4e0489f",
+    "packages/anim/packs/ual/clips/idle-loop.glb": "2fe55bef63f0652549238fb795473fbecf76e71a3afdc3d6ff0f8b78b2f43f8b",
+    "packages/anim/packs/ual/clips/walk-loop.glb": "0a1d38107064683e6cbae14540b73aa5101ad2096e9bc034942f190759663f46",
+    "packages/anim/packs/ual/clips/punch-jab.glb": "47fd04c1804c31ba34c5bfde284d6e3e40a2d3b8f286184d81daa77c28c5fcfc"
+  },
+  "measurements": [
+    {
+      "superSample": 1,
+      "temperature": "cold",
+      "wallTimeS": 5.272692300000001,
+      "bakeId": "4dc0775b",
+      "frames": 96,
+      "metrics": {
+        "flickerPct": 1.4375,
+        "cacheHitPct": 0,
+        "wallTimeS": 4.1586597,
+        "framesTotal": 96
+      },
+      "pages": {
+        "atlas_lit_0.png": "4b28254d8ccf79d0b73c6d4a1e23450fad01a4f86ae599b07c3d693db4a6ebb9",
+        "atlas_albedo_0.png": "fa2429d5a9c53b2a8f8ffab3743becc4e46d84fa91a806636ca6fc841012f924",
+        "atlas_normal_0.png": "e41152eda97ccbe3ee0da5ec806c043cfbfd7ccf7164d374dae4bf9d81d36b8e",
+        "atlas_depth_0.png": "745a768a660ccb983694e1306743c1b1e7899b8c26f829e2d8f7e32f308a3ece",
+        "atlas_mask_0.png": "4b7c0dd54772604910d865f25b3c43b43592384ccd8b7043cf90bb54b8ba8297"
+      },
+      "warnings": []
+    },
+    {
+      "superSample": 1,
+      "temperature": "warm",
+      "wallTimeS": 3.0334133999999993,
+      "bakeId": "4dc0775b",
+      "frames": 96,
+      "metrics": {
+        "flickerPct": 1.4375,
+        "cacheHitPct": 100,
+        "wallTimeS": 2.0248412000000005,
+        "framesTotal": 96
+      },
+      "pages": {
+        "atlas_lit_0.png": "4b28254d8ccf79d0b73c6d4a1e23450fad01a4f86ae599b07c3d693db4a6ebb9",
+        "atlas_albedo_0.png": "fa2429d5a9c53b2a8f8ffab3743becc4e46d84fa91a806636ca6fc841012f924",
+        "atlas_normal_0.png": "e41152eda97ccbe3ee0da5ec806c043cfbfd7ccf7164d374dae4bf9d81d36b8e",
+        "atlas_depth_0.png": "745a768a660ccb983694e1306743c1b1e7899b8c26f829e2d8f7e32f308a3ece",
+        "atlas_mask_0.png": "4b7c0dd54772604910d865f25b3c43b43592384ccd8b7043cf90bb54b8ba8297"
+      },
+      "warnings": []
+    },
+    {
+      "superSample": 2,
+      "temperature": "cold",
+      "wallTimeS": 6.808056500000003,
+      "bakeId": "336ec20f",
+      "frames": 96,
+      "metrics": {
+        "flickerPct": 1.2421875,
+        "cacheHitPct": 0,
+        "wallTimeS": 5.7434845999999995,
+        "framesTotal": 96
+      },
+      "pages": {
+        "atlas_lit_0.png": "7aab800d3afc6f8e7fa7b295cd24478f5480aea27b32d5230fafd428e072d310",
+        "atlas_albedo_0.png": "d10e47b1a6891d13a51de017b9af5c75b530f0032a1f3a7b26d2286d73b1c6c8",
+        "atlas_normal_0.png": "a5318057177fa596788511d3913dcd7bf3f8fab6a61430878fc879cb6083c8e4",
+        "atlas_depth_0.png": "218fa62e0f28741dfb4946e3994231624b055d52a2dff23ee49678aceccadad8",
+        "atlas_mask_0.png": "72ac755b7edc4c481b0e635f119fb25bd282c9596e9fe1ec560562f2ac9920ac"
+      },
+      "warnings": []
+    },
+    {
+      "superSample": 2,
+      "temperature": "warm",
+      "wallTimeS": 2.924218799999999,
+      "bakeId": "336ec20f",
+      "frames": 96,
+      "metrics": {
+        "flickerPct": 1.2421875,
+        "cacheHitPct": 100,
+        "wallTimeS": 1.9537382000000003,
+        "framesTotal": 96
+      },
+      "pages": {
+        "atlas_lit_0.png": "7aab800d3afc6f8e7fa7b295cd24478f5480aea27b32d5230fafd428e072d310",
+        "atlas_albedo_0.png": "d10e47b1a6891d13a51de017b9af5c75b530f0032a1f3a7b26d2286d73b1c6c8",
+        "atlas_normal_0.png": "a5318057177fa596788511d3913dcd7bf3f8fab6a61430878fc879cb6083c8e4",
+        "atlas_depth_0.png": "218fa62e0f28741dfb4946e3994231624b055d52a2dff23ee49678aceccadad8",
+        "atlas_mask_0.png": "72ac755b7edc4c481b0e635f119fb25bd282c9596e9fe1ec560562f2ac9920ac"
+      },
+      "warnings": []
+    },
+    {
+      "superSample": 4,
+      "temperature": "cold",
+      "wallTimeS": 12.300163099999997,
+      "bakeId": "fb8420a0",
+      "frames": 96,
+      "metrics": {
+        "flickerPct": 1.1848958333333335,
+        "cacheHitPct": 0,
+        "wallTimeS": 11.233993799999999,
+        "framesTotal": 96
+      },
+      "pages": {
+        "atlas_lit_0.png": "a4a87d52e0fd526c20e64df16ce1908647d085b0c65579fe2cab00d37aa427d5",
+        "atlas_albedo_0.png": "7b3cc78b75a984b6397ef8f41fdd2922fee4ec53d4504f2820260ca84d8006dc",
+        "atlas_normal_0.png": "2f8cb387b3545c7fab937ef60b1280029a6ad125496a77d8cb76b487f93c1b56",
+        "atlas_depth_0.png": "d4982a2f388e892091b429594349b0a52bf3b6b34c9b4a40a5a9f3604a73f5b1",
+        "atlas_mask_0.png": "a148ac0ca845feb38c1569134234bcc3132823b5d2b44a484ca1e2b02d206593"
+      },
+      "warnings": []
+    },
+    {
+      "superSample": 4,
+      "temperature": "warm",
+      "wallTimeS": 2.903617999999995,
+      "bakeId": "fb8420a0",
+      "frames": 96,
+      "metrics": {
+        "flickerPct": 1.1848958333333335,
+        "cacheHitPct": 100,
+        "wallTimeS": 1.9340984,
+        "framesTotal": 96
+      },
+      "pages": {
+        "atlas_lit_0.png": "a4a87d52e0fd526c20e64df16ce1908647d085b0c65579fe2cab00d37aa427d5",
+        "atlas_albedo_0.png": "7b3cc78b75a984b6397ef8f41fdd2922fee4ec53d4504f2820260ca84d8006dc",
+        "atlas_normal_0.png": "2f8cb387b3545c7fab937ef60b1280029a6ad125496a77d8cb76b487f93c1b56",
+        "atlas_depth_0.png": "d4982a2f388e892091b429594349b0a52bf3b6b34c9b4a40a5a9f3604a73f5b1",
+        "atlas_mask_0.png": "a148ac0ca845feb38c1569134234bcc3132823b5d2b44a484ca1e2b02d206593"
+      },
+      "warnings": []
+    }
+  ],
+  "recordedAt": "2026-10-19",
+  "productSourceCommit": "42be3bbebfc783edb42fb64001aa9b2e3d638c98",
+  "runnerCommit": "8c52ea616af19079f353267693cc6328d228ec4a",
+  "host": {
+    "os": "Windows 11 Pro",
+    "version": "10.0.26200",
+    "execution": "native x64",
+    "cpu": "Intel Core i9-10900K @ 3.70 GHz",
+    "memoryGiB": 63.92,
+    "gpu": "NVIDIA GeForce RTX 3090",
+    "gpuMemoryMiB": 24576,
+    "driver": "610.88"
+  },
+  "supportingTools": {
+    "node": "24.18.1 (web tools only; not a migrated product runtime)",
+    "uv": "0.12.10 (3c979abda)",
+    "sidecarPython": "3.11.15",
+    "studioTypeScript": "7.0.2",
+    "vite": "8.1.4",
+    "cargo": "1.98.0 (797e8a9bc)",
+    "rustc": "1.98.0 (88d9e12ae)"
+  },
+  "invocation": {
+    "backend": "vulkan",
+    "requireGpu": "1",
+    "command": "deno run --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run tools/proofs/migration-baseline.ts .render-bench/f0/replay-control"
+  },
+  "verification": {
+    "fullSuite": {
+      "command": "DENO_WEBGPU_BACKEND=vulkan SPRITEBOOK_REQUIRE_GPU=1 deno task test",
+      "startedAt": "2026-10-19T14:52:50.9027694Z",
+      "endedAt": "2026-10-19T14:54:42.1436796Z",
+      "wallTimeS": 111.2409102,
+      "exitCode": 1,
+      "passed": 817,
+      "passedSteps": 33,
+      "failed": 6,
+      "ignored": 5,
+      "failureCause": "fixture-gen not installed in the default machine model root"
+    },
+    "fixtureQualifiedFollowUp": {
+      "command": "DENO_WEBGPU_BACKEND=vulkan SPRITEBOOK_REQUIRE_GPU=1 SPRITEBOOK_MODELS_DIR=<checkout>/.render-bench/f0/control/models deno test --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=nvidia-smi,uv apps/studio/parity_test.ts packages/cli/anim_preview_test.ts packages/gen/vramlease_test.ts",
+      "startedAt": "2026-10-19T14:55:57.4559658Z",
+      "endedAt": "2026-10-19T14:56:17.4297272Z",
+      "wallTimeS": 19.9737614,
+      "exitCode": 0,
+      "passed": 8,
+      "failed": 0,
+      "fixtureRoot": ".render-bench/f0/control/models"
+    },
+    "explicitlyIgnored": [
+      "real TRELLIS.2/UniRig acceptance",
+      "Godot consumer",
+      "Aseprite consumer",
+      "Phaser browser consumer",
+      "Unity consumer"
+    ],
+    "skippedBodies": [
+      "desktop CDP walkthrough",
+      "local U2-Net ONNX integration",
+      "two-process lease integration"
+    ],
+    "sourceBuilds": [
+      {
+        "command": "deno task --cwd apps/studio check:web",
+        "exitCode": 0
+      },
+      {
+        "command": "deno task --cwd apps/studio build:web",
+        "exitCode": 0,
+        "warning": "existing chunk exceeds 500 kB"
+      },
+      {
+        "command": "cargo check --offline --locked --manifest-path apps/studio/src-tauri/Cargo.toml",
+        "exitCode": 0,
+        "note": "cargo/rustc directory prepended to PATH for this shell; no installed-app test"
+      }
+    ],
+    "existingControlProtection": {
+      "exitCode": 1,
+      "reportBytesUnchanged": true
+    },
+    "independentReplay": {
+      "allAtlasPagesEqual": true,
+      "allExportFilesEqual": true,
+      "exportFileCount": 31
+    },
+    "noProductionFilesChanged": true,
+    "noGoldenUpdates": true,
+    "noNewDependenciesOrUnitTests": true,
+    "archiveIntegrityValidated": true,
+    "localLinksAndAnchorsChecked": 255,
+    "repositoryChecks": {
+      "format": {
+        "command": "deno fmt --check",
+        "exitCode": 1,
+        "unchangedFiles": [
+          "docs/export-validation.md",
+          "docs/versioning.md",
+          "docs/licensing.md",
+          "docs/cli.md",
+          "docs/guide.md",
+          "docs/quickstart.md",
+          "packages/export/aseprite_smoke_test.ts",
+          "packages/registry/install_test.ts"
+        ]
+      },
+      "lint": {
+        "command": "deno lint",
+        "exitCode": 1,
+        "unchangedFinding": {
+          "file": "apps/studio/bake_test.ts",
+          "line": 6,
+          "rule": "no-unused-vars",
+          "name": "assert"
+        }
+      },
+      "note": "Pre-existing checkout failures; no unrelated formatting sweep or test edit in F0."
+    }
+  },
+  "doctor": {
+    "command": "deno run --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 --allow-run=uv,nvidia-smi packages/cli/mod.ts doctor --sidecar --json",
+    "exitCode": 1,
+    "report": {
+      "spritebook": "0.9.0",
+      "deno": "2.9.2",
+      "v8": "14.9.207.2-rusty",
+      "platform": "windows-x86_64",
+      "vramGb": 24,
+      "models": {
+        "root": "%LOCALAPPDATA%/spritebook/models",
+        "virtualization": {
+          "virtualized": false
+        }
+      },
+      "version": "spritebook-render@0.5.0",
+      "backendEnv": "vulkan",
+      "available": true,
+      "signature": "spritebook-render@0.5.0#b490bb6b",
+      "adapter": {
+        "vendor": "4318",
+        "device": "8708",
+        "description": "NVIDIA GeForce RTX 3090",
+        "subgroupMinSize": 32,
+        "subgroupMaxSize": 32,
+        "isFallbackAdapter": false
+      },
+      "features": [],
+      "limits": {
+        "maxColorAttachments": 8,
+        "maxColorAttachmentBytesPerSample": 32,
+        "maxTextureDimension2D": 8192,
+        "maxBufferSize": 268435456
+      },
+      "probe": {
+        "ok": false,
+        "error": "validation error occurred"
+      },
+      "sidecar": {
+        "ok": true,
+        "dir": "<checkout>/sidecar",
+        "contractVersion": 1,
+        "sidecarVersion": "0.1.0",
+        "python": "3.11.15",
+        "adapters": [
+          {
+            "id": "echo",
+            "kind": "test",
+            "version": "1.0.0"
+          },
+          {
+            "id": "rembg",
+            "kind": "imageprep",
+            "version": "2.0.77"
+          },
+          {
+            "id": "pose-check",
+            "kind": "imageprep",
+            "version": "1.0.0"
+          },
+          {
+            "id": "fixture-gen",
+            "kind": "gen3d",
+            "version": "1.0.0"
+          },
+          {
+            "id": "fixture-retexture",
+            "kind": "retexture",
+            "version": "0.1.0"
+          },
+          {
+            "id": "trellis2",
+            "kind": "gen3d",
+            "version": "0.1.0"
+          },
+          {
+            "id": "trellis2-retexture",
+            "kind": "retexture",
+            "version": "0.2.0"
+          },
+          {
+            "id": "texture-substage",
+            "kind": "gen3d",
+            "version": "1.0.0"
+          },
+          {
+            "id": "unirig",
+            "kind": "rig",
+            "version": "1.0.0"
+          }
+        ]
+      }
+    }
+  },
+  "inProcessExperiment": {
+    "status": "failed; root cause unproven",
+    "sourceCommit": "aa2aa4f5a4bf27bbc33033ddca4a936a9c1574bf",
+    "execution": "one runCli process: gen, pick, Track A fit, accept, enable clips, setLook S=1, bake at 100x128 / padding 8",
+    "errorCode": "bake-failed",
+    "message": "render idle-loop failed: renderer setup validation error: Buffer with '' label is invalid",
+    "separateProcessControl": "bake of that workspace succeeded from a fresh CLI process; does not qualify a persistent worker"
+  },
+  "qualityWarnings": [
+    {
+      "at": "2026-10-19T15:01:19.863Z",
+      "code": "fit-stray-joints",
+      "jobId": "rig",
+      "message": "42 joints landed outside the target mesh: hand_l, index_01_l, index_02_l, index_03_l, index_04_leaf_l, middle_01_l, middle_02_l, middle_03_l (+34 more). Those body parts found no matching surface on the target (fused arms, missing fingers and held props are the usual causes), so the skin there will not follow a silhouette that does not exist. The fit is still on disk - open .render-bench/f0/replay-control/workspace/rig/fitted.glb to judge it; a cleaner target mesh or an explicit height often repairs it.",
+      "t": "warn"
+    },
+    {
+      "at": "2026-10-19T15:01:19.864Z",
+      "code": "fit-unprojected",
+      "jobId": "rig",
+      "message": "2091 of 8483 body vertices (24.6%) were farther from the target than the projection falloff allows, so they kept their scaled positions instead of snapping to the surface. Expect the silhouette to drift wherever the generated mesh has no matching part; the counts are in .render-bench/f0/replay-control/workspace/rig/fit-report.json.",
+      "t": "warn"
+    }
+  ],
+  "firstControl": {
+    "sourceCommit": "aa2aa4f5a4bf27bbc33033ddca4a936a9c1574bf",
+    "startedAt": "2026-10-19T14:57:48.046Z",
+    "finishedAt": "2026-10-19T14:58:31.429Z",
+    "measurements": [
+      {
+        "superSample": 1,
+        "temperature": "cold",
+        "wallTimeS": 5.061244800000001,
+        "bakeId": "4dc0775b",
+        "frames": 96,
+        "metrics": {
+          "flickerPct": 1.4375,
+          "cacheHitPct": 0,
+          "wallTimeS": 4.0102455,
+          "framesTotal": 96
+        },
+        "pages": {
+          "atlas_lit_0.png": "4b28254d8ccf79d0b73c6d4a1e23450fad01a4f86ae599b07c3d693db4a6ebb9",
+          "atlas_albedo_0.png": "fa2429d5a9c53b2a8f8ffab3743becc4e46d84fa91a806636ca6fc841012f924",
+          "atlas_normal_0.png": "e41152eda97ccbe3ee0da5ec806c043cfbfd7ccf7164d374dae4bf9d81d36b8e",
+          "atlas_depth_0.png": "745a768a660ccb983694e1306743c1b1e7899b8c26f829e2d8f7e32f308a3ece",
+          "atlas_mask_0.png": "4b7c0dd54772604910d865f25b3c43b43592384ccd8b7043cf90bb54b8ba8297"
+        },
+        "warnings": []
+      },
+      {
+        "superSample": 1,
+        "temperature": "warm",
+        "wallTimeS": 2.9243072999999984,
+        "bakeId": "4dc0775b",
+        "frames": 96,
+        "metrics": {
+          "flickerPct": 1.4375,
+          "cacheHitPct": 100,
+          "wallTimeS": 1.9366736,
+          "framesTotal": 96
+        },
+        "pages": {
+          "atlas_lit_0.png": "4b28254d8ccf79d0b73c6d4a1e23450fad01a4f86ae599b07c3d693db4a6ebb9",
+          "atlas_albedo_0.png": "fa2429d5a9c53b2a8f8ffab3743becc4e46d84fa91a806636ca6fc841012f924",
+          "atlas_normal_0.png": "e41152eda97ccbe3ee0da5ec806c043cfbfd7ccf7164d374dae4bf9d81d36b8e",
+          "atlas_depth_0.png": "745a768a660ccb983694e1306743c1b1e7899b8c26f829e2d8f7e32f308a3ece",
+          "atlas_mask_0.png": "4b7c0dd54772604910d865f25b3c43b43592384ccd8b7043cf90bb54b8ba8297"
+        },
+        "warnings": []
+      },
+      {
+        "superSample": 2,
+        "temperature": "cold",
+        "wallTimeS": 6.603131399999999,
+        "bakeId": "336ec20f",
+        "frames": 96,
+        "metrics": {
+          "flickerPct": 1.2421875,
+          "cacheHitPct": 0,
+          "wallTimeS": 5.5592323,
+          "framesTotal": 96
+        },
+        "pages": {
+          "atlas_lit_0.png": "7aab800d3afc6f8e7fa7b295cd24478f5480aea27b32d5230fafd428e072d310",
+          "atlas_albedo_0.png": "d10e47b1a6891d13a51de017b9af5c75b530f0032a1f3a7b26d2286d73b1c6c8",
+          "atlas_normal_0.png": "a5318057177fa596788511d3913dcd7bf3f8fab6a61430878fc879cb6083c8e4",
+          "atlas_depth_0.png": "218fa62e0f28741dfb4946e3994231624b055d52a2dff23ee49678aceccadad8",
+          "atlas_mask_0.png": "72ac755b7edc4c481b0e635f119fb25bd282c9596e9fe1ec560562f2ac9920ac"
+        },
+        "warnings": []
+      },
+      {
+        "superSample": 2,
+        "temperature": "warm",
+        "wallTimeS": 3.033716199999999,
+        "bakeId": "336ec20f",
+        "frames": 96,
+        "metrics": {
+          "flickerPct": 1.2421875,
+          "cacheHitPct": 100,
+          "wallTimeS": 2.0568968000000005,
+          "framesTotal": 96
+        },
+        "pages": {
+          "atlas_lit_0.png": "7aab800d3afc6f8e7fa7b295cd24478f5480aea27b32d5230fafd428e072d310",
+          "atlas_albedo_0.png": "d10e47b1a6891d13a51de017b9af5c75b530f0032a1f3a7b26d2286d73b1c6c8",
+          "atlas_normal_0.png": "a5318057177fa596788511d3913dcd7bf3f8fab6a61430878fc879cb6083c8e4",
+          "atlas_depth_0.png": "218fa62e0f28741dfb4946e3994231624b055d52a2dff23ee49678aceccadad8",
+          "atlas_mask_0.png": "72ac755b7edc4c481b0e635f119fb25bd282c9596e9fe1ec560562f2ac9920ac"
+        },
+        "warnings": []
+      },
+      {
+        "superSample": 4,
+        "temperature": "cold",
+        "wallTimeS": 12.597430700000004,
+        "bakeId": "fb8420a0",
+        "frames": 96,
+        "metrics": {
+          "flickerPct": 1.1848958333333335,
+          "cacheHitPct": 0,
+          "wallTimeS": 11.4796209,
+          "framesTotal": 96
+        },
+        "pages": {
+          "atlas_lit_0.png": "a4a87d52e0fd526c20e64df16ce1908647d085b0c65579fe2cab00d37aa427d5",
+          "atlas_albedo_0.png": "7b3cc78b75a984b6397ef8f41fdd2922fee4ec53d4504f2820260ca84d8006dc",
+          "atlas_normal_0.png": "2f8cb387b3545c7fab937ef60b1280029a6ad125496a77d8cb76b487f93c1b56",
+          "atlas_depth_0.png": "d4982a2f388e892091b429594349b0a52bf3b6b34c9b4a40a5a9f3604a73f5b1",
+          "atlas_mask_0.png": "a148ac0ca845feb38c1569134234bcc3132823b5d2b44a484ca1e2b02d206593"
+        },
+        "warnings": []
+      },
+      {
+        "superSample": 4,
+        "temperature": "warm",
+        "wallTimeS": 3.042641199999998,
+        "bakeId": "fb8420a0",
+        "frames": 96,
+        "metrics": {
+          "flickerPct": 1.1848958333333335,
+          "cacheHitPct": 100,
+          "wallTimeS": 2.0509957000000005,
+          "framesTotal": 96
+        },
+        "pages": {
+          "atlas_lit_0.png": "a4a87d52e0fd526c20e64df16ce1908647d085b0c65579fe2cab00d37aa427d5",
+          "atlas_albedo_0.png": "7b3cc78b75a984b6397ef8f41fdd2922fee4ec53d4504f2820260ca84d8006dc",
+          "atlas_normal_0.png": "2f8cb387b3545c7fab937ef60b1280029a6ad125496a77d8cb76b487f93c1b56",
+          "atlas_depth_0.png": "d4982a2f388e892091b429594349b0a52bf3b6b34c9b4a40a5a9f3604a73f5b1",
+          "atlas_mask_0.png": "a148ac0ca845feb38c1569134234bcc3132823b5d2b44a484ca1e2b02d206593"
+        },
+        "warnings": []
+      }
+    ],
+    "timingNote": "diagnostic process ran during the 4x sample; use the quiet replay above for timing"
+  },
+  "preservedArchive": {
+    "path": ".render-bench/f0/f0-windows-x64-vulkan.zip",
+    "bytes": 27412058,
+    "sha256": "a1efcb0956fd52c415eefb1efa6ce467d854defa18b7b1fc5ab12bec3e8dd9f3",
+    "contains": "complete replay-control directory: workspace and history, bakes, cache, models receipt, commands, manifests and exports",
+    "gitTracked": false
+  },
+  "exportFiles": {
+    "aseprite/atlas_lit_0.png": "a4a87d52e0fd526c20e64df16ce1908647d085b0c65579fe2cab00d37aa427d5",
+    "aseprite/migration-control.ase.json": "debc0e6c2d8cf1df56774552ff89945c6fb0bee1731dcf026feeb956602d1958",
+    "godot/atlas_lit_0.png": "a4a87d52e0fd526c20e64df16ce1908647d085b0c65579fe2cab00d37aa427d5",
+    "godot/migration-control.tres": "76a5def3dac111708498ee21d65849b4a2429a81f85c9b8ee97c3bdf0eb214c5",
+    "strips/migration-control-idle-loop-d00-strip.png": "a39464697fea1b25e8b711230ba3074fa097cf351177f71651ef29a273c049b2",
+    "strips/migration-control-idle-loop-d01-strip.png": "ed92f4751b626d9c0af27092af8d89f2e999a6eb43bff5ac37789658e66cf02d",
+    "strips/migration-control-idle-loop-d02-strip.png": "1c99abcdbfd7377478975ba25de7dea89e369689f7d6a7ec580308006d3b034f",
+    "strips/migration-control-idle-loop-d03-strip.png": "7e75088a8aa91d38318d38e744accb9116641bb32799fe842071bd6bd351461d",
+    "strips/migration-control-idle-loop-d04-strip.png": "ab7f62d7f50e8b39476251eaef30b439c34f819e5824a54f3728862cefd047cd",
+    "strips/migration-control-idle-loop-d05-strip.png": "9003be1bfde2b466a7bc866b5112ca26240fa35696d748c1d78260344aea1c18",
+    "strips/migration-control-idle-loop-d06-strip.png": "039a79de4df99e6853c484c98253c5ea14b82b01f5c338494dd75b7697a2b1ce",
+    "strips/migration-control-idle-loop-d07-strip.png": "18452142a21b38df09c5e3aca71fe056a08043e679c5dc6f9efbcfb14f0edc1f",
+    "strips/migration-control-punch-jab-d00-strip.png": "bc6bc043b0586f65bba8594ef738da82b03044a87e5b0076ba20c137b1388683",
+    "strips/migration-control-punch-jab-d01-strip.png": "a10c99a269203d42290888f05b03a4495be2dfcba73b3493ab1d711f0ccc3851",
+    "strips/migration-control-punch-jab-d02-strip.png": "94a5704ade9a7909d554c10380db96e418823e568409e773404e033e201cc9d5",
+    "strips/migration-control-punch-jab-d03-strip.png": "1f7243abb5db884f7e3528ed404283541c3efe3c2adb497cb66ed1e83d11cd4c",
+    "strips/migration-control-punch-jab-d04-strip.png": "0cc90cca03da3ba15989c0d1bd42ca5647dc60e68460ce355aa44d9381c056ef",
+    "strips/migration-control-punch-jab-d05-strip.png": "aa9c61829a1e24a1e88153f89370e22e699ae42ca947193ccc9899ab70014c92",
+    "strips/migration-control-punch-jab-d06-strip.png": "e64765ee5d2f854da967f55c57939c559733e8505dcff3a4f941eb7c3caeaed6",
+    "strips/migration-control-punch-jab-d07-strip.png": "e6f381845102fd006bba92ba80c97acc0706a5316184fb98612ecefb3aa13f72",
+    "strips/migration-control-strips.json": "9081919bbfc4f352f0b8fb9496f30cff3ecfb515c3c6448cecb64824ce1a4859",
+    "strips/migration-control-walk-loop-d00-strip.png": "9857a8588ec5689899961184b4976d44f0cc883772eef2922bf8f65564c53bc2",
+    "strips/migration-control-walk-loop-d01-strip.png": "cde3572f12a50ecf50790cc813a54168a9149f7f0bc9ecc06eb68fb4a1cd09d0",
+    "strips/migration-control-walk-loop-d02-strip.png": "bdb44682fb762a1e75e795e41546444a5a390904c551b931972895e140a6305d",
+    "strips/migration-control-walk-loop-d03-strip.png": "cd079e5b71fa9cf04dc3588c7de96e1dd81b3cc5f9e75e0409e8b9bc003edcef",
+    "strips/migration-control-walk-loop-d04-strip.png": "93378d0b115c2a1639396f5c7039350c99f9a0aede7712c7fedc733067c76cdc",
+    "strips/migration-control-walk-loop-d05-strip.png": "e493f6bc33295a1579e84e6467236e2957c3da4719ac942554057ad8decbab73",
+    "strips/migration-control-walk-loop-d06-strip.png": "cd642068a6c48a1fa70a1d9fa09dc07130cf37b86b4154286f976ce05166090c",
+    "strips/migration-control-walk-loop-d07-strip.png": "17b7460d0515ebfd31c4618532dc7bd6e0008d0545bba79566f13b44c14133ca",
+    "texturepacker/atlas_lit_0.png": "a4a87d52e0fd526c20e64df16ce1908647d085b0c65579fe2cab00d37aa427d5",
+    "texturepacker/migration-control.tp.json": "ed381e92f5212713e6149f64512bf6a3b531d3beab7b5c3a820f44b6d93c4fe4"
+  },
+  "localEvidence": {
+    ".render-bench/f0/tests.log": "f49c07cc71f2c12e82d6b1ef56420a32f79b682feb719402239a0495bc0b6c0e",
+    ".render-bench/f0/fixture-qualified-tests.log": "6eecbf7bf81556eba2dddbbb641e473535c07315020430eacf442631e8301bf0",
+    ".render-bench/f0/doctor.json": "055ae0daae43901bc56df4a6ee58fdf7ea37b13c32e3fbf58083a537ad919173",
+    ".render-bench/f0/check-web.log": "ff1217a055ea259c8cbd2d23d5bd87b080ab6bdcdf39696cffa5b838e7feae21",
+    ".render-bench/f0/build-web.log": "cb2e8bf5667dd2b53011e4832de2a6d9bed973006e5df6d764fc501274d6f5a9",
+    ".render-bench/f0/check-tauri.log": "19e4947badbb41652b3d7588d8ca4e2cfa72d83b0f298e154fd37f2e7dd62174",
+    ".render-bench/f0/replay-control/commands.json": "e4b4da49c004645f3de7e3db33899a41b470cd856462c4d1fa186079db1bea8a",
+    ".render-bench/f0/replay-control/workspace/rig/fit-report.json": "59bb9134846b27996950443a4d5d874c54def95b686b0811303b6eebf1624f00",
+    ".render-bench/f0/fmt-check.log": "232cf79936a0177e83ec75035e0a87916328625c5fdb00321d7e71826a91c6d5",
+    ".render-bench/f0/lint.log": "80ea5c50201ab695e5aeb812384b29ba6df42b02db15fd01a6f59f7f20ba56b7"
+  }
+}

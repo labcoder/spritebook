@@ -1,5 +1,11 @@
 # Platform support & targets
 
+The latest source-checkout qualification is the
+[2026-10-19 F0 baseline](../future/baseline.md#preserved-platform-targets): native Windows x64
+Vulkan rendering, source checks and explicit diagnostic failures. Other hardware and installed
+artifacts remain unverified in that run. The targets below remain product commitments, not claims
+that F0 executed every platform.
+
 This page is for contributors working in the repository. The release zips do not include the
 repository, and the commands here assume a checkout.
 

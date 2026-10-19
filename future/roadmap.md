@@ -4,10 +4,12 @@
 Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno. Do not create a new
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
-This is the execution plan for that approved direction. **Implementation has not started.** Only
-F0-T3, the strategy decision, is complete. A task closes on its stated evidence, not on a compiled
+This is the execution plan for that approved direction. **F0 baseline capture is complete as of
+2026-10-19; F1-T2 is next.** The [conformance/platform matrix](baseline.md) records fresh Windows
+evidence, known defects and unverified targets. Closing baseline capture does not close platform,
+installed-app, model or release qualification gates. A task closes on evidence, not on a compiled
 binary or an optimistic support claim. Exact dependency pins and schema changes follow the existing
-BOM/decision process; this plan does not claim that Node/Dawn or any new model is already qualified.
+BOM/decision process; Node/Dawn and new models remain unqualified.
 
 ## The route
 
@@ -40,23 +42,26 @@ prerequisites for replacing the runtime.
 
 ## F0 · Lock the baseline
 
-- [ ] **F0-T1 · Record feature and contract preservation.** Keep the PRD's six stages and eight
+- [x] **F0-T1 · Record feature and contract preservation.** Keep the PRD's six stages and eight
       architecture laws. Record representative source images/meshes, accepted assets, rigs, clip
       bindings, looks, identity edits, BakeManifests, engine outputs, CLI twins and public error
       shapes. Link each to a test or an explicit verification gap; do not mark a historical proof as
       rerun.
-- [ ] **F0-T2 · Preserve and qualify platform targets.** Carry forward Windows x64/ARM64 and macOS
+- [x] **F0-T2 · Preserve and qualify platform targets.** Carry forward Windows x64/ARM64 and macOS
       targets; retain Linux CLI/render support and the documented tier-2 desktop status. Record
       native versus emulated execution and Apple Silicon versus Intel separately. Start hardware
       validation on Windows x64, then execute the same checks on each release target. App/renderer
       availability and model-inference availability remain separate matrices. Missing hardware
-      leaves a gate open; it does not silently drop a target or count as a pass.
+      leaves a gate open; it does not silently drop a target or count as a pass. **F0 result:**
+      target inventory and the native Windows x64 control are recorded; ARM64, macOS and Linux are
+      explicitly unverified here. Their hardware/installed-artifact qualification gates remain open
+      in F2/F7, not counted as completed tests by this checkbox.
 - [x] **F0-T3 · Record the selected strategy.** D-041 confirms Tauri, TypeScript and leaving Deno.
       D-042 approves incremental migration in this repository. The plan targets Node LTS and
       qualifies Node/Dawn first; no alternative editor or full-core language port is scheduled.
       Preserve the existing source/output licensing distinction and permissive bundled-dependency
       policy.
-- [ ] **F0-T4 · Capture a reproducible control.** Record the exact baseline commit, toolchain,
+- [x] **F0-T4 · Capture a reproducible control.** Record the exact baseline commit, toolchain,
       adapter/driver, fixtures, commands and cold/warm results. Include the asymmetric fixture, a
       textured skinned character, an attachment, alpha masking, idle/walk/action clips, non-square
       cells, width 100, and 1×/2×/4× rendering. Preserve old workspaces and exports before any
@@ -65,6 +70,13 @@ prerequisites for replacing the runtime.
 **Acceptance:** one checked-in conformance/feature matrix and reproducible commands; known defects
 and unverified platforms named separately. Do not freeze unsafe behavior as compatibility. Existing
 P0–P4 IDs remain useful cross-references, not tasks to reimplement from scratch.
+
+**Recorded exit:** [F0 matrix and replay commands](baseline.md),
+[measured control](baseline/windows-x64-vulkan.json), and the
+[reusable proof](../tools/proofs/migration-baseline.ts). Six initial test failures were traced to a
+missing fixture receipt; the isolated follow-up passes all affected cases. The doctor clear probe
+and an in-process GPU validation experiment remain recorded failures. No production behavior
+changed.
 
 ## F1 · Make workspace and process state safe
 
@@ -245,8 +257,8 @@ F4/F7 migration work, even when they touch the same modules as these later impro
 
 ## First implementation changes
 
-1. **F0-T4/F0-T1:** capture the current control, conformance fixtures and feature/platform
-   checklist.
+1. **Completed — F0:** current control, conformance fixtures, feature/platform checklist and
+   preserved local workspace/export backup are recorded in [the baseline](baseline.md).
 2. **F1-T2:** add the failing crash/concurrent-writer regressions and consolidate the
    writer/recovery path; do not combine this with the runtime move.
 3. **F1-T1:** prove and repair actual mesh/texture undo through that writer, including bake after
@@ -258,5 +270,5 @@ F4/F7 migration work, even when they touch the same modules as these later impro
 
 Use these task IDs in implementation changes, include the relevant original P-task IDs where
 behavior is carried forward, and update the progress log with actual measurements and remaining
-gates. This documentation session finalizes the plan; it does not perform these implementation
-tasks.
+gates. F0 records the legacy implementation; the runtime migration and F1 safety repairs have not
+started.

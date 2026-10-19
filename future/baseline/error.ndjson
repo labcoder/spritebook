@@ -1,0 +1,1 @@
+{"at":"2026-10-19T15:05:46.815Z","code":"missing-arg","jobId":"bake","message":"--model <glb>, --character <id>, and --out <dir> are required - or --workspace <dir>, which supplies all three from the character it holds","retryable":false,"t":"error"}
