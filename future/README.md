@@ -14,9 +14,9 @@ tests, fixtures and history. See the [accepted strategy](migration-strategy.md) 
 exact dependency pins and renderer adoption still require the stated checks. F0 baseline capture is
 complete; [the evidence and preservation matrix](baseline.md) records the current Windows control,
 known failures and unverified targets. [F1 safety repairs are complete](state-safety.md).
-[F2 Windows renderer evidence](renderer-qualification.md) now records the bounded Node/Dawn
-candidate; remaining delivery/platform/notice gates are explicit. Production runtime replacement has
-not started.
+[F2's Windows renderer and installer proof is complete](renderer-qualification.md), with the
+additional native platforms deferred to F7 and release notice/prerequisite/signing gates explicit.
+**Next: F4-T1**, the production TypeScript core/CLI/toolchain port. Production still runs Deno.
 
 ## Recommendation in one paragraph
 

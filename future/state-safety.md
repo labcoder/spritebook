@@ -1,8 +1,9 @@
 # F1 completion record
 
-**2026-10-19: F1 is complete on `main`. F2 is next.** Tauri, React, TypeScript and the existing
-repository remain the approved direction. Deno still runs the product; this milestone makes the
-existing state safe before the runtime experiment and cutover.
+**2026-10-19: F1 is complete on `main`.** The subsequent
+[Windows F2 proof](renderer-qualification.md) is also complete; F4 is next. Tauri, React, TypeScript
+and the existing repository remain the approved direction. Deno still runs the product; this
+milestone makes the existing state safe before the runtime experiment and cutover.
 
 ## What changed
 

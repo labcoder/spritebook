@@ -5,7 +5,7 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1 state-safety work is complete. F2 is active.** The
+2026-10-19; F1 state-safety work and the Windows x64 F2 proof are complete. Next: F4-T1.** The
 [conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
 unverified targets. Closing baseline capture does not close platform, installed-app, model or
 release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
@@ -56,7 +56,7 @@ prerequisites for replacing the runtime.
       leaves a gate open; it does not silently drop a target or count as a pass. **F0 result:**
       target inventory and the native Windows x64 control are recorded; ARM64, macOS and Linux are
       explicitly unverified here. Their hardware/installed-artifact qualification gates remain open
-      in F2/F7, not counted as completed tests by this checkbox.
+      in F7, not counted as completed tests by this checkbox.
 - [x] **F0-T3 · Record the selected strategy.** D-041 confirms Tauri, TypeScript and leaving Deno.
       D-042 approves incremental migration in this repository. The plan targets Node LTS and
       qualifies Node/Dawn first; no alternative editor or full-core language port is scheduled.
@@ -122,8 +122,8 @@ AI output. [Evidence and affected modules](architecture-review.md#safety-work-be
 implemented on main, including crash/concurrency and byte-level history checks, real desktop
 cancellation/retry, consistent selected-bake queries, exact execution policy, and the final
 creation/no-op/replay regressions. Schema 3 and the sidecar protocol are retained. Deno replacement
-has not started. **Next: F2-T1**, using preserved fixtures and disposable copies; the platform,
-installed-artifact, real-model, power-loss and soak limits remain explicit in the completion record.
+had not started at the F1 exit. The subsequent F2 proof is recorded below; the real-model,
+power-loss, soak and additional native-platform limits remain explicit release gates.
 
 ## F2 · Qualify the Node GPU path and installed layout
 
@@ -135,23 +135,24 @@ performance and installed-app checks require a functioning native adapter and de
 green build alone does not qualify them. See
 [the runner plan](renderer-qualification.md#deferred-platform-checks).
 
-- [~] **F2-T1 · Run the real renderer on Node/Dawn.** Use a bounded adapter/environment experiment
-  in this repository; keep existing production modules as the control. Exercise MRT AOVs, WGSL,
-  upload/skinning/attachments, alpha, padded readback, styling and atlas output. Carry the exact
-  structural assertions and same-machine double-run canary; review old/new image differences with
-  the existing tolerant-golden discipline. Record memory, cold/warm wall time and throughput. Use
-  the [runtime gates](runtime-migration.md#renderer-trial-one-representative-workload), including a
-  proposed ≤10% end-to-end regression budget on the same workload or an explicit recorded exception.
-  Start with 3–5 engineering days for the experiment, then re-estimate from evidence.
+- [x] **F2-T1 · Run the real renderer on Node/Dawn.** Use a bounded adapter/environment experiment
+      in this repository; keep existing production modules as the control. Exercise MRT AOVs, WGSL,
+      upload/skinning/attachments, alpha, padded readback, styling and atlas output. Carry the exact
+      structural assertions and same-machine double-run canary; review old/new image differences
+      with the existing tolerant-golden discipline. Record memory, cold/warm wall time and
+      throughput. Use the
+      [runtime gates](runtime-migration.md#renderer-trial-one-representative-workload), including a
+      proposed ≤10% end-to-end regression budget on the same workload or an explicit recorded
+      exception. Start with 3–5 engineering days for the experiment, then re-estimate from evidence.
 - **F2-T2 · Retired: alternative desktop trial.** Tauri is selected; this ID remains withdrawn. No
   GPUI/native-inspector work is hidden inside the migration.
-- [~] **F2-T3 · Prove delivery early.** Package an app-owned Node runtime, compiled JS, Dawn native
-  library and required shader/decoder assets. Launch through Tauri resource paths without source,
-  development node_modules, Deno/Node on PATH, compilers or an untracked shared cache. A runtime
-  directory is acceptable; do not require a single-file executable. Audit native notices/required
-  shared libraries and execute the Windows x64 installer. Record unresolved prerequisites and
-  redistribution blockers for F7; this proof does not authorize distribution or additional support
-  claims.
+- [x] **F2-T3 · Prove delivery early.** Package an app-owned Node runtime, compiled JS, Dawn native
+      library and required shader/decoder assets. Launch through Tauri resource paths without
+      source, development node_modules, Deno/Node on PATH, compilers or an untracked shared cache. A
+      runtime directory is acceptable; do not require a single-file executable. Audit native
+      notices/required shared libraries and execute the Windows x64 installer. Record unresolved
+      prerequisites and redistribution blockers for F7; this proof does not authorize distribution
+      or additional support claims.
 
 **Acceptance:** a written pass/fail report, artifact paths and reproducible runs. A source build,
 triangle demo, generic addon CI matrix or cache hit is not a qualified SpriteBook renderer. Device
@@ -159,13 +160,19 @@ loss, no-adapter, cancellation and native-addon load failure must be visible and
 artifacts usable. If a gate fails, document the precise blocker before funding a native render
 worker; no full Rust core, new repository or toolkit change is the fallback.
 
-**Current evidence (2026-10-19):** [Windows renderer qualification](renderer-qualification.md). The
-bounded Node/Dawn candidate, with Node-native PNG encoding, passes 110 carried assertions,
-decoded-pixel comparisons and the paired Vulkan performance budget. The unchanged-code experiment
-first missed the 4x budget; profiling and the measured codec change are recorded, without a waived
-gate or changed golden. Tauri resource-layout delivery and failure proofs are being completed. Other
-native platforms, clean-machine prerequisites and redistribution clearance remain open. The full
-milestone and production renderer promotion are not complete; production still uses Deno.
+**Recorded exit (2026-10-19, Windows x64 scope):**
+[Renderer qualification](renderer-qualification.md) and
+[sealed measurements/artifact receipt](qualification/windows-x64.json). The bounded Node/Dawn
+candidate, with Node-native PNG encoding, passes 110 carried assertions, decoded-pixel comparisons
+and the paired Vulkan performance budget. The unchanged-code experiment first missed the 4x budget;
+profiling and the measured codec change are recorded, without a waived gate or changed golden. Final
+cold medians improve by **12.7–16.1%**, and all 40 compared pages match decoded pixels exactly. The
+Unicode-path NSIS install passes all 110 carried checks, missing-addon/loader exit-status checks,
+native device loss, owner death during rendering and retry, with prior bake bytes unchanged. The
+native notice audit records unresolved release blockers. **F2 is complete within its approved
+Windows scope; next is F4-T1.** Additional native platforms, clean-machine prerequisites, signing
+and redistribution clearance remain F7 gates. Production still uses Deno; no runtime or renderer
+promotion is implied.
 
 ## F4 · Migrate the existing TypeScript core and Tauri bridge
 
@@ -191,14 +198,16 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       existing bakes and accepted model assets; provide a compatible export/read path rather than
       deleting them to make migration pass. One path serves core pixel preview and baking. Carry the
       qualified PNG boundary and 8/16-bit/CRC assertions into the real Node modules; remove F2's
-      environment shim and build-time import substitutions.
+      environment shim and build-time import substitutions. Preserve fresh `Uint8Array` copy and
+      alignment semantics in binary readers when replacing Deno file reads with Node buffers.
 - [ ] **F4-T4 · Switch application, tooling and release execution.** Make Tauri invoke bundled
       runtime/core entry points rather than `deno run -A` against a checkout. Switch web build
       hooks, CLI commands, test/lint/format/type-check tasks, CI guards, proof helpers, hooks and
       release builds. Close the observed Vite optimizer stall and Rust-target watcher failure; the
       F1 desktop proof used a temporary watch exclusion, not a delivery fix. Preserve scoped
       args/artifact access, per-job streams and owned worker cleanup. Ship the importer and required
-      native assets; retire the lean-tree importer omission. Preserve current Python/uv adapters and
+      native assets; retain qualified Windows loader layout, Unicode-path handling and failure
+      diagnostics. Retire the lean-tree importer omission. Preserve current Python/uv adapters and
       handshake compatibility, with a clear installed-environment path. Make current adapters'
       declared assets and authentication work from a fresh install. Minimum provisioning fixes
       needed by existing models belong here; they cannot be deferred merely because F3 includes
@@ -303,12 +312,12 @@ successfully is not evidence that the complete character workflow is ready.
    preserved local workspace/export backup are recorded in [the baseline](baseline.md).
 2. **Completed — F1:** recoverable writes, byte-correct asset undo, job/editor isolation, consistent
    reads and execution policy are recorded in [state safety](state-safety.md).
-3. **F2-T1/F2-T3:** finish the Windows Node/Dawn rendering slice and installed proof before a bulk
-   port. Additional native targets are deferred to F7, as confirmed above.
+3. **Completed — F2:** the Windows Node/Dawn slice and installed proof pass. Additional native
+   targets are deferred to F7, as confirmed above.
 4. **Next — F4:** execute the package groups and application/tooling cutover, then F7's release
    gates. Put unrelated model, editor, dependency and performance work in the later tasks above.
 
 Use these task IDs in implementation changes, include the relevant original P-task IDs where
 behavior is carried forward, and update the progress log with actual measurements and remaining
-gates. F0 records the legacy implementation; F1 is complete and production still runs Deno while F2
-qualifies its replacement.
+gates. F0 records the legacy implementation; F1 and the Windows F2 proof are complete. Production
+still runs Deno until F4's port passes its checks.

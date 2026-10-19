@@ -52,7 +52,8 @@ defines the unresolved engineering gates.
 
 The migration roadmap is now finalized for this strategy. It separates the required Deno exit from
 later model and editor improvements. F0 has captured the legacy control and F1 safety work is
-complete. F2 is next. Unverified hardware and installed-artifact gates remain open.
+complete. [F2's Windows renderer/installer proof](renderer-qualification.md) is also complete; F4's
+production port is next. Additional native platforms and release qualification remain F7 gates.
 
 Keep Python or an audited native inference runner for models that need it. Rewriting the UI or
 orchestrator does not make a CUDA-only model run on Metal. Hugging Face remains an artifact source;
