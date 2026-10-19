@@ -1,18 +1,18 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * The Rig stage's projections, pinned against the REAL bulma-fixed deform
  * report: the table is the report verbatim (flags, magnitudes), worst tear
  * first, clean joints counted not hidden — and the arg builder produces
  * exactly the exit script's own invocation shapes.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { projectReport, rigRunArgs } from './src/rig.ts';
 
 // SNAPSHOT of the real exit workspace's report (fixtures/), taken 2026-08-07
 // after the maintainer's UX-pass re-rig - the live dir is a playground now.
-Deno.test('the real p3-exit report projects verbatim, worst tear first', async () => {
-  const raw = await Deno.readTextFile(
-    new URL('./fixtures/p3-exit-deform-report.json', import.meta.url),
-  );
+test('the real p3-exit report projects verbatim, worst tear first', async () => {
+  const raw = await fs.readFile(new URL('./fixtures/p3-exit-deform-report.json', import.meta.url), 'utf8');
   const v = projectReport(JSON.parse(raw))!;
   assertEquals(v.totalJoints, 52);
   assertEquals(
@@ -38,13 +38,13 @@ Deno.test('the real p3-exit report projects verbatim, worst tear first', async (
   assertEquals(v.flagged[0]!.joint, 'clavicle_r', 'and it sorts first');
 });
 
-Deno.test('garbage reports project to null, never a crash', () => {
+test('garbage reports project to null, never a crash', () => {
   for (const bad of [null, 42, 'x', {}, { joints: 'nope' }]) {
     assertEquals(projectReport(bad), null);
   }
 });
 
-Deno.test('the arg builder speaks the exit script dialect exactly', () => {
+test('the arg builder speaks the exit script dialect exactly', () => {
   assertEquals(rigRunArgs('W', {}), [
     'rig',
     '--model',

@@ -157,7 +157,7 @@ test('ACCEPTANCE: an asymmetric character keeps its side in all 8 directions', a
       }
     });
 
-    await t.test('every direction is genuinely rendered, not a reflection', async (t) => {
+    await t.test('every direction is genuinely rendered, not a reflection', async () => {
       // The direct proof: if this character were bilaterally symmetric, the
       // horizontal flip of direction d would BE direction (8-d). For the
       // one-armed fixture it must not be — that difference IS the tattoo

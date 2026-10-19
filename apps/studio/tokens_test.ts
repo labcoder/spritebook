@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * The ratified token layer, held to its own commitments (design-system.md):
  *
@@ -13,9 +15,9 @@
  * Runs under the plain Deno suite: it parses tokens.css textually — the file
  * IS the contract, no browser needed.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 
-const css = await Deno.readTextFile(new URL('./src/tokens.css', import.meta.url));
+const css = await fs.readFile(new URL('./src/tokens.css', import.meta.url), 'utf8');
 
 function block(selector: string): string {
   // the first rule whose selector list contains `selector` verbatim
@@ -56,12 +58,12 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-Deno.test('both themes define the identical token set — no accidental fallthrough', () => {
+test('both themes define the identical token set — no accidental fallthrough', () => {
   assertEquals([...dark.keys()].sort(), [...light.keys()].sort());
   assert(dark.size >= 16, `the layer is the full ratified table (${dark.size} tokens)`);
 });
 
-Deno.test('AA: primary and secondary text hold 4.5:1 on every surface, both themes', () => {
+test('AA: primary and secondary text hold 4.5:1 on every surface, both themes', () => {
   for (const [name, t] of [['dark', dark], ['light', light]] as const) {
     for (const surface of ['sb-bg', 'sb-panel', 'sb-raise']) {
       for (const text of ['sb-text', 'sb-dim']) {
@@ -75,14 +77,14 @@ Deno.test('AA: primary and secondary text hold 4.5:1 on every surface, both them
   }
 });
 
-Deno.test('AA: the primary action reads — on-acid ink on the acid fill', () => {
+test('AA: the primary action reads — on-acid ink on the acid fill', () => {
   for (const t of [dark, light]) {
     const ratio = contrast(t.get('sb-on-acid')!, t.get('sb-acid')!);
     assert(ratio >= 4.5, `on-acid on acid is ${ratio.toFixed(2)}:1`);
   }
 });
 
-Deno.test('rule 4: the canvas well checker is dark in BOTH themes, by value', () => {
+test('rule 4: the canvas well checker is dark in BOTH themes, by value', () => {
   for (const k of ['sb-check-a', 'sb-check-b']) {
     assertEquals(dark.get(k), light.get(k), `${k} must not follow the theme`);
     const [r, g, b] = hexToRgb(dark.get(k)!);
@@ -90,7 +92,7 @@ Deno.test('rule 4: the canvas well checker is dark in BOTH themes, by value', ()
   }
 });
 
-Deno.test('the ratified deltas: ok diverges by theme; light line/strong is stronger', () => {
+test('the ratified deltas: ok diverges by theme; light line/strong is stronger', () => {
   assertEquals(dark.get('sb-ok'), dark.get('sb-acid'), 'dark ok IS acid');
   assertEquals(light.get('sb-ok'), light.get('sb-cobalt'), 'light ok IS cobalt ink');
   assert(dark.get('sb-ok') !== light.get('sb-ok'), 'the hue divergence is real');
@@ -102,7 +104,7 @@ Deno.test('the ratified deltas: ok diverges by theme; light line/strong is stron
   );
 });
 
-Deno.test('every accent-as-text ink clears 4.5:1 on panel AND raise, both themes', () => {
+test('every accent-as-text ink clears 4.5:1 on panel AND raise, both themes', () => {
   // rule 5 generalized by the manual AA pass: accents in a TEXT role go
   // through -ink tokens (tags, drawer severities, badges). Cobalt has no ink
   // on purpose — it fails as text on dark and is a focus ring, never copy.
@@ -121,14 +123,14 @@ Deno.test('every accent-as-text ink clears 4.5:1 on panel AND raise, both themes
   }
 });
 
-Deno.test('the selection surface holds its text at 4.5:1, both themes', () => {
+test('the selection surface holds its text at 4.5:1, both themes', () => {
   for (const [name, t] of [['dark', dark], ['light', light]] as const) {
     const ratio = contrast(t.get('sb-select-text')!, t.get('sb-select-bg')!);
     assert(ratio >= 4.5, `${name}: select-text on select-bg is ${ratio.toFixed(2)}:1`);
   }
 });
 
-Deno.test('status hues stay AA-legible as TEXT on the status bar panel', () => {
+test('status hues stay AA-legible as TEXT on the status bar panel', () => {
   // the status bar renders ok/signal as text on panel — that is a real usage
   // in App.tsx, so it is a real constraint here
   for (const [name, t] of [['dark', dark], ['light', light]] as const) {

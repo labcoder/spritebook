@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * `bake --all` and the plan it prints first.
  *
@@ -10,7 +14,7 @@
  * character is broken must still plan and bake the others, and must name the
  * broken one. Silence over a partial batch is the failure mode.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { createWorkspace, workspacePaths } from '@spritebook/core';
 import {
   BakePlanSchema,
@@ -19,8 +23,8 @@ import {
   PLAN_FILE,
   ROSTER_FILE,
 } from '@spritebook/schema';
-import { passthroughBakeArgs, runCli } from './mod.ts';
-import { formatWarnings, summariseWarnings, warnTee } from './batch.ts';
+import { passthroughBakeArgs, runCli } from './dist/mod.js';
+import { formatWarnings, summariseWarnings, warnTee } from './dist/batch.js';
 
 const NOW = () => '2026-08-01T00:00:00Z';
 
@@ -52,10 +56,10 @@ async function member(
     now: NOW,
   });
   const p = workspacePaths(dir);
-  const doc = JSON.parse(await Deno.readTextFile(p.manifest));
+  const doc = JSON.parse(await fs.readFile(p.manifest, 'utf8'));
   if (opts.mesh !== false) {
-    await Deno.mkdir(p.canonicalDir, { recursive: true });
-    await Deno.writeTextFile(p.canonicalModel, `mesh bytes for ${id}`);
+    await fs.mkdir(p.canonicalDir, { recursive: true });
+    await fs.writeFile(p.canonicalModel, `mesh bytes for ${id}`);
     doc.canonicalMesh = {
       gltfSha256: 'b'.repeat(64),
       heightM: 1.8,
@@ -64,31 +68,31 @@ async function member(
     };
   }
   if (opts.look) doc.look = opts.look;
-  await Deno.writeTextFile(p.manifest, canonicalJson(doc));
+  await fs.writeFile(p.manifest, canonicalJson(doc));
   return dir;
 }
 
 async function roster3(): Promise<string> {
-  const root = await Deno.makeTempDir();
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   await member(root, 'bulma');
   await member(root, 'goku');
   await member(root, 'trunks', { mesh: false });
   return root;
 }
 
-Deno.test('--all without --root says which flag is missing', async () => {
+test('--all without --root says which flag is missing', async () => {
   const o = io();
   assertEquals(await runCli(['bake', '--all'], o), 1);
   assert(o.all().includes('--root'), o.all());
 });
 
-Deno.test('--all and --workspace contradict each other, and are refused', async () => {
+test('--all and --workspace contradict each other, and are refused', async () => {
   const o = io();
   assertEquals(await runCli(['bake', '--all', '--root', '.', '--workspace', 'x'], o), 1);
   assert(o.all().includes('one or the other'), o.all());
 });
 
-Deno.test('--changed-since needs a real date', async () => {
+test('--changed-since needs a real date', async () => {
   const o1 = io();
   assertEquals(await runCli(['bake', '--all', '--root', '.', '--changed-since'], o1), 1);
   assert(o1.all().includes('ISO timestamp'), o1.all());
@@ -100,7 +104,7 @@ Deno.test('--changed-since needs a real date', async () => {
   assert(o2.all().includes('is not a date'), o2.all());
 });
 
-Deno.test('the plan names every character and why, and renders nothing', async () => {
+test('the plan names every character and why, and renders nothing', async () => {
   const root = await roster3();
   try {
     const o = io();
@@ -114,14 +118,14 @@ Deno.test('the plan names every character and why, and renders nothing', async (
     // nothing rendered: no bake directory anywhere
     for (const id of ['bulma', 'goku']) {
       const bakes = workspacePaths(`${root}/${id}`).bakesDir;
-      assertEquals(await Deno.stat(bakes).catch(() => null), null, `${id} baked nothing`);
+      assertEquals(await fs.stat(bakes).catch(() => null), null, `${id} baked nothing`);
     }
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });
 
-Deno.test('--plan --json is ONE plan document, not an event stream', async () => {
+test('--plan --json is ONE plan document, not an event stream', async () => {
   const root = await roster3();
   try {
     const o = io();
@@ -136,20 +140,20 @@ Deno.test('--plan --json is ONE plan document, not an event stream', async () =>
     assertEquals(plan.totals.staleFrames, 96);
     assertEquals(plan.totals.cachedFrames, 0);
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });
 
-Deno.test('the roster index and the plan both land on disk', async () => {
+test('the roster index and the plan both land on disk', async () => {
   const root = await roster3();
   try {
     await runCli(['bake', '--all', '--root', root, '--plan', '--json'], io());
     // the plan is a receipt of what the batch decided, written on every run
     const plan = BakePlanSchema.parse(
-      JSON.parse(await Deno.readTextFile(`${root}/${PLAN_FILE}`)),
+      JSON.parse(await fs.readFile(`${root}/${PLAN_FILE}`, 'utf8')),
     );
     assertEquals(plan.characters.length, 3);
-    const roster = JSON.parse(await Deno.readTextFile(`${root}/${ROSTER_FILE}`));
+    const roster = JSON.parse(await fs.readFile(`${root}/${ROSTER_FILE}`, 'utf8'));
     // the SCAN's census is everyone whose manifest parsed, mesh or not; deciding
     // that a mesh-less character cannot bake is the PLAN's judgement, not the
     // index's, and keeping them separate is what lets the plan say why
@@ -160,16 +164,16 @@ Deno.test('the roster index and the plan both land on disk', async () => {
       'and readiness is recorded rather than acted on',
     );
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });
 
-Deno.test('--changed-since narrows the plan to what was touched', async () => {
+test('--changed-since narrows the plan to what was touched', async () => {
   const root = await roster3();
   try {
     const past = new Date(Date.now() - 3600_000);
     for (const id of ['bulma', 'trunks']) {
-      await Deno.utime(workspacePaths(`${root}/${id}`).manifest, past, past);
+      await fs.utimes(workspacePaths(`${root}/${id}`).manifest, past, past);
     }
     const cutoff = new Date(Date.now() - 1800_000).toISOString();
     const o = io();
@@ -181,11 +185,11 @@ Deno.test('--changed-since narrows the plan to what was touched', async () => {
     assertEquals(plan.characters.map((c) => c.id), ['goku']);
     assertEquals(plan.changedSince, cutoff, 'the plan records the filter it was taken under');
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });
 
-Deno.test('ONE broken character does not take the roster down with it', async () => {
+test('ONE broken character does not take the roster down with it', async () => {
   const root = await roster3();
   try {
     // a look naming a style that does not exist — the single-character bake
@@ -193,9 +197,9 @@ Deno.test('ONE broken character does not take the roster down with it', async ()
     await member(root, 'vegeta', {
       look: { cameraPresetId: 'standard-30', stylePresetId: 'no-such-style' },
     });
-    await Deno.writeTextFile(`${root}/wrecked/character.json`, '{ not json').catch(async () => {
-      await Deno.mkdir(`${root}/wrecked`, { recursive: true });
-      await Deno.writeTextFile(`${root}/wrecked/character.json`, '{ not json');
+    await fs.writeFile(`${root}/wrecked/character.json`, '{ not json').catch(async () => {
+      await fs.mkdir(`${root}/wrecked`, { recursive: true });
+      await fs.writeFile(`${root}/wrecked/character.json`, '{ not json');
     });
 
     const o = io();
@@ -211,28 +215,28 @@ Deno.test('ONE broken character does not take the roster down with it', async ()
     assertEquals(plan.totals.blocked, 3, 'blocked characters are counted, never dropped');
     assertEquals(plan.totals.toBake, 2);
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });
 
-Deno.test('an empty root plans nothing and succeeds', async () => {
-  const root = await Deno.makeTempDir();
+test('an empty root plans nothing and succeeds', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const o = io();
     assertEquals(await runCli(['bake', '--all', '--root', root, '--plan'], o), 0);
     assert(o.all().includes('0 to bake · 0 fresh · 0 blocked'), o.all());
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });
 
-Deno.test('a root that is not there fails by name, not by stack trace', async () => {
+test('a root that is not there fails by name, not by stack trace', async () => {
   const o = io();
-  assertEquals(await runCli(['bake', '--all', '--root', `${await Deno.makeTempDir()}/nope`], o), 1);
+  assertEquals(await runCli(['bake', '--all', '--root', `${await fs.mkdtemp(join(tmpdir(), 'spritebook-'))}/nope`], o), 1);
   assert(o.all().includes('Cannot read the roster root'), o.all());
 });
 
-Deno.test('each character bakes with EXACTLY the flags the batch was given', () => {
+test('each character bakes with EXACTLY the flags the batch was given', () => {
   // the plan predicted a recipe; the bake has to run that recipe, so the
   // batch's own flags are stripped and everything else passes through verbatim
   assertEquals(
@@ -262,7 +266,7 @@ Deno.test('each character bakes with EXACTLY the flags the batch was given', () 
   assertEquals(passthroughBakeArgs(['bake', '--root', '--frames', '4']), ['--frames', '4']);
 });
 
-Deno.test('the batch KEEPS its children’s warnings, in both output modes', () => {
+test('the batch KEEPS its children’s warnings, in both output modes', () => {
   // a batch runs each character through runCli, so a warn goes to the terminal
   // and nowhere a summary can reach it. Both forms are recognised because the
   // batch does not control which one it is in.
@@ -296,7 +300,7 @@ Deno.test('the batch KEEPS its children’s warnings, in both output modes', () 
   assertEquals(tricky.warns[0]!.message, 'first line\nsecond line');
 });
 
-Deno.test('everything passes through the tee untouched', () => {
+test('everything passes through the tee untouched', () => {
   // it is a tee, not a filter: the terminal must see exactly what it saw before
   const out: string[] = [];
   const err: string[] = [];
@@ -308,7 +312,7 @@ Deno.test('everything passes through the tee untouched', () => {
   assertEquals(err, ['error: bad']);
 });
 
-Deno.test('warnings summarise by CODE, counting characters not occurrences', () => {
+test('warnings summarise by CODE, counting characters not occurrences', () => {
   // "rig-unaccepted on 100 characters" is the sentence a morning reader needs;
   // a character that warned twice must not read as two characters
   const summary = summariseWarnings([
@@ -326,7 +330,7 @@ Deno.test('warnings summarise by CODE, counting characters not occurrences', () 
   assertEquals(summariseWarnings([]), []);
 });
 
-Deno.test('the summary a human reads names the code, the count AND the remedy', () => {
+test('the summary a human reads names the code, the count AND the remedy', () => {
   const lines = formatWarnings(
     summariseWarnings([{
       characterId: 'a',

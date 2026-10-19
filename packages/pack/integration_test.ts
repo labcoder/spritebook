@@ -81,7 +81,7 @@ test('acceptance: bake -> rect identity, stability, invalidation, pivot, exporte
 
     await t.test(
       'rect identity: 5 passes x pages at one size; mask content inside rects',
-      async (t) => {
+      async () => {
         const byPass = new Map<string, number>();
         for (const p of a.manifest.atlases) {
           byPass.set(p.pass, (byPass.get(p.pass) ?? 0) + 1);

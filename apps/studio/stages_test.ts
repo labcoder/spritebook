@@ -1,13 +1,15 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * The stage rail's law, pinned: 02–06 locked until a canonical mesh exists
  * (with the unlock condition as the note), gen warns when a pick is pending,
  * rig warns until accepted — and the REAL exit workspace projects the states
  * the maintainer actually saw.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { stageStates } from './src/stages.ts';
 
-Deno.test('no canonical mesh: stages 02-06 are LOCKED and say what unlocks them', () => {
+test('no canonical mesh: stages 02-06 are LOCKED and say what unlocks them', () => {
   const s = stageStates({ id: 'x', generation: { results: [{}, {}] } });
   assertEquals(s.map((x) => x.state), [
     'warn',
@@ -27,13 +29,13 @@ Deno.test('no canonical mesh: stages 02-06 are LOCKED and say what unlocks them'
   }
 });
 
-Deno.test('nothing generated at all: gen is idle, everything else locked', () => {
+test('nothing generated at all: gen is idle, everything else locked', () => {
   const s = stageStates({ id: 'x' });
   assertEquals(s[0].state, 'idle');
   assertEquals(s[0].note, 'nothing generated');
 });
 
-Deno.test('an unaccepted rig is a warn — acceptance is a user act, not a default', () => {
+test('an unaccepted rig is a warn — acceptance is a user act, not a default', () => {
   const s = stageStates({
     id: 'x',
     canonicalMesh: {},
@@ -49,7 +51,7 @@ Deno.test('an unaccepted rig is a warn — acceptance is a user act, not a defau
   assertEquals(accepted[1].state, 'done');
 });
 
-Deno.test('garbage manifests still produce six renderable stages', () => {
+test('garbage manifests still produce six renderable stages', () => {
   for (const bad of [null, 42, 'nope', [], {}]) {
     const s = stageStates(bad);
     assertEquals(s.length, 6);
@@ -63,10 +65,8 @@ Deno.test('garbage manifests still produce six renderable stages', () => {
 // SNAPSHOT of the real exit workspace (fixtures/), taken 2026-08-07 after the
 // maintainer's first UX pass: a new pick (r3), a re-rig, and an ACCEPTANCE -
 // so the rig stage projects done now where the desktop run once showed warn.
-Deno.test('the real p3-exit manifest projects the states the UX pass left', async () => {
-  const raw = await Deno.readTextFile(
-    new URL('./fixtures/p3-exit-character.json', import.meta.url),
-  );
+test('the real p3-exit manifest projects the states the UX pass left', async () => {
+  const raw = await fs.readFile(new URL('./fixtures/p3-exit-character.json', import.meta.url), 'utf8');
   const s = stageStates(JSON.parse(raw));
   assertEquals(s[0].state, 'done', 'canonical mesh saved');
   assert(s[0].note.includes('pick r3'));
@@ -78,7 +78,7 @@ Deno.test('the real p3-exit manifest projects the states the UX pass left', asyn
   assertEquals(s[5].state, 'idle', 'no export recorded in the manifest');
 });
 
-Deno.test('anim says the honest thing when there is no rig yet', () => {
+test('anim says the honest thing when there is no rig yet', () => {
   const noRig = stageStates({ id: 'x', canonicalMesh: {} });
   assertEquals(noRig[2]!.note, 'no rig to animate yet');
   const rigged = stageStates({

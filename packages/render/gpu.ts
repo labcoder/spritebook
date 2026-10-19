@@ -75,7 +75,7 @@ export async function tryGetGpu(): Promise<GpuContext | null> {
   try {
     return await getGpu();
   } catch (err) {
-    if (process.env['SPRITEBOOK_REQUIRE_GPU']) throw err;
+    if (process.env['SPRITEBOOK_REQUIRE_GPU'] || (err as { code?: string })?.code === 'native-addon-load') throw err;
     return null;
   }
 }

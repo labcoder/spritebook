@@ -5,7 +5,7 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1 state-safety work and the Windows x64 F2 proof are complete. F4-T1 is active.** The
+2026-10-19; F1 state-safety work and the Windows x64 F2 proof are complete. F4-T1/T2 are complete; F4-T3/T4 are active.** The
 [conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
 unverified targets. Closing baseline capture does not close platform, installed-app, model or
 release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
@@ -179,16 +179,16 @@ promotion is implied.
 Keep each behavior-changing package group and each toolchain switch in its own reviewable change.
 Avoid dependency upgrades that are unrelated to the runtime move.
 
-- [~] **F4-T1 · Port the contract/test foundation.** Keep schema ownership in `packages/schema`.
+- [x] **F4-T1 · Port the contract/test foundation.** Keep schema ownership in `packages/schema`.
       Establish package exports and a locked npm workspace, compile shipped JavaScript, and retain a
       separate TypeScript check. Port fixture/schema tests first, using a single JS test runner
       (`node:test` if sufficient); retain cleanup/leak checks and honest GPU skip/fail semantics.
       Verify accepted/rejected documents and canonical serialization against the control.
       **Progress:** locked npm workspaces and default compiled package exports are established;
       all 30 existing schema/fixture/migration assertions pass on emitted JavaScript through
-      `node:test`, with a separate TypeScript check. Remaining package and lifecycle checks follow
-      with their ports; no global Deno adapter is being adopted.
-- [~] **F4-T2 · Port runtime-bound calls in package order.** Keep algorithms and package boundaries.
+      `node:test`, with a separate TypeScript check. The full runner discovers the package, GUI and proof tests, enforces cleanup checks and marks
+      GPU/model/desktop skips explicitly. No global Deno adapter is used.
+- [x] **F4-T2 · Port runtime-bound calls in package order.** Keep algorithms and package boundaries.
       Convert filesystem/process/env/path/error handling in `core` and `registry`; then `importer`,
       `gen` and `rig`; `anim`/`style`; `pack`/`export`; and `cli` composition. `schema` is covered
       by F4-T1 and `render` by F4-T3. Each group keeps its existing fixtures and gains Node
@@ -196,13 +196,13 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       transactions and subprocess ownership; no permanent global Deno shim. Preserve canonical
       glTF/FBX behavior, retarget-once, palettes/temporal ordering, deterministic packing and CLI
       twins.
-      **Progress:** core and registry compile on Node; 192 checks cover their first package group,
-      including the real process-crash/concurrency and VRAM lease fixtures. Kernel workspace locks
-      use a small Rust helper; policy stays in TypeScript. Two tests that also call the CLI remain
-      queued with that package's port, rather than counted as passing here. Importer and animation
-      now add 54 passing Node checks for deterministic GLB/OBJ/FBX/VRM import, rig preservation,
-      retargeting, clip packing and preview parity. Animation's render/bake integration checks are
-      queued with the renderer port.
+      **Recorded package exit:** all 12 packages compile to JavaScript and declarations, with a
+      separate source/test type check. The Windows Vulkan suite passes **885 checks**, with
+      **6 explicit skips** for real-engine, real-model and weight-gated lanes. This includes the
+      GUI logic/parity suite, crash/concurrent-writer recovery, asset undo, independent-process
+      VRAM admission, synthetic sidecar inference and sidecar death/retry. The Node resource guard
+      rejects referenced-handle leaks; explicit descriptor/process regressions cover the boundaries
+      Node's resource inventory cannot see. Installed delivery and real-model checks remain below.
 - [~] **F4-T3 · Promote the qualified renderer.** Integrate the F2 path through the existing render
       seam. Assign a fresh renderer signature/cache namespace, including build/backend/adapter and
       available driver identity. Never reuse old cached frames as evidence of Node rendering. Keep
@@ -215,7 +215,7 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       padded readback, materials, attachments and independent 8/16-bit PNG/CRC checks. Renderer
       0.6.0 hashes Node/Dawn, codec, backend and adapter/available driver information into a fresh
       cache identity. Installed delivery and paired baseline replay follow in F4-T4/T5.
-- [ ] **F4-T4 · Switch application, tooling and release execution.** Make Tauri invoke bundled
+- [~] **F4-T4 · Switch application, tooling and release execution.** Make Tauri invoke bundled
       runtime/core entry points rather than `deno run -A` against a checkout. Switch web build
       hooks, CLI commands, test/lint/format/type-check tasks, CI guards, proof helpers, hooks and
       release builds. Close the observed Vite optimizer stall and Rust-target watcher failure; the

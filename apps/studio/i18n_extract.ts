@@ -1,7 +1,8 @@
+import { promises as fs } from 'node:fs';
 /**
  * The extraction pass (hard commitment 3). Callsites are `t('literal')` —
  * this walks src/, collects every id, and holds the es catalog to 100%
- * coverage. Run it as a command (`deno task i18n:extract`) for a report, or
+ * coverage. Run it as a command (`npm run i18n:extract -w spritebook-studio`) for a report, or
  * let the test import the same functions so CI refuses a missing string.
  *
  * It also REFUSES non-literal callsites (t(`…`), t(variable)): an id the
@@ -41,14 +42,14 @@ export function nonLiteralCallsites(source: string): string[] {
 export async function extractFromDir(dir: URL): Promise<{ ids: Set<string>; bad: string[] }> {
   const ids = new Set<string>();
   const bad: string[] = [];
-  for await (const entry of Deno.readDir(dir)) {
-    const child = new URL(`${entry.name}${entry.isDirectory ? '/' : ''}`, dir);
-    if (entry.isDirectory) {
+  for await (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+    const child = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, dir);
+    if (entry.isDirectory()) {
       const sub = await extractFromDir(child);
       sub.ids.forEach((id) => ids.add(id));
       bad.push(...sub.bad);
     } else if (/\.(ts|tsx)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
-      const text = await Deno.readTextFile(child);
+      const text = await fs.readFile(child, 'utf8');
       extractIds(text).forEach((id) => ids.add(id));
       nonLiteralCallsites(text).forEach((b) => bad.push(`${entry.name}: t(${b}`));
     }
@@ -73,5 +74,5 @@ if (import.meta.main) {
   if (unused.length > 0) {
     console.log(`es unused ${unused.length}: ${unused.join(' | ')}`);
   }
-  Deno.exit(bad.length > 0 || missing.length > 0 ? 1 : 0);
+  process.exit(bad.length > 0 || missing.length > 0 ? 1 : 0);
 }

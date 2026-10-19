@@ -1,12 +1,13 @@
+import { test } from 'node:test';
 /**
  * The Bake stage's arithmetic: reading
  * core's own progress events, an ETA that refuses to speak before it can, the
  * player's frame selection, and the flag→stage jump.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { etaSeconds, flagStage, readProgress, summarize } from './src/bakeprogress.ts';
 
-Deno.test('readProgress takes core progress events and nothing else', () => {
+test('readProgress takes core progress events and nothing else', () => {
   assertEquals(
     readProgress(
       JSON.stringify({ t: 'progress', jobId: 'bake', step: 'cells', done: 1, total: 4 }),
@@ -21,7 +22,7 @@ Deno.test('readProgress takes core progress events and nothing else', () => {
   assertEquals(odd.fraction, 1);
 });
 
-Deno.test('the ETA stays silent until it can be honest', () => {
+test('the ETA stays silent until it can be honest', () => {
   const p = (done: number, total = 4) => ({
     step: 's',
     done,
@@ -36,11 +37,11 @@ Deno.test('the ETA stays silent until it can be honest', () => {
   assertEquals(etaSeconds(10, p(2)), 10);
 });
 
-Deno.test('summarize refuses garbage instead of half-rendering it', () => {
+test('summarize refuses garbage instead of half-rendering it', () => {
   for (const bad of [null, 42, 'x', {}, { frames: [] }]) assertEquals(summarize(bad), null);
 });
 
-Deno.test('a flag jumps to the stage that OWNS it, never a guess', () => {
+test('a flag jumps to the stage that OWNS it, never a guess', () => {
   assertEquals(flagStage({ sourceStage: 'look' }), 'look');
   assertEquals(flagStage({ sourceStage: 'rig' }), 'rig');
   assertEquals(flagStage({}), 'bake', 'no source stated: stay put');

@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * docs/cli.md against the code it documents.
  *
@@ -6,14 +8,14 @@
  * own subcommand check) and a knob roster nothing kept honest. Documentation
  * drifts silently; this is the lock.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { loadCatalog } from '@spritebook/registry';
 import { paramsSchemaFor } from '@spritebook/schema';
 
 const CLI_MD = new URL('../../docs/cli.md', import.meta.url);
 
 async function page(): Promise<string> {
-  return await Deno.readTextFile(CLI_MD);
+  return await fs.readFile(CLI_MD, 'utf8');
 }
 
 /** Every `spritebook <verb>` the page tells a reader to run. */
@@ -22,7 +24,7 @@ function commandsIn(md: string): string[] {
     .map((m) => [m[1], m[2] ?? ''].join(' ').trim());
 }
 
-Deno.test("docs/cli.md: the gen knob table is the catalog's gen3d set, exactly", async () => {
+test("docs/cli.md: the gen knob table is the catalog's gen3d set, exactly", async () => {
   const md = await page();
   const table = md.split('### The knobs `--adjust` takes')[1].split('\n## ')[0];
   const cat = await loadCatalog();
@@ -44,7 +46,7 @@ Deno.test("docs/cli.md: the gen knob table is the catalog's gen3d set, exactly",
   }
 });
 
-Deno.test('docs/cli.md: the retexture-only knob is never listed as a gen knob', async () => {
+test('docs/cli.md: the retexture-only knob is never listed as a gen knob', async () => {
   const md = await page();
   const table = md.split('### The knobs `--adjust` takes')[1].split('\n## ')[0];
   assert(
@@ -53,9 +55,9 @@ Deno.test('docs/cli.md: the retexture-only knob is never listed as a gen knob', 
   );
 });
 
-Deno.test('docs/cli.md: every command it prints is a verb the CLI answers', async () => {
+test('docs/cli.md: every command it prints is a verb the CLI answers', async () => {
   const md = await page();
-  const { VERB_FLAGS } = await import('./mod.ts');
+  const { VERB_FLAGS } = await import('./dist/mod.js');
   const verbs = new Set(Object.keys(VERB_FLAGS));
   // the subcommands `models` accepts, from its own refusal message
   const modelsSubs = new Set(['list', 'install', 'verify', 'rm']);
@@ -68,10 +70,10 @@ Deno.test('docs/cli.md: every command it prints is a verb the CLI answers', asyn
   }
 });
 
-Deno.test('the CLI still refuses the subcommand the docs used to print', async () => {
+test('the CLI still refuses the subcommand the docs used to print', async () => {
   // pinning the refusal itself: if `models catalog` is ever implemented, this
   // test fails and the docs get their word back
-  const { VERB_FLAGS } = await import('./mod.ts');
+  const { VERB_FLAGS } = await import('./dist/mod.js');
   assertEquals(typeof VERB_FLAGS.models, 'object');
   assert(!('catalog' in VERB_FLAGS), 'catalog is not a verb');
 });

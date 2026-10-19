@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The --log-append sink (P4-T2): every JobEvent lands in the file as NDJSON
  * regardless of output mode, an unwritable sink warns once and never kills
@@ -5,8 +9,8 @@
  * JOB EVENTS — query snapshots (doctor, models list) are documents and stay
  * out, which this test pins so the contract is deliberate, not accidental.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { runCli } from './mod.ts';
+import { assert, assertEquals } from '@std/assert';
+import { runCli } from './dist/mod.js';
 
 function io() {
   const out: string[] = [];
@@ -19,8 +23,8 @@ function io() {
   };
 }
 
-Deno.test('events tee to the sink as NDJSON even WITHOUT --json', async () => {
-  const tmp = await Deno.makeTempDir();
+test('events tee to the sink as NDJSON even WITHOUT --json', async () => {
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const sink = `${tmp}/session.ndjsonl`;
   try {
     // a cheap, deterministic failure: undo with a missing manifest
@@ -30,7 +34,7 @@ Deno.test('events tee to the sink as NDJSON even WITHOUT --json', async () => {
       o,
     );
     assertEquals(code, 1);
-    const lines = (await Deno.readTextFile(sink)).trim().split('\n');
+    const lines = (await fs.readFile(sink, 'utf8')).trim().split('\n');
     // the full stream lands, not a summary: queued, started, then the error
     assertEquals(lines.map((l) => JSON.parse(l).t), ['queued', 'started', 'error']);
     const e = JSON.parse(lines.at(-1)!);
@@ -38,25 +42,25 @@ Deno.test('events tee to the sink as NDJSON even WITHOUT --json', async () => {
     // and the TERMINAL stayed human (no JSON on stdout without --json)
     assert(!o.out.some((l) => l.startsWith('{')), 'stdout stays human without --json');
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });
 
-Deno.test('the sink APPENDS across runs — a session file accumulates', async () => {
-  const tmp = await Deno.makeTempDir();
+test('the sink APPENDS across runs — a session file accumulates', async () => {
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const sink = `${tmp}/session.ndjsonl`;
   try {
     await runCli(['undo', '--manifest', `${tmp}/a/character.json`, '--log-append', sink], io());
-    const afterOne = (await Deno.readTextFile(sink)).trim().split('\n').length;
+    const afterOne = (await fs.readFile(sink, 'utf8')).trim().split('\n').length;
     await runCli(['redo', '--manifest', `${tmp}/b/character.json`, '--log-append', sink], io());
-    const afterTwo = (await Deno.readTextFile(sink)).trim().split('\n').length;
+    const afterTwo = (await fs.readFile(sink, 'utf8')).trim().split('\n').length;
     assertEquals(afterTwo, afterOne * 2, 'the second run APPENDED, not replaced');
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });
 
-Deno.test('an unwritable sink warns on stderr and the run continues', async () => {
+test('an unwritable sink warns on stderr and the run continues', async () => {
   const o = io();
   // a directory path is never writable as a file
   const code = await runCli(
@@ -67,15 +71,15 @@ Deno.test('an unwritable sink warns on stderr and the run continues', async () =
   assert(o.err.some((l) => l.includes('--log-append')), 'the sink failure is named once');
 });
 
-Deno.test('query snapshots stay OUT of the sink — it is a job-event stream', async () => {
-  const tmp = await Deno.makeTempDir();
+test('query snapshots stay OUT of the sink — it is a job-event stream', async () => {
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const sink = `${tmp}/session.ndjsonl`;
   try {
     const code = await runCli(['models', 'list', '--json', '--log-append', sink], io());
     assertEquals(code, 0);
-    const exists = await Deno.stat(sink).then(() => true, () => false);
+    const exists = await fs.stat(sink).then(() => true, () => false);
     assertEquals(exists, false, 'a list document is not a job event');
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });

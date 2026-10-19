@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * The viewport-disposal leak test (P4-T3).
  *
@@ -14,12 +15,9 @@
  * `renderer.info.memory` half of the story is proven live in the browser and
  * recorded in docs/internal/roadmap/p4.md.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-// The exact version apps/studio/package.json pins. Spelled out here because
-// apps/studio is an npm project rather than a Deno workspace member, so the
-// root `deno test` has no import map to resolve a bare "three" through. The
-// REVISION assertion below is what catches the two drifting apart.
-import * as THREE from 'npm:three@0.185.1';
+import { assert, assertEquals } from '@std/assert';
+// The REVISION assertion pins the viewport's actual dependency.
+import * as THREE from 'three';
 import { disposeTree, type MaterialLike, type TreeNode } from './src/viewport/dispose.ts';
 
 /** Wrap three's dispose so the test can see what was released, and count it. */
@@ -100,13 +98,13 @@ const asTree = (o: THREE.Object3D) => o as unknown as TreeNode;
 const asMap = (m: Built['originals']) =>
   m as unknown as Map<TreeNode, MaterialLike | MaterialLike[]>;
 
-Deno.test('the three under test is the three the app ships', () => {
+test('the three under test is the three the app ships', () => {
   // if this fails, apps/studio/package.json moved and this file did not: the
   // leak walk would then be proven against a different three than runs
   assertEquals(THREE.REVISION, '185');
 });
 
-Deno.test('every geometry, material and texture in a model is released', () => {
+test('every geometry, material and texture in a model is released', () => {
   const built = buildModel();
   const tally = disposeTree(asTree(built.root), asMap(built.originals));
 
@@ -134,7 +132,7 @@ Deno.test('every geometry, material and texture in a model is released', () => {
   assertEquals(tally.kept, 0);
 });
 
-Deno.test('textures are found by walking slots, not by a hardcoded list', () => {
+test('textures are found by walking slots, not by a hardcoded list', () => {
   // three adds material slots every release; a fixed list of names silently
   // stops freeing the new ones, and nothing fails until VRAM does
   const root = new THREE.Group();
@@ -159,7 +157,7 @@ Deno.test('textures are found by walking slots, not by a hardcoded list', () => 
   for (const t of textures) assertEquals(t.disposals, 1);
 });
 
-Deno.test('the ORIGINAL material is released, not the one the mode swapped in', () => {
+test('the ORIGINAL material is released, not the one the mode swapped in', () => {
   // Clay/Wire mode replaces mesh.material; at dispose time the material on the
   // mesh is not the one that needs freeing, and the one that does is only in
   // the originals map. Without it, a model disposed in clay mode leaks every
@@ -182,7 +180,7 @@ Deno.test('the ORIGINAL material is released, not the one the mode swapped in', 
   for (const t of built.textures) assertEquals(t.disposals, 1);
 });
 
-Deno.test('a mesh missing from the map never takes a SHARED material down', () => {
+test('a mesh missing from the map never takes a SHARED material down', () => {
   // the fallback path: `originals.get(mesh) ?? mesh.material`. With clay on the
   // mesh and no map entry, the fallback IS the app-wide singleton — disposing
   // it blanks the mesh in every other open viewport, which takes two viewports
@@ -200,7 +198,7 @@ Deno.test('a mesh missing from the map never takes a SHARED material down', () =
   assertEquals(tally.kept, 1, 'and said so in the tally rather than silently');
 });
 
-Deno.test('a hundred load/dispose cycles retain nothing', () => {
+test('a hundred load/dispose cycles retain nothing', () => {
   // the actual leak shape: the viewport replaces its model on every load, and
   // a walk that misses one class of resource compounds once per character
   let geometries = 0;
@@ -227,7 +225,7 @@ Deno.test('a hundred load/dispose cycles retain nothing', () => {
   );
 });
 
-Deno.test('disposing twice is not a double release', () => {
+test('disposing twice is not a double release', () => {
   // React strict mode mounts, unmounts and remounts; `dispose()` guards on a
   // flag, but the walk itself must be safe if that guard ever moves
   const built = buildModel(2);
@@ -242,7 +240,7 @@ Deno.test('disposing twice is not a double release', () => {
   for (const t of built.textures) assert(t.disposals >= 1);
 });
 
-Deno.test('an empty model is not an error', () => {
+test('an empty model is not an error', () => {
   const tally = disposeTree(asTree(new THREE.Group()));
   assertEquals(tally, { geometries: 0, materials: 0, textures: 0, kept: 0 });
 });

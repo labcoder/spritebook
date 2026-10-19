@@ -8,7 +8,7 @@ import { SCHEMA_VERSION } from '@spritebook/schema';
 import { createWorkspace, readWorkspace, workspacePaths } from './dist/workspace.js';
 import { commitManifest, moveManifestCursor } from './dist/persistence.js';
 import { listWorkspaces, readBakeArtifact, readCurrentBake } from './dist/queries.js';
-import { runCli } from '../cli/mod.ts';
+import { runCli } from '../cli/dist/mod.js';
 
 test('core, CLI and artifacts follow the selected bake through undo, never directory age', async () => {
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));

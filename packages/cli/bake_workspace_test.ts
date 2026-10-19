@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The manifest-driven-bake acceptances, on real bakes (GPU-gated;
  * SPRITEBOOK_REQUIRE_GPU forces them on the lavapipe lane).
@@ -25,7 +29,7 @@
  * sharper half: a bakeId could in principle collide, but 100% hits mean the
  * recipe hashed identically all the way down to each frame.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { BakeManifestSchema, canonicalJson, parseWith } from '@spritebook/schema';
 import type { BakeManifest } from '@spritebook/schema';
 import {
@@ -37,8 +41,8 @@ import {
   sha256Hex,
   workspacePaths,
 } from '@spritebook/core';
-import { tryGetGpu } from '../render/gpu.ts';
-import { runCli } from './mod.ts';
+import { tryGetGpu } from '../render/dist/gpu.js';
+import { runCli } from './dist/mod.js';
 import { rigForKey } from '@spritebook/pack';
 import { NodeIO } from '@gltf-transform/core';
 import { appendGenerationResult, resultPaths } from '@spritebook/core';
@@ -49,9 +53,9 @@ const GLB = new URL('../style/fixtures/asymmetric.glb', import.meta.url).pathnam
 );
 const NOW = () => '2026-07-12T00:00:00Z';
 
-Deno.test('pick A -> pick B -> undo bakes the restored mesh, not just its metadata', async () => {
-  if (!(await tryGetGpu())) return;
-  const dir = await Deno.makeTempDir({ prefix: 'sb-asset-undo-' });
+test('pick A -> pick B -> undo bakes the restored mesh, not just its metadata', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-asset-undo-'));
   try {
     await createWorkspace({
       workspace: dir,
@@ -60,20 +64,20 @@ Deno.test('pick A -> pick B -> undo bakes the restored mesh, not just its metada
       source: {
         kind: 'mesh',
         originalFilename: 'asymmetric.glb',
-        sha256: await sha256Bytes(await Deno.readFile(GLB)),
+        sha256: await sha256Bytes(new Uint8Array(await fs.readFile(GLB))),
       },
     });
     const io = new NodeIO();
-    const doc = await io.readBinary(await Deno.readFile(GLB));
+    const doc = await io.readBinary(new Uint8Array(await fs.readFile(GLB)));
     doc.getRoot().listMeshes()[0].listPrimitives()[0].setMaterial(
       doc.createMaterial().setBaseColorFactor([1, 0, 0, 1]),
     );
-    const variants = [await Deno.readFile(GLB), await io.writeBinary(doc)];
+    const variants = [new Uint8Array(await fs.readFile(GLB)), await io.writeBinary(doc)];
     for (const [i, bytes] of variants.entries()) {
       const id = `r${i + 1}`;
       const paths = resultPaths(dir, id);
-      await Deno.mkdir(paths.dir, { recursive: true });
-      await Deno.writeFile(paths.model, bytes);
+      await fs.mkdir(paths.dir, { recursive: true });
+      await fs.writeFile(paths.model, bytes);
       await appendGenerationResult(dir, {
         id,
         backend: { modelId: 'fixture-gen', version: '1.0.0' },
@@ -109,9 +113,9 @@ Deno.test('pick A -> pick B -> undo bakes the restored mesh, not just its metada
     await bake();
     const before = (await readWorkspace(dir)).lastBakeId!;
     const page = `${workspacePaths(dir).bakesDir}/bake-${before}/atlas_lit_0.png`;
-    const expected = await Deno.readFile(page);
+    const expected = new Uint8Array(await fs.readFile(page));
     await pick('r2');
-    assertEquals(await Deno.readFile(workspacePaths(dir).canonicalModel), variants[1]);
+    assertEquals(new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel)), variants[1]);
     await run(['undo', '--manifest', workspacePaths(dir).manifest]);
     await bake();
     assertEquals(
@@ -119,9 +123,9 @@ Deno.test('pick A -> pick B -> undo bakes the restored mesh, not just its metada
       before,
       'bake keys the actual restored input',
     );
-    assertEquals(await Deno.readFile(page), expected, 'the rerendered pixels agree too');
+    assertEquals(new Uint8Array(await fs.readFile(page)), expected, 'the rerendered pixels agree too');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
@@ -142,7 +146,7 @@ function collector() {
 /** The bake manifest of one bake in the workspace's bakes dir. */
 async function bakeManifest(dir: string, bakeId: string): Promise<BakeManifest> {
   const path = `${workspacePaths(dir).bakesDir}/bake-${bakeId}/manifest.json`;
-  return parseWith(BakeManifestSchema, JSON.parse(await Deno.readTextFile(path)), path);
+  return parseWith(BakeManifestSchema, JSON.parse(await fs.readFile(path, 'utf8')), path);
 }
 
 /**
@@ -168,7 +172,7 @@ async function character(dir: string): Promise<void> {
     source: { kind: 'mesh', originalFilename: 'asymmetric.glb', sha256: 'a'.repeat(64) },
     now: NOW,
   });
-  await Deno.copyFile(GLB, workspacePaths(dir).canonicalModel);
+  await fs.copyFile(GLB, workspacePaths(dir).canonicalModel);
 }
 
 /** Which directions this bake produced by flipping, and from where. */
@@ -180,9 +184,9 @@ function flips(m: BakeManifest): Array<[number, number]> {
   return [...out].sort((a, b) => a[0] - b[0]);
 }
 
-Deno.test('acceptance: --mirror once, then mirrored from the workspace alone', async (t) => {
-  if (!(await tryGetGpu())) return;
-  const raw = await Deno.makeTempDir({ prefix: 'sb-mirror-ws-' });
+test('acceptance: --mirror once, then mirrored from the workspace alone', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const raw = await fs.mkdtemp(join(tmpdir(), 'sb-mirror-ws-'));
   const dir = raw.replaceAll('\\', '/');
   const cache = `${dir}/cache`;
   // 4 directions is the cheapest count that mirrors at all: direction 3 is the
@@ -193,7 +197,7 @@ Deno.test('acceptance: --mirror once, then mirrored from the workspace alone', a
     await character(dir);
 
     let mirroredId = '';
-    await t.step('--mirror records the choice on the character', async () => {
+    await t.test('--mirror records the choice on the character', async () => {
       const c = collector();
       assertEquals(
         await runCli(
@@ -219,7 +223,7 @@ Deno.test('acceptance: --mirror once, then mirrored from the workspace alone', a
       assertEquals(flips(await bakeManifest(dir, mirroredId)), [[3, 1]], 'direction 3 is a flip');
     });
 
-    await t.step('THE acceptance: no flags at all, and it still mirrors', async () => {
+    await t.test('THE acceptance: no flags at all, and it still mirrors', async () => {
       const c = collector();
       assertEquals(
         await runCli(
@@ -236,7 +240,7 @@ Deno.test('acceptance: --mirror once, then mirrored from the workspace alone', a
       assertEquals(baked.frames.every((f) => f.cacheHit), true, 'served entirely from cache');
     });
 
-    await t.step('--no-mirror is how a yes says no for one bake', async () => {
+    await t.test('--no-mirror is how a yes says no for one bake', async () => {
       const c = collector();
       assertEquals(
         await runCli(
@@ -266,13 +270,13 @@ Deno.test('acceptance: --mirror once, then mirrored from the workspace alone', a
       assertEquals(baked.frames.length, 4 * 6, '4 directions x the default 6 frames');
     });
   } finally {
-    await Deno.remove(raw, { recursive: true });
+    await fs.rm(raw, { recursive: true });
   }
 });
 
-Deno.test('acceptance: a workspace bake reproduces the last one exactly', async (t) => {
-  if (!(await tryGetGpu())) return;
-  const raw = await Deno.makeTempDir({ prefix: 'sb-bake-ws-' });
+test('acceptance: a workspace bake reproduces the last one exactly', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const raw = await fs.mkdtemp(join(tmpdir(), 'sb-bake-ws-'));
   const dir = raw.replaceAll('\\', '/');
   const cache = `${dir}/cache`;
   try {
@@ -280,7 +284,7 @@ Deno.test('acceptance: a workspace bake reproduces the last one exactly', async 
 
     let firstId = '';
     let firstRecipe = '';
-    await t.step('a flag-driven bake records what it ran with', async () => {
+    await t.test('a flag-driven bake records what it ran with', async () => {
       const c = collector();
       const code = await runCli([
         'bake',
@@ -324,7 +328,7 @@ Deno.test('acceptance: a workspace bake reproduces the last one exactly', async 
       firstRecipe = recipe(baked);
     });
 
-    await t.step('the same bake with NO camera or style flags reproduces it', async () => {
+    await t.test('the same bake with NO camera or style flags reproduces it', async () => {
       const c = collector();
       const code = await runCli(
         ['bake', '--workspace', dir, '--cache', cache, '--only-invalidated', '--json'],
@@ -341,7 +345,7 @@ Deno.test('acceptance: a workspace bake reproduces the last one exactly', async 
       assertEquals(baked.metrics.cacheHitPct, 100);
     });
 
-    await t.step('changing look.overrides alone moves the bakeId', async () => {
+    await t.test('changing look.overrides alone moves the bakeId', async () => {
       const before = await readWorkspace(dir);
       // cel-2 ships 1-bit alpha; this is the manifest asking for soft, and
       // nothing else about the bake changes
@@ -374,7 +378,7 @@ Deno.test('acceptance: a workspace bake reproduces the last one exactly', async 
       assert(rebaked.frames.some((f) => !f.cacheHit), 'a changed recipe recomputes frames');
     });
 
-    await t.step('--frames is the stub count, and deliberately does not persist', async () => {
+    await t.test('--frames is the stub count, and deliberately does not persist', async () => {
       // Found by this acceptance failing on its first run, and pinned rather
       // than papered over. `--frames` feeds the P2-era idle-stub bake, whose
       // frame count IS part of the recipe but has no home in the manifest: the
@@ -408,18 +412,18 @@ Deno.test('acceptance: a workspace bake reproduces the last one exactly', async 
       );
     });
   } finally {
-    await Deno.remove(raw, { recursive: true });
+    await fs.rm(raw, { recursive: true });
   }
 });
 
-Deno.test('acceptance: the bake manifest records the backend that really made it', async () => {
+test('acceptance: the bake manifest records the backend that really made it', async (t) => {
   // Found by self-review: every other acceptance here uses a workspace with no
   // rig and no picked result, so `provenanceOf` returns undefined and the whole
   // manifest -> spec -> recipe -> BakeManifest.inputs path went unexercised.
   // `inputs` is a COMMITTED record - it is what "re-run exactly this" reads -
   // and it used to say `source-mesh@0` for a character a named backend made.
-  if (!(await tryGetGpu())) return;
-  const raw = await Deno.makeTempDir({ prefix: 'sb-prov-e2e-' });
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const raw = await fs.mkdtemp(join(tmpdir(), 'sb-prov-e2e-'));
   const dir = raw.replaceAll('\\', '/');
   try {
     await character(dir);
@@ -432,7 +436,7 @@ Deno.test('acceptance: the bake manifest records the backend that really made it
       startedAt: NOW(),
       wallTimeS: 92.5,
       output: {
-        gltfSha256: await sha256Bytes(await Deno.readFile(workspacePaths(dir).canonicalModel)),
+        gltfSha256: await sha256Bytes(new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel))),
         tris: 14318,
         kind: 'mesh',
       },
@@ -475,18 +479,18 @@ Deno.test('acceptance: the bake manifest records the backend that really made it
       baked.inputs.rigStateHash,
     );
   } finally {
-    await Deno.remove(raw, { recursive: true });
+    await fs.rm(raw, { recursive: true });
   }
 });
 
-Deno.test('bake says so, loudly, when the rig was never accepted', async (t) => {
+test('bake says so, loudly, when the rig was never accepted', async (t) => {
   // The P3 exit run shipped 48 frames off a rig whose own deform check had
   // flagged 37 of 40 joints and set accepted: false - and not one line said so
   // at bake time. It cannot be a refusal: both rig tracks write accepted: false
   // ("theirs to set") and no verb sets it yet, so refusing would dead-end every
   // rigged character. Loud, actionable warn.
-  if (!(await tryGetGpu())) return;
-  const raw = await Deno.makeTempDir({ prefix: 'sb-rig-warn-' });
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const raw = await fs.mkdtemp(join(tmpdir(), 'sb-rig-warn-'));
   const dir = raw.replaceAll('\\', '/');
   const geometry = ['--directions', '2', '--cell', '48', '--json'];
   const rig = {
@@ -500,7 +504,7 @@ Deno.test('bake says so, loudly, when the rig was never accepted', async (t) => 
   try {
     await character(dir);
 
-    await t.step('an unaccepted rig warns before the bake starts', async () => {
+    await t.test('an unaccepted rig warns before the bake starts', async () => {
       await setRigState(dir, rig, { now: NOW });
       const c = collector();
       assertEquals(await runCli(['bake', '--workspace', dir, ...geometry], c.io), 0);
@@ -512,7 +516,7 @@ Deno.test('bake says so, loudly, when the rig was never accepted', async (t) => 
       assert(c.out.some((l) => l.includes('"done"')), 'the bake still ran');
     });
 
-    await t.step('an accepted rig bakes without the warning', async () => {
+    await t.test('an accepted rig bakes without the warning', async () => {
       await setRigState(dir, { ...rig, accepted: true }, { now: NOW });
       const c = collector();
       assertEquals(await runCli(['bake', '--workspace', dir, ...geometry], c.io), 0);
@@ -523,6 +527,6 @@ Deno.test('bake says so, loudly, when the rig was never accepted', async (t) => 
       );
     });
   } finally {
-    await Deno.remove(raw, { recursive: true });
+    await fs.rm(raw, { recursive: true });
   }
 });

@@ -313,7 +313,7 @@ test('acceptance: a mirrored bake flips every pass, marks it, and styles half', 
       );
     });
 
-    await t.test('only the rendered directions were styled', async (t) => {
+    await t.test('only the rendered directions were styled', async () => {
       const styled = (dir: string) =>
         JSON.parse(readFileSync(`${dir}/style-result.json`, 'utf8')).directions;
       assertEquals(

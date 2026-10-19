@@ -1,3 +1,8 @@
+import { runProcess } from '../../tools/testing/process.ts';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * P3-T2 acceptance against the REAL Python sidecar (gated on uv + the sidecar
  * checkout; the prep leg additionally needs the u2net weight via
@@ -9,12 +14,12 @@
  *     verified against the catalog pin), then `spritebook prep` produces a
  *     real cutout + preflight through the border.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { JobEvent, JobId } from '@spritebook/schema';
 import { SidecarSession } from '@spritebook/core';
 import { loadCatalog, runInstallJob } from '@spritebook/registry';
-import { runCli } from './mod.ts';
+import { runCli } from './dist/mod.js';
 
 const SIDECAR_DIR = decodeURIComponent(
   new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
@@ -22,13 +27,8 @@ const SIDECAR_DIR = decodeURIComponent(
 
 async function sidecarAvailable(): Promise<boolean> {
   try {
-    await Deno.stat(`${SIDECAR_DIR}/pyproject.toml`);
-    const uv = await new Deno.Command('uv', {
-      args: ['--version'],
-      stdout: 'null',
-      stderr: 'null',
-      stdin: 'null',
-    }).output();
+    await fs.stat(`${SIDECAR_DIR}/pyproject.toml`);
+    const uv = await runProcess('uv', ['--version']);
     return uv.success;
   } catch {
     return false;
@@ -41,12 +41,12 @@ async function collect(it: AsyncIterable<JobEvent>): Promise<JobEvent[]> {
   return out;
 }
 
-Deno.test('real sidecar: spawn via uv, handshake roster, echo end-to-end', async () => {
+test('real sidecar: spawn via uv, handshake roster, echo end-to-end', async (t) => {
   if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
+    t.skip('uv or sidecar/ not available');
     return;
   }
-  const out = await Deno.makeTempDir();
+  const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const session = new SidecarSession({ sidecarDir: SIDECAR_DIR });
   try {
     const handle = await session.ensure();
@@ -75,19 +75,19 @@ Deno.test('real sidecar: spawn via uv, handshake roster, echo end-to-end', async
       ['queued', 'started', 'progress', 'progress', 'progress', 'artifact', 'done'],
     );
     const artifact = events.find((e) => e.t === 'artifact') as { path: string };
-    assert((await Deno.readTextFile(artifact.path)).includes('3'), 'echo log written');
+    assert((await fs.readFile(artifact.path, 'utf8')).includes('3'), 'echo log written');
   } finally {
     await session.dispose();
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('ACCEPTANCE: kill sidecar mid-job -> retryable error; retry recovers', async () => {
+test('ACCEPTANCE: kill sidecar mid-job -> retryable error; retry recovers', async (t) => {
   if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
+    t.skip('uv or sidecar/ not available');
     return;
   }
-  const out = await Deno.makeTempDir();
+  const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const session = new SidecarSession({ sidecarDir: SIDECAR_DIR });
   try {
     const first = await session.ensure();
@@ -123,22 +123,22 @@ Deno.test('ACCEPTANCE: kill sidecar mid-job -> retryable error; retry recovers',
     assert(second.pid !== killedPid, 'recovery ran on a FRESH process');
   } finally {
     await session.dispose();
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('ACCEPTANCE: registry-installed weight -> spritebook prep -> cutout + preflight', async () => {
+test('ACCEPTANCE: registry-installed weight -> spritebook prep -> cutout + preflight', async (t) => {
   if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
+    t.skip('uv or sidecar/ not available');
     return;
   }
-  const weightPath = Deno.env.get('SPRITEBOOK_ITEST_U2NET');
+  const weightPath = process.env['SPRITEBOOK_ITEST_U2NET'];
   if (!weightPath) {
-    console.log('skip: SPRITEBOOK_ITEST_U2NET not set (points at a local u2net.onnx)');
+    t.skip('SPRITEBOOK_ITEST_U2NET not set (points at a local u2net.onnx)');
     return;
   }
-  const root = await Deno.makeTempDir({ prefix: 'sb-prep-models-' });
-  const work = await Deno.makeTempDir({ prefix: 'sb-prep-' });
+  const root = await fs.mkdtemp(join(tmpdir(), 'sb-prep-models-'));
+  const work = await fs.mkdtemp(join(tmpdir(), 'sb-prep-'));
   try {
     // install through the REAL job (gates, staging, receipt) — the fetcher is
     // a local copy, but the hash still verifies against the catalog pin, so a
@@ -150,7 +150,7 @@ Deno.test('ACCEPTANCE: registry-installed weight -> spritebook prep -> cutout + 
       root,
       modelId: 'rembg-u2net',
       fetcher: async (_url, dest) => {
-        await Deno.copyFile(weightPath, dest);
+        await fs.copyFile(weightPath, dest);
       },
     }));
     assertEquals(install.at(-1)?.t, 'done', `install: ${JSON.stringify(install.at(-1))}`);
@@ -161,7 +161,7 @@ Deno.test('ACCEPTANCE: registry-installed weight -> spritebook prep -> cutout + 
       new URL('../style/fixtures/aov/frames/d00_f000_lit.png', import.meta.url).pathname
         .replace(/^\/([A-Za-z]:)/, '$1'),
     );
-    const lit = decodePng(await Deno.readFile(litPath));
+    const lit = decodePng(new Uint8Array(await fs.readFile(litPath)));
     const px = lit.data as Uint8Array;
     const rgba = new Uint8Array(lit.width * lit.height * 4);
     for (let p = 0; p < lit.width * lit.height; p++) {
@@ -172,7 +172,7 @@ Deno.test('ACCEPTANCE: registry-installed weight -> spritebook prep -> cutout + 
       rgba[p * 4 + 3] = 255;
     }
     const inputPath = `${work}/input.png`;
-    await Deno.writeFile(
+    await fs.writeFile(
       inputPath,
       encodePng({ width: lit.width, height: lit.height, data: rgba }),
     );
@@ -193,7 +193,7 @@ Deno.test('ACCEPTANCE: registry-installed weight -> spritebook prep -> cutout + 
     ], { stdout: (l) => lines.push(l), stderr: (l) => lines.push(l) });
     assertEquals(code, 0, `prep exit 0; events:\n${lines.join('\n')}`);
 
-    const cutout = decodePng(await Deno.readFile(`${work}/out/cutout.png`));
+    const cutout = decodePng(new Uint8Array(await fs.readFile(`${work}/out/cutout.png`)));
     assertEquals(cutout.channels, 4, 'cutout is RGBA');
     const cpx = cutout.data as Uint8Array;
     let opaque = 0, clear = 0;
@@ -204,7 +204,7 @@ Deno.test('ACCEPTANCE: registry-installed weight -> spritebook prep -> cutout + 
     assert(opaque > 500, `subject present in the cutout (${opaque} opaque px)`);
     assert(clear > 500, `background actually removed (${clear} clear px)`);
 
-    const preflight = JSON.parse(await Deno.readTextFile(`${work}/out/preflight.json`));
+    const preflight = JSON.parse(await fs.readFile(`${work}/out/preflight.json`, 'utf8'));
     assertEquals(
       preflight.checks.map((c: { id: string }) => c.id),
       ['loaded', 'cutout', 'pose', 'resolution'],
@@ -215,16 +215,16 @@ Deno.test('ACCEPTANCE: registry-installed weight -> spritebook prep -> cutout + 
       assert(typeof c.message === 'string' && c.message.length > 0);
     }
   } finally {
-    await Deno.remove(root, { recursive: true });
-    await Deno.remove(work, { recursive: true });
+    await fs.rm(root, { recursive: true });
+    await fs.rm(work, { recursive: true });
   }
 });
 
-Deno.test('doctor --sidecar: boots, handshakes, reports the roster, exits by health', async () => {
+test('doctor --sidecar: boots, handshakes, reports the roster, exits by health', async (t) => {
   // P4-T1: the studio status bar consumes exactly this document, so the test
   // asserts the CONTRACT of the report, not incidental fields.
   if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
+    t.skip('uv or sidecar/ not available');
     return;
   }
   const lines: string[] = [];

@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * `anim --enable/--disable` (P4-T2): binding decisions as journaled patches.
  * Enable resolves the pack from the installed packs and merges position-
@@ -5,9 +9,9 @@
  * clip out is still a choice); unknown clips are refused naming the fix; and
  * one undo takes any of it back — that is the whole point of the journal.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { createWorkspace } from '@spritebook/core';
-import { runCli } from './mod.ts';
+import { runCli } from './dist/mod.js';
 
 function io() {
   const out: string[] = [];
@@ -15,7 +19,7 @@ function io() {
 }
 
 async function rig(): Promise<{ ws: string; tmp: string }> {
-  const tmp = await Deno.makeTempDir();
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const ws = `${tmp}/sprout`;
   await createWorkspace({
     workspace: ws,
@@ -26,7 +30,7 @@ async function rig(): Promise<{ ws: string; tmp: string }> {
   return { ws, tmp };
 }
 
-Deno.test('enable resolves the pack, records the binding, and undo reverts it', async () => {
+test('enable resolves the pack, records the binding, and undo reverts it', async () => {
   const { ws, tmp } = await rig();
   try {
     const o = io();
@@ -47,14 +51,14 @@ Deno.test('enable resolves the pack, records the binding, and undo reverts it', 
 
     const undo = await runCli(['undo', '--manifest', `${ws}/character.json`], io());
     assertEquals(undo, 0);
-    const manifest = JSON.parse(await Deno.readTextFile(`${ws}/character.json`));
+    const manifest = JSON.parse(await fs.readFile(`${ws}/character.json`, 'utf8'));
     assertEquals(manifest.animationSet, undefined, 'the decision is fully taken back');
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });
 
-Deno.test('disable keeps the numbers; re-enable updates in place', async () => {
+test('disable keeps the numbers; re-enable updates in place', async () => {
   const { ws, tmp } = await rig();
   try {
     await runCli(
@@ -80,11 +84,11 @@ Deno.test('disable keeps the numbers; re-enable updates in place', async () => {
     assertEquals(set[0].clipId, 'idle-loop', 'position stable');
     assertEquals(set.length, 2);
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });
 
-Deno.test('unknown clips and absent bindings refuse with the fix named', async () => {
+test('unknown clips and absent bindings refuse with the fix named', async () => {
   const { ws, tmp } = await rig();
   try {
     const o = io();
@@ -100,6 +104,6 @@ Deno.test('unknown clips and absent bindings refuse with the fix named', async (
     assertEquals(code2, 1);
     assert(o2.out.join('\n').includes('(none)'), 'names the (empty) binding set');
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });

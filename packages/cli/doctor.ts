@@ -1,3 +1,5 @@
+import { resourcePath } from '@spritebook/core';
+
 /**
  * `spritebook doctor` — the GPU/adapter/backend health report (P2-T4). Prints
  * the product + render-pipeline versions, the backend env, adapter identity,
@@ -29,11 +31,9 @@ import type { CliIo } from './mod.ts';
 /** The same resolution gen/pick use, minus the per-call flag: doctor examines
  * the DEFAULT configuration, so an env override is the only knob. */
 function defaultSidecarDir(): string {
-  const env = Deno.env.get('SPRITEBOOK_SIDECAR_DIR');
+  const env = process.env['SPRITEBOOK_SIDECAR_DIR'];
   if (env) return env;
-  return decodeURIComponent(
-    new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-  );
+  return resourcePath('sidecar');
 }
 
 interface SidecarReport {
@@ -98,9 +98,9 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
   const vramGb = await detectVramGb();
   const report = {
     spritebook: SPRITEBOOK_VERSION,
-    deno: Deno.version.deno,
-    v8: Deno.version.v8,
-    platform: `${Deno.build.os}-${Deno.build.arch}`,
+    node: process.versions.node,
+    v8: process.versions.v8,
+    platform: `${(process.platform === 'win32' ? 'windows' : process.platform)}-${process.arch}`,
     vramGb,
     models: { root: modelsRoot, virtualization },
     ...diag,
@@ -111,7 +111,7 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
     io.stdout(JSON.stringify(report));
   } else {
     io.stdout(`SpriteBook ${SPRITEBOOK_VERSION}`);
-    io.stdout(`deno ${report.deno} - v8 ${report.v8} - ${report.platform}`);
+    io.stdout(`node ${report.node} - v8 ${report.v8} - ${report.platform}`);
     io.stdout(`vram: ${vramGb === null ? 'unknown (no nvidia-smi)' : `${vramGb} GiB detected`}`);
     io.stdout(
       `models root: ${modelsRoot ?? '(unresolvable - set SPRITEBOOK_MODELS_DIR)'}`,
@@ -124,7 +124,7 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
       );
     }
     io.stdout(`render pipeline ${diag.version}`);
-    io.stdout(`backend env: DENO_WEBGPU_BACKEND=${diag.backendEnv}`);
+    io.stdout(`backend env: SPRITEBOOK_GPU_BACKEND=${diag.backendEnv}`);
     if (!diag.available) {
       io.stdout('adapter: NONE - GPU rendering unavailable');
       for (const h of diag.hints ?? []) io.stdout(`  hint: ${h}`);

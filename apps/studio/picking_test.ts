@@ -1,10 +1,11 @@
+import { test } from 'node:test';
 /**
  * The viewport's pure parts. The mirror rule is CROSS-CHECKED against core's
  * own `sidePartner` — the GUI only previews which joint will move (core does
  * the mirroring from the edit's flag), and a preview that disagreed with the
  * verb would be a lie told confidently.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { sidePartner } from '@spritebook/rig';
 import {
   editsFile,
@@ -17,7 +18,7 @@ import {
 
 const J = (name: string, x: number, y: number, depth = 1): ScreenJoint => ({ name, x, y, depth });
 
-Deno.test('picking takes the nearest joint inside the radius, or nothing', () => {
+test('picking takes the nearest joint inside the radius, or nothing', () => {
   const joints = [J('hips', 100, 100), J('spine_01', 140, 100), J('head', 300, 300)];
   assertEquals(pickJoint(joints, 102, 101, 14), 'hips');
   assertEquals(pickJoint(joints, 138, 103, 14), 'spine_01');
@@ -26,14 +27,14 @@ Deno.test('picking takes the nearest joint inside the radius, or nothing', () =>
   assertEquals(pickJoint([], 0, 0, 14), null);
 });
 
-Deno.test('overlapping joints break the tie toward the nearer one', () => {
+test('overlapping joints break the tie toward the nearer one', () => {
   // the elbow in front of the shoulder at the same screen pixel
   const stacked = [J('shoulder_l', 100, 100, 5.0), J('elbow_l', 100, 100, 2.0)];
   assertEquals(pickJoint(stacked, 100, 100, 14), 'elbow_l');
   assertEquals(pickJoint([...stacked].reverse(), 100, 100, 14), 'elbow_l', 'order-independent');
 });
 
-Deno.test('the mirror rule IS core’s rule, pattern for pattern', () => {
+test('the mirror rule IS core’s rule, pattern for pattern', () => {
   const names = [
     'clavicle_l',
     'clavicle_r',
@@ -58,7 +59,7 @@ Deno.test('the mirror rule IS core’s rule, pattern for pattern', () => {
   assertEquals(mirrorPartner('spine_01'), null);
 });
 
-Deno.test('the edits file is exactly what `rig --edits` reads', () => {
+test('the edits file is exactly what `rig --edits` reads', () => {
   const edits: PendingEdit[] = [{ joint: 'clavicle_r', delta: [0.01, -0.02, 0], mirrored: true }];
   const doc = editsFile(edits);
   assertEquals(Object.keys(doc), ['edits'], 'no extra keys — the schema is strict');
@@ -68,7 +69,7 @@ Deno.test('the edits file is exactly what `rig --edits` reads', () => {
   assert(doc.edits !== edits, 'the caller keeps its array');
 });
 
-Deno.test('repeated nudges of one joint SUM into a single edit', () => {
+test('repeated nudges of one joint SUM into a single edit', () => {
   let edits: PendingEdit[] = [];
   edits = mergeEdits(edits, { joint: 'clavicle_r', delta: [0.01, 0, 0], mirrored: false });
   edits = mergeEdits(edits, { joint: 'clavicle_r', delta: [0.02, 0.01, 0], mirrored: true });

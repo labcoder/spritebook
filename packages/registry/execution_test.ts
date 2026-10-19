@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import { test } from 'node:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runCli } from '../cli/mod.ts';
+import { runCli } from '../cli/dist/mod.js';
 import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 import { fileURLToPath } from 'node:url';
 import { CharacterIdSchema, type ModelCatalog, type ProjectPins } from '@spritebook/schema';
@@ -17,7 +17,7 @@ import {
   verifyPackPin,
 } from './dist/execution.js';
 import { collect, installRig } from './_testutil.ts';
-import { runGenJob } from '../gen/gen.ts';
+import { runGenJob } from '../gen/dist/gen.js';
 import { readWorkspace } from '../core/workspace.ts';
 
 const pins: ProjectPins = {

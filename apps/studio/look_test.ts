@@ -1,10 +1,11 @@
+import { test } from 'node:test';
 /**
  * The Look stage's pure parts, pinned: resolution (preset under overrides)
  * matches what core's resolveCamera/resolveStyle would produce, the arg
  * builder emits only DIVERGENCE, and the staleness statement is all-or-none
  * because every frame key embeds the whole recipe.
  */
-import { assertEquals } from 'jsr:@std/assert@1';
+import { assertEquals } from '@std/assert';
 import {
   DIRECTION_CHOICES,
   ELEVATION_DETENTS,
@@ -40,12 +41,12 @@ const STYLES = [
   { id: 'clean', mode: 'painterly' },
 ];
 
-Deno.test('the detents are the ones core’s schema documents', () => {
+test('the detents are the ones core’s schema documents', () => {
   assertEquals(ELEVATION_DETENTS.map((d) => d.deg), [15, 26.565, 30, 35.264]);
   assertEquals([...DIRECTION_CHOICES], [2, 4, 8, 16]);
 });
 
-Deno.test('resolution is preset defaults UNDER recorded overrides', () => {
+test('resolution is preset defaults UNDER recorded overrides', () => {
   const plain = resolvedCamera(
     CAMERAS,
     { cameraPresetId: 'low-15', stylePresetId: 'pixel' },
@@ -74,7 +75,7 @@ Deno.test('resolution is preset defaults UNDER recorded overrides', () => {
   assertEquals(noLook.maxColors, 16, 'no look at all falls back to the default preset');
 });
 
-Deno.test('the twin carries ONLY divergence from the presets', () => {
+test('the twin carries ONLY divergence from the presets', () => {
   const base: LookDraft = {
     cameraPresetId: 'standard-30',
     stylePresetId: 'pixel',
@@ -110,7 +111,7 @@ Deno.test('the twin carries ONLY divergence from the presets', () => {
   );
 });
 
-Deno.test('staleness is all-or-none, and zero when nothing is baked', () => {
+test('staleness is all-or-none, and zero when nothing is baked', () => {
   const rec: LookDraft = {
     cameraPresetId: 'standard-30',
     stylePresetId: 'pixel',

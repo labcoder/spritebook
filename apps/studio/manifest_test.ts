@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * The gallery projection: any manifest the CLI would accept renders a card,
  * and a manifest it cannot project yields a card that SAYS so — the gallery
@@ -5,7 +7,7 @@
  * noticed, not hidden). Run against the REAL exit workspace when present, so
  * the projection is pinned to the manifest the pipeline actually writes.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { toCard } from './src/manifest.ts';
 
 // The manifest is a SNAPSHOT of the real exit workspace (fixtures/), taken
@@ -13,10 +15,8 @@ import { toCard } from './src/manifest.ts';
 // acceptance, and a new pick. The live workspace stopped being a fixture the
 // day it became the maintainer's playground - pinning against it meant every
 // UX session broke the suite.
-Deno.test('the real p3-exit manifest projects with every card field', async () => {
-  const raw = await Deno.readTextFile(
-    new URL('./fixtures/p3-exit-character.json', import.meta.url),
-  );
+test('the real p3-exit manifest projects with every card field', async () => {
+  const raw = await fs.readFile(new URL('./fixtures/p3-exit-character.json', import.meta.url), 'utf8');
   const c = toCard('bulma-fixed', JSON.parse(raw));
   assertEquals(c.id, 'bulma-fixed');
   assertEquals(
@@ -35,7 +35,7 @@ Deno.test('the real p3-exit manifest projects with every card field', async () =
   assert(typeof c.heightM === 'number');
 });
 
-Deno.test('a malformed manifest yields a labeled card, never a blank', () => {
+test('a malformed manifest yields a labeled card, never a blank', () => {
   for (const bad of [null, 42, 'nope', {}, { id: '' }, { id: 7 }]) {
     const c = toCard('some/dir', bad);
     assertEquals(c.dir, 'some/dir');
@@ -44,7 +44,7 @@ Deno.test('a malformed manifest yields a labeled card, never a blank', () => {
   }
 });
 
-Deno.test('partial manifests project what they have and nothing invented', () => {
+test('partial manifests project what they have and nothing invented', () => {
   const c = toCard('d', { id: 'sprout', displayName: 'Sprout' });
   assertEquals(c.problem, undefined);
   assertEquals(c.displayName, 'Sprout');

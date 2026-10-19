@@ -1,3 +1,8 @@
+import { promises as fs } from 'node:fs';
+import { after, before, test } from 'node:test';
+import { readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The CLI-twin parity acceptance (P4-T2).
  *
@@ -11,9 +16,9 @@
  * verbs (bake, export) are gated like every other render test; the other
  * eight run everywhere.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { tryGetGpu } from '../../packages/render/gpu.ts';
-import { runCli } from '../../packages/cli/mod.ts';
+import { assert, assertEquals } from '@std/assert';
+import { tryGetGpu } from '../../packages/render/dist/gpu.js';
+import { runCli } from '../../packages/cli/dist/mod.js';
 import {
   acceptRigArgs,
   animDisableArgs,
@@ -50,11 +55,11 @@ async function twin(args: string[], label: string): Promise<string[]> {
 }
 
 async function manifestOf(ws: string): Promise<Record<string, unknown>> {
-  return JSON.parse(await Deno.readTextFile(`${ws}/character.json`));
+  return JSON.parse(await fs.readFile(`${ws}/character.json`, 'utf8'));
 }
 
-Deno.test('CLI-twin parity: the GUI actions execute verbatim', async () => {
-  const tmp = await Deno.makeTempDir();
+test('CLI-twin parity: the GUI actions execute verbatim', async () => {
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const ws = `${tmp}/parity`;
   try {
     // 1. Generate model — the + tab's primary action, with a candidate ladder
@@ -196,16 +201,16 @@ Deno.test('CLI-twin parity: the GUI actions execute verbatim', async () => {
     assertEquals(code, 1);
     assert(o.out.join('\n').includes('no rig'), `named the reason: ${o.out.join('\n')}`);
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });
 
-Deno.test('CLI-twin parity: bake and export (GPU)', async () => {
+test('CLI-twin parity: bake and export (GPU)', async (t) => {
   if (!(await tryGetGpu())) {
     console.log('skip: no GPU adapter — the render twins need one');
     return;
   }
-  const tmp = await Deno.makeTempDir();
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const ws = `${tmp}/parity-gpu`;
   try {
     await twin(
@@ -225,7 +230,7 @@ Deno.test('CLI-twin parity: bake and export (GPU)', async () => {
     const bakeId = m.lastBakeId as string;
     assert(typeof bakeId === 'string', 'the bake recorded itself on the manifest');
     const bakeManifest = JSON.parse(
-      await Deno.readTextFile(`${ws}/bakes/bake-${bakeId}/manifest.json`),
+      await fs.readFile(`${ws}/bakes/bake-${bakeId}/manifest.json`, 'utf8'),
     );
     assert(bakeManifest.frames.length > 0, 'frames landed');
 
@@ -234,12 +239,25 @@ Deno.test('CLI-twin parity: bake and export (GPU)', async () => {
     await twin(exportArgs(ws, out, ['godot', 'strips']), 'export');
     // each target produced its folder, which is what the done state lists
     for (const target of ['godot', 'strips']) {
-      const stat = await Deno.stat(`${out}/${target}`);
-      assert(stat.isDirectory, `${target} produced a folder`);
+      const stat = await fs.stat(`${out}/${target}`);
+      assert(stat.isDirectory(), `${target} produced a folder`);
     }
-    const godot = [...Deno.readDirSync(`${out}/godot`)].map((e) => e.name);
+    const godot = [...readdirSync(`${out}/godot`, { withFileTypes: true })].map((e) => e.name);
     assert(godot.some((n) => n.endsWith('.tres')), `the Godot resource exists: ${godot}`);
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
+});
+
+const previousModelsRoot = process.env.SPRITEBOOK_MODELS_DIR;
+let modelsRoot: string;
+before(async () => {
+  modelsRoot = await fs.mkdtemp(join(tmpdir(), 'sb-parity-models-'));
+  process.env.SPRITEBOOK_MODELS_DIR = modelsRoot;
+  await twin(['models', 'install', 'fixture-gen'], 'install fixture');
+});
+after(async () => {
+  if (previousModelsRoot === undefined) delete process.env.SPRITEBOOK_MODELS_DIR;
+  else process.env.SPRITEBOOK_MODELS_DIR = previousModelsRoot;
+  if (modelsRoot) await fs.rm(modelsRoot, { recursive: true });
 });

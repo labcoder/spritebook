@@ -1,8 +1,12 @@
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { runCli } from './mod.ts';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assert, assertEquals } from '@std/assert';
+import { runCli } from './dist/mod.js';
 
-Deno.test('missing and repeated flag values refuse before touching workspaces', async () => {
-  const root = await Deno.makeTempDir();
+test('missing and repeated flag values refuse before touching workspaces', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     for (
       const flags of [
@@ -24,9 +28,9 @@ Deno.test('missing and repeated flag values refuse before touching workspaces', 
       assertEquals(lines.length, 1);
       assertEquals(JSON.parse(lines[0]).code, 'bad-args');
       assert(JSON.parse(lines[0]).message.includes('value'));
-      assertEquals(await Array.fromAsync(Deno.readDir(root)), []);
+      assertEquals(await Array.fromAsync(await fs.readdir(root, { withFileTypes: true })), []);
     }
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });

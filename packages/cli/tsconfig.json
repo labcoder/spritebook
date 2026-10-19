@@ -1,0 +1,49 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "../anim"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../export"
+    },
+    {
+      "path": "../gen"
+    },
+    {
+      "path": "../pack"
+    },
+    {
+      "path": "../registry"
+    },
+    {
+      "path": "../render"
+    },
+    {
+      "path": "../rig"
+    },
+    {
+      "path": "../schema"
+    },
+    {
+      "path": "../style"
+    }
+  ],
+  "include": [
+    "*.ts"
+  ],
+  "exclude": [
+    "*_test.ts",
+    "dist"
+  ]
+}

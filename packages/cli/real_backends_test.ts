@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The real-backend acceptance lane (W4e): gen -> rig track B -> preview ->
  * bake against the ACTUAL installed backends on this machine's GPU, asserting
@@ -6,16 +10,16 @@
  * joint naming, and the collapsed-pose bake invisible. This lane is the
  * anti-regression for that whole class: if the sheet is a smear, it fails.
  *
- * Gated twice, honestly: `ignore` without SPRITEBOOK_REAL_BACKENDS=1 (it
- * costs minutes of GPU), and a skip-with-a-sentence when the run permission
- * for the sidecar's uv is missing. Run it with `deno task test:real`.
+ * Gated twice, honestly: skipped without SPRITEBOOK_REAL_BACKENDS=1 (it
+ * costs minutes of GPU). An explicitly requested lane fails on missing prerequisites.
+ * Run it with `npm run test:real`.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { decode as decodePng } from 'fast-png';
 import { NodeIO } from '@gltf-transform/core';
-import { runCli } from './mod.ts';
+import { runCli } from './dist/mod.js';
 
-const WANTED = Deno.env.get('SPRITEBOOK_REAL_BACKENDS') === '1';
+const WANTED = process.env['SPRITEBOOK_REAL_BACKENDS'] === '1';
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
@@ -30,18 +34,8 @@ async function cli(args: string[]): Promise<{ code: number; out: string[] }> {
   return { code, out: o.out };
 }
 
-Deno.test({
-  name: 'real backends: gen -> rig B -> preview -> bake puts a character on the sheet',
-  ignore: !WANTED,
-  fn: async () => {
-    if ((await Deno.permissions.query({ name: 'run', command: 'uv' })).state !== 'granted') {
-      console.log(
-        'skip: SPRITEBOOK_REAL_BACKENDS=1 but this run cannot spawn uv - asserted NOTHING. ' +
-          'Use `deno task test:real`, which grants --allow-run.',
-      );
-      return;
-    }
-    const root = await Deno.makeTempDir({ prefix: 'sb-real-' });
+test('real backends: gen -> rig B -> preview -> bake puts a character on the sheet', { skip: !WANTED }, async () => {
+    const root = await fs.mkdtemp(join(tmpdir(), 'sb-real-'));
     const ws = `${root}/w`;
     try {
       // 1. REAL generation - one candidate, the reference image, a fixed
@@ -83,7 +77,7 @@ Deno.test({
 
       // the rescue's claim on a REAL prediction: every retarget-critical
       // joint is named (pelvis above all - the borderline one in the field)
-      const rigged = await new NodeIO().readBinary(await Deno.readFile(`${ws}/rig/rigged.glb`));
+      const rigged = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(`${ws}/rig/rigged.glb`)));
       const names = new Set(
         rigged.getRoot().listNodes().filter((n) => !n.getMesh()).map((n) => n.getName()),
       );
@@ -112,11 +106,11 @@ Deno.test({
       // character 10-30%. Exit codes said "done" both times; only this tells
       // them apart.
       const manifest = JSON.parse(
-        await Deno.readTextFile(`${ws}/character.json`),
+        await fs.readFile(`${ws}/character.json`, 'utf8'),
       ) as { lastBakeId?: string };
       assert(manifest.lastBakeId, 'the bake recorded itself');
       const bakeDir = `${ws}/bakes/bake-${manifest.lastBakeId}`;
-      const bakeManifest = JSON.parse(await Deno.readTextFile(`${bakeDir}/manifest.json`)) as {
+      const bakeManifest = JSON.parse(await fs.readFile(`${bakeDir}/manifest.json`, 'utf8')) as {
         flags: { code: string }[];
         frames: {
           clipId: string;
@@ -132,7 +126,7 @@ Deno.test({
       const cell = bakeManifest.frames.find((f) => f.clipId === 'idle-loop' && f.direction === 0);
       assert(cell, 'the manifest places idle-loop d0');
       const atlas = decodePng(
-        await Deno.readFile(`${bakeDir}/atlas_lit_${cell!.atlas.pageIndex}.png`),
+        new Uint8Array(await fs.readFile(`${bakeDir}/atlas_lit_${cell!.atlas.pageIndex}.png`)),
       );
       const data = atlas.data as Uint8Array;
       let on = 0;
@@ -154,7 +148,6 @@ Deno.test({
       );
       console.log(`real-backend lane: coverage ${(cov * 100).toFixed(1)}%, all stages green`);
     } finally {
-      await Deno.remove(root, { recursive: true }).catch(() => {});
+      await fs.rm(root, { recursive: true }).catch(() => {});
     }
-  },
 });

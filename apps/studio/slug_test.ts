@@ -1,10 +1,11 @@
+import { test } from 'node:test';
 /**
  * The slug preview vs core's CharacterIdSchema: the studio mirrors the rule
  * for live feedback, and this test CROSS-CHECKS every sample against the
  * real schema so the mirror can never drift silently. Runs under the root
  * Deno config, so @spritebook/schema resolves.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { CharacterIdSchema } from '@spritebook/schema';
 import { CHARACTER_ID_RE, slugify, slugProblem } from './src/slug.ts';
 
@@ -24,7 +25,7 @@ const NAMES = [
   '99 red balloons',
 ];
 
-Deno.test('every minted slug the preview calls valid IS valid to core', () => {
+test('every minted slug the preview calls valid IS valid to core', () => {
   for (const name of NAMES) {
     const slug = slugify(name);
     const preview = slugProblem(slug);
@@ -39,7 +40,7 @@ Deno.test('every minted slug the preview calls valid IS valid to core', () => {
   }
 });
 
-Deno.test('the mirrored regex IS the schema regex, character for character', () => {
+test('the mirrored regex IS the schema regex, character for character', () => {
   // the schema's error message quotes its regex — compare source to source,
   // so a core rule change fails HERE before it ships a lying preview
   const probe = CharacterIdSchema.safeParse('!');
@@ -51,7 +52,7 @@ Deno.test('the mirrored regex IS the schema regex, character for character', () 
   );
 });
 
-Deno.test('minting normalizes the way a user expects', () => {
+test('minting normalizes the way a user expects', () => {
   assertEquals(slugify('Bulma'), 'bulma');
   assertEquals(slugify('The  Mermaid!!'), 'the-mermaid');
   assertEquals(slugify("princess's dress"), 'princesss-dress');

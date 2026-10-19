@@ -1,18 +1,20 @@
-import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert@1';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
 import { CAMERA_PRESETS, ManifestJournal } from '@spritebook/core';
-import { bakeSpecFromFlags, mergeAnimationSet, mirroringFor, provenanceOf, runCli } from './mod.ts';
+import { bakeSpecFromFlags, mergeAnimationSet, mirroringFor, provenanceOf, runCli } from './dist/mod.js';
 
 const now = () => '2026-07-12T00:00:00Z';
 const target = { kind: 'character', id: 'brave-knight' } as const;
 
 /** Set up a manifest + journal on disk exactly as core writes them. */
 async function setupWorkspace(): Promise<{ manifest: string; original: string }> {
-  const dir = await Deno.makeTempDir({ prefix: 'sb-cli-' });
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-cli-'));
   const original = JSON.parse(
-    await Deno.readTextFile(
-      new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url),
-    ),
+    await fs.readFile(new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url), 'utf8'),
   );
   const originalBytes = canonicalJson(original);
   const journal = new ManifestJournal(original, { now });
@@ -29,8 +31,8 @@ async function setupWorkspace(): Promise<{ manifest: string; original: string }>
     }),
   ];
   const manifest = `${dir}/character.json`;
-  await Deno.writeTextFile(manifest, journal.canonicalBytes);
-  await Deno.writeTextFile(
+  await fs.writeFile(manifest, journal.canonicalBytes);
+  await fs.writeFile(
     `${manifest}.journal.ndjson`,
     patches.map((p) => canonicalJson(p)).join(''),
   );
@@ -47,9 +49,9 @@ function collector() {
   };
 }
 
-Deno.test('cli undo/redo restore and reapply patches; --json emits valid NDJSON', async () => {
+test('cli undo/redo restore and reapply patches; --json emits valid NDJSON', async () => {
   const { manifest, original } = await setupWorkspace();
-  const afterBoth = await Deno.readTextFile(manifest);
+  const afterBoth = await fs.readFile(manifest, 'utf8');
 
   // undo twice -> byte-identical original
   for (let i = 0; i < 2; i++) {
@@ -59,7 +61,7 @@ Deno.test('cli undo/redo restore and reapply patches; --json emits valid NDJSON'
     for (const line of c.out) parseWith(JobEventSchema, JSON.parse(line), 'cli NDJSON line');
     assertEquals(c.out.length, 4, 'queued, started, artifact, done');
   }
-  assertEquals(await Deno.readTextFile(manifest), original);
+  assertEquals(await fs.readFile(manifest, 'utf8'), original);
 
   // a third undo has nothing left - error event, exit 1
   const spent = collector();
@@ -73,7 +75,7 @@ Deno.test('cli undo/redo restore and reapply patches; --json emits valid NDJSON'
     const c = collector();
     assertEquals(await runCli(['redo', '--manifest', manifest, '--json'], c.io), 0);
   }
-  assertEquals(await Deno.readTextFile(manifest), afterBoth);
+  assertEquals(await fs.readFile(manifest, 'utf8'), afterBoth);
 });
 
 /**
@@ -83,11 +85,9 @@ Deno.test('cli undo/redo restore and reapply patches; --json emits valid NDJSON'
  * but any corrupt or hand-edited journal reaches the same write.
  */
 async function setupBadJournal(direction: 'undo' | 'redo') {
-  const dir = await Deno.makeTempDir({ prefix: 'sb-cli-bad-' });
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-cli-bad-'));
   const doc = JSON.parse(
-    await Deno.readTextFile(
-      new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url),
-    ),
+    await fs.readFile(new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url), 'utf8'),
   ) as Record<string, unknown>;
   const undoing = direction === 'undo';
   if (undoing) doc.displayName = 'Sir Bravery';
@@ -107,14 +107,14 @@ async function setupBadJournal(direction: 'undo' | 'redo') {
   const bytes = canonicalJson(doc);
   const cursor = `${manifest}.journal.cursor`;
   const at = undoing ? '1' : '0';
-  await Deno.writeTextFile(manifest, bytes);
-  await Deno.writeTextFile(`${manifest}.journal.ndjson`, canonicalJson(patch));
-  await Deno.writeTextFile(cursor, at);
+  await fs.writeFile(manifest, bytes);
+  await fs.writeFile(`${manifest}.journal.ndjson`, canonicalJson(patch));
+  await fs.writeFile(cursor, at);
   return { manifest, cursor, bytes, at };
 }
 
 for (const verb of ['undo', 'redo'] as const) {
-  Deno.test(`cli ${verb} refuses to write an invalid manifest, naming the file`, async () => {
+  test(`cli ${verb} refuses to write an invalid manifest, naming the file`, async () => {
     const w = await setupBadJournal(verb);
     const c = collector();
 
@@ -125,12 +125,12 @@ for (const verb of ['undo', 'redo'] as const) {
     assertEquals(event.code, 'invalid-manifest');
     assert(event.message.includes(w.manifest), `names the manifest: ${event.message}`);
     assert(event.message.includes('displayName'), `and what is wrong: ${event.message}`);
-    assertEquals(await Deno.readTextFile(w.manifest), w.bytes, 'the document is untouched');
-    assertEquals(await Deno.readTextFile(w.cursor), w.at, 'the cursor did not move');
+    assertEquals(await fs.readFile(w.manifest, 'utf8'), w.bytes, 'the document is untouched');
+    assertEquals(await fs.readFile(w.cursor, 'utf8'), w.at, 'the cursor did not move');
   });
 }
 
-Deno.test('cli without --json stays human-readable; unknown verbs fail actionably', async () => {
+test('cli without --json stays human-readable; unknown verbs fail actionably', async () => {
   const { manifest } = await setupWorkspace();
   const human = collector();
   assertEquals(await runCli(['undo', '--manifest', manifest], human.io), 0);
@@ -146,17 +146,15 @@ Deno.test('cli without --json stays human-readable; unknown verbs fail actionabl
   assert(missing.err[0].includes('--manifest'));
 });
 
-Deno.test('undo works on a workspace written by an older build', async () => {
+test('undo works on a workspace written by an older build', async () => {
   // Without the migration at readJournal, `undo` applies the inverse to a v2
   // document and manifestFault then refuses the RESULT for being v2 - a verb
   // whose entire promise is "put it back", failing on a document whose only
   // fault is being old.
-  const dir = await Deno.makeTempDir({ prefix: 'sb-cli-v2-' });
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-cli-v2-'));
   try {
     const v3 = JSON.parse(
-      await Deno.readTextFile(
-        new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url),
-      ),
+      await fs.readFile(new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url), 'utf8'),
     ) as Record<string, unknown>;
     // wind the fixture back to what a pre-D-029 build wrote
     const v2 = {
@@ -166,8 +164,8 @@ Deno.test('undo works on a workspace written by an older build', async () => {
       displayName: 'Sir Bravery',
     };
     const manifest = `${dir}/character.json`;
-    await Deno.writeTextFile(manifest, canonicalJson(v2));
-    await Deno.writeTextFile(
+    await fs.writeFile(manifest, canonicalJson(v2));
+    await fs.writeFile(
       `${manifest}.journal.ndjson`,
       canonicalJson({
         seq: 0,
@@ -178,20 +176,20 @@ Deno.test('undo works on a workspace written by an older build', async () => {
         label: 'Rename',
       }),
     );
-    await Deno.writeTextFile(`${manifest}.journal.cursor`, '1');
+    await fs.writeFile(`${manifest}.journal.cursor`, '1');
 
     const c = collector();
     assertEquals(await runCli(['undo', '--manifest', manifest, '--json'], c.io), 0, c.err.join(''));
-    const after = JSON.parse(await Deno.readTextFile(manifest));
+    const after = JSON.parse(await fs.readFile(manifest, 'utf8'));
     assertEquals(after.displayName, 'Brave Knight', 'the undo did what it said');
     assertEquals(after.schemaVersion, 3, 'and the write persisted the upgrade');
     assertEquals(after.preflight, undefined);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('bake --clips arg validation fails fast, before any GPU work', async () => {
+test('bake --clips arg validation fails fast, before any GPU work', async () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o', '--json'];
   const cases: Array<[string[], string]> = [
     // valueless --clips must NOT silently bake the legacy idle stub (review F9)
@@ -214,13 +212,15 @@ Deno.test('bake --clips arg validation fails fast, before any GPU work', async (
   }
 });
 
-Deno.test('--seed 0 is a seed, not a bad argument', async () => {
+test('--seed 0 is a seed, not a bad argument', async (t) => {
+  const workspace = await fs.mkdtemp(join(tmpdir(), 'sb-cli-args-'));
+  t.after(() => fs.rm(workspace, { recursive: true }));
   // Found by running `retexture --seed 0` for real: every verb taking a seed
   // ran it through the POSITIVE-integer helper, so 0 was refused as
   // "must be a positive integer" — while GenAdapterParamsSchema says
   // nonnegative() and the catalog's own default seed is literally 0. A user
   // reproducing a documented run could not type the seed it names.
-  const zero = ['retexture', '--workspace', 'nope', '--result', 'r1', '--seed', '0', '--json'];
+  const zero = ['retexture', '--workspace', workspace, '--result', 'r1', '--seed', '0', '--json'];
   const c = collector();
   await runCli(zero, c.io);
   const first = JSON.parse(c.out[c.out.length - 1]);
@@ -234,7 +234,7 @@ Deno.test('--seed 0 is a seed, not a bad argument', async () => {
   // is the parse and not a missing workspace.
   for (const bad of ['-1', '1.5']) {
     const c2 = collector();
-    const args = ['gen', '--workspace', 'nope', '--character', 'c', '--image', 'i.png', '--seed'];
+    const args = ['gen', '--workspace', workspace, '--character', 'c', '--image', 'i.png', '--seed'];
     assertEquals(await runCli([...args, bad, '--json'], c2.io), 1, bad);
     const e = JSON.parse(c2.out[c2.out.length - 1]);
     assertEquals(e.code, 'bad-args', bad);
@@ -242,7 +242,7 @@ Deno.test('--seed 0 is a seed, not a bad argument', async () => {
   }
 });
 
-Deno.test('mirroring: the flags beat the stored choice, which beats off', () => {
+test('mirroring: the flags beat the stored choice, which beats off', () => {
   const on = ['bake', '--mirror'];
   const off = ['bake', '--no-mirror'];
   const silent = ['bake'];
@@ -262,7 +262,7 @@ Deno.test('mirroring: the flags beat the stored choice, which beats off', () => 
   assertEquals(mirroringFor(off, false), false);
 });
 
-Deno.test('mirroring reaches the SPEC from the stored choice, not just the flag', () => {
+test('mirroring reaches the SPEC from the stored choice, not just the flag', () => {
   const base = ['bake'];
   const resolved = { model: 'm.glb', character: 'c', out: 'o' };
   assertEquals(bakeSpecFromFlags(base, { ...resolved, mirroring: true }).mirroring, true);
@@ -273,7 +273,7 @@ Deno.test('mirroring reaches the SPEC from the stored choice, not just the flag'
   assertEquals(bakeSpecFromFlags(base, resolved).mirroring, false);
 });
 
-Deno.test('--mirror and --no-mirror together are refused, not silently resolved', async () => {
+test('--mirror and --no-mirror together are refused, not silently resolved', async () => {
   const c = collector();
   const args = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o', '--json'];
   assertEquals(await runCli([...args, '--mirror', '--no-mirror'], c.io), 1);
@@ -282,7 +282,7 @@ Deno.test('--mirror and --no-mirror together are refused, not silently resolved'
   assert(e.message.includes('contradict'), e.message);
 });
 
-Deno.test('bake --mirror reaches the spec, so D-008 is reachable at all', () => {
+test('bake --mirror reaches the spec, so D-008 is reachable at all', () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
   const resolved = { model: 'm.glb', character: 'c', out: 'o' };
 
@@ -308,7 +308,7 @@ Deno.test('bake --mirror reaches the spec, so D-008 is reachable at all', () => 
 
 const RESOLVED = { model: 'm.glb', character: 'c', out: 'o' };
 
-Deno.test('flags and a stored look resolve to the SAME camera (D-029)', () => {
+test('flags and a stored look resolve to the SAME camera (D-029)', () => {
   // The whole reason one resolution path replaced two: the flag defaults used
   // to synthesize a camera whose id (`cli-e30x8`) named no preset anywhere, so
   // a look-driven bake and a flag-driven bake of identical geometry produced
@@ -330,7 +330,7 @@ Deno.test('flags and a stored look resolve to the SAME camera (D-029)', () => {
   assertEquals(viaFlags.id, 'standard-30', 'the id names a preset that resolves');
 });
 
-Deno.test('the bake defaults are the standard-30 preset, field for field', () => {
+test('the bake defaults are the standard-30 preset, field for field', () => {
   // The cross-check core/presets_test.ts points at. If either side moves alone,
   // a default bake silently changes framing.
   assertEquals(
@@ -340,7 +340,7 @@ Deno.test('the bake defaults are the standard-30 preset, field for field', () =>
   assertEquals(bakeSpecFromFlags(['bake'], RESOLVED).style.id, 'pixel');
 });
 
-Deno.test('an explicit flag beats the stored look; silence defers to it', () => {
+test('an explicit flag beats the stored look; silence defers to it', () => {
   const look = {
     cameraPresetId: 'isometric',
     cameraOverrides: { directions: 4 as const, paddingPx: 10 },
@@ -366,7 +366,7 @@ Deno.test('an explicit flag beats the stored look; silence defers to it', () => 
   assertEquals(overridden.style.id, 'painterly');
 });
 
-Deno.test('a default is not a decision: unspoken flags do not overwrite a look', () => {
+test('a default is not a decision: unspoken flags do not overwrite a look', () => {
   // `intFlag(args, 'cell', 64)` cannot tell "the user asked for 64" from
   // "nobody said anything". Folding defaults in would silently reset a
   // character's stored cell size on every bake that did not restate it.
@@ -383,7 +383,7 @@ Deno.test('a default is not a decision: unspoken flags do not overwrite a look',
   assertEquals(spec.camera.elevationDeg, 22);
 });
 
-Deno.test("a character's own clips drive the bake, disabled ones excepted", () => {
+test("a character's own clips drive the bake, disabled ones excepted", () => {
   const animationSet = [
     { clipId: 'walk-loop', packId: 'ual', enabled: true, frames: 6, speed: 1.5, holdLast: false },
     { clipId: 'idle-loop', packId: 'ual', enabled: false, frames: 4, speed: 1, holdLast: false },
@@ -410,7 +410,7 @@ Deno.test("a character's own clips drive the bake, disabled ones excepted", () =
   );
 });
 
-Deno.test('a bake merges its clips over the stored ones, deleting nothing', () => {
+test('a bake merges its clips over the stored ones, deleting nothing', () => {
   const stored = [
     { clipId: 'walk-loop', packId: 'ual', enabled: true, frames: 6, speed: 1, holdLast: false },
     { clipId: 'idle-loop', packId: 'ual', enabled: false, frames: 4, speed: 1, holdLast: false },
@@ -444,10 +444,10 @@ Deno.test('a bake merges its clips over the stored ones, deleting nothing', () =
   );
 });
 
-Deno.test('clips from another pack are refused, not resolved against this one', async () => {
+test('clips from another pack are refused, not resolved against this one', async () => {
   // The same clip id in a different pack is a different animation. Guessing
   // would render it, write it to the atlas, and report done.
-  const ws = await Deno.makeTempDir({ prefix: 'sb-pack-' });
+  const ws = await fs.mkdtemp(join(tmpdir(), 'sb-pack-'));
   try {
     const { createWorkspace, recordBake } = await import('@spritebook/core');
     await createWorkspace({
@@ -480,16 +480,16 @@ Deno.test('clips from another pack are refused, not resolved against this one', 
     assert(e.message.includes('mixamo-personal'), e.message);
     assert(e.message.includes('--pack'), 'and says how to fix it');
   } finally {
-    await Deno.remove(ws, { recursive: true });
+    await fs.rm(ws, { recursive: true });
   }
 });
 
-Deno.test("a workspace bake keys on the character's real rig and backend", async () => {
+test("a workspace bake keys on the character's real rig and backend", async () => {
   // The two facts a glb cannot state. Under the old sentinels a bake manifest
   // recorded `source-mesh@0` for a character a named backend actually made, so
   // its `inputs` block - the record "re-run exactly this" depends on - named
   // the wrong producer.
-  const ws = await Deno.makeTempDir({ prefix: 'sb-prov-' });
+  const ws = await fs.mkdtemp(join(tmpdir(), 'sb-prov-'));
   try {
     const { appendGenerationResult, createWorkspace, pickResult, setRigState } = await import(
       '@spritebook/core'
@@ -535,7 +535,7 @@ Deno.test("a workspace bake keys on the character's real rig and backend", async
     assertEquals(rigged?.rig?.jointCount, 52);
     assertEquals(rigged?.backend?.modelId, 'trellis2', 'and the backend came along');
   } finally {
-    await Deno.remove(ws, { recursive: true });
+    await fs.rm(ws, { recursive: true });
   }
 });
 
@@ -550,8 +550,8 @@ async function provenanceFor(ws: string) {
   }).provenance;
 }
 
-Deno.test('a look naming a preset that does not exist says which one, and where from', async () => {
-  const ws = await Deno.makeTempDir({ prefix: 'sb-look-' });
+test('a look naming a preset that does not exist says which one, and where from', async () => {
+  const ws = await fs.mkdtemp(join(tmpdir(), 'sb-look-'));
   try {
     const { createWorkspace, recordBake } = await import('@spritebook/core');
     await createWorkspace({
@@ -575,11 +575,11 @@ Deno.test('a look naming a preset that does not exist says which one, and where 
     assert(e.message.includes("from the character's look"), e.message);
     assert(e.message.includes('standard-30'), 'names what it could have been');
   } finally {
-    await Deno.remove(ws, { recursive: true });
+    await fs.rm(ws, { recursive: true });
   }
 });
 
-Deno.test('an unsupported flag is an error event, never silent success', async () => {
+test('an unsupported flag is an error event, never silent success', async () => {
   const bake = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
   const cases: Array<[string[], string]> = [
     // THE defect: --mirror was unsupported, so this ran a full unmirrored bake
@@ -611,7 +611,7 @@ Deno.test('an unsupported flag is an error event, never silent success', async (
   assert(JSON.parse(listed.out[0]).message.includes('--mirror'), 'names the real flag');
 });
 
-Deno.test('flag checking does not fire on flags the verbs legitimately take', async () => {
+test('flag checking does not fire on flags the verbs legitimately take', async () => {
   // the guard must not become a second place where a real flag goes missing:
   // every flag reaching a real code path has to survive the gate
   const ok: string[][] = [
@@ -639,7 +639,7 @@ Deno.test('flag checking does not fire on flags the verbs legitimately take', as
   assert(proto.err[0].includes('Unknown verb'), proto.err[0]);
 });
 
-Deno.test('anim --list finds the bundled pack; --tag filters; --json is one document', async () => {
+test('anim --list finds the bundled pack; --tag filters; --json is one document', async () => {
   const c = collector();
   assertEquals(await runCli(['anim', '--list', '--tag', 'walk', '--json'], c.io), 0);
   assertEquals(c.out.length, 1, 'one JSON document');
@@ -661,8 +661,10 @@ Deno.test('anim --list finds the bundled pack; --tag filters; --json is one docu
   assert(err.message.includes('no-such-root'), 'names the offending root');
 });
 
-Deno.test('gen --adjust refuses seed and prototype keys', async () => {
-  const base = ['gen', '--character', 'hero', '--workspace', 'ws', '--image', 'i.png', '--json'];
+test('gen --adjust refuses seed and prototype keys', async (t) => {
+  const workspace = await fs.mkdtemp(join(tmpdir(), 'sb-cli-args-'));
+  t.after(() => fs.rm(workspace, { recursive: true }));
+  const base = ['gen', '--character', 'hero', '--workspace', workspace, '--image', 'i.png', '--json'];
   for (
     const [args, needle] of [
       // --adjust seed=N would be silently overridden by the hoisted seed, and
@@ -680,14 +682,14 @@ Deno.test('gen --adjust refuses seed and prototype keys', async () => {
   }
 });
 
-Deno.test('rig --accept records the review; undo takes it back', async () => {
+test('rig --accept records the review; undo takes it back', async () => {
   // The missing half of the deform gate: both rig tracks write accepted:false
   // ("theirs to set") and bake warns while it stays false. This is the verb
   // that sets it - ONE journaled patch, so the decision undoes like any other.
   const { createWorkspace, readWorkspace, setRigState, workspacePaths } = await import(
     '@spritebook/core'
   );
-  const raw = await Deno.makeTempDir({ prefix: 'sb-accept-' });
+  const raw = await fs.mkdtemp(join(tmpdir(), 'sb-accept-'));
   const dir = raw.replaceAll('\\', '/');
   const rig = {
     track: 'B' as const,
@@ -726,7 +728,7 @@ Deno.test('rig --accept records the review; undo takes it back', async () => {
 
     await setRigState(dir, rig, { now: () => '2026-07-12T00:00:00Z' });
     const journalBefore =
-      (await Deno.readTextFile(workspacePaths(dir).journal)).trim().split('\n').length;
+      (await fs.readFile(workspacePaths(dir).journal, 'utf8')).trim().split('\n').length;
 
     const ok = await run(['rig', '--workspace', dir, '--accept', '--json']);
     assertEquals(ok.code, 0, ok.err.join('\n'));
@@ -734,7 +736,7 @@ Deno.test('rig --accept records the review; undo takes it back', async () => {
     assertEquals((await readWorkspace(dir)).rig!.accepted, true);
     // exactly ONE patch, so exactly one undo owns the decision
     const journalAfter =
-      (await Deno.readTextFile(workspacePaths(dir).journal)).trim().split('\n').length;
+      (await fs.readFile(workspacePaths(dir).journal, 'utf8')).trim().split('\n').length;
     assertEquals(journalAfter, journalBefore + 1);
 
     // idempotence is a refusal, not a silent success
@@ -753,11 +755,11 @@ Deno.test('rig --accept records the review; undo takes it back', async () => {
     assertEquals(un.code, 0, un.err.join('\n'));
     assertEquals((await readWorkspace(dir)).rig!.accepted, false);
   } finally {
-    await Deno.remove(raw, { recursive: true });
+    await fs.rm(raw, { recursive: true });
   }
 });
 
-Deno.test('rig --auto-hints refuses honestly before any GPU work', async () => {
+test('rig --auto-hints refuses honestly before any GPU work', async () => {
   const run = async (argv: string[]) => {
     const out: string[] = [];
     const err: string[] = [];
@@ -768,7 +770,7 @@ Deno.test('rig --auto-hints refuses honestly before any GPU work', async () => {
     });
     return { code, out, err: err.join('NEWLINE') };
   };
-  const empty = (await Deno.makeTempDir({ prefix: 'sb-ah-' })).replaceAll('\\', '/');
+  const empty = (await fs.mkdtemp(join(tmpdir(), 'sb-ah-'))).replaceAll('\\', '/');
   try {
     // two sources of truth for one joint is a contradiction, not a merge
     const both = await run([
@@ -789,7 +791,7 @@ Deno.test('rig --auto-hints refuses honestly before any GPU work', async () => {
     assert(bare.err.includes('deform-report.json'), bare.err);
     assert(bare.err.includes('rig` once first') || bare.err.includes('once first'), bare.err);
   } finally {
-    await Deno.remove(empty, { recursive: true });
+    await fs.rm(empty, { recursive: true });
   }
 });
 
@@ -797,7 +799,7 @@ Deno.test('rig --auto-hints refuses honestly before any GPU work', async () => {
 // Output controls: cell size, world scale, palette size (D-029 look)
 // ---------------------------------------------------------------------------
 
-Deno.test('--colors sets the palette size, and only the palette size', () => {
+test('--colors sets the palette size, and only the palette size', () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
   const resolved = { model: 'm.glb', character: 'c', out: 'o' };
 
@@ -821,7 +823,7 @@ Deno.test('--colors sets the palette size, and only the palette size', () => {
   assertEquals(wide.id, 'pixel', 'the preset it refines is still named');
 });
 
-Deno.test('--colors refines what the CHARACTER stored, not the bare preset', () => {
+test('--colors refines what the CHARACTER stored, not the bare preset', () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
   // a character that already chose no dithering
   const resolved = {
@@ -850,7 +852,7 @@ Deno.test('--colors refines what the CHARACTER stored, not the bare preset', () 
   );
 });
 
-Deno.test('--colors outside the schema bound names the flag, not a nested path', () => {
+test('--colors outside the schema bound names the flag, not a nested path', () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
   const resolved = { model: 'm.glb', character: 'c', out: 'o' };
   for (const n of ['1', '257']) {
@@ -865,7 +867,7 @@ Deno.test('--colors outside the schema bound names the flag, not a nested path',
   }
 });
 
-Deno.test('--cell takes WxH, because cellPx always had two numbers', () => {
+test('--cell takes WxH, because cellPx always had two numbers', () => {
   const base = ['bake', '--model', 'm.glb', '--character', 'c', '--out', 'o'];
   const resolved = { model: 'm.glb', character: 'c', out: 'o' };
 
@@ -907,7 +909,7 @@ Deno.test('--cell takes WxH, because cellPx always had two numbers', () => {
   }
 });
 
-Deno.test('the palette size reaches the CACHE KEY, so two sizes cannot collide', () => {
+test('the palette size reaches the CACHE KEY, so two sizes cannot collide', () => {
   // `stylePresetHash` is sha256(canonicalJson(spec.style)) — the whole resolved
   // style, so `quantize.maxColors` is in it by construction. Pinned anyway,
   // because the flag is new and the property it needs is not "the hash exists"

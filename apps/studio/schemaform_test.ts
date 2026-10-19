@@ -1,17 +1,17 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * The D-009 form derivation, pinned against the REAL catalog: trellis2's
  * gen3d schema must yield renderable fields with the shipped defaults
  * resolved through the operation overlay, and only DIVERGENCE travels as
  * --adjust. A catalog change that breaks the form fails here first.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { adjustArg, resolveOpDefaults, schemaFields } from './src/schemaform.ts';
 
-Deno.test('trellis2 gen3d: real schema -> renderable fields with shipped defaults', async () => {
+test('trellis2 gen3d: real schema -> renderable fields with shipped defaults', async () => {
   const catalog = JSON.parse(
-    await Deno.readTextFile(
-      new URL('../../packages/registry/catalog/models.json', import.meta.url),
-    ),
+    await fs.readFile(new URL('../../packages/registry/catalog/models.json', import.meta.url), 'utf8'),
   );
   const t2 = catalog.models.find((m: { id: string }) => m.id === 'trellis2-4b');
   const v = t2.versions[0];
@@ -29,7 +29,7 @@ Deno.test('trellis2 gen3d: real schema -> renderable fields with shipped default
   assertEquals(steps.defaultValue, 12);
 });
 
-Deno.test('only divergence travels: --adjust is empty at pure defaults', () => {
+test('only divergence travels: --adjust is empty at pure defaults', () => {
   const resolved = { steps: 12, guidanceStrength: 7.5, pipelineType: '512' };
   assertEquals(adjustArg({}, resolved), null);
   assertEquals(adjustArg({ steps: 12 }, resolved), null, 'explicit default is still default');
@@ -41,14 +41,12 @@ Deno.test('only divergence travels: --adjust is empty at pure defaults', () => {
   assertEquals(adjustArg({ steps: undefined }, resolved), null, 'cleared field does not travel');
 });
 
-Deno.test('the gen form never offers a knob only retexture accepts', async () => {
+test('the gen form never offers a knob only retexture accepts', async () => {
   // Where the field report started: the form rendered the UNION of trellis2's
   // two operations, so `resolution` was an editable option on a GENERATE
   // screen — and the CLI then refused it. The form asks for gen3d's set now.
   const catalog = JSON.parse(
-    await Deno.readTextFile(
-      new URL('../../packages/registry/catalog/models.json', import.meta.url),
-    ),
+    await fs.readFile(new URL('../../packages/registry/catalog/models.json', import.meta.url), 'utf8'),
   );
   const v = catalog.models.find((m: { id: string }) => m.id === 'trellis2-4b').versions[0];
   const resolved = resolveOpDefaults(v.defaults, v.operationDefaults, 'gen3d');
@@ -63,12 +61,12 @@ Deno.test('the gen form never offers a knob only retexture accepts', async () =>
   }
 });
 
-Deno.test('an absent knob set leaves every field, for single-operation backends', () => {
+test('an absent knob set leaves every field, for single-operation backends', () => {
   const fields = schemaFields({ properties: { a: { type: 'integer' } } }, {}, undefined);
   assertEquals(fields.map((f) => f.key), ['a']);
 });
 
-Deno.test('unknown schema shapes degrade to labeled rows, never wrong widgets', () => {
+test('unknown schema shapes degrade to labeled rows, never wrong widgets', () => {
   const fields = schemaFields(
     { properties: { weird: { type: 'array' }, plain: { type: 'boolean' } } },
     { weird: [1], plain: true },

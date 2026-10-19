@@ -1,12 +1,13 @@
+import { test } from 'node:test';
 /**
  * The Anim stage's two pure pieces: the binding spec builder speaks the
  * bake/enable grammar exactly (round-trips through core's parser shape), and
  * the frames math is the design doc's own arithmetic.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { bindingSpec, framesMath } from './src/bindings.ts';
 
-Deno.test('bindingSpec speaks clip:frames[@speed][!hold] exactly', () => {
+test('bindingSpec speaks clip:frames[@speed][!hold] exactly', () => {
   assertEquals(
     bindingSpec({ clipId: 'idle-loop', frames: 6, speed: 1, holdLast: false }),
     'idle-loop:6',
@@ -40,7 +41,7 @@ Deno.test('bindingSpec speaks clip:frames[@speed][!hold] exactly', () => {
   }
 });
 
-Deno.test('the frames math is the design doc arithmetic (3 clips x 8 dir x O7 = 168)', () => {
+test('the frames math is the design doc arithmetic (3 clips x 8 dir x O7 = 168)', () => {
   const m = framesMath([
     { clipId: 'a', enabled: true, frames: 6, speed: 1, holdLast: false },
     { clipId: 'b', enabled: true, frames: 8, speed: 1, holdLast: false },

@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * `look` (P4-T2): the look as a DECISION, separated from the bake that runs
  * it. --list serves the real preset rosters (a GUI renders cards from these,
@@ -5,9 +9,9 @@
  * refuses illegal combinations BEFORE writing, states the cost from the real
  * bake artifact, and journals one patch so undo takes it back.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { createWorkspace } from '@spritebook/core';
-import { runCli } from './mod.ts';
+import { runCli } from './dist/mod.js';
 
 function io() {
   const out: string[] = [];
@@ -15,7 +19,7 @@ function io() {
 }
 
 async function ws(): Promise<{ dir: string; tmp: string }> {
-  const tmp = await Deno.makeTempDir();
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const dir = `${tmp}/sprout`;
   await createWorkspace({
     workspace: dir,
@@ -26,7 +30,7 @@ async function ws(): Promise<{ dir: string; tmp: string }> {
   return { dir, tmp };
 }
 
-Deno.test('--list serves the real rosters with the knobs a picker needs', async () => {
+test('--list serves the real rosters with the knobs a picker needs', async () => {
   const o = io();
   assertEquals(await runCli(['look', '--list', '--json'], o), 0);
   const doc = JSON.parse(o.out.at(-1)!);
@@ -43,7 +47,7 @@ Deno.test('--list serves the real rosters with the knobs a picker needs', async 
   assertEquals(clean.outlineWidthPx, undefined);
 });
 
-Deno.test('recording merges like the bake, and one undo takes it back', async () => {
+test('recording merges like the bake, and one undo takes it back', async () => {
   const { dir, tmp } = await ws();
   try {
     const o = io();
@@ -64,15 +68,15 @@ Deno.test('recording merges like the bake, and one undo takes it back', async ()
     assertEquals(JSON.parse(o2.out.at(-1)!).staleFrames, 0);
 
     assertEquals(await runCli(['undo', '--manifest', `${dir}/character.json`], io()), 0);
-    const manifest = JSON.parse(await Deno.readTextFile(`${dir}/character.json`));
+    const manifest = JSON.parse(await fs.readFile(`${dir}/character.json`, 'utf8'));
     assertEquals(manifest.look.cameraOverrides, undefined, 'the elevation decision is undone');
     assertEquals(manifest.look.stylePresetId, 'pixel', 'and the one before it survives');
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });
 
-Deno.test('an illegal look is refused BEFORE it reaches the manifest', async () => {
+test('an illegal look is refused BEFORE it reaches the manifest', async () => {
   const { dir, tmp } = await ws();
   try {
     // 5 is not a legal direction count (2|4|8|16)
@@ -88,14 +92,14 @@ Deno.test('an illegal look is refused BEFORE it reaches the manifest', async () 
     );
     assert(o2.out.join('\n').includes('does not quantize'), 'and names why');
 
-    const manifest = JSON.parse(await Deno.readTextFile(`${dir}/character.json`));
+    const manifest = JSON.parse(await fs.readFile(`${dir}/character.json`, 'utf8'));
     assertEquals(manifest.look, undefined, 'nothing illegal was recorded');
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });
 
-Deno.test('--outline sets the width, and refuses a style that draws none', async () => {
+test('--outline sets the width, and refuses a style that draws none', async () => {
   const { dir, tmp } = await ws();
   try {
     const o = io();
@@ -115,6 +119,6 @@ Deno.test('--outline sets the width, and refuses a style that draws none', async
     );
     assert(o2.out.join('\n').includes('draws no outline'));
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });

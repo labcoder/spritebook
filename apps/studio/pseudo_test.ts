@@ -1,11 +1,12 @@
+import { test } from 'node:test';
 /**
  * Hard commitment 3's number, held: the pseudo locale expands EVERY string
  * by at least 40%, visibly bracketed so truncation is unmissable.
  */
-import { assert } from 'jsr:@std/assert@1';
+import { assert } from '@std/assert';
 import { pseudoExpand } from './src/pseudo.ts';
 
-Deno.test('every string grows >= 40% and is bracketed', () => {
+test('every string grows >= 40% and is bracketed', () => {
   const samples = [
     'Gallery',
     'Run health exam',
@@ -26,7 +27,7 @@ Deno.test('every string grows >= 40% and is bracketed', () => {
   }
 });
 
-Deno.test('accents land, so non-ASCII rendering problems surface in dev', () => {
+test('accents land, so non-ASCII rendering problems surface in dev', () => {
   const p = pseudoExpand('bake sheet');
   assert(/[áéíóúýñç]/i.test(p), `accented: ${p}`);
 });

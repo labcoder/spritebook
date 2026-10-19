@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The batch surface (P4-T3): `bake --all`, and the plan it refuses to run
  * without.
@@ -89,7 +90,7 @@ async function recordedInputs(
   if (entry.lastBakeId === undefined) return null;
   const dir = `${workspacePaths(workspace).bakesDir}/bake-${entry.lastBakeId}`;
   try {
-    const doc = JSON.parse(await Deno.readTextFile(`${dir}/manifest.json`));
+    const doc = JSON.parse(await fs.readFile(`${dir}/manifest.json`, 'utf8'));
     return parseWith(BakeManifestSchema, doc, 'BakeManifest').inputs;
   } catch {
     return null; // gone or unreadable — never-baked is the safe reading
@@ -278,8 +279,8 @@ export function summariseWarnings(
 export async function writeReport(report: BatchReport): Promise<string> {
   const path = `${report.root}/${BATCH_REPORT_FILE}`;
   const tmp = `${path}.tmp`;
-  await Deno.writeTextFile(tmp, canonicalJson(report));
-  await Deno.rename(tmp, path);
+  await fs.writeFile(tmp, canonicalJson(report));
+  await fs.rename(tmp, path);
   return path;
 }
 
@@ -306,8 +307,8 @@ export function formatWarnings(warnings: BatchWarning[], total: number): string[
 export async function writePlan(plan: BakePlan): Promise<string> {
   const path = `${plan.root}/${PLAN_FILE}`;
   const tmp = `${path}.tmp`;
-  await Deno.writeTextFile(tmp, canonicalJson(plan));
-  await Deno.rename(tmp, path);
+  await fs.writeFile(tmp, canonicalJson(plan));
+  await fs.rename(tmp, path);
   return path;
 }
 

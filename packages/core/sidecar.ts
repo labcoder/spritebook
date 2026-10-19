@@ -169,8 +169,8 @@ export async function* runSidecarJob(
       }
     }
   } finally {
+    await reader.cancel().catch(() => {});
     reader.releaseLock();
-    await res.body.cancel().catch(() => {});
   }
   if (!terminal) {
     // stream ended without done|error — the sidecar died under the job

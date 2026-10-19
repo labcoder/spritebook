@@ -1,11 +1,12 @@
+import { test } from 'node:test';
 /**
  * doctor is honest on BOTH kinds of machine: with an adapter it reports the
  * render signature + a passing probe and exits 0; without one it reports
  * unavailability + hints and exits 1 (never a silent green).
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { runDoctor } from './doctor.ts';
-import { SPRITEBOOK_VERSION } from './version.ts';
+import { assert, assertEquals } from '@std/assert';
+import { runDoctor } from './dist/doctor.js';
+import { SPRITEBOOK_VERSION } from './dist/version.js';
 
 function io() {
   const out: string[] = [];
@@ -17,15 +18,15 @@ function io() {
   };
 }
 
-Deno.test('--version prints the single-source version and exits 0', async () => {
-  const { runCli } = await import('./mod.ts');
+test('--version prints the single-source version and exits 0', async () => {
+  const { runCli } = await import('./dist/mod.js');
   const { out, io: cliIo } = io();
   const code = await runCli(['--version'], cliIo);
   assertEquals(code, 0);
   assertEquals(out, [`spritebook ${SPRITEBOOK_VERSION}`]);
 });
 
-Deno.test('doctor: human output matches the machine it runs on', async () => {
+test('doctor: human output matches the machine it runs on', async () => {
   const { out, io: cliIo } = io();
   const code = await runDoctor([], cliIo);
   const text = out.join('\n');
@@ -42,7 +43,7 @@ Deno.test('doctor: human output matches the machine it runs on', async () => {
   }
 });
 
-Deno.test('doctor --json: one parseable document with the same verdict', async () => {
+test('doctor --json: one parseable document with the same verdict', async () => {
   const { out, io: cliIo } = io();
   const code = await runDoctor(['--json'], cliIo);
   assertEquals(out.length, 1, 'exactly one JSON line');

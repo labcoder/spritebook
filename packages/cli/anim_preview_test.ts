@@ -1,12 +1,16 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * `anim --preview` (D-038): the clip's motion before any bake, through the
  * bake's own retarget path. Pinned on the fixture pipeline end to end - the
  * glb must carry the named animation with real channels and the clip's own
  * duration, on the skinned character.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { NodeIO } from '@gltf-transform/core';
-import { runCli } from './mod.ts';
+import { runCli } from './dist/mod.js';
 
 function io() {
   const out: string[] = [];
@@ -22,14 +26,17 @@ const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const BODY = `${REPO}packages/rig/bodies/ubc-male`;
 
-Deno.test('anim --preview writes the retargeted clip onto the rigged character', async () => {
-  const root = await Deno.makeTempDir({ prefix: 'sb-preview-' });
+test('anim --preview writes the retargeted clip onto the rigged character', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'sb-preview-'));
   const ws = `${root}/w`;
   try {
     for (
       const args of [
+        ['models', 'install', 'fixture-gen', '--models-dir', `${root}/models`],
         [
           'gen',
+          '--models-dir',
+          `${root}/models`,
           '--workspace',
           ws,
           '--character',
@@ -64,7 +71,7 @@ Deno.test('anim --preview writes the retargeted clip onto the rigged character',
     assertEquals(r.code, 0, r.out.slice(-4).join('\n'));
 
     const glbPath = `${ws}/anim/preview-idle-loop.glb`;
-    const doc = await new NodeIO().readBinary(await Deno.readFile(glbPath));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(glbPath)));
     const anim = doc.getRoot().listAnimations().find((a) => a.getName() === 'idle-loop');
     assert(anim, 'the animation carries the clip id');
     const channels = anim.listChannels();
@@ -80,7 +87,7 @@ Deno.test('anim --preview writes the retargeted clip onto the rigged character',
     // mixed-type buffers defeat the studio viewport's WebGPU vertex formats
     // (the 'unorm32x4' empty canvas), so a per-attribute bufferView may
     // stride at most one element (float32 VEC4 = 16 bytes)
-    const glbBytes = await Deno.readFile(glbPath);
+    const glbBytes = new Uint8Array(await fs.readFile(glbPath));
     const dv = new DataView(glbBytes.buffer, glbBytes.byteOffset);
     const jsonLen = dv.getUint32(12, true);
     const gjson = JSON.parse(new TextDecoder().decode(glbBytes.subarray(20, 20 + jsonLen)));
@@ -95,17 +102,17 @@ Deno.test('anim --preview writes the retargeted clip onto the rigged character',
     const again = await cli(['anim', '--preview', 'idle-loop', '--workspace', ws]);
     assertEquals(again.code, 0);
   } finally {
-    await Deno.remove(root, { recursive: true }).catch(() => {});
+    await fs.rm(root, { recursive: true }).catch(() => {});
   }
 });
 
-Deno.test('anim --preview refuses honestly without a canonical mesh', async () => {
-  const root = await Deno.makeTempDir({ prefix: 'sb-preview-' });
+test('anim --preview refuses honestly without a canonical mesh', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'sb-preview-'));
   try {
     const r = await cli(['anim', '--preview', 'idle-loop', '--workspace', `${root}/empty`]);
     assert(r.code !== 0);
     assert(r.out.join('\n').includes('no canonical mesh'), 'names the missing prerequisite');
   } finally {
-    await Deno.remove(root, { recursive: true }).catch(() => {});
+    await fs.rm(root, { recursive: true }).catch(() => {});
   }
 });

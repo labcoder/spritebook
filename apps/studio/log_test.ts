@@ -1,12 +1,13 @@
+import { test } from 'node:test';
 /**
  * The session log's contract: severity is DERIVED from the line (JobEvent
  * `t`, or a doctor-style `error` field), never rewritten; the store caps as
  * a tail; the unseen-error badge counts until the drawer is opened.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { LOG_CAP, LogStore, severityOf } from './src/log.ts';
 
-Deno.test('severity: JobEvent t wins; doctor error field is an error; junk is info', () => {
+test('severity: JobEvent t wins; doctor error field is an error; junk is info', () => {
   assertEquals(severityOf(JSON.stringify({ t: 'error', code: 'x' })), 'error');
   assertEquals(severityOf(JSON.stringify({ t: 'warn', code: 'x' })), 'warn');
   assertEquals(severityOf(JSON.stringify({ t: 'progress' })), 'info');
@@ -17,7 +18,7 @@ Deno.test('severity: JobEvent t wins; doctor error field is an error; junk is in
   assertEquals(severityOf('42'), 'info');
 });
 
-Deno.test('the store is a tail: the cap drops the OLDEST lines', () => {
+test('the store is a tail: the cap drops the OLDEST lines', () => {
   const s = new LogStore();
   for (let i = 0; i < LOG_CAP + 10; i++) s.append('job', `line ${i}`);
   const { lines } = s.snapshot();
@@ -26,7 +27,7 @@ Deno.test('the store is a tail: the cap drops the OLDEST lines', () => {
   assertEquals(lines.at(-1)!.line, `line ${LOG_CAP + 9}`);
 });
 
-Deno.test('the badge counts errors until seen, then starts over', () => {
+test('the badge counts errors until seen, then starts over', () => {
   const s = new LogStore();
   s.append('a', JSON.stringify({ t: 'error' }));
   s.append('a', 'plain line');
@@ -38,7 +39,7 @@ Deno.test('the badge counts errors until seen, then starts over', () => {
   assertEquals(s.snapshot().unseenErrors, 1);
 });
 
-Deno.test('subscribers fire per append and the snapshot is stable between them', () => {
+test('subscribers fire per append and the snapshot is stable between them', () => {
   const s = new LogStore();
   let fired = 0;
   const un = s.subscribe(() => fired++);
@@ -51,7 +52,7 @@ Deno.test('subscribers fire per append and the snapshot is stable between them',
   assertEquals(fired, 1, 'unsubscribed');
 });
 
-Deno.test('stderr stays verbatim, separate from stdout, and contributes to the error badge', () => {
+test('stderr stays verbatim, separate from stdout, and contributes to the error badge', () => {
   const s = new LogStore();
   const raw = 'Traceback: worker process crashed';
   s.append('job', '{"t":"progress"}', 1);

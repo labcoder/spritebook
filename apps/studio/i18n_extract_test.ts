@@ -1,13 +1,14 @@
+import { test } from 'node:test';
 /**
  * The extraction gate: every t() callsite is a literal the extractor can
  * see, and the es catalog covers 100% of extracted ids. A new string without
  * a translation fails HERE, not in front of a Spanish-speaking user.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { extractFromDir, extractIds, nonLiteralCallsites } from './i18n_extract.ts';
 import { es } from './src/locales/es.ts';
 
-Deno.test('extractIds sees literals, escapes, and nothing in comments', () => {
+test('extractIds sees literals, escapes, and nothing in comments', () => {
   const src = `
     // a comment mentioning t() and t(variable) never counts
     /* t('also not this') */
@@ -18,13 +19,13 @@ Deno.test('extractIds sees literals, escapes, and nothing in comments', () => {
   assertEquals(nonLiteralCallsites(src), []);
 });
 
-Deno.test('non-literal callsites are named as defects', () => {
+test('non-literal callsites are named as defects', () => {
   const bad = nonLiteralCallsites(`const x = t(label);`);
   assertEquals(bad.length, 1);
   assert(bad[0]!.startsWith('label'));
 });
 
-Deno.test('src/ has zero non-literal callsites and es covers every id', async () => {
+test('src/ has zero non-literal callsites and es covers every id', async () => {
   const { ids, bad } = await extractFromDir(new URL('./src/', import.meta.url));
   assertEquals(bad, [], 'every t() takes a literal');
   assert(ids.size >= 80, `the chrome has real string mass (${ids.size})`);
@@ -36,7 +37,7 @@ Deno.test('src/ has zero non-literal callsites and es covers every id', async ()
   );
 });
 
-Deno.test('es translates, not parrots: most entries differ from their ids', () => {
+test('es translates, not parrots: most entries differ from their ids', () => {
   // loanwords (bake, rig, ok) legitimately match; the catalog as a whole must
   // not be a copy of the ids, which is what a lazy fill would produce
   const entries = Object.entries(es);

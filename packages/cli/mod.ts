@@ -1,3 +1,6 @@
+import { appendFileSync } from 'node:fs';
+import { resourcePath } from '@spritebook/core';
+import { promises as fs } from 'node:fs';
 /**
  * @spritebook/cli - verb surface. P1-T3 landed `undo`/`redo`; P2-T3 lands
  * `bake` (canonical glb -> bake dir via render->style->pack) and `export`
@@ -1179,7 +1182,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
   const sink = (line: string) => {
     if (!logPath || sinkBroken) return;
     try {
-      Deno.writeTextFileSync(logPath, line + '\n', { append: true });
+      appendFileSync(logPath, line + '\n');
     } catch (err) {
       sinkBroken = true;
       io.stderr(
@@ -1274,7 +1277,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     ['gen', 'pick', 'retexture', 'rig', 'identity', 'bake', 'anim', 'look', 'rename'].includes(verb)
   ) {
     try {
-      await Deno.mkdir(workspace, { recursive: true });
+      await fs.mkdir(workspace, { recursive: true });
       return await withManifestWrite(
         workspacePaths(workspace).manifest,
         () => dispatchCli(args, io, true),
@@ -1405,9 +1408,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       if (manifest.lastBakeId !== undefined) {
         try {
           const bakeManifest = JSON.parse(
-            await Deno.readTextFile(
-              `${wsPaths(workspace).bakesDir}/bake-${manifest.lastBakeId}/manifest.json`,
-            ),
+            await fs.readFile(`${wsPaths(workspace).bakesDir}/bake-${manifest.lastBakeId}/manifest.json`, 'utf8'),
           );
           staleFrames = Array.isArray(bakeManifest.frames) ? bakeManifest.frames.length : 0;
         } catch {
@@ -1449,15 +1450,13 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         // decodeURIComponent: URL.pathname percent-encodes spaces/non-ASCII in
         // the install path (review F3)
         const packsRoot = flag(args, 'packs') ??
-          decodeURIComponent(
-            new URL('../anim/packs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-          );
+          resourcePath('anim', 'packs');
         // every subdir with a pack.json is a pack — imported packs list too
         const packDirs: string[] = [];
-        for await (const entry of Deno.readDir(packsRoot)) {
-          if (!entry.isDirectory) continue;
+        for await (const entry of await fs.readdir(packsRoot, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
           try {
-            await Deno.stat(`${packsRoot}/${entry.name}/pack.json`);
+            await fs.stat(`${packsRoot}/${entry.name}/pack.json`);
             packDirs.push(`${packsRoot}/${entry.name}`);
           } catch {
             // not a pack dir
@@ -1523,7 +1522,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         }
         const modelPath = `${workspace}/canonical/model.glb`;
         try {
-          await Deno.stat(modelPath);
+          await fs.stat(modelPath);
         } catch {
           return fail(
             'anim' as JobEvent['jobId'],
@@ -1536,7 +1535,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         let rigged = false;
         try {
           const manifest = JSON.parse(
-            await Deno.readTextFile(`${workspace}/character.json`),
+            await fs.readFile(`${workspace}/character.json`, 'utf8'),
           );
           rigged = manifest.rig !== undefined;
         } catch { /* unreadable manifest = unrigged */ }
@@ -1583,7 +1582,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
               message: msg,
             }, `warn [anim-unmapped-core]: ${msg}`);
           }
-          await Deno.mkdir(`${workspace}/anim`, { recursive: true });
+          await fs.mkdir(`${workspace}/anim`, { recursive: true });
           const outPath = `${workspace}/anim/preview-${previewClip}.glb`;
           await writePreviewGlb(modelPath, clip, outPath);
           emit(
@@ -1647,14 +1646,12 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           const specs = parseClips(enableRaw);
           // resolve each clip's pack from the installed packs, --list's order
           const packsRoot = flag(args, 'packs') ??
-            decodeURIComponent(
-              new URL('../anim/packs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-            );
+            resourcePath('anim', 'packs');
           const packDirs: string[] = [];
-          for await (const entry of Deno.readDir(packsRoot)) {
-            if (!entry.isDirectory) continue;
+          for await (const entry of await fs.readdir(packsRoot, { withFileTypes: true })) {
+            if (!entry.isDirectory()) continue;
             try {
-              await Deno.stat(`${packsRoot}/${entry.name}/pack.json`);
+              await fs.stat(`${packsRoot}/${entry.name}/pack.json`);
               packDirs.push(`${packsRoot}/${entry.name}`);
             } catch {
               // not a pack dir
@@ -1768,11 +1765,9 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       );
     }
     const sidecarDir = () => {
-      const explicit = flag(args, 'sidecar') ?? Deno.env.get('SPRITEBOOK_SIDECAR_DIR');
+      const explicit = flag(args, 'sidecar') ?? process.env['SPRITEBOOK_SIDECAR_DIR'];
       if (explicit) return explicit;
-      return decodeURIComponent(
-        new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-      );
+      return resourcePath('sidecar');
     };
 
     try {
@@ -1928,7 +1923,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           throw new Error(`--${name} needs a JSON file path`);
         }
         if (!path) return undefined;
-        return JSON.parse(await Deno.readTextFile(path));
+        return JSON.parse(await fs.readFile(path, 'utf8'));
       };
       const decalsRaw = await readJson('decals');
       const attachmentsRaw = await readJson('attachments');
@@ -2168,7 +2163,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         const { JointEditsFileSchema } = await import('@spritebook/schema');
         edits = parseWith(
           JointEditsFileSchema,
-          JSON.parse(await Deno.readTextFile(editsPath)),
+          JSON.parse(await fs.readFile(editsPath, 'utf8')),
           `joint edits file "${editsPath}"`,
         ).edits;
       }
@@ -2199,12 +2194,12 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         try {
           report = parseWith(
             DeformReportSchema,
-            JSON.parse(await Deno.readTextFile(`${outDir}/deform-report.json`)),
+            JSON.parse(await fs.readFile(`${outDir}/deform-report.json`, 'utf8')),
             'DeformReport',
           );
           skeleton = parseWith(
             RigSkeletonSchema,
-            JSON.parse(await Deno.readTextFile(`${outDir}/rig.json`)),
+            JSON.parse(await fs.readFile(`${outDir}/rig.json`, 'utf8')),
             'RigSkeleton',
           );
         } catch (err) {
@@ -2303,10 +2298,8 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
             `first (models root: ${root}).${await registry.virtualizationNote()}`,
         );
       }
-      const sidecarDir = flag(args, 'sidecar') ?? Deno.env.get('SPRITEBOOK_SIDECAR_DIR') ??
-        decodeURIComponent(
-          new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-        );
+      const sidecarDir = flag(args, 'sidecar') ?? process.env['SPRITEBOOK_SIDECAR_DIR'] ??
+        resourcePath('sidecar');
       // The rig job takes a pre-resolved modelDir and never opens the catalog,
       // so the VRAM figure is resolved HERE, where the catalog already is. A
       // backend with no declared minimum claims nothing rather than a guess:
@@ -2412,13 +2405,11 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         }, memory.warn);
       }
       const prepAdapter = adapterFor('rembg-u2net', prepVersion, 'imageprep');
-      let sidecarDir = flag(args, 'sidecar') ?? Deno.env.get('SPRITEBOOK_SIDECAR_DIR');
+      let sidecarDir = flag(args, 'sidecar') ?? process.env['SPRITEBOOK_SIDECAR_DIR'];
       if (!sidecarDir) {
-        const repoSidecar = decodeURIComponent(
-          new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-        );
+        const repoSidecar = resourcePath('sidecar');
         try {
-          await Deno.stat(`${repoSidecar}/pyproject.toml`);
+          await fs.stat(`${repoSidecar}/pyproject.toml`);
           sidecarDir = repoSidecar;
         } catch {
           return fail(
@@ -2428,7 +2419,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           );
         }
       }
-      await Deno.mkdir(out, { recursive: true });
+      await fs.mkdir(out, { recursive: true });
       const session = new SidecarSession({ sidecarDir });
       const events = async function* (): AsyncIterable<JobEvent> {
         const lease = yield* acquireVramLeaseEvents({
@@ -2615,7 +2606,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     try {
       const baked = parseWith(
         BakeManifestSchema,
-        JSON.parse(await Deno.readTextFile(`${bakeDir}/manifest.json`)),
+        JSON.parse(await fs.readFile(`${bakeDir}/manifest.json`, 'utf8')),
         `BakeManifest at "${bakeDir}/manifest.json"`,
       );
       const cameraOverrides = cameraOverridesOf(CAMERA_PRESETS[cameraId], spec.camera);
@@ -2753,16 +2744,3 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
   return 0;
 }
 
-if (import.meta.main) {
-  const args = [...Deno.args];
-  // The shell assigns this process to its owned tree before releasing the gate.
-  if (args[0] === '--owned-start') {
-    args.shift();
-    if (await new Response(Deno.stdin.readable).text() !== 'start\n') Deno.exit(130);
-  }
-  const code = await runCli(args, {
-    stdout: (l) => console.log(l),
-    stderr: (l) => console.error(l),
-  });
-  Deno.exit(code);
-}

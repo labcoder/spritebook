@@ -25,5 +25,8 @@
     "@spritebook/rig": "0.1.0",
     "@spritebook/schema": "0.1.0",
     "@spritebook/style": "0.1.0"
+  },
+  "bin": {
+    "spritebook": "./dist/entry.js"
   }
 }
