@@ -13,8 +13,10 @@ tests, fixtures and history. See the [accepted strategy](migration-strategy.md) 
 [migration roadmap](roadmap.md). The plan targets supported Node LTS and qualifies Node/Dawn first;
 exact dependency pins and renderer adoption still require the stated checks. F0 baseline capture is
 complete; [the evidence and preservation matrix](baseline.md) records the current Windows control,
-known failures and unverified targets. [F1 safety repairs are complete](state-safety.md); F2 is
-next. Runtime replacement has not started.
+known failures and unverified targets. [F1 safety repairs are complete](state-safety.md).
+[F2 Windows renderer evidence](renderer-qualification.md) now records the bounded Node/Dawn
+candidate; remaining delivery/platform/notice gates are explicit. Production runtime replacement has
+not started.
 
 ## Recommendation in one paragraph
 
@@ -40,6 +42,7 @@ migration problems either.
 | [Migration roadmap](roadmap.md)                          | What is the required execution order, what evidence closes each task, and which model/UX improvements come later?            |
 | [F0 preservation and control](baseline.md)               | Which contracts and platform targets must survive, what ran, and how do we replay the legacy control safely?                 |
 | [F1 state-safety completion](state-safety.md)            | What changed in state, process ownership, queries and execution policy; what passed and what remains unqualified?            |
+| [F2 renderer qualification](renderer-qualification.md)   | Does the actual Node/Dawn pipeline preserve pixels and performance, and which installed/platform gates remain open?          |
 
 ## Findings that change the decision
 

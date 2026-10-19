@@ -5,7 +5,7 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1 state-safety work is complete. F2 is next.** The
+2026-10-19; F1 state-safety work is complete. F2 is active.** The
 [conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
 unverified targets. Closing baseline capture does not close platform, installed-app, model or
 release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
@@ -127,29 +127,35 @@ installed-artifact, real-model, power-loss and soak limits remain explicit in th
 
 ## F2 · Qualify the Node GPU path and installed layout
 
-- [ ] **F2-T1 · Run the real renderer on Node/Dawn.** Use a bounded adapter/environment experiment
-      in this repository; keep existing production modules as the control. Exercise MRT AOVs, WGSL,
-      upload/skinning/attachments, alpha, padded readback, styling and atlas output. Carry the exact
-      structural assertions and same-machine double-run canary; review old/new image differences
-      with the existing tolerant-golden discipline. Record memory, cold/warm wall time and
-      throughput. Use the
-      [runtime gates](runtime-migration.md#renderer-trial-one-representative-workload), including a
-      proposed ≤10% end-to-end regression budget on the same workload or an explicit recorded
-      exception. Start with 3–5 engineering days for the experiment, then re-estimate from evidence.
+- [~] **F2-T1 · Run the real renderer on Node/Dawn.** Use a bounded adapter/environment experiment
+  in this repository; keep existing production modules as the control. Exercise MRT AOVs, WGSL,
+  upload/skinning/attachments, alpha, padded readback, styling and atlas output. Carry the exact
+  structural assertions and same-machine double-run canary; review old/new image differences with
+  the existing tolerant-golden discipline. Record memory, cold/warm wall time and throughput. Use
+  the [runtime gates](runtime-migration.md#renderer-trial-one-representative-workload), including a
+  proposed ≤10% end-to-end regression budget on the same workload or an explicit recorded exception.
+  Start with 3–5 engineering days for the experiment, then re-estimate from evidence.
 - **F2-T2 · Retired: alternative desktop trial.** Tauri is selected; this ID remains withdrawn. No
   GPUI/native-inspector work is hidden inside the migration.
-- [ ] **F2-T3 · Prove delivery early.** Package an app-owned Node runtime, compiled JS, Dawn native
-      library and required shader/decoder assets. Launch through Tauri resource paths without
-      source, development node_modules, Deno/Node on PATH, compilers or an untracked shared cache. A
-      runtime directory is acceptable; do not require a single-file executable. Audit native
-      notices/required shared libraries and execute the installed artifact on each claimed OS/CPU
-      target.
+- [~] **F2-T3 · Prove delivery early.** Package an app-owned Node runtime, compiled JS, Dawn native
+  library and required shader/decoder assets. Launch through Tauri resource paths without source,
+  development node_modules, Deno/Node on PATH, compilers or an untracked shared cache. A runtime
+  directory is acceptable; do not require a single-file executable. Audit native notices/required
+  shared libraries and execute the installed artifact on each claimed OS/CPU target.
 
 **Acceptance:** a written pass/fail report, artifact paths and reproducible runs. A source build,
 triangle demo, generic addon CI matrix or cache hit is not a qualified SpriteBook renderer. Device
 loss, no-adapter, cancellation and native-addon load failure must be visible and leave prior
 artifacts usable. If a gate fails, document the precise blocker before funding a native render
 worker; no full Rust core, new repository or toolkit change is the fallback.
+
+**Current evidence (2026-10-19):** [Windows renderer qualification](renderer-qualification.md). The
+bounded Node/Dawn candidate, with Node-native PNG encoding, passes 110 carried assertions,
+decoded-pixel comparisons and the paired Vulkan performance budget. The unchanged-code experiment
+first missed the 4x budget; profiling and the measured codec change are recorded, without a waived
+gate or changed golden. Tauri resource-layout delivery and failure proofs are being completed. Other
+native platforms, clean-machine prerequisites and redistribution clearance remain open. The full
+milestone and production renderer promotion are not complete; production still uses Deno.
 
 ## F4 · Migrate the existing TypeScript core and Tauri bridge
 
@@ -173,7 +179,9 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       seam. Assign a fresh renderer signature/cache namespace, including build/backend/adapter and
       available driver identity. Never reuse old cached frames as evidence of Node rendering. Keep
       existing bakes and accepted model assets; provide a compatible export/read path rather than
-      deleting them to make migration pass. One path serves core pixel preview and baking.
+      deleting them to make migration pass. One path serves core pixel preview and baking. Carry the
+      qualified PNG boundary and 8/16-bit/CRC assertions into the real Node modules; remove F2's
+      environment shim and build-time import substitutions.
 - [ ] **F4-T4 · Switch application, tooling and release execution.** Make Tauri invoke bundled
       runtime/core entry points rather than `deno run -A` against a checkout. Switch web build
       hooks, CLI commands, test/lint/format/type-check tasks, CI guards, proof helpers, hooks and
