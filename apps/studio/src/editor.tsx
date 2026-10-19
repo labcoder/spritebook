@@ -332,6 +332,7 @@ export function Editor(
   const { bridge, busy, cancel } = useJobBridge(
     baseBridge,
     `${card.dir}|${effective}|${JSON.stringify(manifest)}`,
+    onChanged,
   );
 
   // picking a canonical advances the rail to the NEXT stage in order - the

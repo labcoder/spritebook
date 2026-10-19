@@ -72,3 +72,15 @@ only implicit bake selection; its manifest must match the selected id and charac
 cannot escape the bake directory. Missing selections return null; corrupt selections fail rather
 than choosing a newer directory. The Tauri shell delegates gallery/thumbnail/atlas selection to
 these queries. `export --workspace` uses the same selection; explicit `export --bake` is preserved.
+
+## Creation and late termination
+
+A committed creation intent reserves its destination even before character.json is materialized.
+Clone checks both files before copying, rejects destinations inside the source (including resolved
+aliases), and locks canonical paths in a consistent order. Initialization verifies and retains a
+copied canonical asset before publishing its first intent.
+
+An identical rig/fit rerun succeeds with a `rig-unchanged` warning and no undo entry. Other
+acceptance failures remain terminal. Cancellation racing an already committed intent may reveal the
+complete new state after recovery; it cannot turn that intent into a partial accepted asset. The
+editor refreshes recovered state when work terminates, and tab activation reads current state.

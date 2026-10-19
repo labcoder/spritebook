@@ -268,7 +268,9 @@ export async function initializeManifest(
       if (await optionalText(path, '')) {
         throw new Error(`A character already exists at "${path}" - refusing to overwrite it.`);
       }
-      await persist(path, validateState({ doc, patches, cursor: patches.length }, path));
+      const state = validateState({ doc, patches, cursor: patches.length }, path);
+      await prepareAssets(path, doc, state);
+      await persist(path, state);
     }));
 }
 

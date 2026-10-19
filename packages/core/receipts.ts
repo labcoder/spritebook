@@ -233,7 +233,9 @@ export async function setRigState(
     const current = manifest.rig;
     const sameRig = current !== undefined && canonicalJson(current) === canonicalJson(rig);
     if (sameRig && opts.canonicalMesh === undefined) {
-      throw new Error('setRigState was given the rig the character already has.');
+      throw Object.assign(new Error('setRigState was given the rig the character already has.'), {
+        code: 'rig-unchanged',
+      });
     }
     // A Track A fit REPLACES the canonical mesh with the fitted body, so the
     // hash re-pin belongs in this patch: one fit, one undo, and no window

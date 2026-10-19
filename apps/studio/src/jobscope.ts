@@ -5,7 +5,7 @@ import { log } from './log';
 const canceled = (): CliRun => ({ exitCode: 130, lines: [] });
 
 /** A mounted character/stage owns its work; old completions cannot report success. */
-export function useJobBridge(base: StudioBridge, key: string) {
+export function useJobBridge(base: StudioBridge, key: string, onInterrupted?: () => void) {
   const [running, setRunning] = useState(0);
   const scope = useMemo(
     () => ({ live: true, controller: new AbortController() }),
@@ -28,18 +28,21 @@ export function useJobBridge(base: StudioBridge, key: string) {
       }
       const { signal } = scope.controller;
       setRunning((n) => n + 1);
+      let interrupted = true;
       try {
         const result = await base.runCli(args, (line) => {
           if (!signal.aborted) onLine?.(line);
         }, signal);
+        interrupted = signal.aborted || result.exitCode !== 0;
         return signal.aborted ? canceled() : result;
       } catch (e) {
         log.append(args[0] ?? 'cli', String(e), Date.now(), 'stderr');
         return { exitCode: 1, lines: [] };
       } finally {
+        if (interrupted && args.includes('--workspace')) onInterrupted?.();
         if (scope.live) setRunning((n) => Math.max(0, n - 1));
       }
     },
-  }), [base, scope]);
+  }), [base, scope, onInterrupted]);
   return { bridge, busy: running > 0, cancel: () => scope.controller.abort() };
 }

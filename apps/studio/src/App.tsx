@@ -117,7 +117,7 @@ export default function App() {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, activeTab]);
 
   const openCharacter = useCallback((dir: string) => {
     setOpenDirs((cur) => (cur.includes(dir) ? cur : [...cur, dir]));

@@ -9,7 +9,7 @@ import { sha256Bytes } from './cache.ts';
 import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import type { CharacterId } from '@spritebook/schema';
 import { canonicalJson } from '@spritebook/schema';
-import { createWorkspace, workspacePaths } from './workspace.ts';
+import { createWorkspace, readWorkspace, workspacePaths } from './workspace.ts';
 import { cloneCharacter, renameCharacter } from './roster.ts';
 
 const NOW = () => '2026-07-19T00:00:00Z';
@@ -218,5 +218,57 @@ Deno.test('a clone that keeps its source name journals nothing at all', async ()
   } finally {
     await Deno.remove(src, { recursive: true });
     await Deno.remove(dest, { recursive: true });
+  }
+});
+
+Deno.test('clone cannot overwrite a destination whose creation intent is committed', async () => {
+  const source = await character('Source'), dest = await character('Accepted destination');
+  try {
+    await Deno.writeTextFile(`${source}/payload.txt`, 'would overwrite');
+    await Deno.writeTextFile(`${dest}/payload.txt`, 'accepted');
+    const path = workspacePaths(dest).manifest;
+    const doc = await readWorkspace(dest);
+    await Deno.writeTextFile(
+      `${path}.pending.json`,
+      JSON.stringify({ version: 1, doc, patches: [], cursor: 0 }),
+    );
+    await Deno.remove(path);
+    await assertRejects(
+      () => cloneCharacter(source, dest, { id: 'copy' }),
+      Error,
+      'already exists',
+    );
+    assertEquals(await Deno.readTextFile(`${dest}/payload.txt`), 'accepted');
+    assertEquals((await readWorkspace(dest)).displayName, 'Accepted destination');
+  } finally {
+    await Deno.remove(source, { recursive: true });
+    await Deno.remove(dest, { recursive: true });
+  }
+});
+
+Deno.test('clone refuses corrupt canonical source bytes before publishing a manifest', async () => {
+  const source = await character('Source'), dest = await Deno.makeTempDir();
+  try {
+    await Deno.writeTextFile(workspacePaths(source).canonicalModel, 'corrupt');
+    await assertRejects(() => cloneCharacter(source, dest, { id: 'copy' }), Error, 'hash mismatch');
+    await assertRejects(() => Deno.stat(workspacePaths(dest).manifest), Deno.errors.NotFound);
+  } finally {
+    await Deno.remove(source, { recursive: true });
+    await Deno.remove(dest, { recursive: true });
+  }
+});
+
+Deno.test('clone refuses a nested destination, including a dot-prefixed child', async () => {
+  const source = await character();
+  try {
+    for (const child of ['child', '..child']) {
+      await assertRejects(
+        () => cloneCharacter(source, `${source}/${child}`, { id: 'copy' }),
+        Error,
+        'outside the source',
+      );
+    }
+  } finally {
+    await Deno.remove(source, { recursive: true });
   }
 });

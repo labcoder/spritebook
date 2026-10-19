@@ -1842,6 +1842,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       let image = flag(args, 'image');
       let params = parseAdjust(flag(args, 'adjust'));
       let modelId = flag(args, 'model') ?? 'fixture-gen';
+      let modelVersion = flag(args, 'model-version');
       let seed = flag(args, 'seed') !== undefined ? seedFlag(args, 0) : undefined;
 
       // --more-like rN: reuse that receipt's backend and params, vary the seed.
@@ -1860,6 +1861,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           );
         }
         modelId = flag(args, 'model') ?? parent.backend.modelId;
+        if (flag(args, 'model') === undefined) modelVersion ??= parent.backend.version;
         params = { ...parent.params, ...params };
         delete params.seed;
         seed ??= Math.max(...manifest.generation.results.map((r) => r.seed)) + 1;
@@ -1880,7 +1882,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           workspace,
           imagePath: image,
           modelId,
-          version: flag(args, 'model-version'),
+          version: modelVersion,
           seed: seed ?? 0,
           params,
           ...(flag(args, 'candidates') !== undefined

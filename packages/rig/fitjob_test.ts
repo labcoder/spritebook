@@ -288,6 +288,23 @@ Deno.test('runFitJob: on a picked workspace the fit BECOMES the canonical mesh',
     const paths_ = (patch.op as { path: string }[]).map((o) => o.path).sort();
     assertEquals(paths_, ['/canonicalMesh', '/rig'], 'both facts in the same patch');
     assert(Array.isArray(patch.inverse) && patch.inverse.length === 2, 'and both are reversible');
+    const history = await Deno.readTextFile(paths.journal);
+    const repeat = await collect(
+      runFitJob({
+        jobId: 'fit-repeat',
+        bodyDir: UBC_MALE,
+        targetPath,
+        outDir: `${dir}/out`,
+        workspace: ws,
+      }),
+    );
+    assertEquals(repeat.at(-1)?.t, 'done', 'an identical rerun is a successful no-op');
+    assertEquals(
+      await Deno.readTextFile(paths.journal),
+      history,
+      'no undo entry for an unchanged rig',
+    );
+    assertEquals(await Deno.readFile(paths.canonicalModel), canonical);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

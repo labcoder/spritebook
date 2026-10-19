@@ -276,3 +276,6 @@ Memory admission uses the effective configuration's catalog profile, not another
 minimum. Unmeasured combinations refuse. `models list --json` exposes these profiles; its historical
 single minimum is advisory. See the [execution policy](architecture/execution-policy.md) for the
 consent fingerprint, unmanaged behavior, renderer-pin boundary and qualification limits.
+
+`gen --more-like <result>` reuses the result's recorded backend version as well as its parameters.
+Explicit `--model` or `--model-version` requests a different choice; project pins still apply.

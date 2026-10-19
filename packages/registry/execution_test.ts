@@ -1,3 +1,4 @@
+import { runCli } from '../cli/mod.ts';
 import { assertEquals, assertRejects, assertThrows } from 'jsr:@std/assert@1';
 import { fileURLToPath } from 'node:url';
 import { CharacterIdSchema, type ModelCatalog, type ProjectPins } from '@spritebook/schema';
@@ -81,12 +82,41 @@ Deno.test('project pins select the exact installed recipe and corrupt weights re
       catalogPath,
     };
     assertEquals((await collect(runGenJob(opts))).at(-1)?.t, 'done');
-    const accepted = await readWorkspace(workspace);
+    let accepted = await readWorkspace(workspace);
     assertEquals(
       accepted.generation.results[0].backend.version,
       '1.0.0',
       'actual output receipt uses the pin, not newest',
     );
+    await Deno.remove(`${root}/pins.json`);
+    const replay: string[] = [];
+    assertEquals(
+      await runCli([
+        'gen',
+        '--workspace',
+        workspace,
+        '--character',
+        'hero',
+        '--more-like',
+        'r1',
+        '--models-dir',
+        models,
+        '--catalog',
+        catalogPath,
+        '--sidecar',
+        opts.sidecarDir,
+        '--json',
+      ], { stdout: (line) => replay.push(line), stderr: (line) => replay.push(line) }),
+      0,
+      replay.join('\n'),
+    );
+    accepted = await readWorkspace(workspace);
+    assertEquals(
+      accepted.generation.results.at(-1)?.backend.version,
+      '1.0.0',
+      'more-like replays the recorded version even without project pins',
+    );
+    await writePins(`${root}/pins.json`, pins);
     const measured = (await loadCatalog()).models.find((m) => m.id === 'trellis2-4b')!.versions[0];
     const memoryCatalog = structuredClone(small);
     const memoryVersion = memoryCatalog.models[0].versions[0];

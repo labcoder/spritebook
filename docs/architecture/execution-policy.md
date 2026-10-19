@@ -12,8 +12,10 @@ invalid file or a missing explicit file is an error.
 In a managed project every executed model/pack needs an exact pin. An explicit requested model
 version must agree. A missing pinned install never falls forward to a newer one. Unmanaged jobs
 retain the existing explicit-version or highest-installed behavior and record the actual model
-version in their result receipt. Retexturing considers only backends allowed by project pins.
-Picking, undoing or rendering accepted assets does not require the generator to remain installed.
+version in their result receipt. Retexturing considers only backends allowed by project pins. Recipe
+replay with `gen --more-like` defaults to the recorded backend version; explicit model or version
+flags request a different choice. Picking, undoing or rendering accepted assets does not require the
+generator to remain installed.
 
 Before model loading, generation, retexturing, Track B rigging and image preparation check:
 

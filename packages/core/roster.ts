@@ -1,5 +1,5 @@
 import { readCurrentBake } from './queries.ts';
-import { relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 /**
  * Roster operations: `clone` and `rename` (P3-T4).
  *
@@ -98,13 +98,20 @@ export async function cloneCharacter(
   destWorkspace: string,
   opts: CloneOptions,
 ) {
-  const nested = relative(resolve(sourceWorkspace), resolve(destWorkspace));
-  if (!nested || (!nested.startsWith('..') && !nested.includes(':'))) {
+  const inside = (source: string, dest: string) => {
+    const rel = relative(source, dest);
+    return !isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`);
+  };
+  if (inside(resolve(sourceWorkspace), resolve(destWorkspace))) {
     throw new Error('Clone destination must be outside the source workspace');
   }
   await Deno.mkdir(destWorkspace, { recursive: true });
-  const paths = [workspacePaths(sourceWorkspace).manifest, workspacePaths(destWorkspace).manifest]
-    .sort();
+  const source = await Deno.realPath(sourceWorkspace), dest = await Deno.realPath(destWorkspace);
+  if (inside(source, dest)) {
+    throw new Error('Clone destination must be outside the source workspace');
+  }
+  const paths = [workspacePaths(source).manifest, workspacePaths(dest).manifest]
+    .map((path) => Deno.build.os === 'windows' ? path.toLowerCase() : path).sort();
   return await withManifestWrite(
     paths[0],
     () =>
@@ -129,7 +136,7 @@ async function cloneUnlocked(
     );
   }
   const destPaths = workspacePaths(destWorkspace);
-  if (await exists(destPaths.manifest)) {
+  if (await exists(destPaths.manifest) || await exists(`${destPaths.manifest}.pending.json`)) {
     throw new Error(
       `"${destPaths.manifest}" already exists - clone never overwrites a character; ` +
         `pick another destination or remove that one first.`,

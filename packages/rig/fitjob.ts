@@ -244,12 +244,22 @@ async function* executeFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
           path: `${opts.workspace}/${MANIFEST_FILE}`,
         };
       } catch (err) {
-        throw new FitFail(
-          'fit-not-recorded',
-          `Output files were retained, but the character was not updated: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
+        if ((err as { code?: string }).code === 'rig-unchanged') {
+          yield {
+            t: 'warn',
+            jobId,
+            at: at(),
+            code: 'rig-unchanged',
+            message: 'Output matches the accepted rig; no change to record.',
+          };
+        } else {
+          throw new FitFail(
+            'fit-not-recorded',
+            `Output files were retained, but the character was not updated: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
       }
     }
 

@@ -18,9 +18,12 @@ export async function prepareCanonicalPromotion(
     return {
       ready: true,
       canonicalSource: sourcePath,
-      ...(gltfSha256 === manifest.canonicalMesh.gltfSha256 && heightM === undefined ? {} : {
-        meshRepin: { gltfSha256, ...(heightM === undefined ? {} : { heightM }) },
-      }),
+      ...(gltfSha256 === manifest.canonicalMesh.gltfSha256 &&
+          (heightM === undefined || heightM === manifest.canonicalMesh.heightM)
+        ? {}
+        : {
+          meshRepin: { gltfSha256, ...(heightM === undefined ? {} : { heightM }) },
+        }),
     };
   } catch (err) {
     return {
