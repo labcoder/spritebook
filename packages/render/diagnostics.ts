@@ -1,18 +1,12 @@
+
 /**
  * Render identity + health as PLAIN DATA (D-004: nothing GPU-shaped crosses the
  * seam — strings, numbers, and JSON-safe records only).
  *
- * renderSignature (D-023, scope corrected after review): `<RENDERER_VERSION>#
- * <8-hex sha256 of adapterInfo>`. The composed string is what cache keys carry
- * as `rendererVersion`, so an ADAPTER change (different GPU, vendor, device, or
- * anything Deno's GPUAdapterInfo exposes — including fields future Deno
- * versions add, so a Deno upgrade may flip keys too) is an honest full cache
- * miss. KNOWN GAP: GPUAdapterInfo carries NO driver version (verified: vendor/
- * device ids, description, subgroup sizes only), so a driver-version-only
- * update does NOT flip keys and a warm `--only-invalidated` bake can serve
- * pre-update pixels — open rider on D-023 to fold driver identity in when the
- * runtime exposes it. The signature lands verbatim in BakeManifest.inputs for
- * provenance, and `spritebook doctor` prints it.
+ * renderSignature hashes the pipeline, runtime, Dawn, PNG codec, backend and
+ * adapter information (including driver fields when exposed). GPUAdapterInfo
+ * does not guarantee a driver version; the diagnostics retain the exact fields.
+ * Old bake manifests remain readable; their frame cache identities are distinct.
  *
  * renderDiagnostics: the doctor payload — versions, backend env, adapter info,
  * features, the limits we depend on, and an optional clear-pass probe that
@@ -24,14 +18,18 @@
  */
 import { canonicalJson } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
-import { getGpu, tryGetGpu } from './gpu.ts';
+import { getGpu, gpuBackend, tryGetGpu } from './gpu.ts';
 import { createAovPassDescriptor, createAovTargets } from './aov.ts';
 import { RENDERER_VERSION } from './contracts.ts';
 
 /** The cache-key renderer identity. Throws (actionably) when no adapter exists. */
 export async function renderSignature(): Promise<string> {
   const gpu = await getGpu();
-  const hash = await sha256Hex(canonicalJson(gpu.adapterInfo));
+  const hash = await sha256Hex(canonicalJson({
+    runtime: process.version, platform: process.platform, arch: process.arch,
+    dawn: '0.6.2', png: `native-zlib-1/${process.versions.zlib}`,
+    backend: gpuBackend(), adapter: gpu.adapterInfo,
+  }));
   return `${RENDERER_VERSION}#${hash.slice(0, 8)}`;
 }
 
@@ -49,7 +47,7 @@ export interface RenderDiagnostics {
 
 const NO_ADAPTER_HINTS = [
   'Check that your GPU drivers are installed and current.',
-  'Force a backend with DENO_WEBGPU_BACKEND=vulkan (Windows/Linux), dx12 (Windows), or metal (macOS).',
+  'Select SPRITEBOOK_GPU_BACKEND=vulkan (Windows/Linux) or metal (macOS).',
   'Headless Linux / CI: install Mesa lavapipe (mesa-vulkan-drivers) for a software adapter.',
 ];
 
@@ -102,7 +100,7 @@ export async function renderDiagnostics(
   opts: { probe?: boolean } = {},
 ): Promise<RenderDiagnostics> {
   const version = RENDERER_VERSION;
-  const backendEnv = Deno.env.get('DENO_WEBGPU_BACKEND') ?? '(unset - wgpu default)';
+  const backendEnv = gpuBackend();
   const gpu = await tryGetGpu(); // SPRITEBOOK_REQUIRE_GPU turns a missing adapter into a throw
   if (!gpu) {
     return { version, backendEnv, available: false, hints: NO_ADAPTER_HINTS };
@@ -112,7 +110,7 @@ export async function renderDiagnostics(
     version,
     backendEnv,
     available: true,
-    signature: `${version}#${(await sha256Hex(canonicalJson(gpu.adapterInfo))).slice(0, 8)}`,
+    signature: await renderSignature(),
     adapter: gpu.adapterInfo,
     features: gpu.features,
     limits: {

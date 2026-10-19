@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createInterface } from 'node:readline';
-import { fileURLToPath } from 'node:url';
+import { resourcePath } from './resources.ts';
 
 /** Kernel locking is native; acquisition order and reentrancy stay in persistence. */
 export async function acquireFileLock(path: string) {
-  const binary = fileURLToPath(import.meta.resolve('#lock-host')) +
+  const binary = resourcePath('core', 'spritebook-lock') +
     (process.platform === 'win32' ? '.exe' : '');
   const child = spawn(binary, [path], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   const closed = once(child, 'close');

@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * THE ATTACHMENT ACCEPTANCE: a sword hung on the `hand-r` socket must bake IN
  * THE HAND, in every direction, and stay there while a clip swings the arm.
@@ -30,7 +34,7 @@
  * untextured factors now upload as exact float, so this is a bit pattern rather
  * than a tolerance.
  */
-import { assert, assertAlmostEquals, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertAlmostEquals, assertEquals } from '@std/assert';
 import { NodeIO } from '@gltf-transform/core';
 import type { CameraPreset } from '@spritebook/schema';
 import {
@@ -40,17 +44,17 @@ import {
   sampleClip,
   writePoses,
 } from '@spritebook/anim';
-import { UAL_HUMANOID } from '../anim/profile.ts';
-import { tryGetGpu } from './gpu.ts';
+import { UAL_HUMANOID } from '../anim/dist/profile.js';
+import { tryGetGpu } from './dist/gpu.js';
 import {
   evalPosesMatrices,
   jointScratch,
   loadSkinnedAsset,
   posedBoundsFromPoses,
-} from './skinning.ts';
-import { mapPosesJoints, readPoses } from './poses.ts';
-import { solveFraming } from './camera.ts';
-import { Renderer } from './renderer.ts';
+} from './dist/skinning.js';
+import { mapPosesJoints, readPoses } from './dist/poses.js';
+import { solveFraming } from './dist/camera.js';
+import { Renderer } from './dist/renderer.js';
 
 const win = (u: URL) => decodeURIComponent(u.pathname.replace(/^\/([A-Za-z]:)/, '$1'));
 const BODY = win(new URL('../rig/bodies/ubc-male/body.glb', import.meta.url));
@@ -94,7 +98,7 @@ const HAND_TOL_PX = PROP_HALF_M * Math.sqrt(3) * CAM.pixelsPerMeter + 1;
  * to the joint node through a wrapper carrying the socket offset.
  */
 async function bodyWithProp(outPath: string, attach: boolean): Promise<void> {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(BODY));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(BODY)));
   if (attach) {
     const buffer = doc.getRoot().listBuffers()[0];
     const s = PROP_HALF_M; // a 12cm cube: a fist-sized hilt, several px at 48 px/m
@@ -144,7 +148,7 @@ async function bodyWithProp(outPath: string, attach: boolean): Promise<void> {
       ),
     );
   }
-  await Deno.writeFile(outPath, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(outPath, await new NodeIO().writeBinary(doc));
 }
 
 /**
@@ -212,7 +216,7 @@ async function rig(modelPath: string, posesPath: string, frames: number, clipId:
     g,
     asset,
     framing,
-    await Deno.readTextFile(SHADERS),
+    await fs.readFile(SHADERS, 'utf8'),
     CAM.cellPx.w,
     CAM.cellPx.h,
     'clip',
@@ -236,9 +240,9 @@ function handAt(
   ] as const;
 }
 
-Deno.test('ACCEPTANCE: a socketed sword bakes IN THE HAND, in every direction', async (t) => {
-  if (!(await tryGetGpu())) return;
-  const dir = await Deno.makeTempDir({ prefix: 'sb-attach-' });
+test('ACCEPTANCE: a socketed sword bakes IN THE HAND, in every direction', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-attach-'));
   try {
     const armed = `${dir}/armed.glb`;
     const bare = `${dir}/bare.glb`;
@@ -251,7 +255,7 @@ Deno.test('ACCEPTANCE: a socketed sword bakes IN THE HAND, in every direction', 
     const scratch = jointScratch(A.asset);
     const { w, h } = CAM.cellPx;
 
-    await t.step('the projector agrees with the framing solver', () => {
+    await t.test('the projector agrees with the framing solver', () => {
       // feet-baseline anchors (cx, 0, cz) — the footprint centre on the ground
       // (camera.ts). If projectPx reproduces framing.pivotPx from that anchor
       // in every direction, it is provably the inverse of the framing solve,
@@ -266,14 +270,14 @@ Deno.test('ACCEPTANCE: a socketed sword bakes IN THE HAND, in every direction', 
       }
     });
 
-    await t.step('the un-attached body shows no prop pixels at all (control)', async () => {
+    await t.test('the un-attached body shows no prop pixels at all (control)', async () => {
       for (let d = 0; d < CAM.directions; d++) {
         const planes = await B.renderer.capturePadded(d, 0);
         assertEquals(inkPixels(planes[1], w, h).length, 0, `direction ${d} has no magenta`);
       }
     });
 
-    await t.step('the sword is visible and lands on the hand in all 8 directions', async () => {
+    await t.test('the sword is visible and lands on the hand in all 8 directions', async () => {
       const hand = handAt(A, 0, scratch);
       const report: string[] = [];
       for (let d = 0; d < CAM.directions; d++) {
@@ -298,13 +302,13 @@ Deno.test('ACCEPTANCE: a socketed sword bakes IN THE HAND, in every direction', 
       }
     });
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('ACCEPTANCE: the sword STAYS in the hand while the clip swings it', async (t) => {
-  if (!(await tryGetGpu())) return;
-  const dir = await Deno.makeTempDir({ prefix: 'sb-attach-clip-' });
+test('ACCEPTANCE: the sword STAYS in the hand while the clip swings it', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-attach-clip-'));
   try {
     const armed = `${dir}/armed.glb`;
     await bodyWithProp(armed, true);
@@ -314,7 +318,7 @@ Deno.test('ACCEPTANCE: the sword STAYS in the hand while the clip swings it', as
     const { w, h } = CAM.cellPx;
 
     const handPx: { x: number; y: number }[] = [];
-    await t.step('every frame of every direction keeps the prop on the hand', async () => {
+    await t.test('every frame of every direction keeps the prop on the hand', async () => {
       for (let d = 0; d < CAM.directions; d++) {
         for (let f = 0; f < FRAMES; f++) {
           const planes = await A.renderer.capturePadded(d, f);
@@ -332,13 +336,13 @@ Deno.test('ACCEPTANCE: the sword STAYS in the hand while the clip swings it', as
       }
     });
 
-    await t.step('and the hand really moved, so that was not vacuous', () => {
+    await t.test('and the hand really moved, so that was not vacuous', () => {
       const spread = Math.max(
         ...handPx.map((p) => Math.hypot(p.x - handPx[0].x, p.y - handPx[0].y)),
       );
       assert(spread >= 8, `the swing must move the hand on screen; moved ${spread.toFixed(1)}px`);
     });
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });

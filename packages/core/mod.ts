@@ -29,3 +29,4 @@ export {
 } from './persistence.ts';
 
 export * from './queries.ts';
+export { resourcePath } from './resources.ts';

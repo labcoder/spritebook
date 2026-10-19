@@ -7,6 +7,10 @@
     ".": {
       "types": "./dist/mod.d.ts",
       "default": "./dist/mod.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "default": "./dist/contracts.js"
     }
   },
   "files": [

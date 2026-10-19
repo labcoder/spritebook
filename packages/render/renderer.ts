@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The render orchestrator (P2-T1): canonical glb -> per-direction, per-frame AOV
  * PNGs + a throughput report, entirely headless. INTERNAL — the D-004 seam is
@@ -411,7 +412,7 @@ export class Renderer {
     frames: number,
   ): Promise<{ summary: RenderSummary; throughputPath: string }> {
     const framesDir = `${outDir}/frames`;
-    await Deno.mkdir(framesDir, { recursive: true });
+    await fs.mkdir(framesDir, { recursive: true });
 
     const pool = new ReadbackPool(this.gpu.device, this.width, this.height, bpp);
     // the frames are laid out subset-major: g -> (list[g/frames], g%frames),
@@ -442,7 +443,7 @@ export class Renderer {
         const tag = `d${pad(direction, 2)}_f${pad(frame, 3)}`;
         for (let k = 0; k < AOV_TARGETS.length; k++) {
           const png = encodeAov(planes[k], this.width, this.height, AOV_TARGETS[k].encode);
-          await Deno.writeFile(`${framesDir}/${tag}_${AOV_TARGETS[k].pass}.png`, png);
+          await fs.writeFile(`${framesDir}/${tag}_${AOV_TARGETS[k].pass}.png`, png);
         }
       },
     });

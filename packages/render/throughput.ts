@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The throughput report artifact — written on every render and uploaded from CI
  * so frames/sec and readback MB/s regressions are visible in the trend (P2-T1
@@ -5,6 +6,7 @@
  * slow by design), so this is a TREND signal, never a pass/fail gate and never
  * hashed for caching — the repo invariant is hash inputs, not rendered output.
  */
+import { gpuBackend } from './gpu.ts';
 import type { BatchMetrics } from './readback.ts';
 
 export interface ThroughputReport {
@@ -33,11 +35,11 @@ export function buildThroughput(
     width: ctx.width,
     height: ctx.height,
     aovCount: ctx.aovCount,
-    backend: Deno.env.get('DENO_WEBGPU_BACKEND') ?? '(unset)',
+    backend: gpuBackend(),
     adapter: ctx.adapter,
   };
 }
 
 export async function writeThroughput(path: string, report: ThroughputReport): Promise<void> {
-  await Deno.writeTextFile(path, JSON.stringify(report, null, 2) + '\n');
+  await fs.writeFile(path, JSON.stringify(report, null, 2) + '\n');
 }

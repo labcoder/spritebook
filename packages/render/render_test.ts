@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Structural render tests (renderer-golden-testing skill): exact invariants, no
  * tolerance, no golden PNGs — dimensions, silhouette-in-padding, the pivot pixel,
@@ -9,15 +13,15 @@
  * instead of silently skipping. Shared-scale (two characters, one ruler) is a
  * pure property of the framing and is proven exhaustively in camera_test.ts.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { fileURLToPath } from 'node:url';
 import { decode as decodePng } from 'fast-png';
 import type { CameraPreset } from '@spritebook/schema';
-import { tryGetGpu } from './gpu.ts';
-import { AOV_TARGETS } from './contracts.ts';
-import { loadSkinnedAsset, posedBounds } from './skinning.ts';
-import { solveFraming } from './camera.ts';
-import { Renderer } from './renderer.ts';
+import { tryGetGpu } from './dist/gpu.js';
+import { AOV_TARGETS } from './dist/contracts.js';
+import { loadSkinnedAsset, posedBounds } from './dist/skinning.js';
+import { solveFraming } from './dist/camera.js';
+import { Renderer } from './dist/renderer.js';
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/skinned-column.glb', import.meta.url));
 const SHADERS = new URL('./shaders.wgsl', import.meta.url);
@@ -45,7 +49,7 @@ async function setup(over: Partial<CameraPreset> = {}) {
   // frame the posed bounds over the frames the tests touch (canary uses frame 5),
   // matching the production makeRenderer path (m6).
   const framing = solveFraming(cam, posedBounds(asset, 8));
-  const shaderSrc = await Deno.readTextFile(SHADERS);
+  const shaderSrc = await fs.readFile(SHADERS, 'utf8');
   const renderer = await Renderer.create(g, asset, framing, shaderSrc, cam.cellPx.w, cam.cellPx.h);
   return { asset, cam, framing, renderer };
 }
@@ -67,32 +71,32 @@ function alphaBBox(lit: Uint8Array, w: number, h: number) {
   return { minX, minY, maxX, maxY, count };
 }
 
-Deno.test('render: AOV pages are cellPx-sized, one per direction x frame x pass', async () => {
+test('render: AOV pages are cellPx-sized, one per direction x frame x pass', async (t) => {
   const s = await setup();
-  if (!s) return;
-  const outDir = await Deno.makeTempDir();
+  if (!s) { t.skip('No WebGPU adapter'); return; }
+  const outDir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const { summary, throughputPath } = await s.renderer.renderAll(outDir, 2);
     assertEquals(summary.cellPx, { w: 128, h: 128 });
     assertEquals(summary.pageCount, 8 * 2 * AOV_TARGETS.length);
-    const img = decodePng(await Deno.readFile(`${summary.framesDir}/d00_f000_lit.png`));
+    const img = decodePng(new Uint8Array(await fs.readFile(`${summary.framesDir}/d00_f000_lit.png`)));
     assertEquals([img.width, img.height], [128, 128]);
-    const tp = JSON.parse(await Deno.readTextFile(throughputPath));
+    const tp = JSON.parse(await fs.readFile(throughputPath, 'utf8'));
     assert(tp.frames === 16 && tp.fps > 0, 'throughput report has real numbers');
   } finally {
-    await Deno.remove(outDir, { recursive: true });
+    await fs.rm(outDir, { recursive: true });
   }
 });
 
-Deno.test('render: depth and mask AOVs encode drawn vs background correctly', async () => {
+test('render: depth and mask AOVs encode drawn vs background correctly', async (t) => {
   // exercises the non-trivial png.ts paths: r32float->gray16 and r32uint->gray16
   const s = await setup({ pivot: 'center' });
-  if (!s) return;
-  const outDir = await Deno.makeTempDir();
+  if (!s) { t.skip('No WebGPU adapter'); return; }
+  const outDir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const { summary } = await s.renderer.renderAll(outDir, 1);
-    const depth = decodePng(await Deno.readFile(`${summary.framesDir}/d00_f000_depth.png`));
-    const mask = decodePng(await Deno.readFile(`${summary.framesDir}/d00_f000_mask.png`));
+    const depth = decodePng(new Uint8Array(await fs.readFile(`${summary.framesDir}/d00_f000_depth.png`)));
+    const mask = decodePng(new Uint8Array(await fs.readFile(`${summary.framesDir}/d00_f000_mask.png`)));
     const dd = depth.data as Uint16Array;
     const md = mask.data as Uint16Array;
     // corner (0,0) is background: depth cleared to far (1.0 -> 65535), mask empty (0)
@@ -107,22 +111,22 @@ Deno.test('render: depth and mask AOVs encode drawn vs background correctly', as
     assert(md.some((v) => v === 65535), 'mask has covered texels, at full scale');
     assert(!md.some((v) => v !== 0 && v !== 65535), 'and coverage is only ever those two');
   } finally {
-    await Deno.remove(outDir, { recursive: true });
+    await fs.rm(outDir, { recursive: true });
   }
 });
 
-Deno.test('render: pivot lands on the world-locked feet-baseline pixel', async () => {
+test('render: pivot lands on the world-locked feet-baseline pixel', async (t) => {
   const s = await setup();
-  if (!s) return;
+  if (!s) { t.skip('No WebGPU adapter'); return; }
   // feet-baseline ⇒ (w/2, h - paddingPx) = (64, 120)
   assertEquals(s.framing.pivotPx, { x: 64, y: 120 });
 });
 
-Deno.test('render: centered silhouette stays strictly inside the padding on all sides', async () => {
+test('render: centered silhouette stays strictly inside the padding on all sides', async (t) => {
   // center pivot: the whole silhouette is framed around the cell centre, so the
   // strict all-sides alpha-in-padding invariant (atlas-bleed margins) holds.
   const s = await setup({ pivot: 'center' });
-  if (!s) return;
+  if (!s) { t.skip('No WebGPU adapter'); return; }
   const [lit] = await s.renderer.capturePadded(0, 0);
   const { w, h } = s.cam.cellPx;
   const pad = s.cam.paddingPx;
@@ -134,13 +138,13 @@ Deno.test('render: centered silhouette stays strictly inside the padding on all 
   );
 });
 
-Deno.test('render: feet-baseline grounds the feet at the baseline row', async () => {
+test('render: feet-baseline grounds the feet at the baseline row', async (t) => {
   // feet-baseline pins the ground-contact row to h - paddingPx. Under an elevated
   // camera the footprint has visual depth, so the near foot projects a few px BELOW
   // the baseline into the bottom padding — that sub-baseline margin is the footprint
   // landing zone by design; the bleed margins that must stay clear are top/left/right.
   const s = await setup(); // feet-baseline (default)
-  if (!s) return;
+  if (!s) { t.skip('No WebGPU adapter'); return; }
   const [lit] = await s.renderer.capturePadded(0, 0);
   const { w, h } = s.cam.cellPx;
   const pad = s.cam.paddingPx;
@@ -155,9 +159,9 @@ Deno.test('render: feet-baseline grounds the feet at the baseline row', async ()
   );
 });
 
-Deno.test('render: same-process double render is byte-identical (nondeterminism canary)', async () => {
+test('render: same-process double render is byte-identical (nondeterminism canary)', async (t) => {
   const s = await setup();
-  if (!s) return;
+  if (!s) { t.skip('No WebGPU adapter'); return; }
   const a = await s.renderer.capturePadded(2, 5);
   const b = await s.renderer.capturePadded(2, 5);
   for (let k = 0; k < a.length; k++) {
@@ -169,10 +173,10 @@ Deno.test('render: same-process double render is byte-identical (nondeterminism 
   }
 });
 
-Deno.test('render: width-100 padded readback matches the per-row reference (strip test)', async () => {
+test('render: width-100 padded readback matches the per-row reference (strip test)', async (t) => {
   // row = 100*4 = 400 bytes -> padded to 512: exercises both the alignment and the strip
   const s = await setup({ cellPx: { w: 100, h: 128 } });
-  if (!s) return;
+  if (!s) { t.skip('No WebGPU adapter'); return; }
   const padded = await s.renderer.capturePadded(0, 0);
   const rows = await s.renderer.captureRowByRow(0, 0);
   for (let k = 0; k < padded.length; k++) {

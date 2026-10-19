@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Throughput probe: render the checked-in fixture through the seam and leave
  * throughput.json (frames/sec, readback MB/s) under `outDir` for CI to upload on
@@ -11,7 +12,7 @@
 import type { CameraPreset } from '@spritebook/schema';
 import { type RenderJobSpec, runRenderJob } from './mod.ts';
 
-const outDir = Deno.args[0] ?? '.render-bench';
+const outDir = process.argv.slice(2)[0] ?? '.render-bench';
 const FIXTURE = new URL('./fixtures/skinned-column.glb', import.meta.url)
   .pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
@@ -42,9 +43,9 @@ for await (const e of runRenderJob(spec)) {
     console.error(`render bench failed [${e.code}]: ${e.message}`);
     failed = true;
   } else if (e.t === 'artifact' && e.kind === 'throughput') {
-    console.log(await Deno.readTextFile(e.path));
+    console.log(await fs.readFile(e.path, 'utf8'));
   } else if (e.t === 'done') {
     console.log(`bench: 8 directions x 16 frames in ${e.wallTimeS.toFixed(2)}s`);
   }
 }
-if (failed) Deno.exit(1);
+if (failed) process.exit(1);

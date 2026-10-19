@@ -47,11 +47,11 @@ F4's small `spritebook-lock` helper reuses **windows-sys 0.61.2** and **libc 0.2
 builds need Rust, while installed applications include the compiled helper. No FFI package or
 timeout-based replacement for F1's workspace locks is added.
 
-F2's isolated renderer experiment (`tools/qualification`, not the production runtime) pins `webgpu`
+F4 promotes F2's qualified renderer into `@spritebook/render` with pinned `webgpu`
 **0.6.2**. Its npm metadata says MIT, but its actual `LICENSE.md` is **BSD-3-Clause** (Dawn/Tint);
-retain the shipped text. The addon is evaluated with an app-owned **Node 24.22.0** (MIT plus Node's
-bundled third-party notices). Build-only npm transitives are `debug` (MIT), `ms` (MIT) and
-`@webgpu/types` (BSD-3-Clause); the deployed loader imports none of them. Windows shader DLLs and
+retain the shipped text. The addon runs on an app-owned **Node 24.22.0** (MIT plus Node's
+bundled third-party notices). Its npm transitives are `debug` (MIT), `ms` (MIT) and
+`@webgpu/types` **0.1.74** (BSD-3-Clause); the deployed loader imports none of them. Windows shader DLLs and
 native transitive notices require an explicit artifact audit before a shipping claim; do not copy
 the entire npm distribution on the strength of its metadata label.
 

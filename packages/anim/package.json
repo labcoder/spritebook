@@ -7,6 +7,10 @@
     ".": {
       "types": "./dist/mod.d.ts",
       "default": "./dist/mod.js"
+    },
+    "./quat": {
+      "types": "./dist/quat.d.ts",
+      "default": "./dist/quat.js"
     }
   },
   "files": [

@@ -15,6 +15,9 @@
     },
     {
       "path": "packages/anim"
+    },
+    {
+      "path": "packages/render"
     }
   ]
 }

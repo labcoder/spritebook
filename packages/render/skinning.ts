@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Load a canonical glb (importer-border output) into GPU-ready vertex streams +
  * a skeleton, and evaluate joint matrices per frame. Promoted from the P0-T2
@@ -335,7 +336,7 @@ function boundsOf(positions: Float32Array): ModelBounds {
 }
 
 export async function loadSkinnedAsset(path: string): Promise<SkinnedAsset> {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path)));
   return documentToAsset(doc, path);
 }
 

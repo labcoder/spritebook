@@ -1,3 +1,4 @@
+import { resourcePath } from '@spritebook/core';
 import { promises as fs } from 'node:fs';
 /**
  * Catalog layer (D-009): the committed catalog JSON is the single source of
@@ -7,11 +8,7 @@ import { promises as fs } from 'node:fs';
  */
 import { type ModelCatalog, ModelCatalogSchema, parseWith } from '@spritebook/schema';
 
-// decodeURIComponent: URL.pathname percent-encodes (spaces, non-ASCII) — an
-// install under "C:\Users\First Last\..." must still resolve (P3-T1 review F3)
-const BUNDLED_CATALOG = decodeURIComponent(
-  new URL('./catalog/models.json', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-);
+const BUNDLED_CATALOG = resourcePath('registry', 'catalog/models.json');
 
 /** Read + schema-validate a model catalog; defaults to the bundled file. */
 export async function loadCatalog(path = BUNDLED_CATALOG): Promise<ModelCatalog> {

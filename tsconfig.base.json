@@ -6,7 +6,15 @@
     "strict": true,
     "skipLibCheck": true,
     "rewriteRelativeImportExtensions": true,
-    "types": ["node"],
-    "lib": ["ES2024", "DOM", "DOM.Iterable"]
+    "types": [
+      "node",
+      "@webgpu/types"
+    ],
+    "lib": [
+      "ES2024",
+      "DOM",
+      "DOM.Iterable",
+      "ESNext.Array"
+    ]
   }
 }

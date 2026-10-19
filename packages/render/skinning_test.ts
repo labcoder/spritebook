@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * documentToAsset concatenation (M1) — no GPU. A canonical character is almost
  * always multi-primitive (body/clothes/hair, or extra mesh nodes); the loader
@@ -8,9 +9,9 @@
  * cannot place: geometry only reaches the screen through a node, and one flat
  * vertex stream can hold exactly one placement of a mesh.
  */
-import { assert, assertEquals, assertThrows } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 import { Document } from '@gltf-transform/core';
-import { documentToAsset } from './skinning.ts';
+import { documentToAsset } from './dist/skinning.js';
 
 function tri(doc: Document, buffer: ReturnType<Document['createBuffer']>, yOffset: number) {
   const pos = doc.createAccessor().setType('VEC3').setArray(
@@ -25,7 +26,7 @@ function tri(doc: Document, buffer: ReturnType<Document['createBuffer']>, yOffse
     .setIndices(idx);
 }
 
-Deno.test('documentToAsset folds in every primitive, offsetting indices', () => {
+test('documentToAsset folds in every primitive, offsetting indices', () => {
   const doc = new Document();
   const buffer = doc.createBuffer();
   const mesh = doc.createMesh('m').addPrimitive(tri(doc, buffer, 0)).addPrimitive(
@@ -44,7 +45,7 @@ Deno.test('documentToAsset folds in every primitive, offsetting indices', () => 
   assertEquals(asset.bounds.min[1], 0);
 });
 
-Deno.test('documentToAsset spans multiple mesh nodes too', () => {
+test('documentToAsset spans multiple mesh nodes too', () => {
   const doc = new Document();
   const buffer = doc.createBuffer();
   const meshA = doc.createMesh('a').addPrimitive(tri(doc, buffer, 0));
@@ -58,7 +59,7 @@ Deno.test('documentToAsset spans multiple mesh nodes too', () => {
   assertEquals(asset.bounds.max[1], 6, 'second mesh (y offset 5) included');
 });
 
-Deno.test('documentToAsset refuses a mesh no node draws', () => {
+test('documentToAsset refuses a mesh no node draws', () => {
   const doc = new Document();
   const buffer = doc.createBuffer();
   doc.createMesh('orphan').addPrimitive(tri(doc, buffer, 0));
@@ -71,7 +72,7 @@ Deno.test('documentToAsset refuses a mesh no node draws', () => {
   );
 });
 
-Deno.test('documentToAsset refuses an instanced mesh, naming both nodes', () => {
+test('documentToAsset refuses an instanced mesh, naming both nodes', () => {
   const doc = new Document();
   const buffer = doc.createBuffer();
   const mesh = doc.createMesh('earring').addPrimitive(tri(doc, buffer, 0));

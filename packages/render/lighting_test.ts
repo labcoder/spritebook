@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * The LIGHTING acceptance (GPU): what the lit AOV holds, against the closed
  * form the shader claims to compute.
@@ -19,13 +21,13 @@
  * tolerance to argue about: three different defects predict three different
  * numbers, and the test names them.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { Document } from '@gltf-transform/core';
 import type { CameraPreset } from '@spritebook/schema';
-import { tryGetGpu } from './gpu.ts';
-import { documentToAsset } from './skinning.ts';
-import { solveFraming } from './camera.ts';
-import { AMBIENT, LIGHT_DIR, Renderer } from './renderer.ts';
+import { tryGetGpu } from './dist/gpu.js';
+import { documentToAsset } from './dist/skinning.js';
+import { solveFraming } from './dist/camera.js';
+import { AMBIENT, LIGHT_DIR, Renderer } from './dist/renderer.js';
 
 const SHADERS = new URL('./shaders.wgsl', import.meta.url);
 
@@ -43,7 +45,7 @@ const CAM: CameraPreset = {
 
 /** The shader's own encode, in TypeScript, so the two can be compared. */
 function srgbEncode(c: number): number {
-  return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(Math.max(c, 0), 1 / 2.4) - 0.055;
+  return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.max(c, 0) ** (1 / 2.4) - 0.055;
 }
 
 /** An unlit-white quad facing +Z, tinted by `factor` — no texture to confuse it. */
@@ -74,7 +76,7 @@ async function shade(factor: [number, number, number, number]) {
     g,
     asset,
     solveFraming(CAM, asset.bounds),
-    await Deno.readTextFile(SHADERS),
+    await fs.readFile(SHADERS, 'utf8'),
     CAM.cellPx.w,
     CAM.cellPx.h,
   );
@@ -100,8 +102,8 @@ function ndlFacingCamera(): number {
   return z / Math.hypot(x, y, z);
 }
 
-Deno.test('the lit AOV is exactly albedo * (ambient + (1-ambient)*ndl), sRGB-encoded once', async () => {
-  if (!(await tryGetGpu())) return;
+test('the lit AOV is exactly albedo * (ambient + (1-ambient)*ndl), sRGB-encoded once', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
   const ndl = ndlFacingCamera();
   const shadeFactor = AMBIENT + (1 - AMBIENT) * ndl;
 
@@ -131,7 +133,7 @@ Deno.test('the lit AOV is exactly albedo * (ambient + (1-ambient)*ndl), sRGB-enc
   }
 });
 
-Deno.test('what the rig costs a camera-facing surface, from the rig itself', async () => {
+test('what the rig costs a camera-facing surface, from the rig itself', async (t) => {
   // The number behind "every sheet reads darker than its reference". It is not
   // a defect and this test exists to stop anyone re-diagnosing it as one: the
   // key light sits at [0.4, 0.9, 0.5], which is mostly OVERHEAD, so a surface
@@ -142,7 +144,7 @@ Deno.test('what the rig costs a camera-facing surface, from the rig itself', asy
   // DERIVED from AMBIENT rather than pinned at a measured percentage, so
   // changing the rig moves this test's expectation with it instead of failing
   // it — the loss was 26% at the 0.12 that shipped first and is 19% at 0.30.
-  if (!(await tryGetGpu())) return;
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
   const got = await shade([1, 1, 1, 1]);
   assert(got);
 
@@ -169,14 +171,14 @@ Deno.test('what the rig costs a camera-facing surface, from the rig itself', asy
   );
 });
 
-Deno.test('camera-frame lighting reproduces the front relation at every yaw', async () => {
+test('camera-frame lighting reproduces the front relation at every yaw', async () => {
   // B3 (C-WAVE.md): 'world' keeps one world-space key, so a back view is lit
   // from behind; 'camera' rotates the key with each direction's camera, so the
   // light-to-camera relation at direction 0 is reproduced everywhere. Both are
   // closed-form checkable without a GPU: at yaw 0 the two frames agree
   // exactly, and at yaw 180 the camera-frame key has its horizontal components
   // negated while Y (the overhead component) is untouched.
-  const { DEFAULT_LIGHT_FRAME, lightDirFor } = await import('./renderer.ts');
+  const { DEFAULT_LIGHT_FRAME, lightDirFor } = await import('./dist/renderer.js');
 
   assertEquals(lightDirFor('world', 0), [...LIGHT_DIR] as [number, number, number]);
   assertEquals(lightDirFor('camera', 0), [...LIGHT_DIR] as [number, number, number]);

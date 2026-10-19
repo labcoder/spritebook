@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * Node placement — no GPU. In glTF a NODE is the only thing that says where a
  * mesh is, and the loader used to ignore that entirely: it read `listMeshes()`
@@ -16,9 +17,9 @@
  * deterministic arithmetic, so "the sword stays in the hand" does not need a
  * GPU to be true — attachment_test.ts then proves it in real pixels.
  */
-import { assert, assertAlmostEquals, assertEquals, assertThrows } from 'jsr:@std/assert@1';
+import { assert, assertAlmostEquals, assertEquals, assertThrows } from '@std/assert';
 import { Document } from '@gltf-transform/core';
-import { documentToAsset, evalPosesMatrices } from './skinning.ts';
+import { documentToAsset, evalPosesMatrices } from './dist/skinning.js';
 
 type Acc = (type: 'VEC3' | 'VEC4' | 'MAT4' | 'SCALAR', array: ArrayLike<number>) => never;
 
@@ -81,7 +82,7 @@ function rigidDoc(configure: (node: ReturnType<Document['createNode']>) => void,
   return doc;
 }
 
-Deno.test('placement: an identity mesh node leaves the streams byte-identical', () => {
+test('placement: an identity mesh node leaves the streams byte-identical', () => {
   const doc = rigidDoc(() => {});
   const prim = doc.getRoot().listMeshes()[0].listPrimitives()[0];
   const srcPos = [...(prim.getAttribute('POSITION')!.getArray() as Float32Array)];
@@ -92,7 +93,7 @@ Deno.test('placement: an identity mesh node leaves the streams byte-identical', 
   assertEquals([...asset.normals], srcNrm, 'normals untouched');
 });
 
-Deno.test('placement: a rigid mesh node bakes its world transform', () => {
+test('placement: a rigid mesh node bakes its world transform', () => {
   const doc = rigidDoc((n) => n.setTranslation([5, 0, 0]).setScale([2, 2, 2]));
   const asset = documentToAsset(doc, 'test');
   assertEquals([...asset.positions.slice(0, 3)], [5, 0, 0], 'origin vertex placed at the node');
@@ -100,7 +101,7 @@ Deno.test('placement: a rigid mesh node bakes its world transform', () => {
   assertEquals(asset.bounds.max[0], 7, 'bounds follow the placement');
 });
 
-Deno.test('placement: a skinned node ignores its own transform (glTF spec)', () => {
+test('placement: a skinned node ignores its own transform (glTF spec)', () => {
   const { doc, bodyNode } = riggedDoc();
   const before = [...documentToAsset(doc, 'test').positions];
   bodyNode.setTranslation([100, 100, 100]);
@@ -111,7 +112,7 @@ Deno.test('placement: a skinned node ignores its own transform (glTF spec)', () 
   );
 });
 
-Deno.test('placement: a prop under a joint rides that joint, placed at it', () => {
+test('placement: a prop under a joint rides that joint, placed at it', () => {
   const { doc, acc, hand } = riggedDoc();
   hand.addChild(doc.createNode('attach').setMesh(propMesh(doc, acc)));
 
@@ -129,7 +130,7 @@ Deno.test('placement: a prop under a joint rides that joint, placed at it', () =
   );
 });
 
-Deno.test('placement: a prop under NO joint rides joint 0', () => {
+test('placement: a prop under NO joint rides joint 0', () => {
   const { doc, acc } = riggedDoc();
   doc.getRoot().listScenes()[0].addChild(doc.createNode('loose').setMesh(propMesh(doc, acc)));
   const asset = documentToAsset(doc, 'test');
@@ -137,7 +138,7 @@ Deno.test('placement: a prop under NO joint rides joint 0', () => {
   assertEquals(asset.joints[(n - 1) * 4], 0, 'nothing above it -> joint 0');
 });
 
-Deno.test('placement: nested wrapper nodes compose', () => {
+test('placement: nested wrapper nodes compose', () => {
   const { doc, acc, hand } = riggedDoc();
   hand.addChild(
     doc.createNode('wrapper').setTranslation([0, 1, 0]).addChild(
@@ -153,7 +154,7 @@ Deno.test('placement: nested wrapper nodes compose', () => {
   );
 });
 
-Deno.test('placement: normals ride the rotation and stay unit length', () => {
+test('placement: normals ride the rotation and stay unit length', () => {
   const h = Math.SQRT1_2; // 90deg about +X takes +Z to -Y (quaternion xyzw)
   const doc = rigidDoc((n) => n.setRotation([h, 0, 0, h]).setScale([3, 3, 3]));
   const asset = documentToAsset(doc, 'test');
@@ -164,7 +165,7 @@ Deno.test('placement: normals ride the rotation and stay unit length', () => {
   assertAlmostEquals(nz, 0, 1e-6);
 });
 
-Deno.test('placement: a mirror is allowed, a non-uniform scale is refused', () => {
+test('placement: a mirror is allowed, a non-uniform scale is refused', () => {
   // (1/s)Q points the same way once renormalized, so a mirror is safe here
   const mirrored = documentToAsset(rigidDoc((n) => n.setScale([-1, 1, 1])), 'test');
   assertEquals(mirrored.positions[3], -1, 'mirrored across X');
@@ -179,7 +180,7 @@ Deno.test('placement: a mirror is allowed, a non-uniform scale is refused', () =
   );
 });
 
-Deno.test('placement: skin attributes on a node that binds no skin are refused', () => {
+test('placement: skin attributes on a node that binds no skin are refused', () => {
   const { doc, acc } = riggedDoc();
   const prim = doc.createPrimitive()
     .setAttribute('POSITION', acc('VEC3', new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0])))
@@ -198,7 +199,7 @@ Deno.test('placement: skin attributes on a node that binds no skin are refused',
   );
 });
 
-Deno.test('ACCEPTANCE (cpu): the prop STAYS in the hand while the clip moves it', () => {
+test('ACCEPTANCE (cpu): the prop STAYS in the hand while the clip moves it', () => {
   const { doc, acc, hand } = riggedDoc();
   hand.addChild(doc.createNode('attach').setMesh(propMesh(doc, acc)));
   const asset = documentToAsset(doc, 'test');

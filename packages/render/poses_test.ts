@@ -1,10 +1,14 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Poses reader unit tests (no GPU): the frozen byte format round-trips, errors
  * are actionable, and name-mapping behaves. The cross-package write->read->
  * render parity proof lives in the anim integration tests (P3-T1 Phase 2).
  */
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
-import { mapPosesJoints, readPoses } from './poses.ts';
+import { assert, assertEquals, assertRejects } from '@std/assert';
+import { mapPosesJoints, readPoses } from './dist/poses.js';
 
 function canonicalHeader(h: Record<string, unknown>): Uint8Array {
   const sorted = Object.fromEntries(Object.entries(h).sort(([a], [b]) => a < b ? -1 : 1));
@@ -21,11 +25,11 @@ async function writePosesFile(
   const out = new Uint8Array(head.length + blob.length);
   out.set(head, 0);
   out.set(blob, head.length);
-  await Deno.writeFile(path, out);
+  await fs.writeFile(path, out);
 }
 
-Deno.test('poses: round-trip preserves header and every float', async () => {
-  const dir = await Deno.makeTempDir();
+test('poses: round-trip preserves header and every float', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const joints = ['root', 'pelvis'];
     const frames = 3;
@@ -39,12 +43,12 @@ Deno.test('poses: round-trip preserves header and every float', async () => {
     assertEquals(r.header.jointNames, joints);
     assertEquals([...r.data], [...data], 'blob bytes identical');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('poses: wrong version and truncated blob are actionable errors', async () => {
-  const dir = await Deno.makeTempDir();
+test('poses: wrong version and truncated blob are actionable errors', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const p1 = `${dir}/v2.bin`;
     await writePosesFile(
@@ -62,11 +66,11 @@ Deno.test('poses: wrong version and truncated blob are actionable errors', async
     );
     await assertRejects(() => readPoses(p2), Error, 'expected');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('poses: joints map by NAME; unmatched -> -1', () => {
+test('poses: joints map by NAME; unmatched -> -1', () => {
   const map = mapPosesJoints(['pelvis', 'spine_01', 'tail'], {
     clipId: 'x',
     frames: 1,

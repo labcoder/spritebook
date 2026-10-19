@@ -132,7 +132,8 @@ export const REQUIRED_LIMITS: Record<string, number> = {
 // and every golden an honest miss rather than a silent disagreement.
 // 0.4.0: materials honoured (factor x texture, alpha cutout); median cut
 // reaches maxColors DISTINCT colours; area average weights colour by coverage.
-export const RENDERER_VERSION = 'spritebook-render@0.5.0';
+// 0.6.0: Node/Dawn and native PNG bytes get a new cache namespace.
+export const RENDERER_VERSION = 'spritebook-render@0.6.0';
 
 // ---------------------------------------------------------------------------
 // AOV contract (aov.ts + shaders.wgsl). One MRT pass, five color attachments,

@@ -1,18 +1,32 @@
+
 /**
  * Device/adapter management + diagnostics (webgpu-headless-rendering skill).
  * `initGPU` returns either a usable device or throws an actionable error naming
- * DENO_WEBGPU_BACKEND. `device.lost` is captured on the context so a bake job
+ * SPRITEBOOK_GPU_BACKEND. `device.lost` is captured on the context so a bake job
  * can convert it into a RETRYABLE error rather than a mystery abort.
  */
 import { type GpuContext, REQUIRED_LIMITS } from './contracts.ts';
 
+export function gpuBackend(): string {
+  const selected = process.env.SPRITEBOOK_GPU_BACKEND ?? process.env.DENO_WEBGPU_BACKEND;
+  return selected === 'dx12' ? 'd3d12' : selected ?? (process.platform === 'darwin' ? 'metal' : 'vulkan');
+}
+
 export async function initGPU(): Promise<GpuContext> {
+  const { create, globals } = await import('webgpu').catch((cause) => {
+    throw Object.assign(new Error(`Cannot load the Dawn native addon: ${cause.message}`, { cause }), {
+      code: 'native-addon-load',
+    });
+  });
+  Object.assign(globalThis, globals);
+  Object.defineProperty(navigator, 'gpu', { value: create([`backend=${gpuBackend()}`]), configurable: true });
   const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
   if (!adapter) {
-    const backend = Deno.env.get('DENO_WEBGPU_BACKEND') ?? '(unset)';
+    delete (navigator as { gpu?: GPU }).gpu;
+    const backend = gpuBackend();
     throw new Error(
-      `No WebGPU adapter (DENO_WEBGPU_BACKEND=${backend}). ` +
-        `Check GPU drivers; try DENO_WEBGPU_BACKEND=vulkan, metal, or dx12.`,
+      `No WebGPU adapter (SPRITEBOOK_GPU_BACKEND=${backend}). ` +
+        `Check GPU drivers; try SPRITEBOOK_GPU_BACKEND=vulkan or metal.`,
     );
   }
   const adapterInfo = walkInfo(adapter.info);
@@ -26,21 +40,27 @@ export async function initGPU(): Promise<GpuContext> {
   };
   device.lost.then((info) => {
     ctx.lost = { reason: String(info.reason), message: info.message };
-    console.error(`device lost (retryable): ${info.reason} - ${info.message}`);
+    if (info.reason !== 'destroyed') console.error(`device lost (retryable): ${info.reason} - ${info.message}`);
   });
   return ctx;
 }
 
 /**
- * Process-wide device singleton. Deno's wgpu is unhappy with several GPUDevices
- * live in one process, and one device per CLI process is the right production
- * model anyway (device creation is expensive) — so every render job and every
- * test shares this one context.
+ * One device per CLI process; initialization stays lazy for non-rendering commands.
  */
 let shared: Promise<GpuContext> | undefined;
 export function getGpu(): Promise<GpuContext> {
   if (!shared) shared = initGPU();
   return shared;
+}
+
+/** Release Dawn's root as well as the device, so Node can exit without force-exit. */
+export async function disposeGpu(): Promise<void> {
+  const pending = shared;
+  shared = undefined;
+  const gpu = await pending?.catch(() => undefined);
+  gpu?.device.destroy();
+  delete (navigator as { gpu?: GPU }).gpu;
 }
 
 /**
@@ -49,22 +69,13 @@ export function getGpu(): Promise<GpuContext> {
  * (the lavapipe lane does) to turn a missing adapter back into a hard failure, so
  * a broken software-Vulkan lane can't masquerade as "all tests skipped, green".
  *
- * The skip SAYS SO, once per caller. `if (!(await tryGetGpu())) return;` is how
- * roughly sixteen tests across eight files begin, and a bare `return` makes Deno
- * print `ok` — so on a machine with no adapter the entire acceptance suite
- * reported success while asserting nothing, which is the exact shape of failure
- * this project keeps finding. Deno prints the test's name immediately above its
- * output, so one line here reads as that test declining to run.
+ * Test callers must also mark their TestContext skipped when this returns null.
  */
 export async function tryGetGpu(): Promise<GpuContext | null> {
   try {
     return await getGpu();
   } catch (err) {
-    if (Deno.env.get('SPRITEBOOK_REQUIRE_GPU')) throw err;
-    console.log(
-      'skip: no GPU adapter — this test asserted NOTHING. ' +
-        'Set SPRITEBOOK_REQUIRE_GPU=1 to make a missing adapter a failure instead.',
-    );
+    if (process.env['SPRITEBOOK_REQUIRE_GPU']) throw err;
     return null;
   }
 }
@@ -73,7 +84,7 @@ export async function tryGetGpu(): Promise<GpuContext | null> {
 function walkInfo(info: GPUAdapterInfo): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (
-    let p = Object.getPrototypeOf(info);
+    let p = info;
     p && p !== Object.prototype;
     p = Object.getPrototypeOf(p)
   ) {

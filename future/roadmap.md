@@ -203,7 +203,7 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       now add 54 passing Node checks for deterministic GLB/OBJ/FBX/VRM import, rig preservation,
       retargeting, clip packing and preview parity. Animation's render/bake integration checks are
       queued with the renderer port.
-- [ ] **F4-T3 · Promote the qualified renderer.** Integrate the F2 path through the existing render
+- [~] **F4-T3 · Promote the qualified renderer.** Integrate the F2 path through the existing render
       seam. Assign a fresh renderer signature/cache namespace, including build/backend/adapter and
       available driver identity. Never reuse old cached frames as evidence of Node rendering. Keep
       existing bakes and accepted model assets; provide a compatible export/read path rather than
@@ -211,6 +211,10 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       qualified PNG boundary and 8/16-bit/CRC assertions into the real Node modules; remove F2's
       environment shim and build-time import substitutions. Preserve fresh `Uint8Array` copy and
       alignment semantics in binary readers when replacing Deno file reads with Node buffers.
+      **Progress:** the compiled Node/Dawn renderer passes 59 Windows Vulkan checks, including
+      padded readback, materials, attachments and independent 8/16-bit PNG/CRC checks. Renderer
+      0.6.0 hashes Node/Dawn, codec, backend and adapter/available driver information into a fresh
+      cache identity. Installed delivery and paired baseline replay follow in F4-T4/T5.
 - [ ] **F4-T4 · Switch application, tooling and release execution.** Make Tauri invoke bundled
       runtime/core entry points rather than `deno run -A` against a checkout. Switch web build
       hooks, CLI commands, test/lint/format/type-check tasks, CI guards, proof helpers, hooks and

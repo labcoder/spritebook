@@ -1,8 +1,9 @@
-import { assert, assertAlmostEquals, assertEquals } from 'jsr:@std/assert@1';
+import { test } from 'node:test';
+import { assert, assertAlmostEquals, assertEquals } from '@std/assert';
 import { CameraPresetSchema } from '@spritebook/schema';
 import type { CameraPreset } from '@spritebook/schema';
-import type { DirectionCamera, ModelBounds } from './contracts.ts';
-import { solveFraming } from './camera.ts';
+import type { DirectionCamera, ModelBounds } from './dist/contracts.js';
+import { solveFraming } from './dist/camera.js';
 
 // f32-stored matrices read back into f64 math carry ~1e-4 px of rounding for
 // cell coords in the low hundreds; 1e-2 px is comfortably tight and far under
@@ -63,7 +64,7 @@ function boxCorners(b: ModelBounds): [number, number, number][] {
 
 const person: ModelBounds = { min: [-0.3, 0, -0.2], max: [0.3, 1.8, 0.2] };
 
-Deno.test('ortho maps frustum edges to NDC +/-1 (el=0, az=0, center pivot)', () => {
+test('ortho maps frustum edges to NDC +/-1 (el=0, az=0, center pivot)', () => {
   const p = preset({ pivot: 'center', elevationDeg: 0, directions: 4 });
   const { cameras } = solveFraming(p, person);
   const mpp = 1 / p.pixelsPerMeter;
@@ -83,7 +84,7 @@ Deno.test('ortho maps frustum edges to NDC +/-1 (el=0, az=0, center pivot)', () 
   assertAlmostEquals(top.ndcY, 1, EPS_NDC);
 });
 
-Deno.test('pivot pixel is integer, exact, and identical across all directions', () => {
+test('pivot pixel is integer, exact, and identical across all directions', () => {
   for (const directions of [2, 4, 8, 16] as const) {
     const p = preset({ directions, pivot: 'feet-baseline' });
     const { cameras, pivotPx } = solveFraming(p, person);
@@ -106,7 +107,7 @@ Deno.test('pivot pixel is integer, exact, and identical across all directions', 
   }
 });
 
-Deno.test('world-lock: one preset, two models share the world->pixel scale exactly', () => {
+test('world-lock: one preset, two models share the world->pixel scale exactly', () => {
   const p = preset({ pivot: 'feet-baseline', elevationDeg: 30 });
   const { w, h } = p.cellPx;
   const ppm = p.pixelsPerMeter;
@@ -136,7 +137,7 @@ Deno.test('world-lock: one preset, two models share the world->pixel scale exact
   assertAlmostEquals(spanX(b), 1 * ppm, EPS_PX);
 });
 
-Deno.test('texel-snap: solving twice is byte-identical', () => {
+test('texel-snap: solving twice is byte-identical', () => {
   const p = preset({ directions: 16 });
   const first = solveFraming(p, person);
   const second = solveFraming(p, person);
@@ -150,7 +151,7 @@ Deno.test('texel-snap: solving twice is byte-identical', () => {
   });
 });
 
-Deno.test('texel-snap: a sub-texel bounds shift keeps the pivot on the same texel', () => {
+test('texel-snap: a sub-texel bounds shift keeps the pivot on the same texel', () => {
   const p = preset({ pivot: 'feet-baseline', directions: 8 });
   const mpp = 1 / p.pixelsPerMeter;
   const nudge = mpp * 0.1; // one tenth of a texel, well under half
@@ -171,7 +172,7 @@ Deno.test('texel-snap: a sub-texel bounds shift keeps the pivot on the same texe
   }
 });
 
-Deno.test('near > 0, near < far, and all 8 corners fall within [near, far]', () => {
+test('near > 0, near < far, and all 8 corners fall within [near, far]', () => {
   for (const directions of [2, 4, 8, 16] as const) {
     const p = preset({ directions, elevationDeg: 35.264 });
     const { cameras } = solveFraming(p, person);
@@ -191,7 +192,7 @@ Deno.test('near > 0, near < far, and all 8 corners fall within [near, far]', () 
   }
 });
 
-Deno.test('feet-baseline: feet project to row (h - paddingPx) within < 0.5 px', () => {
+test('feet-baseline: feet project to row (h - paddingPx) within < 0.5 px', () => {
   const p = preset({ pivot: 'feet-baseline', directions: 8, paddingPx: 12 });
   const { cameras } = solveFraming(p, person);
   const targetRow = p.cellPx.h - p.paddingPx;
@@ -203,7 +204,7 @@ Deno.test('feet-baseline: feet project to row (h - paddingPx) within < 0.5 px', 
   }
 });
 
-Deno.test('elevation sweep: vertical foreshortening follows cos(el); el=0 has none', () => {
+test('elevation sweep: vertical foreshortening follows cos(el); el=0 has none', () => {
   const H = 1.8;
   const tall: ModelBounds = { min: [-0.2, 0, -0.2], max: [0.2, H, 0.2] };
   let prevSpan = Infinity;
@@ -222,7 +223,7 @@ Deno.test('elevation sweep: vertical foreshortening follows cos(el); el=0 has no
   }
 });
 
-Deno.test('center pivot projects the box centre to the image centre', () => {
+test('center pivot projects the box centre to the image centre', () => {
   const p = preset({ pivot: 'center', directions: 8 });
   const { cameras, pivotPx } = solveFraming(p, person);
   assertEquals(pivotPx, { x: p.cellPx.w / 2, y: p.cellPx.h / 2 });
@@ -234,7 +235,7 @@ Deno.test('center pivot projects the box centre to the image centre', () => {
   }
 });
 
-Deno.test('custom {xPct,yPct} pivot pins the box centre to the requested pixel', () => {
+test('custom {xPct,yPct} pivot pins the box centre to the requested pixel', () => {
   const p = preset({ pivot: { xPct: 25, yPct: 40 }, directions: 8 });
   const { cameras, pivotPx } = solveFraming(p, person);
   assertEquals(pivotPx, {
@@ -249,7 +250,7 @@ Deno.test('custom {xPct,yPct} pivot pins the box centre to the requested pixel',
   }
 });
 
-Deno.test('metersPerPixel is 1/pixelsPerMeter and matrices are NaN-free', () => {
+test('metersPerPixel is 1/pixelsPerMeter and matrices are NaN-free', () => {
   const p = preset({ pixelsPerMeter: 64 });
   const { cameras, metersPerPixel } = solveFraming(p, person);
   assertAlmostEquals(metersPerPixel, 1 / 64, 1e-12);
@@ -260,7 +261,7 @@ Deno.test('metersPerPixel is 1/pixelsPerMeter and matrices are NaN-free', () => 
   }
 });
 
-Deno.test('odd cell dimensions still yield an integer (edge-snapped) pivot', () => {
+test('odd cell dimensions still yield an integer (edge-snapped) pivot', () => {
   const p = preset({ cellPx: { w: 65, h: 129 }, pivot: 'center', directions: 4 });
   const { pivotPx } = solveFraming(p, person);
   assertEquals(pivotPx.x, Math.round(65 / 2)); // 33

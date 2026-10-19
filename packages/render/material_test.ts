@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * The MATERIAL acceptance (GPU). glTF says base color is
  * `baseColorFactor × baseColorTexture` and that `alphaMode: MASK` cuts the
@@ -16,14 +18,14 @@
  * because both are exactly expressible: the factor path uploads a 1x1 float
  * texture, and a discarded fragment writes nothing at all.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { Document } from '@gltf-transform/core';
 import { encode as encodePng } from 'fast-png';
 import type { CameraPreset } from '@spritebook/schema';
-import { tryGetGpu } from './gpu.ts';
-import { documentToAsset } from './skinning.ts';
-import { solveFraming } from './camera.ts';
-import { Renderer } from './renderer.ts';
+import { tryGetGpu } from './dist/gpu.js';
+import { documentToAsset } from './dist/skinning.js';
+import { solveFraming } from './dist/camera.js';
+import { Renderer } from './dist/renderer.js';
 
 const SHADERS = new URL('./shaders.wgsl', import.meta.url);
 
@@ -103,7 +105,7 @@ async function render(doc: Document) {
     g,
     asset,
     framing,
-    await Deno.readTextFile(SHADERS),
+    await fs.readFile(SHADERS, 'utf8'),
     CAM.cellPx.w,
     CAM.cellPx.h,
   );
@@ -128,8 +130,8 @@ function albedoOf(planes: Uint8Array[]) {
   return { covered, first };
 }
 
-Deno.test('material: baseColorFactor multiplies the texture, it is not ignored', async () => {
-  if (!(await tryGetGpu())) return;
+test('material: baseColorFactor multiplies the texture, it is not ignored', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
 
   const white = albedoOf((await render(quadDoc({}))).planes);
   const tinted = albedoOf(
@@ -147,8 +149,8 @@ Deno.test('material: baseColorFactor multiplies the texture, it is not ignored',
   assertEquals(tinted.covered, white.covered, 'a factor tints, it does not cut geometry');
 });
 
-Deno.test('material: MASK discards below the cutoff, in EVERY AOV', async () => {
-  if (!(await tryGetGpu())) return;
+test('material: MASK discards below the cutoff, in EVERY AOV', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
 
   const opaque = albedoOf((await render(quadDoc({ rightHalfTransparent: true }))).planes);
   const cut = albedoOf(
@@ -173,8 +175,8 @@ Deno.test('material: MASK discards below the cutoff, in EVERY AOV', async () => 
   assert(cut.covered < opaque.covered, 'the mask AOV lost the discarded half');
 });
 
-Deno.test('material: BLEND is treated as a cutout at 0.5 (documented limit)', async () => {
-  if (!(await tryGetGpu())) return;
+test('material: BLEND is treated as a cutout at 0.5 (documented limit)', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
 
   const blend = albedoOf(
     (await render(quadDoc({ rightHalfTransparent: true, alphaMode: 'BLEND' }))).planes,
@@ -193,8 +195,8 @@ Deno.test('material: BLEND is treated as a cutout at 0.5 (documented limit)', as
   assertEquals(blend.covered, mask.covered, 'BLEND matches MASK at cutoff 0.5');
 });
 
-Deno.test('material: two materials sharing one texture keep their own factors', async () => {
-  if (!(await tryGetGpu())) return;
+test('material: two materials sharing one texture keep their own factors', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
   // The reason the factor cannot be folded into the decoded texels: textures
   // dedupe by glTF Texture identity, so a shared texture with two factors
   // would collide onto one entry.
@@ -225,8 +227,8 @@ Deno.test('material: two materials sharing one texture keep their own factors', 
   assertEquals(asset.materials[1].factor[0], 1);
 });
 
-Deno.test('material: a semi-transparent BLEND surface bakes PRESENT, not absent', async () => {
-  if (!(await tryGetGpu())) return;
+test('material: a semi-transparent BLEND surface bakes PRESENT, not absent', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
   // The regression this pins, measured on GPU before the fix: a BLEND material
   // whose baseColorFactor alpha sat below the 0.5 cutout discarded EVERY
   // fragment, so a 40%-opacity cape, visor or glass vanished from all five
@@ -258,8 +260,8 @@ Deno.test('material: a semi-transparent BLEND surface bakes PRESENT, not absent'
   assert(ratio > 0.4 && ratio < 0.6, `texture alpha still shapes the cutout (ratio ${ratio})`);
 });
 
-Deno.test('material: MASK keeps the full glTF product, factor alpha included', async () => {
-  if (!(await tryGetGpu())) return;
+test('material: MASK keeps the full glTF product, factor alpha included', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
   // Not a bug, and deliberately NOT changed: glTF says alpha is
   // factor.a * texture.a, so a MASK material whose factor alpha is below its
   // own cutoff is the author declaring the surface fully transparent. We honour

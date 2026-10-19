@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Poses-artifact READER — the render side of the P3-T1 poses seam. The FORMAT
  * is frozen in packages/anim/contracts.ts (producer): one canonical-JSON header
@@ -19,7 +20,7 @@ export interface PosesHeader {
 export async function readPoses(
   path: string,
 ): Promise<{ header: PosesHeader; data: Float32Array }> {
-  const bytes = await Deno.readFile(path);
+  const bytes = new Uint8Array(await fs.readFile(path));
   const nl = bytes.indexOf(0x0a);
   if (nl < 0) throw new Error(`${path}: not a poses file (no header line)`);
   const header = JSON.parse(new TextDecoder().decode(bytes.subarray(0, nl))) as PosesHeader;

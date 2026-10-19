@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * AOV PNG encoding — the seam where a plane becomes a file someone opens.
  *
@@ -11,9 +12,9 @@
  * contract for a file — it also has to be distinguishable from the failure it
  * would look like.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { decode as decodePng } from 'fast-png';
-import { encodeAov } from './png.ts';
+import { encodeAov } from './dist/png.js';
 
 /** A coverage plane as the readback hands it over: u32 bytes, 1 = drawn. */
 function coverage(width: number, height: number, drawn: (i: number) => boolean): Uint8Array {
@@ -22,7 +23,7 @@ function coverage(width: number, height: number, drawn: (i: number) => boolean):
   return new Uint8Array(u.buffer);
 }
 
-Deno.test('a covered mask texel encodes to full white, not to a value of 1', () => {
+test('a covered mask texel encodes to full white, not to a value of 1', () => {
   const w = 4, h = 4;
   const png = encodeAov(coverage(w, h, (i) => i % 2 === 0), w, h, 'u32');
   const img = decodePng(png);
@@ -38,13 +39,13 @@ Deno.test('a covered mask texel encodes to full white, not to a value of 1', () 
   assert(max > 32767, `a mask with coverage must be visibly non-black, got max ${max}`);
 });
 
-Deno.test('an all-empty mask really is black, so blank still reads as blank', () => {
+test('an all-empty mask really is black, so blank still reads as blank', () => {
   const png = encodeAov(coverage(4, 4, () => false), 4, 4, 'u32');
   const d = decodePng(png).data as Uint16Array;
   assertEquals(Math.max(...d), 0, 'nothing drawn stays nothing');
 });
 
-Deno.test('coverage encoding is idempotent, so a mirrored page cannot drift', () => {
+test('coverage encoding is idempotent, so a mirrored page cannot drift', () => {
   // pack/mirror.ts decodes a cell, flips it and re-encodes. A scale rather than
   // a threshold would multiply 65535 by 65535 on the second pass.
   const u = new Uint32Array([0, 1, 65535, 7]);
@@ -52,7 +53,7 @@ Deno.test('coverage encoding is idempotent, so a mirrored page cannot drift', ()
   assertEquals([...d], [0, 65535, 65535, 65535], 'any coverage is the same coverage');
 });
 
-Deno.test('depth still scales, because it is a measurement and not a flag', () => {
+test('depth still scales, because it is a measurement and not a flag', () => {
   // the neighbouring case, pinned so the mask fix cannot be copied onto it:
   // depth carries a continuum and thresholding it would destroy the AOV
   const f = new Float32Array([0, 0.25, 0.5, 1]);

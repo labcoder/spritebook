@@ -402,10 +402,16 @@ export class SidecarSession {
     } catch {
       // unreachable = already dead
     }
-    const graceful = await Promise.race([
-      handle.exited.then(() => true),
-      new Promise<false>((resolve) => setTimeout(() => resolve(false), 3_000)),
-    ]);
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    let graceful: boolean;
+    try {
+      graceful = await Promise.race([
+        handle.exited.then(() => true),
+        new Promise<false>((resolve) => deadline = setTimeout(() => resolve(false), 3_000)),
+      ]);
+    } finally {
+      clearTimeout(deadline);
+    }
     if (!graceful) {
       // the announced pid is the PYTHON process; proc is the uv wrapper —
       // kill both, or a stubborn python could orphan behind a dead wrapper

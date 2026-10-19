@@ -17,6 +17,7 @@
     "@spritebook/core": "0.1.0",
     "@spritebook/importer": "0.1.0",
     "@spritebook/registry": "0.1.0",
-    "@spritebook/schema": "0.1.0"
+    "@spritebook/schema": "0.1.0",
+    "@spritebook/anim": "0.1.0"
   }
 }

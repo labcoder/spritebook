@@ -39,3 +39,6 @@ docs/superpowers/
 .claude/worktrees/
 # proof-run rosters (gigabytes of atlases; the transcript is the artifact)
 .proof-roster*/
+
+# App-owned runtime build inputs and generated payloads
+.build/

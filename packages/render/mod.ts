@@ -1,3 +1,5 @@
+import { resourcePath } from '@spritebook/core';
+import { promises as fs } from 'node:fs';
 /**
  * @spritebook/render - headless WebGPU: MRT AOVs, skinning, readback.
  *
@@ -35,7 +37,7 @@ export { renderDiagnostics, renderSignature } from './diagnostics.ts';
 export type { RenderDiagnostics } from './diagnostics.ts';
 // the honest availability probe, for best-effort callers (gen thumbnails):
 // returns null instead of throwing when no adapter exists
-export { tryGetGpu } from './gpu.ts';
+export { disposeGpu, tryGetGpu } from './gpu.ts';
 
 /** Render one canonical model to per-direction AOV pages + a throughput report. */
 export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent> {
@@ -52,7 +54,7 @@ export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent
     yield { t: 'progress', jobId, at: at(), step: 'device', done: 1, total: 4 };
     gpu = await getGpu();
 
-    const shaderSrc = await Deno.readTextFile(new URL('./shaders.wgsl', import.meta.url));
+    const shaderSrc = await fs.readFile(resourcePath('render', 'shaders.wgsl'), 'utf8');
     const renderer = await makeRenderer(gpu, spec, shaderSrc);
     yield { t: 'progress', jobId, at: at(), step: 'setup', done: 2, total: 4 };
 
@@ -75,7 +77,7 @@ export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent
     }
 
     const summaryPath = `${spec.outDir}/render-summary.json`;
-    await Deno.writeTextFile(summaryPath, JSON.stringify(summary, null, 2) + '\n');
+    await fs.writeFile(summaryPath, JSON.stringify(summary, null, 2) + '\n');
     yield { t: 'progress', jobId, at: at(), step: 'write', done: 4, total: 4 };
 
     yield { t: 'artifact', jobId, at: at(), kind: 'render-summary', path: summaryPath };
@@ -93,7 +95,7 @@ export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent
       t: 'error',
       jobId,
       at: at(),
-      code: lost ? 'device-lost' : 'render-failed',
+      code: lost ? 'device-lost' : (err as { code?: string })?.code === 'native-addon-load' ? 'native-addon-load' : 'render-failed',
       message,
       retryable: lost,
     };

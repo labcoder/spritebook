@@ -11,7 +11,7 @@
     "apps/studio"
   ],
   "scripts": {
-    "build": "npm run build:host && tsc -b && node tools/copy-assets.mjs",
+    "build": "npm run build:host && node tools/setup-gpu.mjs && tsc -b && node tools/copy-assets.mjs",
     "check": "tsc -p tsconfig.check.json",
     "test": "node --test --test-concurrency=1 packages/schema/*_test.ts",
     "test:schema": "node --test packages/schema/*_test.ts",
@@ -25,7 +25,8 @@
     "@biomejs/biome": "2.5.15",
     "@std/assert": "npm:@jsr/std__assert@1.0.19",
     "@types/node": "24.19.2",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "@webgpu/types": "0.1.74"
   },
   "overrides": {
     "@jsr/std__internal": "1.0.12"
