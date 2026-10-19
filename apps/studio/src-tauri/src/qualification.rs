@@ -26,6 +26,8 @@ pub fn run() {
             cmd.arg(runtime.join("node-run.mjs"));
             if args.get(1).map(String::as_str) == Some("checks") {
                 cmd.arg("checks");
+            } else if args.get(1).map(String::as_str) == Some("loss") {
+                cmd.arg("loss").arg(&out).args(&args[2..]);
             } else {
                 cmd.args(&args);
             }
