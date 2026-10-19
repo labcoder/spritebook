@@ -84,7 +84,8 @@ pub fn run() -> i32 {
             });
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("renderer qualification launch failed");
+        .build(tauri::generate_context!())
+        .expect("renderer qualification launch failed")
+        .run_return(|_, _| {});
     exit_code.load(Ordering::SeqCst)
 }
