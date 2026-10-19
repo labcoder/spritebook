@@ -7,7 +7,9 @@ References to measured performance below identify historical evidence explicitly
 **Decision update:** the maintainer has selected Tauri and the TypeScript core/CLI, with Deno to be
 replaced, and has approved [incremental migration in this repository](migration-strategy.md). Full
 Rust core and alternate desktop shells are outside scope. The [migration roadmap](roadmap.md) now
-defines the execution order; the source findings below remain the current implementation baseline.
+defines the execution order. The source findings below describe the reviewed baseline;
+[F1 implementation and verification](state-safety.md) supersede the state-safety defects. Runtime,
+model provisioning and installed-delivery gaps remain subject to their roadmap gates.
 
 ## Verdict
 
@@ -19,7 +21,7 @@ Changing language alone does not repair them.
 The previous [August audit](../docs/internal/proofs/adversarial-audit-2026-08-16.md) is unusually
 useful, but its overall statement that all laws hold needs qualification. Some contracts are
 implemented, some are incomplete, and reversible manifest data does not yet imply reversible assets.
-The audit's key findings below remain visible in this checkout.
+The audit's findings below describe that historical checkout; F1 repairs are recorded separately.
 
 ## What runs today
 
@@ -109,7 +111,8 @@ traces Look and rig drafts to another character after switching tabs. Key the ed
 workspace identity and make late async results prove their originating workspace/revision before
 applying. Rewriting the editor without fixing state ownership would preserve the bug.
 
-These are implementation tasks for F1, not fixes made by this documentation session.
+These findings led to F1. The [completion record](state-safety.md) documents the implemented repairs
+and fresh regressions; the reproduction above remains historical evidence.
 
 ## Make the declared laws operational
 

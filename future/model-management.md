@@ -42,7 +42,9 @@ without an authentication path. Do not assume setting `HF_TOKEN` authenticates t
 The [UniRig adapter](../sidecar/spritebook_sidecar/adapters/unirig.py) routes checkpoints to
 absolute installed paths, disables HF network access and telemetry for its stage processes, and
 prefers a registry-installed OPT architecture config. It retains a warned cache fallback for older
-installs. Preserve compatibility while provisioning that config explicitly for every fresh install.
+installs. F1 now verifies every catalog file before model execution, so an incomplete older receipt
+refuses before reaching that fallback. Existing accepted assets can still be used without re-running
+the model. [Execution policy and verification](state-safety.md).
 
 The [TRELLIS.2 adapter](../sidecar/spritebook_sidecar/adapters/trellis2.py) loads from the model
 directory, but DINOv3 still requires a per-user gate and external HF state. The adapter also stubs

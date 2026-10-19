@@ -5,7 +5,7 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1 is now in progress, starting with F1-T2.** The
+2026-10-19; F1 state-safety work is complete. F2 is next.** The
 [conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
 unverified targets. Closing baseline capture does not close platform, installed-app, model or
 release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
@@ -85,29 +85,29 @@ Work **F1-T2 → F1-T1 → F1-T3**, then finish the read/policy checks in F1-T4/
 cutover. F2's read-only fixture experiment may run independently; no real workspace conversion
 precedes F1.
 
-- [~] **F1-T2 · One recoverable writer.** Consolidate commit/undo/redo persistence in core, protect
-  the entire read-modify-write with a per-workspace inter-process lock, use unique staging paths,
-  and define recovery across journal, cursor, manifest and asset selection. Reuse proven mechanisms
-  where correct. Document process-crash versus power-loss durability. Two writers and injected
-  failure at every commit boundary must produce a recoverable prior/new state, never a silently lost
-  acknowledged edit or a replayed wrong inverse.
-- [ ] **F1-T1 · Restore actual assets during undo.** Fix the reproduced pick r1 → pick r2 → undo
+- [x] **F1-T2 · One recoverable writer.** Consolidate commit/undo/redo persistence in core, protect
+      the entire read-modify-write with a per-workspace inter-process lock, use unique staging
+      paths, and define recovery across journal, cursor, manifest and asset selection. Reuse proven
+      mechanisms where correct. Document process-crash versus power-loss durability. Two writers and
+      injected failure at every commit boundary must produce a recoverable prior/new state, never a
+      silently lost acknowledged edit or a replayed wrong inverse.
+- [x] **F1-T1 · Restore actual assets during undo.** Fix the reproduced pick r1 → pick r2 → undo
       mismatch. Preserve recoverable versions of transformed canonical meshes/textures, not just the
-      original generator outputs. Immutable hash-addressed revisions are the proposed minimal
-      storage approach; settle the exact manifest/materialization design with F1-T2 before
-      implementation. Undo/redo after pick, rig, retexture and identity edits must restore the bytes
-      consumed by the next bake. Aborted promotion cannot replace the last accepted asset.
-- [ ] **F1-T3 · Isolate editor and job ownership.** Key character-local drafts, reject stale async
+      original generator outputs. Immutable hash-addressed revisions are the implemented storage
+      approach; the revision/materialization protocol is documented with F1-T2. Undo/redo after
+      pick, rig, retexture and identity edits must restore the bytes consumed by the next bake.
+      Aborted promotion cannot replace the last accepted asset.
+- [x] **F1-T3 · Isolate editor and job ownership.** Key character-local drafts, reject stale async
       completion for another character/revision, capture stderr without corrupting NDJSON, and make
       cancellation reach the owned CLI/worker process tree. Closing or canceling a job must not
       publish partial assets. Prove tab switching, cancel, process death and retry against
       disposable workspaces.
-- [ ] **F1-T4 · Make core reads consistent.** Expose workspace/roster/current-bake queries from
+- [x] **F1-T4 · Make core reads consistent.** Expose workspace/roster/current-bake queries from
       core; use `lastBakeId` consistently in review, thumbnails and export. Preserve existing CLI
       arguments and query-versus-event output contracts. Fix missing/ambiguous valued-flag handling
       where it can silently change a job. Help expansion, aesthetic grammar changes and flag renames
       are later CLI ergonomics work; any future rename needs a compatibility alias.
-- [ ] **F1-T5 · Make exact execution policy load-bearing.** Resolve project model/pack pins, verify
+- [x] **F1-T5 · Make exact execution policy load-bearing.** Resolve project model/pack pins, verify
       install receipts, recheck applicable license/territory/platform gates at job time and use
       config-specific memory claims. Preserve cross-process VRAM admission and the existing sidecar
       contract; do not add a new scheduler to wire the unused queue into production. Invalid pins,
@@ -117,6 +117,13 @@ precedes F1.
 state agreement, classified terminal errors, and correct admission/consent checks. Keep existing
 valid workflows green. No artifact schema or storage migration may rely on regenerating a historic
 AI output. [Evidence and affected modules](architecture-review.md#safety-work-before-migration).
+
+**Recorded exit (2026-10-19):** [F1 completion and validation](state-safety.md). All five tasks are
+implemented on main, including crash/concurrency and byte-level history checks, real desktop
+cancellation/retry, consistent selected-bake queries, exact execution policy, and the final
+creation/no-op/replay regressions. Schema 3 and the sidecar protocol are retained. Deno replacement
+has not started. **Next: F2-T1**, using preserved fixtures and disposable copies; the platform,
+installed-artifact, real-model, power-loss and soak limits remain explicit in the completion record.
 
 ## F2 · Qualify the Node GPU path and installed layout
 
@@ -170,12 +177,14 @@ Avoid dependency upgrades that are unrelated to the runtime move.
 - [ ] **F4-T4 · Switch application, tooling and release execution.** Make Tauri invoke bundled
       runtime/core entry points rather than `deno run -A` against a checkout. Switch web build
       hooks, CLI commands, test/lint/format/type-check tasks, CI guards, proof helpers, hooks and
-      release builds. Preserve scoped args/artifact access, per-job streams and owned worker
-      cleanup. Ship the importer and required native assets; retire the lean-tree importer omission.
-      Preserve current Python/uv adapters and handshake compatibility, with a clear
-      installed-environment path. Make current adapters' declared assets and authentication work
-      from a fresh install. Minimum provisioning fixes needed by existing models belong here; they
-      cannot be deferred merely because F3 includes broader model-management improvements.
+      release builds. Close the observed Vite optimizer stall and Rust-target watcher failure; the
+      F1 desktop proof used a temporary watch exclusion, not a delivery fix. Preserve scoped
+      args/artifact access, per-job streams and owned worker cleanup. Ship the importer and required
+      native assets; retire the lean-tree importer omission. Preserve current Python/uv adapters and
+      handshake compatibility, with a clear installed-environment path. Make current adapters'
+      declared assets and authentication work from a fresh install. Minimum provisioning fixes
+      needed by existing models belong here; they cannot be deferred merely because F3 includes
+      broader model-management improvements.
 - [ ] **F4-T5 · Prove conversion, rollback and legacy retirement.** Validate a preserved workspace
       copy before changing it. Preserve IDs, source/assets/history and readable exports; reject
       future schemas honestly. Test interrupted installs, corrupt receipts, disk-full commits,
@@ -240,6 +249,7 @@ F4/F7 migration work, even when they touch the same modules as these later impro
 | **F5-T4**        | Further installer/updater and platform integration improvements                                                         | Clean upgrade/rollback and safe paths on claimed targets; required migration delivery is already covered by F4/F7                                                             |
 | **F6-T1, F6-T2** | Expanded identity, motion and pixel-style qualification                                                                 | Asymmetric marks/prosthetics, root/feet, thin features, palettes, alpha, outline, all directions and aligned AOVs survive actual sprite-size review                           |
 | **F6-T3**        | Higher roster throughput and resource efficiency                                                                        | Cold/warm/single-edit/style-pivot predictions and 8-hour soak pass; preserve palette scope and temporal frame order while profiling before parallelism                        |
+| **F6-T4**        | End-to-end production workflow qualification                                                                            | Props, asymmetric animated characters, roster recovery and engine playback pass with setup/inference/bake costs reported separately                                           |
 
 ### Workflow qualification
 

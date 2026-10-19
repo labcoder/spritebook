@@ -13,7 +13,8 @@ tests, fixtures and history. See the [accepted strategy](migration-strategy.md) 
 [migration roadmap](roadmap.md). The plan targets supported Node LTS and qualifies Node/Dawn first;
 exact dependency pins and renderer adoption still require the stated checks. F0 baseline capture is
 complete; [the evidence and preservation matrix](baseline.md) records the current Windows control,
-known failures and unverified targets. F1 safety repairs and runtime migration have not started.
+known failures and unverified targets. [F1 safety repairs are complete](state-safety.md); F2 is
+next. Runtime replacement has not started.
 
 ## Recommendation in one paragraph
 
@@ -38,6 +39,7 @@ migration problems either.
 | [Hugging Face and model management](model-management.md) | What HF integration exists, should we retain it, and how should authentication, caches, pins and offline inference work?     |
 | [Migration roadmap](roadmap.md)                          | What is the required execution order, what evidence closes each task, and which model/UX improvements come later?            |
 | [F0 preservation and control](baseline.md)               | Which contracts and platform targets must survive, what ran, and how do we replay the legacy control safely?                 |
+| [F1 state-safety completion](state-safety.md)            | What changed in state, process ownership, queries and execution policy; what passed and what remains unqualified?            |
 
 ## Findings that change the decision
 
@@ -52,12 +54,14 @@ migration problems either.
   core-language replacement. [Decision boundaries](technology-options.md).
 - **There is no identified HF Desktop app dependency.** Actual usage is Hub artifacts and Python
   client/cache behavior, with a hidden provisioning gap. [HF review](model-management.md).
-- **Undo has a reproduced asset-consistency defect.** Picking A, picking B, then undoing restores
-  A's metadata while leaving B's canonical GLB. Fix this with the known transaction/concurrency gaps
-  before trusting a migration.
-  [Reproduction and proposed repair](architecture-review.md#safety-work-before-migration).
+- **F1 repairs the reproduced state-consistency defects.** Undo now restores canonical bytes;
+  transactions recover under one writer; desktop jobs and core reads share clear ownership.
+  [Implemented behavior and verification](state-safety.md).
 
 ## How this review was done
+
+The source review below is historical. Fresh F0 and F1 execution evidence is recorded in
+[the baseline](baseline.md) and [the state-safety completion record](state-safety.md).
 
 Validation for the original research change: Markdown formatting, local link/anchor checks, source
 spot-checks, and one isolated CPU-only reproduction through the real CLI implementation. The

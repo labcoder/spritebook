@@ -25,8 +25,9 @@ immediate outage. [Deno announcement](https://deno.com/blog/cloudflare).
 
 A rewrite should also fix the larger usability promise: a clean-machine install that can explain
 what works on this machine, get to the first usable sprite quickly, and scale to hundreds of
-characters. The current code already contains valuable work, while its packaging, asset undo, model
-provisioning, and process lifecycle need attention. The
+characters. The current code already contains valuable work, while packaging, model provisioning and
+installed delivery still need attention.
+[F1 has repaired asset history and process/state ownership](state-safety.md). The
 [architecture review](architecture-review.md) separates those facts from proposals.
 
 Native and Python inference routes deserve separate qualification. Keep app availability separate
@@ -50,8 +51,8 @@ contingency if that path fails; it would not move product behavior out of TypeSc
 defines the unresolved engineering gates.
 
 The migration roadmap is now finalized for this strategy. It separates the required Deno exit from
-later model and editor improvements. F0 has captured the legacy control; F1 safety work is in
-progress. Unverified hardware and installed-artifact gates remain open.
+later model and editor improvements. F0 has captured the legacy control and F1 safety work is
+complete. F2 is next. Unverified hardware and installed-artifact gates remain open.
 
 Keep Python or an audited native inference runner for models that need it. Rewriting the UI or
 orchestrator does not make a CUDA-only model run on Metal. Hugging Face remains an artifact source;
