@@ -13,11 +13,10 @@
 // binary takes SPRITEBOOK_REPO until the packaging task pins a real story.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod jobs;
 #[cfg(feature = "renderer-qualification")]
 mod qualification;
 
-use jobs::Jobs;
+use spritebook_lock::jobs::Jobs;
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
