@@ -1,0 +1,20 @@
+{
+  "name": "@spritebook/anim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/mod.d.ts",
+      "default": "./dist/mod.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@gltf-transform/core": "4.4.1",
+    "@spritebook/registry": "0.1.0",
+    "@spritebook/schema": "0.1.0"
+  }
+}

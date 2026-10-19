@@ -1,39 +1,33 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * T2 acceptance: invalid documents fail with ACTIONABLE messages — the error
  * must name the offending path and say what was expected, never a stack trace.
  */
-import { assert, assertThrows } from 'jsr:@std/assert@1';
+import { assert, assertThrows } from '@std/assert';
 import type { z } from 'zod';
-import { parseWith, SchemaError } from './canonical.ts';
-import { CharacterIdSchema } from './identity.ts';
-import { CacheKeyInputsSchema } from './cache.ts';
-import { JsonPatchOpSchema, ManifestPatchSchema } from './patch.ts';
-import { CameraOverridesSchema, StylePresetSchema } from './project.ts';
-import { CharacterManifestSchema } from './character.ts';
-import { JobEventSchema } from './jobs.ts';
-import { migrateCharacterManifest } from './migrate.ts';
+import { parseWith, SchemaError } from './dist/canonical.js';
+import { CharacterIdSchema } from './dist/identity.js';
+import { CacheKeyInputsSchema } from './dist/cache.js';
+import { JsonPatchOpSchema, ManifestPatchSchema } from './dist/patch.js';
+import { CameraOverridesSchema, StylePresetSchema } from './dist/project.js';
+import { CharacterManifestSchema } from './dist/character.js';
+import { JobEventSchema } from './dist/jobs.js';
+import { migrateCharacterManifest } from './dist/migrate.js';
 
-function expectFailure(
-  schema: z.ZodType,
-  data: unknown,
-  what: string,
-  ...fragments: string[]
-) {
+function expectFailure(schema: z.ZodType, data: unknown, what: string, ...fragments: string[]) {
   const err = assertThrows(() => parseWith(schema, data, what), SchemaError);
   for (const f of fragments) {
-    assert(
-      err.message.includes(f),
-      `expected message to include "${f}", got:\n${err.message}`,
-    );
+    assert(err.message.includes(f), `expected message to include "${f}", got:\n${err.message}`);
   }
 }
 
-Deno.test('characterId rejects non-slug values with the rule spelled out', () => {
+test('characterId rejects non-slug values with the rule spelled out', () => {
   expectFailure(CharacterIdSchema, 'Brave Knight!', 'characterId', 'lowercase slug');
   expectFailure(CharacterIdSchema, 'x', 'characterId', 'lowercase slug'); // too short
 });
 
-Deno.test('CacheKeyInputs rejects a smuggled displayName (strict object)', () => {
+test('CacheKeyInputs rejects a smuggled displayName (strict object)', () => {
   expectFailure(
     CacheKeyInputsSchema,
     {
@@ -52,7 +46,7 @@ Deno.test('CacheKeyInputs rejects a smuggled displayName (strict object)', () =>
   );
 });
 
-Deno.test('patches cannot touch immutable identity paths', () => {
+test('patches cannot touch immutable identity paths', () => {
   expectFailure(
     JsonPatchOpSchema,
     { op: 'replace', path: '/id', value: 'new-name' },
@@ -67,7 +61,7 @@ Deno.test('patches cannot touch immutable identity paths', () => {
   );
 });
 
-Deno.test('patch ops: value required for add/replace, forbidden for remove', () => {
+test('patch ops: value required for add/replace, forbidden for remove', () => {
   expectFailure(
     JsonPatchOpSchema,
     { op: 'replace', path: '/displayName' },
@@ -82,7 +76,7 @@ Deno.test('patch ops: value required for add/replace, forbidden for remove', () 
   );
 });
 
-Deno.test('ManifestPatch requires a 1:1 precomputed inverse', () => {
+test('ManifestPatch requires a 1:1 precomputed inverse', () => {
   expectFailure(
     ManifestPatchSchema,
     {
@@ -102,7 +96,7 @@ Deno.test('ManifestPatch requires a 1:1 precomputed inverse', () => {
   );
 });
 
-Deno.test("StylePreset: alpha '1bit' without cutoff is actionable", () => {
+test("StylePreset: alpha '1bit' without cutoff is actionable", () => {
   expectFailure(
     StylePresetSchema,
     {
@@ -118,7 +112,7 @@ Deno.test("StylePreset: alpha '1bit' without cutoff is actionable", () => {
   );
 });
 
-Deno.test("StylePreset: passes must include 'lit' (parallel-layout law)", () => {
+test("StylePreset: passes must include 'lit' (parallel-layout law)", () => {
   expectFailure(
     StylePresetSchema,
     {
@@ -133,7 +127,7 @@ Deno.test("StylePreset: passes must include 'lit' (parallel-layout law)", () => 
   );
 });
 
-Deno.test('StylePreset: a fixed palette cannot exceed maxColors', () => {
+test('StylePreset: a fixed palette cannot exceed maxColors', () => {
   // buildPalette hands a fixed palette straight to paletteFromHex and never
   // consults maxColors, so 40 hex colours with maxColors 8 painted with 40 —
   // a ceiling the user set and the pipeline ignored.
@@ -174,7 +168,7 @@ Deno.test('StylePreset: a fixed palette cannot exceed maxColors', () => {
   );
 });
 
-Deno.test('CameraOverrides: every field optional, but each still judged', () => {
+test('CameraOverrides: every field optional, but each still judged', () => {
   // the whole point of a partial: a character overriding one control must not
   // have to restate the other six
   parseWith(CameraOverridesSchema, {}, 'CameraOverrides');
@@ -187,7 +181,7 @@ Deno.test('CameraOverrides: every field optional, but each still judged', () => 
   expectFailure(CameraOverridesSchema, { cellPx: { w: 64 } }, 'CameraOverrides', 'h');
 });
 
-Deno.test('CameraOverrides cannot rename the preset it refines', () => {
+test('CameraOverrides cannot rename the preset it refines', () => {
   // `id` is omitted on purpose (D-029): an override refines a preset, and the
   // resolved camera keeps the preset's id so a bake manifest can still say
   // where its framing came from. Accepting `id` here would let a character
@@ -197,9 +191,9 @@ Deno.test('CameraOverrides cannot rename the preset it refines', () => {
   expectFailure(CameraOverridesSchema, { elevation: 30 }, 'CameraOverrides', 'elevation');
 });
 
-Deno.test('a result cannot derive from a parent that is not there', async () => {
+test('a result cannot derive from a parent that is not there', async () => {
   const fixture = JSON.parse(
-    await Deno.readTextFile(new URL('./fixtures/valid/character-manifest.json', import.meta.url)),
+    await fs.readFile(new URL('./fixtures/valid/character-manifest.json', import.meta.url), 'utf8'),
   ) as { generation: { results: { id: string; derivedFrom?: string }[] } };
   const withResults = (results: unknown[]) => ({
     ...fixture,
@@ -234,7 +228,7 @@ Deno.test('a result cannot derive from a parent that is not there', async () => 
   parseWith(CharacterManifestSchema, withResults([r1]), 'CharacterManifest');
 });
 
-Deno.test('JobEvent rejects unknown discriminants and bad timestamps', () => {
+test('JobEvent rejects unknown discriminants and bad timestamps', () => {
   expectFailure(
     JobEventSchema,
     { t: 'finished', jobId: 'job-1', at: '2026-07-12T00:00:00Z' },
@@ -244,9 +238,9 @@ Deno.test('JobEvent rejects unknown discriminants and bad timestamps', () => {
   expectFailure(JobEventSchema, { t: 'queued', jobId: 'job-1', at: 'yesterday' }, 'JobEvent', 'at');
 });
 
-Deno.test('migration refuses documents newer than this build', () => {
+test('migration refuses documents newer than this build', () => {
   const err = assertThrows(() =>
-    migrateCharacterManifest({ schemaVersion: 99, id: 'brave-knight' })
+    migrateCharacterManifest({ schemaVersion: 99, id: 'brave-knight' }),
   );
   assert((err as Error).message.includes('newer than this build'));
 });

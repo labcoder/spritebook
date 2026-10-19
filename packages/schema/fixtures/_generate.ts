@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Fixture generator: builds one full-featured valid document per entity from
  * typed literals, validates it, and writes CANONICAL bytes. Deterministic —
@@ -301,10 +302,10 @@ const characterV1 = (() => {
 })();
 
 const here = new URL('.', import.meta.url);
-const write = (rel: string, content: string) => Deno.writeTextFile(new URL(rel, here), content);
+const write = (rel: string, content: string) => fs.writeFile(new URL(rel, here), content);
 
-await Deno.mkdir(new URL('valid/', here), { recursive: true });
-await Deno.mkdir(new URL('migrate/', here), { recursive: true });
+await fs.mkdir(new URL('valid/', here), { recursive: true });
+await fs.mkdir(new URL('migrate/', here), { recursive: true });
 await write('valid/model-entry.json', canonicalJson(modelEntry));
 await write('valid/animation-pack.json', canonicalJson(animationPack));
 await write('valid/project.json', canonicalJson(project));

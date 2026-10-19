@@ -1,0 +1,19 @@
+{
+  "name": "@spritebook/export",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/mod.d.ts",
+      "default": "./dist/mod.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "fast-png": "6.2.0",
+    "@spritebook/schema": "0.1.0"
+  }
+}

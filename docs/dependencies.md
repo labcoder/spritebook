@@ -20,6 +20,23 @@ are unchanged.
 | Tauri 2.x (pin minor)    | app shell — **chosen by P0-T3 (D-005)**; `deno desktop` revisit trigger noted in D-005; in use since P4-T1 (`apps/studio/src-tauri`, pinned 2.11/2.6 + serde, serde_json, base64 crates — all MIT+Apache-2.0) | MIT+Apache-2.0      | std              |
 | wgpu (under Deno WebGPU) | GPU backend                                                                                                                                                                                                   | MIT/Apache-2.0 dual | std              |
 
+F4 is porting the existing packages to a locked npm workspace. Node **24.22.0** remains the
+qualified runtime target; production cutover is recorded in the migration roadmap as each package
+group lands. Build/test dependencies below are not bundled in application resources:
+
+| Dependency | Role | License | Pin |
+| --- | --- | --- | --- |
+| TypeScript | Compile JavaScript/declarations and separately check source/tests | Apache-2.0 | 7.0.2, retained from Studio |
+| `@types/node` | Node API declarations | MIT | 24.19.2 |
+| `@std/assert` / `@jsr/std__internal` | Existing assertions through JSR's npm-compatible registry | MIT | 1.0.19 / 1.0.12, retained from the Deno lock |
+| `@biomejs/biome` | Development formatter/linter | MIT OR Apache-2.0 | 2.5.15 |
+| `@vitejs/plugin-react` | Studio's existing React integration, made compatible with Vite 8 | MIT | 6.0.1 |
+
+The previous React plugin 5.1.4 declared Vite support only through 7, preventing a clean npm
+workspace install with the already-pinned Vite 8.1.4. The
+[upstream migration notes](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/CHANGELOG.md)
+describe the compatible v6 integration. No Babel compiler plugin is enabled.
+
 The shell also directly uses lock-pinned `windows-sys` 0.61.2 (MIT/Apache-2.0) for Windows job
 objects and `libc` 0.2 (MIT/Apache-2.0) for Unix process groups. Both already belonged to the Tauri
 dependency graph; F1-T3 uses them to cancel owned CLI descendants and clean up on close.

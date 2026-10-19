@@ -26,10 +26,10 @@
     "@tauri-apps/cli": "2.11.4",
     "@types/react": "19.2.13",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "5.1.4",
-    "axe-core": "^4.12.1",
-    "typescript": "^7.0.2",
+    "@vitejs/plugin-react": "6.0.1",
+    "axe-core": "4.12.1",
+    "typescript": "7.0.2",
     "vite": "8.1.4",
-    "phaser": "^3.87.0"
+    "phaser": "3.90.0"
   }
 }

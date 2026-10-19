@@ -1,0 +1,32 @@
+{
+  "name": "spritebook",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.22.0 <25"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/studio"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "check": "tsc -p tsconfig.check.json",
+    "test": "node --test --test-concurrency=1 packages/schema/*_test.ts",
+    "test:schema": "node --test packages/schema/*_test.ts",
+    "lint": "biome lint .",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "hooks:install": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@std/assert": "npm:@jsr/std__assert@1.0.19",
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2"
+  },
+  "overrides": {
+    "@jsr/std__internal": "1.0.12"
+  }
+}

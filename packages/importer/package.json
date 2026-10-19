@@ -1,0 +1,25 @@
+{
+  "name": "@spritebook/importer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/mod.d.ts",
+      "default": "./dist/mod.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@gltf-transform/core": "4.4.1",
+    "@gltf-transform/extensions": "4.4.1",
+    "@gltf-transform/functions": "4.4.1",
+    "draco3dgltf": "1.5.7",
+    "meshoptimizer": "1.2.0",
+    "obj2gltf": "3.2.0",
+    "three": "0.185.1",
+    "@spritebook/schema": "0.1.0"
+  }
+}

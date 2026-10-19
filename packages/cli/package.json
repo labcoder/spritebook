@@ -1,0 +1,29 @@
+{
+  "name": "@spritebook/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/mod.d.ts",
+      "default": "./dist/mod.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "fast-png": "6.2.0",
+    "@gltf-transform/core": "4.4.1",
+    "@spritebook/anim": "0.1.0",
+    "@spritebook/core": "0.1.0",
+    "@spritebook/export": "0.1.0",
+    "@spritebook/gen": "0.1.0",
+    "@spritebook/pack": "0.1.0",
+    "@spritebook/registry": "0.1.0",
+    "@spritebook/render": "0.1.0",
+    "@spritebook/rig": "0.1.0",
+    "@spritebook/schema": "0.1.0",
+    "@spritebook/style": "0.1.0"
+  }
+}

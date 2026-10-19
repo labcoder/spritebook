@@ -39,6 +39,12 @@ shows its CLI twin for every action. See [`docs/prd.md`](docs/prd.md) for the pr
 The repo is a Deno workspace (`packages/*`; scaffolded at P1-T1, packages fill in over the roadmap
 phases). Requires [Deno](https://deno.com) 2.9.x.
 
+The [Node migration](future/roadmap.md#f4--migrate-the-existing-typescript-core-and-tauri-bridge) is
+active. Its npm workspace uses the version in `.node-version`: `npm ci --ignore-scripts`,
+`npm run build`, `npm run check` and `npm run test:schema` currently build and verify the compiled
+schema package. The remaining production core and desktop commands below still use Deno while
+their package groups are ported.
+
 ```sh
 deno task dev             # the studio in a BROWSER (demo-data bridge, port 5174)
 deno task dev:desktop     # the studio as the real desktop app (Tauri window;

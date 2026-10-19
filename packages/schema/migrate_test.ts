@@ -1,11 +1,17 @@
-import { assert, assertEquals, assertThrows } from 'jsr:@std/assert@1';
-import { parseWith } from './canonical.ts';
-import { CharacterManifestSchema } from './character.ts';
-import { CHARACTER_SCHEMA_VERSION, migrateCharacterManifest, SCHEMA_VERSION } from './migrate.ts';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { assert, assertEquals, assertThrows } from '@std/assert';
+import { parseWith } from './dist/canonical.js';
+import { CharacterManifestSchema } from './dist/character.js';
+import {
+  CHARACTER_SCHEMA_VERSION,
+  migrateCharacterManifest,
+  SCHEMA_VERSION,
+} from './dist/migrate.js';
 
-Deno.test('v1 character manifest walks every step and validates', async () => {
+test('v1 character manifest walks every step and validates', async () => {
   const raw = JSON.parse(
-    await Deno.readTextFile(new URL('./fixtures/migrate/character.v1.json', import.meta.url)),
+    await fs.readFile(new URL('./fixtures/migrate/character.v1.json', import.meta.url), 'utf8'),
   );
   assertEquals(raw.schemaVersion, undefined, 'v1 fixture predates the version field');
   assertEquals(raw.mirroring, undefined, 'v1 fixture predates D-008 opt-in mirroring');
@@ -20,7 +26,7 @@ Deno.test('v1 character manifest walks every step and validates', async () => {
   assert(manifest.id === 'brave-knight');
 });
 
-Deno.test('a v2 document carrying preflight upgrades rather than being refused', () => {
+test('a v2 document carrying preflight upgrades rather than being refused', () => {
   // The realistic case: a workspace created before this build. `schemaVersion:
   // z.literal(3)` would REJECT it outright, which is why the loaders migrate
   // first — a valid v2 manifest must never become an unopenable workspace.
@@ -44,15 +50,15 @@ Deno.test('a v2 document carrying preflight upgrades rather than being refused',
   assertEquals(manifest.displayName, 'Brave Knight', 'everything else survives untouched');
 });
 
-Deno.test('migration is a no-op on current documents', async () => {
+test('migration is a no-op on current documents', async () => {
   const raw = JSON.parse(
-    await Deno.readTextFile(new URL('./fixtures/valid/character-manifest.json', import.meta.url)),
+    await fs.readFile(new URL('./fixtures/valid/character-manifest.json', import.meta.url), 'utf8'),
   );
   const migrated = migrateCharacterManifest(raw);
   assertEquals(migrated, raw);
 });
 
-Deno.test('the character version is its own, and has left the global behind', () => {
+test('the character version is its own, and has left the global behind', () => {
   // A regression guard with teeth: the two constants used to be one, so any
   // future CharacterManifest change must move CHARACTER_SCHEMA_VERSION alone.
   // Re-pointing the schema at SCHEMA_VERSION would silently un-version four

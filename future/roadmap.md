@@ -5,7 +5,7 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1 state-safety work and the Windows x64 F2 proof are complete. Next: F4-T1.** The
+2026-10-19; F1 state-safety work and the Windows x64 F2 proof are complete. F4-T1 is active.** The
 [conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
 unverified targets. Closing baseline capture does not close platform, installed-app, model or
 release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
@@ -179,11 +179,15 @@ promotion is implied.
 Keep each behavior-changing package group and each toolchain switch in its own reviewable change.
 Avoid dependency upgrades that are unrelated to the runtime move.
 
-- [ ] **F4-T1 · Port the contract/test foundation.** Keep schema ownership in `packages/schema`.
+- [~] **F4-T1 · Port the contract/test foundation.** Keep schema ownership in `packages/schema`.
       Establish package exports and a locked npm workspace, compile shipped JavaScript, and retain a
       separate TypeScript check. Port fixture/schema tests first, using a single JS test runner
       (`node:test` if sufficient); retain cleanup/leak checks and honest GPU skip/fail semantics.
       Verify accepted/rejected documents and canonical serialization against the control.
+      **Progress:** locked npm workspaces and default compiled package exports are established;
+      all 30 existing schema/fixture/migration assertions pass on emitted JavaScript through
+      `node:test`, with a separate TypeScript check. Remaining package and lifecycle checks follow
+      with their ports; no global Deno adapter is being adopted.
 - [ ] **F4-T2 · Port runtime-bound calls in package order.** Keep algorithms and package boundaries.
       Convert filesystem/process/env/path/error handling in `core` and `registry`; then `importer`,
       `gen` and `rig`; `anim`/`style`; `pack`/`export`; and `cli` composition. `schema` is covered
