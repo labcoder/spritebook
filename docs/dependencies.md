@@ -183,12 +183,13 @@ Check exact artifact notices and source/build provenance. The
 [F4 model gate](../future/model-provisioning-gate.md) records current primary license evidence and
 distinguishes private evaluation, user-installed model terms and commercial product claims.
 
-DINOv3's separately gated conditioner is also an existing dependency, but is not yet declared in the
-model's catalog file set. The authorized `ea8dc2863c51be0a264bab82070e3e8836b02d51` snapshot's
-August 19, 2025 agreement has custom use/trade and redistribution terms; it is not MIT. Its exact
-license SHA-256 is `25d122eb8f5b880fd23c736fb6ea8018ee45c12237e00b8a86d14c653904999e`. That text
-omits the older public website's “Built with DINOv3” clause. Preserve the applicable agreement and
-explicit acceptance; do not substitute a blanket attribution or output-rights claim.
+DINOv3's separately gated conditioner is declared in the complete `af44b45f.local1` catalog version,
+alongside its exact agreement and an explicit acceptance gate. The authorized
+`ea8dc2863c51be0a264bab82070e3e8836b02d51` snapshot's August 19, 2025 agreement has custom use/trade
+and redistribution terms; it is not MIT. Its exact license SHA-256 is
+`25d122eb8f5b880fd23c736fb6ea8018ee45c12237e00b8a86d14c653904999e`. That text omits the older public
+website's “Built with DINOv3” clause. Preserve the applicable agreement and explicit acceptance; do
+not substitute a blanket attribution or output-rights claim.
 
 ## Rigging
 

@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { test } from 'node:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
 import { CAMERA_PRESETS, ManifestJournal } from '@spritebook/core';
@@ -57,6 +58,56 @@ function collector() {
     err,
   };
 }
+
+test('offline model install maps files from the highest version when omitted', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'sb-offline-model-'));
+  try {
+    const catalog = JSON.parse(
+      await fs.readFile(new URL('../registry/catalog/models.json', import.meta.url), 'utf8'),
+    );
+    const entry = catalog.models.find((model: { id: string }) => model.id === 'fixture-gen');
+    const bytes = new TextEncoder().encode('new model bytes');
+    const file = {
+      path: 'new.bin',
+      url: 'https://example.invalid/new.bin',
+      bytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    };
+    entry.versions = [
+      {
+        ...entry.versions[0],
+        version: '1.9.0',
+        files: [{ ...file, path: 'old.bin', url: 'https://example.invalid/old.bin' }],
+      },
+      { ...entry.versions[0], version: '1.10.0', files: [file] },
+    ];
+    const catalogPath = join(root, 'catalog.json');
+    await fs.writeFile(catalogPath, JSON.stringify(catalog));
+    await fs.writeFile(join(root, 'new.bin'), bytes);
+    const c = collector();
+    const code = await runCli([
+      'models',
+      'install',
+      'fixture-gen',
+      '--catalog',
+      catalogPath,
+      '--from',
+      root,
+      '--models-dir',
+      join(root, 'models'),
+      '--json',
+    ], c.io);
+    assertEquals(code, 0, c.out.join('\n'));
+    const installed = join(root, 'models/fixture-gen/1.10.0');
+    assertEquals(new Uint8Array(await fs.readFile(join(installed, 'new.bin'))), bytes);
+    assertEquals(
+      JSON.parse(await fs.readFile(join(installed, 'receipt.json'), 'utf8')).version,
+      '1.10.0',
+    );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
 
 test('cli undo/redo restore and reapply patches; --json emits valid NDJSON', async () => {
   const { manifest, original } = await setupWorkspace();

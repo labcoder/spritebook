@@ -63,7 +63,7 @@ from typing import Any
 
 from . import Adapter, AdapterError, Emitter, validate_params
 
-TRELLIS2_ADAPTER_VERSION = "0.1.0"
+TRELLIS2_ADAPTER_VERSION = "0.2.0"
 
 # A collapsed texture has NO CONTENT, and the decoder can reach that at either
 # end of its [-1, 1] range. Black was found first (generation, seed 42, mean
@@ -368,8 +368,11 @@ def _shim_dinov3() -> None:
 
 def _prepare_runtime() -> None:
     """Everything that must happen between importing trellis2 and loading it."""
+    from .trellis2_local import install_local_loaders
+
     _stub_rembg()
     _shim_dinov3()
+    install_local_loaders()
 
 
 def reset_vram_stats() -> None:
@@ -448,6 +451,8 @@ def _load_pipeline(model_dir: Path, low_vram: bool) -> Any:
     _prepare_runtime()
     try:
         pipeline = Trellis2ImageTo3DPipeline.from_pretrained(str(model_dir))
+    except AdapterError:
+        raise
     except Exception as err:  # noqa: BLE001
         text = str(err)
         if "gated repo" in text or "403" in text or "401" in text:

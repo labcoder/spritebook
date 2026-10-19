@@ -30,11 +30,12 @@ the incumbent adapters, set absolute paths outside the checkout:
   [Hub environment contract](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables).
 
 **Open model gate:** the existing TRELLIS.2 CUDA stack has evaluation-only NVIDIA components and an
-unverified O-Voxel wheel provenance/notice gap listed in the BOM. DINOv3 remains manually gated and
-absent from its registry file set; upstream may fetch it after authentication. Fully declared
-fresh/offline generation and UniRig environment provisioning are not established by the Node port.
-They remain explicit roadmap gates, rather than an implicit dependency on an old HF cache or a
-builder's deleted environment. See the
+unverified O-Voxel wheel provenance/notice gap listed in the BOM. The `af44b45f.local1` catalog
+version now includes the exact DINOv3 config, weights and agreement; access remains manually gated
+and installation requires explicit acceptance. The adapter maps the declared decoder and conditioner
+to verified local files without Hub fallback. Fresh optional runtime and UniRig environment
+provisioning still require qualification. They remain explicit roadmap gates, rather than an
+implicit dependency on an old HF cache or a builder's deleted environment. See the
 [F4 model gate investigation](../future/model-provisioning-gate.md) for the exact artifacts, local
 dependency resolution defects, frozen setup requirements and closure checks.
 

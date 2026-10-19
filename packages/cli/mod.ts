@@ -2529,7 +2529,8 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           let fetcher;
           if (from) {
             const entry = catalog.models.find((m) => m.id === modelId);
-            const v = entry?.versions.find((x) => x.version === (version ?? x.version));
+            const v = entry?.versions.filter((x) => version === undefined || x.version === version)
+              .sort((a, b) => registry.compareVersions(a.version, b.version)).at(-1);
             if (!v) {
               return fail(
                 'models' as JobEvent['jobId'],

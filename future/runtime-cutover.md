@@ -85,8 +85,9 @@ is counted as a successful Node render.
 ## Remaining gate
 
 The existing real TRELLIS.2 and UniRig environments/source are absent on this machine. Their old
-preparation relied on retired, untracked spike directories. TRELLIS.2 still has an undeclared,
-manually gated DINOv3 conditioner and CUDA artifact license/provenance gaps documented in the
+preparation relied on retired, untracked spike directories. TRELLIS.2 now declares its manually
+gated DINOv3 conditioner in `af44b45f.local1`, with local-only decoder/conditioner loading. Optional
+runtime setup and CUDA artifact license/provenance gaps remain documented in the
 [BOM](../docs/dependencies.md) and [sidecar setup](../sidecar/README.md). Current auth access is
 available; access alone does not solve reproducible provisioning or stack clearance. No model
 substitution, license exception or silent cloud fallback was introduced. The

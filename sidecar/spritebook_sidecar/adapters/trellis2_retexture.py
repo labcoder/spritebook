@@ -65,7 +65,7 @@ from .trellis2 import (
     vram_peaks,
 )
 
-RETEXTURE_ADAPTER_VERSION = "0.2.0"  # 0.2.0: frame restore before the guard (W4b)
+RETEXTURE_ADAPTER_VERSION = "0.3.0"
 
 # How far the output frame may move before we refuse. The spike measured 0.1% of
 # extent across seeds, so 2% is far above the noise while still catching the two
@@ -268,6 +268,8 @@ def _load_pipeline(model_dir: Path, low_vram: bool) -> Any:
         pipeline = Trellis2TexturingPipeline.from_pretrained(
             str(model_dir), config_file="texturing_pipeline.json"
         )
+    except AdapterError:
+        raise
     except Exception as err:  # noqa: BLE001
         text = str(err)
         if "gated repo" in text or "403" in text or "401" in text:
@@ -276,8 +278,7 @@ def _load_pipeline(model_dir: Path, low_vram: bool) -> Any:
                 "TRELLIS.2's image conditioner "
                 "'facebook/dinov3-vitl16-pretrain-lvd1689m' is a MANUALLY GATED Hugging "
                 "Face repo and this machine is not authorised for it. Request access "
-                "from Meta on that model's page, then log in with `huggingface-cli "
-                "login`.",
+                "from Meta on that model's page, then log in with `hf auth login`.",
             ) from err
         raise AdapterError(
             "backend-failed", f"Loading the TRELLIS.2 texturing pipeline failed: {err}"

@@ -5,6 +5,12 @@ setup gate is resolved. The Node/Windows proofs do not establish fresh TRELLIS.2
 This note separates reproducibility fixes from permission and product-support claims; it does not
 select another model or relax the dependency policy.
 
+**Implementation progress:** `af44b45f.local1` now declares the exact DINOv3 config, weights and
+agreement behind explicit acceptance, retaining the original weight-only version. The shared adapter
+loader resolves decoder/conditioner files locally without rewriting verified configs or using Hub
+fallback. Its missing-file/traversal/selection regressions pass. The remaining source, optional
+environment and permitted rasterizer work below still needs native qualification.
+
 ## What the current installation provides
 
 The [runtime builder](../tools/runtime/build.mjs) ships the base sidecar project, frozen lock,
@@ -23,7 +29,9 @@ retain an already-prepared extra, but does not install a missing one automatical
 ([uv synchronization contract](https://docs.astral.sh/uv/concepts/projects/sync/),
 [pinned utils3d build metadata](https://github.com/EasternJournalist/utils3d/blob/9a4eb15e4021b67b12c460c7057d642626897ec8/pyproject.toml))
 
-## Verified technical gaps
+## Initial technical findings
+
+This table records the initial audit; implementation progress is recorded above.
 
 | Requirement                    | Current state                                                                                                                                                                                                                        | Smallest necessary correction                                                                                                                                                                                                                                                       |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -41,16 +49,16 @@ Local evidence:
 [catalog files and terms](../packages/registry/catalog/models.json), and
 [wheel download verification](../sidecar/fetch_wheels.py).
 
-The decoder issue is a concrete receipt bypass. Official
+The decoder issue was a concrete receipt bypass. Official
 [`Pipeline.from_pretrained`, lines 26–43](https://github.com/microsoft/TRELLIS.2/blob/75fbf0183001ed9876c8dbb35de6b68552ee08bd/trellis2/pipelines/base.py#L26)
 tries `<modelDir>/<reference>`, catches **any** loading exception, then retries the reference as a
 Hub model. The
 [pinned pipeline config](https://huggingface.co/microsoft/TRELLIS.2-4B/blob/af44b45f2e35a493886929c6d786e563ec68364d/pipeline.json)
-contains the mismatched cross-repository name. The bounded patch seam is the existing
-`_prepare_runtime`/loader preparation shared by generation and retexture: supply verified local
-model references and a local DINO constructor before either `from_pretrained` call. Refuse unknown
-or absent dependencies; offline flags are a second guard, not a substitute for path resolution. The
-official
+contains the mismatched cross-repository name. The adapter now patches the existing
+`_prepare_runtime`/loader preparation shared by generation and retexture to supply verified local
+model references and a local-only DINO constructor before either `from_pretrained` call. It refuses
+unknown or absent dependencies; offline flags are a second guard, not a substitute for path
+resolution. The official
 [DINO extractor](https://github.com/microsoft/TRELLIS.2/blob/75fbf0183001ed9876c8dbb35de6b68552ee08bd/trellis2/modules/image_feature_extractor.py#L58)
 currently calls Transformers with a model name and no revision/local-only restriction.
 

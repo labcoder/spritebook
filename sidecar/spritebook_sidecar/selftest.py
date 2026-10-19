@@ -1301,6 +1301,70 @@ def test_trellis2_code_dir(tmp: Path) -> None:
         os.environ.pop(t2.CODE_DIR_ENV, None)
 
 
+def test_trellis2_local_dependencies(tmp: Path) -> None:
+    import types
+    from unittest.mock import patch
+    from .adapters.trellis2_local import DINO_ID, DECODER_ID, load_local_pipeline
+
+    root = tmp / "local-model"
+    for name in [
+        "deps/dinov3/config.json", "deps/dinov3/model.safetensors", "deps/dinov3/LICENSE.md",
+        "deps/trellis-image-large/ckpts/ss_dec_conv3d_16l8_fp16.json",
+        "deps/trellis-image-large/ckpts/ss_dec_conv3d_16l8_fp16.safetensors",
+    ]:
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("fixture", encoding="utf-8")
+    config = {
+        "args": {
+            "models": {"decoder": DECODER_ID, "not_loaded": "ckpts/not_installed"},
+            "image_cond_model": {"name": "DinoV3FeatureExtractor", "args": {"model_name": DINO_ID}},
+        },
+    }
+    config_path = root / "pipeline.json"
+    config_bytes = json.dumps(config)
+    config_path.write_text(config_bytes, encoding="utf-8")
+    requests = []
+
+    class Pipeline:
+        model_names_to_load = ["decoder"]
+
+        def __init__(self, models):
+            self.models = models
+
+    def load(path):
+        requests.append(path)
+        return "decoded"
+
+    package = types.ModuleType("trellis2")
+    package.models = types.SimpleNamespace(from_pretrained=load)
+    with patch.dict(sys.modules, {"trellis2": package}):
+        pipeline = load_local_pipeline(Pipeline, str(root))
+        ok(requests == [str(root.resolve() / "deps/trellis-image-large/ckpts/ss_dec_conv3d_16l8_fp16")],
+           "cross-repository decoder loads the registry's local bytes")
+        ok(pipeline.models == {"decoder": "decoded"}, "unselected models are not loaded")
+        ok(pipeline._pretrained_args["image_cond_model"]["args"]["model_name"] == str(root.resolve() / "deps/dinov3"),
+           "conditioner resolves locally rather than using an HF cache")
+        ok(config_path.read_text(encoding="utf-8") == config_bytes, "verified pipeline config is never rewritten")
+        for reference in ["../escape", "unknown/remote", "ckpts/missing"]:
+            config["args"]["models"]["decoder"] = reference
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            try:
+                load_local_pipeline(Pipeline, str(root))
+                ok(False, "missing and escaped dependencies must refuse")
+            except AdapterError as err:
+                ok(err.code == "model-missing", "local dependency failure stays actionable")
+        ok(len(requests) == 1, "invalid local assets never trigger a model loader or Hub fallback")
+        config["args"]["models"]["decoder"] = DECODER_ID
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+        (root / "deps/dinov3/model.safetensors").unlink()
+        try:
+            load_local_pipeline(Pipeline, str(root))
+            ok(False, "missing conditioner must refuse before model loading")
+        except AdapterError as err:
+            ok(err.code == "model-missing" and len(requests) == 1, "missing DINO never reaches model loading")
+
+
 def test_trellis2_rembg_is_refused() -> None:
     from .adapters import trellis2 as t2
 
@@ -1603,6 +1667,7 @@ def main() -> int:
             test_trellis2_retry_ladder()
             test_trellis2_params_and_input(tmp)
             test_trellis2_code_dir(tmp)
+            test_trellis2_local_dependencies(tmp)
             test_trellis2_rembg_is_refused()
             test_trellis2_registered()
             test_retexture_collapse_and_ladder()
