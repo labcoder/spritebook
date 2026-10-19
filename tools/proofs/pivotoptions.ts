@@ -23,7 +23,7 @@ import { join } from 'node:path';
  *   (c) which frames are GENUINELY cut at a given padding (below > padding-1)
  *       versus merely touching the last row (below == padding-1)
  *
- * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/pivotoptions.ts
+ * Run: SPRITEBOOK_GPU_BACKEND=vulkan node tools/run.mjs tools/proofs/pivotoptions.ts
  */
 import { decode as decodePng } from 'fast-png';
 import { runCli } from '../../packages/cli/dist/mod.js';

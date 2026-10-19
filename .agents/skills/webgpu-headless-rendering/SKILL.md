@@ -1,24 +1,24 @@
 ---
 name: webgpu-headless-rendering
-description: Offscreen GPU rendering and pixel readback with WebGPU in Deno, for the core render module. Use this skill whenever writing or modifying anything that renders without a browser — the render module, render spikes, throughput benchmarks, AOV passes (lit/albedo/normal/depth/mask), skinned mesh drawing, or any script that creates a GPUDevice, renders to a texture, or reads pixels back to write PNGs. Consult it even for "simple" render scripts — the readback alignment and color-space rules here prevent the most common silent image-corruption bugs.
+description: Offscreen GPU rendering and pixel readback with WebGPU in Node/Dawn, for the core render module. Use this skill whenever writing or modifying anything that renders without a browser — the render module, render spikes, throughput benchmarks, AOV passes (lit/albedo/normal/depth/mask), skinned mesh drawing, or any script that creates a GPUDevice, renders to a texture, or reads pixels back to write PNGs. Consult it even for "simple" render scripts — the readback alignment and color-space rules here prevent the most common silent image-corruption bugs.
 ---
 
-# Headless WebGPU rendering in Deno
+# Headless WebGPU rendering in Node/Dawn
 
-Deno's WebGPU implementation is headless by design: there is no canvas and no swapchain. You render
-into textures you create, then copy them to buffers and read them back. That model is exactly right
-for this repo's batch renderer — embrace it rather than simulating a browser.
+The core renders headlessly through the pinned `webgpu` Dawn addon on app-owned Node. There is no
+canvas or swapchain: render into textures, copy into aligned buffers and read back. Use the existing
+`getGpu`/`tryGetGpu` path instead of constructing a parallel device manager.
 
 ## Runtime setup
 
-- Enable the API: add `"webgpu"` to the `unstable` array in `deno.json` (or run with
-  `--unstable-webgpu`). The API is spec-shaped but flag-gated in Deno.
-- Force a specific native backend for reproducibility or debugging with the `DENO_WEBGPU_BACKEND`
-  env var (`vulkan`, `metal`, `dx12`). Pin it in CI so failures are comparable.
-- Always handle the null adapter:
-  `const adapter = await navigator.gpu.requestAdapter(); if (!adapter) fail with a message naming DENO_WEBGPU_BACKEND and driver hints.`
-  Log adapter info and feature list in every diagnostic path — half of "renderer is broken" reports
-  are driver situations.
+- Use Node **24.22.0**, compiled package exports and `webgpu` **0.6.2**. `npm run build` prepares
+  the native helpers, JavaScript and Windows Vulkan loader. No runtime compatibility shim is used.
+- Select `SPRITEBOOK_GPU_BACKEND=vulkan` (Windows/Linux) or `metal` (macOS). Direct3D shader
+  redistribution is not cleared. The legacy backend variable remains only a compatibility alias.
+- Null adapters must skip explicitly in optional tests and fail when `SPRITEBOOK_REQUIRE_GPU=1`.
+  Native-addon load errors always fail; do not disguise a missing DLL as absent GPU hardware.
+- Always call `disposeGpu()` at entrypoint/test teardown. Destroying the device alone leaves Dawn's
+  root alive and Node running. Proof scripts can use `node tools/run.mjs <script.ts> [args]`.
 - Request the device with explicit `requiredLimits` you actually depend on (e.g.
   `maxColorAttachments` for MRT). Relying on defaults works on your machine and fails on the
   smallest supported GPU.
@@ -109,6 +109,8 @@ washed-out sprites that "look almost right." Palette quantization happens _after
 
 ## Writing images
 
-`npm:fast-png` encodes RGBA in pure JS/WASM and works in Deno; write with `Deno.writeFile` (needs
-`--allow-write`). Study `denoland/webgpu-examples` for the canonical headless capture→buffer→PNG
-pattern.
+Use `@spritebook/image` for the qualified native-zlib PNG writer and fast-png decoder, and Node's
+filesystem API for bytes. Copy file buffers into fresh `Uint8Array`s when code depends on `.slice()`
+copying or typed-array alignment. Node Buffer slicing is a view. The image package also owns the
+PNG/JPEG ndarray boundary used by glTF transforms; do not add Sharp/libvips to application
+resources.

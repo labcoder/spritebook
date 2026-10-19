@@ -2,7 +2,7 @@
  * The stage rail's truth: six pipeline stages projected from a character
  * manifest, read-only. The lock law comes from the design system — stages
  * 02–06 are LOCKED until a canonical mesh is saved, and the rail states the
- * unlock condition instead of hiding it. Pure so the Deno suite pins it.
+ * unlock condition instead of hiding it. Pure so the Node suite pins it.
  */
 
 export type StageKey = 'gen' | 'rig' | 'anim' | 'look' | 'bake' | 'export';

@@ -22,7 +22,7 @@ import { join } from 'node:path';
  * achieved, and where the mesh actually ended up.
  *
  * Run:
- *   deno run --allow-all tools/proofs/meshfloor.ts [--body <glb>] [--clips a,b,c]
+ *   node tools/run.mjs tools/proofs/meshfloor.ts [--body <glb>] [--clips a,b,c]
  *
  * With no `--body` it builds a Track A fitted character the way the roster
  * proof does, which is the configuration the 100-character run flagged.

@@ -8,8 +8,9 @@ References to measured performance below identify historical evidence explicitly
 replaced, and has approved [incremental migration in this repository](migration-strategy.md). Full
 Rust core and alternate desktop shells are outside scope. The [migration roadmap](roadmap.md) now
 defines the execution order. The source findings below describe the reviewed baseline;
-[F1 implementation and verification](state-safety.md) supersede the state-safety defects. Runtime,
-model provisioning and installed-delivery gaps remain subject to their roadmap gates.
+[F1 implementation and verification](state-safety.md) supersede the state-safety defects, and
+[F4 cutover evidence](runtime-cutover.md) records the Node implementation. Real-model provisioning
+and release qualification remain explicit roadmap gates.
 
 ## Verdict
 
@@ -200,10 +201,11 @@ re-running a generative model.
 ## Distribution is part of the architecture
 
 [release.yml](../.github/workflows/release.yml) builds four CLI zips; it does not deliver the
-complete Studio/model environment. [lean.ts](../tools/release/lean.ts) removes the importer to work
-around native-module packaging. The Tauri configuration currently targets NSIS, and its CLI bridge
-still needs source/Deno. The platform matrix describes targets with explicit gaps, not a
-demonstrated clean-machine installer for every feature.
+complete Studio/model environment.
+[lean.ts](https://github.com/labcoder/spritebook/blob/7f098c6/tools/release/lean.ts) removes the
+importer to work around native-module packaging. The Tauri configuration currently targets NSIS, and
+its CLI bridge still needs source/Deno. The platform matrix describes targets with explicit gaps,
+not a demonstrated clean-machine installer for every feature.
 
 The replacement must install and run offline for mesh → sprites on a machine without source,
 Node/Deno on PATH, compilers, or model weights. Package the chosen CLI/runtime/render worker and

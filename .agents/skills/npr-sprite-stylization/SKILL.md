@@ -45,10 +45,9 @@ classic mistakes — both manufacture shimmer.
 
 ## Outlines
 
-- Exterior silhouette: edge of the object-ID/alpha mask. Interior creases:
-  `dot(n_a, n_b) < normalThreshold` OR `|depth_a − depth_b| > depthThreshold`, with the **depth
-  threshold scaled by linear depth** — a constant threshold draws phantom lines up close and misses
-  them far away.
+- Exterior silhouette: edge of the object-ID/alpha mask. Interior creases: `dot(n_a, n_b) <
+  normalThreshold` OR `|depth_a − depth_b| > depthThreshold`, with the **depth threshold scaled by
+  linear depth** — a constant threshold draws phantom lines up close and misses them far away.
 - A 1 px outline at output resolution is S px at render resolution — derive stroke width from the
   supersample factor.
 - Outline width must never exceed `CameraPreset.paddingPx`, or strokes clip at cell edges; assert

@@ -6,7 +6,7 @@
  * Consumed twice, deliberately:
  *   - tools/proofs/walkthrough_journey.ts runs it and writes the transcript
  *     to docs/internal/proofs/ (the acceptance evidence)
- *   - tools/proofs/walkthrough_test.ts runs it under `deno test` as the
+ *   - tools/proofs/walkthrough_test.ts runs it under `node:test` as the
  *     regression gate: any finding fails the test
  *
  * Two modes of truth come out of one run:

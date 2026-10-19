@@ -5,7 +5,7 @@ import { promises as fs } from 'node:fs';
  * what a user actually sees. Trusted input only - mouse via
  * Input.dispatchMouseEvent, keys via the walkthrough's own press/typeText.
  *
- *   deno run --allow-net=127.0.0.1 --allow-write --allow-env tools/proofs/uxdrive.ts <cmd> [...]
+ *   node tools/run.mjs tools/proofs/uxdrive.ts <cmd> [...]
  *
  *   shot <name>          screenshot -> docs/internal/proofs/uxpass2/<name>.png
  *   click <selector>     trusted left click at the element's center

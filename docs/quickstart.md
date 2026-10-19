@@ -1,46 +1,49 @@
 # Quickstart
 
-<!-- Transcripts below were captured from the real compiled win-x64 binary (lean release build,
-2026-07-18) running in a fresh directory laid out like the release zip. Regenerate them the same
-way when behavior changes; never hand-write them. -->
+The current Node runtime is a qualification candidate. Windows x64 has local GPU evidence;
+additional native targets, model provisioning, signing and native notices remain release gates. See
+the [cutover evidence](../future/runtime-cutover.md) before treating a build as a supported release.
 
 Bake a rigged 3D character into engine-ready 2D spritesheets, locally, in five minutes.
 
-Starting from an IMAGE instead of a rigged model? That path is `gen`, `pick`,
-and `rig`, and it needs an installed AI backend. `docs/cli.md` walks it
-command by command; the guide covers the same flow in Studio. This file's
-five minutes start where a rigged `.glb` already exists.
+Starting from an IMAGE instead of a rigged model? That path is `gen`, `pick`, and `rig`, and it
+needs an installed AI backend. `docs/cli.md` walks it command by command; the guide covers the same
+flow in Studio. This file's five minutes start where a rigged `.glb` already exists.
 
-## 1. Download
+## 1. Build or obtain a candidate
 
-Grab the zip for your platform from the GitHub release: `win-x64`, `mac-arm64`, `mac-x64`, or
-`linux-x64`. On Windows-on-ARM use `win-x64` — it runs under x64 emulation.
+From a checkout with Node 24.22.0, npm, Rust/Cargo and the Windows SDK:
 
-Unzip it anywhere. Contents:
-
-```
-spritebook (.exe on Windows)   the CLI binary
-sample/asymmetric.glb          a small rigged test character (deliberately one-armed)
-quickstart.md                  this file
-CHANGELOG.md                   what is in this release
+```sh
+npm ci --ignore-scripts
+npm run build
+npm run build:runtime
 ```
 
-The alpha zips carry the CLI only. SpriteBook Studio, the desktop app the
-guide describes, ships with the 1.0 bundle. Until then, every Studio action
-has a CLI twin, and this file plus `docs/cli.md` cover them all.
+The complete CLI lives in `.build/runtime/`. `npm run build:desktop` builds the Windows Tauri
+installer candidate. The release workflow also assembles candidate CLI trees; native qualification
+is separate from compilation. Windows ARM64, macOS and Linux remain targets with open F7 gates.
 
-## 2. First run on each OS
+## 2. Keep the runtime together
 
-Alpha binaries are unsigned (signing arrives with the 1.0 desktop bundle — `docs/versioning.md`), so
-each OS objects exactly once:
+```text
+spritebook (.exe on Windows)   native launcher that owns the Node worker tree
+node (.exe on Windows)         app-owned Node 24.22.0
+uv (.exe on Windows)           app-owned uv 0.12.10
+core/cli.mjs                   compiled CLI entry
+node_modules/                  exact production JavaScript dependencies, including importer
+assets/                        catalogs, shaders, clips, bodies, Python source and native lock helper
+notices/                       licenses and package inventory
+receipt.json                   sealed file hashes and source/lock identity
+sample/asymmetric.glb          asymmetric test model
+quickstart.md, CHANGELOG.md    documentation
+LICENSE, NOTICE               SpriteBook source/output terms
+```
 
-- **Windows**: SmartScreen may block the first run — click **More info -> Run anyway**.
-- **macOS**: if Gatekeeper blocks it, allow it under **System Settings -> Privacy & Security ->
-  "Open Anyway"**, or clear the quarantine attribute: `xattr -d com.apple.quarantine ./spritebook`
-- **Linux**: mark it executable: `chmod +x ./spritebook`
-
-Commands below are written as `./spritebook` — that form works in bash, zsh, and Windows PowerShell
-alike (in classic `cmd.exe`, type `.\spritebook` instead).
+Keep **all** these files together. No system Node, Deno or compiler is needed to run the CLI. Model
+workflows additionally need their separately installed weights and Python/CUDA prerequisites. Use a
+writable working/output directory; application resources are immutable. Commands below use
+`./spritebook` from a portable runtime directory. A desktop installation keeps it under `runtime/`.
 
 ## 3. Check your GPU
 
@@ -51,17 +54,19 @@ Baking renders on your GPU through WebGPU. Make sure the machine is ready first:
 ```
 
 Healthy output shows the product and render-pipeline versions, your adapter, the render signature
-(the renderer + adapter identity that cache keys carry), and a passing render probe
-(`render probe: OK`):
+(the renderer + adapter identity that cache keys carry), and a passing render probe (`render probe:
+OK`):
 
 ```
 SpriteBook 0.9.0
-deno 2.9.2 - v8 14.9.207.2-rusty - windows-x86_64
-render pipeline spritebook-render@0.5.0
-backend env: DENO_WEBGPU_BACKEND=(unset - wgpu default)
-adapter: NVIDIA GeForce RTX 3090 (vendor 4318, device 8708)
-render signature: spritebook-render@0.5.0#<adapter>
-features: (none)
+node 24.22.0 - v8 13.6.233.17-node.57 - windows-x64
+vram: 24 GiB detected
+models root: C:\Users\oms10\AppData\Local/spritebook/models
+render pipeline spritebook-render@0.6.0
+backend env: SPRITEBOOK_GPU_BACKEND=vulkan
+adapter: NVIDIA: 610.88 610.88.0.0 (vendor nvidia, device nvidia-geforce-rtx-3090)
+render signature: spritebook-render@0.6.0#9a231c45
+features: core-features-and-limits
 limits: maxColorAttachments=8 maxColorAttachmentBytesPerSample=32 maxTextureDimension2D=8192 maxBufferSize=268435456
 render probe: OK (checksum 5f70bf18a0860070)
 ```
@@ -71,16 +76,17 @@ see Troubleshooting below.
 
 ## What the stages need
 
-| Work                          | Needs                                                            |
-| ----------------------------- | ---------------------------------------------------------------- |
-| bake, style, export           | any WebGPU adapter — NVIDIA, AMD, Intel, Apple, or Mesa lavapipe |
-| AI generation (`trellis2-4b`) | NVIDIA GPU with CUDA, 12 GiB VRAM, 16.4 GB disk                  |
-| auto-rig (`unirig`, Track B)  | NVIDIA GPU with CUDA, 17.4 GiB VRAM, 5.8 GB disk                 |
-| Track A rig, `fixture-gen`    | nothing extra — no GPU, no download                              |
+| Work                          | Needs                                                                                                     |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
+| bake, style, export           | any WebGPU adapter — NVIDIA, AMD, Intel, Apple, or Mesa lavapipe                                          |
+| AI generation (`trellis2-4b`) | NVIDIA/CUDA; config-specific catalog claims (4?18 GiB), 16.4 GB weights; manual backend/conditioner setup |
+| auto-rig (`unirig`, Track B)  | NVIDIA GPU with CUDA, 17.4 GiB VRAM, 5.8 GB disk                                                          |
+| Track A rig, `fixture-gen`    | nothing extra — no GPU, no download                                                                       |
 
-The VRAM floors are measured, and the install warns on a smaller card. The
-performance numbers later in this file come from one reference machine, an
-RTX 3090; treat them as that machine's numbers, not promises.
+These are catalog admission claims from prior model measurements; this Node migration does not
+requalify real TRELLIS.2/UniRig inference. The install warns on a smaller card. The performance
+numbers later in this file come from one reference machine, an RTX 3090; treat them as that
+machine's numbers, not promises.
 
 ## 4. Bake
 
@@ -97,23 +103,24 @@ started
 [4/4] manifest
 bake-manifest: bakes/bake-<id>/manifest.json
 bake-dir: bakes/bake-<id>
-done in 4.17s
+done in <seconds>
 ```
 
 The bake lands in a content-addressed directory, `bakes/bake-<id>/`. The id is the first 8 hex of
 the recipe hash, and the recipe includes the render signature above — which is composed with an
-identity hash of your GPU adapter, because a driver change can change pixels. So the same model and flags give you the same id every
-time on one machine, and a different one on a machine with a different adapter. That is deliberate:
-two adapters can rasterize the same scene differently, and sharing a cache entry between them would
-serve pixels that were never rendered from this recipe here.
+identity hash of your GPU adapter, because a driver change can change pixels. So the same model and
+flags give you the same id every time on one machine, and a different one on a machine with a
+different adapter. That is deliberate: two adapters can rasterize the same scene differently, and
+sharing a cache entry between them would serve pixels that were never rendered from this recipe
+here.
 
-| File                                                                             | What it is                                                                                                     |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `manifest.json`                                                                  | the canonical BakeManifest: every frame's atlas rect and pivot, provenance (inputs, render signature), metrics |
-| `atlas_lit_0.png`                                                                | the styled spritesheet page(s) — what your game draws                                                          |
-| `atlas_albedo_0.png` `atlas_normal_0.png` `atlas_depth_0.png` `atlas_mask_0.png` | AOV pages (arbitrary output variables: albedo, normal, depth, mask), rect-identical to the lit page — for dynamic lighting, outlines, custom shaders                     |
-| `style-result.json`                                                              | the style stage's artifact: palette, flicker metric, warnings                                                  |
-| `contact-idle.gif`                                                               | animated contact sheet for eyeballing the bake — review-only, not a game asset                                 |
+| File                                                                             | What it is                                                                                                                                           |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifest.json`                                                                  | the canonical BakeManifest: every frame's atlas rect and pivot, provenance (inputs, render signature), metrics                                       |
+| `atlas_lit_0.png`                                                                | the styled spritesheet page(s) — what your game draws                                                                                                |
+| `atlas_albedo_0.png` `atlas_normal_0.png` `atlas_depth_0.png` `atlas_mask_0.png` | AOV pages (arbitrary output variables: albedo, normal, depth, mask), rect-identical to the lit page — for dynamic lighting, outlines, custom shaders |
+| `style-result.json`                                                              | the style stage's artifact: palette, flicker metric, warnings                                                                                        |
+| `contact-idle.gif`                                                               | animated contact sheet for eyeballing the bake — review-only, not a game asset                                                                       |
 
 ## 5. Export
 
@@ -121,9 +128,9 @@ serve pixels that were never rendered from this recipe here.
 ./spritebook export --bake bakes/bake-<id> --out exports --targets godot,aseprite,texturepacker,strips
 ```
 
-CAUTION: before you sell work made with a downloaded AI backend, read
-[Licensing](licensing.md). TRELLIS.2 output is not cleared for commercial
-use today; bakes of `fixture-gen` output and of your own meshes are yours.
+CAUTION: before you sell work made with a downloaded AI backend, read [Licensing](licensing.md).
+TRELLIS.2 output is not cleared for commercial use today; bakes of `fixture-gen` output and of your
+own meshes are yours.
 
 (`bakes/bake-<id>` is the bake directory printed by step 4.)
 
@@ -138,7 +145,7 @@ export-aseprite: exports/aseprite
 export-texturepacker: exports/texturepacker
 [4/4] strips
 export-strips: exports/strips
-done in 0.07s
+done in <seconds>
 ```
 
 One subdirectory per target:
@@ -157,9 +164,9 @@ never span pages.
 
 The bake records a pivot per frame — with the default `feet-baseline` pivot, the character's feet.
 Each `AtlasTexture` in `hero.tres` carries a transparent `margin` that puts that pivot at the middle
-of the texture, so an `AnimatedSprite2D` with its **default `centered = true` and
-`offset = (0, 0)`** puts the node origin on the feet. Place the node at a tile's floor position and
-the character stands on it.
+of the texture, so an `AnimatedSprite2D` with its **default `centered = true` and `offset =
+(0, 0)`** puts the node origin on the feet. Place the node at a tile's floor position and the
+character stands on it.
 
 So: change nothing on the node. If you set `centered = false`, the sprite jumps by half the padded
 texture — set `offset` yourself in that case. `manifest.json` has the exact `pivotPx` per frame if
@@ -301,11 +308,10 @@ the same way rather than being silently dropped from the count.
 
 #### The character must know its height
 
-The cell math below assumes a character measured in metres. A generated mesh
-keeps its backend's own scale unless `gen --height <metres>` declared one, and
-a one-unit character bakes about 30 px tall at 32 px/m. The job warns when no
-height was given and states what the character measures. Declare the height at
-generation; see `docs/cli.md`.
+The cell math below assumes a character measured in metres. A generated mesh keeps its backend's own
+scale unless `gen --height <metres>` declared one, and a one-unit character bakes about 30 px tall
+at 32 px/m. The job warns when no height was given and states what the character measures. Declare
+the height at generation; see `docs/cli.md`.
 
 #### Why the default cell is 112 px with 16 px of padding
 
@@ -325,8 +331,8 @@ bigger cell adds room above the character and none below it. Measured across the
 the band runs to 15 px below the pivot on a death animation, so 16 px of padding is what stops the
 clipping.
 
-The two interact: drawable width is `cell - 2*padding`, so 16 px of padding needs at least
-`73 + 32 = 105` px of cell, rounded to 112.
+The two interact: drawable width is `cell - 2*padding`, so 16 px of padding needs at least `73 +
+32 = 105` px of cell, rounded to 112.
 
 One clip sets the padding budget — the death, because a body lying down has a footprint metres deep.
 If you ship no deaths and no sword combos, `--padding 9 --cell 96` is measurably enough and saves a
@@ -357,8 +363,7 @@ Y=0 in its bind pose is the character genuinely ungrounded, and the flag says ho
 
 - **`adapter: NONE - GPU rendering unavailable`** — `doctor` prints hints with it:
   - check that your GPU drivers are installed and current;
-  - force a backend: `DENO_WEBGPU_BACKEND=vulkan` (Windows/Linux), `dx12` (Windows), or `metal`
-    (macOS);
+  - force a backend: `SPRITEBOOK_GPU_BACKEND=vulkan` (Windows/Linux) or `metal` (macOS);
   - headless Linux / CI: install Mesa lavapipe (`mesa-vulkan-drivers`) for a software adapter.
 - **`render probe: FAILED`** — an adapter exists but a minimal render pass failed; the error text is
   in the output. Update drivers or try the other backend for your OS.

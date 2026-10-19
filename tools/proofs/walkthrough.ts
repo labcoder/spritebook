@@ -14,8 +14,8 @@
  * WCAG keyboard criterion is about.
  *
  * Run: launch the app with the debug port, then the driver —
- *   WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223 deno task dev:desktop
- *   deno run --allow-net=127.0.0.1 --allow-write tools/proofs/walkthrough.ts
+ *   WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223 npm run dev:desktop
+ *   node tools/run.mjs tools/proofs/walkthrough.ts
  */
 
 // ---------------------------------------------------------------- CDP client

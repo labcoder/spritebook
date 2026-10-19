@@ -11,10 +11,10 @@ ownership. Lock files are never unlinked or stolen based on elapsed time. Nested
 reuse ownership in their asynchronous call context; separate jobs do not share it.
 
 F4's Node implementation acquires the same kernel lock through the app-owned `spritebook-lock`
-helper (`LockFileEx` on Windows, `flock` on Unix). A dedicated stdin pipe holds its lifetime;
-normal release or Node process death closes the pipe and drops the native handle. Acquisition
-order, reentrancy, transactions and recovery remain in TypeScript. The compiled helper ships with
-core; development builds compile it with Rust. The persistent lock file is still never deleted.
+helper (`LockFileEx` on Windows, `flock` on Unix). A dedicated stdin pipe holds its lifetime; normal
+release or Node process death closes the pipe and drops the native handle. Acquisition order,
+reentrancy, transactions and recovery remain in TypeScript. The compiled helper ships with core;
+development builds compile it with Rust. The persistent lock file is still never deleted.
 
 A mutation validates the next state, writes a uniquely staged and file-synced version-1
 `<manifest>.pending.json`, then atomically renames it into place. That intent is the commit point.

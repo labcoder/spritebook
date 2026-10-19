@@ -8,7 +8,7 @@ import { promises as fs } from 'node:fs';
  *
  * The rigged-cube.fbx fixture is generated separately by _generate-fbx.py (bpy).
  *
- *   deno run --allow-read --allow-write packages/importer/fixtures/_generate.ts
+ *   node tools/run.mjs packages/importer/fixtures/_generate.ts
  */
 
 const here = new URL('.', import.meta.url);

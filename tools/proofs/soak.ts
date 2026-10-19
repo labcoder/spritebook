@@ -10,7 +10,7 @@ import { promises as fs } from 'node:fs';
  *
  * Three series, because the three ways this can go wrong are unrelated:
  *
- *   rssMb        the Deno processes' working set. A JS/handle leak climbs here.
+ *   rssMb        the Node processes' working set. A JS/handle leak climbs here.
  *   vramMb       nvidia-smi memory.used across the card. A GPU-resource leak
  *                climbs here while RSS stays flat — the exact shape the
  *                viewport-disposal work was about, and invisible to any
@@ -31,8 +31,8 @@ import { promises as fs } from 'node:fs';
  * number "flat memory" actually means.
  *
  * Run alongside the thing under test:
- *   deno run --allow-all tools/proofs/soak.ts --out soak.ndjson --every 15
- *   deno run --allow-all tools/proofs/soak.ts --report soak.ndjson
+ *   node tools/run.mjs tools/proofs/soak.ts --out soak.ndjson --every 15
+ *   node tools/run.mjs tools/proofs/soak.ts --report soak.ndjson
  */
 const arg = (name: string, fallback = ''): string => {
   const i = process.argv.slice(2).indexOf(`--${name}`);
@@ -218,7 +218,7 @@ interface Phase {
  * The build phase is not printed and has to be inferred: pivot 1 starts at
  * `M1` and the cold batch ran for `coldDur` before it, so whatever came before
  * `M1 - coldDur` was the build. Inferring it matters because the build is a
- * `deno check` — a different program with a different memory profile — and a
+ * `npm run check` — a different program with a different memory profile — and a
  * slope fitted across that step describes the step, not a leak.
  */
 function parsePhases(log: string, offsetS: number): Phase[] {

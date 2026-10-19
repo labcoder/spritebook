@@ -6,7 +6,7 @@ import { join } from 'node:path';
  * Universal Base Characters download (CC0 1.0, verified 2026-07-20 —
  * License_Standard.txt in the download states it explicitly).
  *
- *   deno run -A tools/roster/build-body.ts [--src <ubc dir>] [--out <bodies dir>]
+ *   node tools/run.mjs tools/roster/build-body.ts [--src <ubc dir>] [--out <bodies dir>]
  *
  * Two upstream defects are repaired IN A STAGING COPY, never in the download:
  *

@@ -4,7 +4,7 @@ import { promises as fs } from 'node:fs';
  * by hand (or pasted from a draft); this tool is the only writer of the
  * committed bytes, so the file stays schema-valid canonical JSON forever.
  *
- *   deno run --allow-read --allow-write tools/registry/canonicalize-catalog.ts [draft.json]
+ *   node tools/run.mjs tools/registry/canonicalize-catalog.ts [draft.json]
  *
  * With no argument it re-canonicalizes packages/registry/catalog/models.json
  * in place; with a draft path it validates the draft and replaces the bundled

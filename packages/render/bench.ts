@@ -6,7 +6,7 @@ import { promises as fs } from 'node:fs';
  * acceptance). NOT a pass/fail gate — software Vulkan on CI is slow by design and
  * numbers are machine-dependent; this is a trend signal, never hashed for cache.
  *
- *   deno run --allow-read --allow-write --allow-env --allow-ffi \
+ *   node tools/run.mjs \
  *     packages/render/bench.ts [outDir=.render-bench]
  */
 import type { CameraPreset } from '@spritebook/schema';

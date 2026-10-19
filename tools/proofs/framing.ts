@@ -28,7 +28,7 @@ import { join } from 'node:path';
  * `below` large with meshfloor ≥ 0 is foreshortening, `below` large with
  * meshfloor < 0 is a genuinely ungrounded mesh.
  *
- * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/framing.ts
+ * Run: SPRITEBOOK_GPU_BACKEND=vulkan node tools/run.mjs tools/proofs/framing.ts
  */
 // the exact pin packages/pack and packages/cli carry; tools/ is not a
 // workspace member, so the specifier is spelled out rather than mapped

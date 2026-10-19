@@ -1,15 +1,15 @@
 import { promises as fs } from 'node:fs';
 /**
  * Render the asymmetric fixture to Sx AOV PNGs, checked in as the style test
- * fixtures. Run ONCE on a GPU (this box: DENO_WEBGPU_BACKEND=vulkan); the style
+ * fixtures. Run ONCE on a GPU (this box: SPRITEBOOK_GPU_BACKEND=vulkan); the style
  * stage is pure CPU, so downstream style tests read these committed AOVs and run
  * deterministically on any machine (no GPU needed in CI).
  *
  * 1x output is 64px, supersample S=4 -> 256px render. Idle pose = the low-motion
  * loop the flicker metric measures. Leaves packages/style/fixtures/aov/frames/.
  *
- *   DENO_WEBGPU_BACKEND=vulkan deno run --allow-read --allow-write --allow-env \
- *     --allow-ffi packages/style/fixtures/_render-aovs.ts
+ *   SPRITEBOOK_GPU_BACKEND=vulkan node tools/run.mjs \
+ *     packages/style/fixtures/_render-aovs.ts
  */
 import type { CameraPreset } from '@spritebook/schema';
 import { runRenderJob } from '@spritebook/render';

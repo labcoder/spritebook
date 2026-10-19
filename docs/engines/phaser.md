@@ -81,8 +81,8 @@ and the character stands on it.
 - Each clip's own fps is in the bake's `manifest.json` under `clips[]`. The strips JSON carries it
   too. The export default is 8.
 
-- `repeat: -1` loops the animation. If the manifest records `loop: false` for a clip, set
-  `repeat: 0`. A `!hold` death clip is the usual case.
+- `repeat: -1` loops the animation. If the manifest records `loop: false` for a clip, set `repeat:
+  0`. A `!hold` death clip is the usual case.
 
 ## The strips alternative
 

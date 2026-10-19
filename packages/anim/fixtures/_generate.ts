@@ -10,7 +10,7 @@ import { promises as fs } from 'node:fs';
  * Bodies are box segments rigidly skinned to their bone (like the style
  * package's asymmetric fixture, but a full biped). Feet rest on Y=0.
  *
- *   deno run --allow-read --allow-write --allow-env --allow-ffi \
+ *   node tools/run.mjs \
  *     packages/anim/fixtures/_generate.ts
  */
 import { Document, NodeIO } from '@gltf-transform/core';

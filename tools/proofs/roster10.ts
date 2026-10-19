@@ -19,7 +19,7 @@ import { join } from 'node:path';
  *      that field, and no others — and does the bake that follows hit cache
  *      on the nine it said were fresh?
  *
- * Run:  DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/roster10.ts
+ * Run:  SPRITEBOOK_GPU_BACKEND=vulkan node tools/run.mjs tools/proofs/roster10.ts
  * Add --keep to leave the roster on disk for inspection.
  */
 import { runCli } from '../../packages/cli/dist/mod.js';

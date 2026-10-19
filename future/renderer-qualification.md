@@ -1,5 +1,9 @@
 # Node renderer qualification
 
+**Historical F2 exit at 7f098c6.** The production path on main now uses Node; see
+[F4 cutover evidence](runtime-cutover.md). Run the commands below only in an archived F2 checkout.
+The temporary qualification adapters/launcher were retired after promotion.
+
 Evidence date: **2026-10-19**. This is the bounded **F2** experiment, using the preserved
 [F0 control](baseline.md) and the existing renderer, animation, style and pack modules. Production
 Studio and the CLI still use Deno. The Tauri renderer-proof build is an isolated launcher, not a
@@ -23,8 +27,9 @@ and notice hashes are sealed in the build receipt. The control uses **Deno 2.9.2
 production modules and the original PNG encoder. Neither path serves an old frame cache as fresh
 rendering evidence.
 
-The small [qualification harness](../tools/qualification/build.mjs) bundles existing TypeScript. Its
-temporary [Node environment adapter](../tools/qualification/node-environment.mjs) implements only
+The small [qualification harness](runtime-cutover.md#reproduction-and-preserved-controls) bundles
+existing TypeScript. Its temporary
+[Node environment adapter](runtime-cutover.md#reproduction-and-preserved-controls) implements only
 the filesystem operations that this experiment executes; unsupported APIs fail explicitly. It is not
 a Node port of transactions, model installation, subprocess policy or the CLI. Delete the adapter
 during F4 rather than adopting a permanent global Deno shim.
@@ -32,9 +37,10 @@ during F4 rather than adopting a permanent global Deno shim.
 The first unchanged-code Node trial produced matching images but missed the 10% regression budget:
 the 4x median was **13.004 s versus 11.278 s**, **15.3% slower**. Its CPU profile concentrated time
 in PNG byte serialization, compression and decoding. The candidate now substitutes a
-[small Node PNG encoder](../tools/qualification/png.ts) at build time: bulk scanline copies, native
-zlib at the original compression level, native CRC32, and 8/16-bit grayscale/RGB(A). `fast-png`
-remains the independent decoder. Production encoding and WGSL remain unchanged.
+[small Node PNG encoder](runtime-cutover.md#reproduction-and-preserved-controls) at build time: bulk
+scanline copies, native zlib at the original compression level, native CRC32, and 8/16-bit
+grayscale/RGB(A). `fast-png` remains the independent decoder. Production encoding and WGSL remain
+unchanged.
 
 The native encoder changes compressed PNG bytes. Image equality below concerns decoded channels;
 new-runtime byte determinism is checked separately. No committed golden was refreshed or tolerance
@@ -131,19 +137,19 @@ second production-renderer commitment.
 
 ## Installed layout and failures
 
-The [opt-in Tauri launcher](../apps/studio/src-tauri/src/qualification.rs) resolves
+The [opt-in Tauri launcher](runtime-cutover.md#reproduction-and-preserved-controls) resolves
 `renderer-runtime` through `app.path().resource_dir()`. Its child has an **empty PATH**, a fresh
 working/temp/data directory and the existing owned-process startup gate. It invokes only bundled
 Node and compiled JavaScript, with addon, Vulkan loader, WGSL, canonical mesh, clip data and PNG
 fixtures in resources. No source files or development `node_modules` are installed. The proof has no
 editor window; GUI/CLI cutover remains F4.
 
-The [delivery probe](../tools/qualification/delivery.mjs) exercises completed bakes, carried
-assertions, actual native device destruction after a queue submission, unavailable adapter after
-removing the packaged loader, missing addon, abrupt owner death during real rendering and retry. It
-compares every prior bake byte after failures. Device-loss tests require `device-lost` with
-`retryable: true`, no done event and no completed failed-attempt manifest. They simulate destruction
-through the real API, not a physical driver reset.
+The [delivery probe](runtime-cutover.md#reproduction-and-preserved-controls) exercises completed
+bakes, carried assertions, actual native device destruction after a queue submission, unavailable
+adapter after removing the packaged loader, missing addon, abrupt owner death during real rendering
+and retry. It compares every prior bake byte after failures. Device-loss tests require `device-lost`
+with `retryable: true`, no done event and no completed failed-attempt manifest. They simulate
+destruction through the real API, not a physical driver reset.
 
 **Installed result: pass on Windows 11 Pro 10.0.26200 x64.** A fresh, unsigned NSIS proof installer
 was executed into a private temporary directory containing spaces and **Ω**. All **118** runtime

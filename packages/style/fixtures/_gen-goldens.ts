@@ -7,7 +7,7 @@ import { join } from 'node:path';
  * — goldens_test.ts reproduces them byte-for-byte on any machine. Regenerate +
  * review the image diff whenever the pipeline intentionally changes output.
  *
- *   deno run --allow-read --allow-write --allow-env --allow-ffi \
+ *   node tools/run.mjs \
  *     packages/style/fixtures/_gen-goldens.ts
  */
 import type { CameraPreset } from '@spritebook/schema';

@@ -12,7 +12,7 @@ import { test } from 'node:test';
  *  plus the two ratified deltas: state/ok diverges in hue by theme, and
  *  light's line/strong is stronger than its line.
  *
- * Runs under the plain Deno suite: it parses tokens.css textually — the file
+ * Runs under the plain Node suite: it parses tokens.css textually — the file
  * IS the contract, no browser needed.
  */
 import { assert, assertEquals } from '@std/assert';

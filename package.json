@@ -21,7 +21,7 @@
     "cli": "node packages/cli/dist/entry.js",
     "test:gpu": "node tools/test.mjs --gpu packages/render packages/style",
     "test:real": "node tools/test.mjs --real packages/cli/real_backends_test.ts",
-    "test:watch": "node --import ./tools/testing/setup.ts --test --watch --test-concurrency=1 \"packages/*/*_test.ts\" \"apps/studio/*_test.ts\" \"tools/ci/*_test.ts\" \"tools/testing/*_test.ts\" \"tools/proofs/*_test.ts\"",
+    "test:watch": "node --import ./tools/testing/setup.ts --test --watch --test-concurrency=1 \"packages/*/*_test.ts\" \"apps/studio/*_test.ts\" \"tools/ci/*_test.ts\" \"tools/testing/*_test.ts\" \"tools/proofs/*_test.ts\" \"tools/runtime/*_test.ts\"",
     "coverage": "node tools/test.mjs --coverage",
     "goldens:update": "node tools/run.mjs packages/style/fixtures/_gen-goldens.ts",
     "test:godot": "node tools/test.mjs packages/export/godot_smoke_test.ts",

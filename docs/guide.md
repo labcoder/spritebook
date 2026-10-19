@@ -1,7 +1,9 @@
 # SpriteBook Studio user guide
 
-NOTE: Studio ships with the 1.0 bundle. The alpha zips carry the CLI only,
-and every action below has a CLI twin — see [the CLI reference](cli.md).
+Studio on main now uses the owned Node runtime. Build a local Windows candidate with `npm run
+build:desktop`; see [development setup](../README.md#development) and the
+[qualification status](../future/runtime-cutover.md). Published/signed target artifacts remain F7
+work. Every action below has a CLI twin ? see [the CLI reference](cli.md).
 
 SpriteBook turns a character image into engine-ready 2D spritesheets. It runs on your machine.
 Nothing goes to a server.
@@ -34,8 +36,8 @@ The tab strip holds the gallery and each open character. The status bar at the b
 character count, the bridge (which engine runs your commands: `tauri` is the real CLI, a browser
 preview is a demo), and the log handle (opens the session log — every line the CLI writes).
 
-To check your machine, select **Run health exam**. It reports the GPU, the sidecar (the local
-Python helper process that runs the AI models), and the installed models.
+To check your machine, select **Run health exam**. It reports the GPU, the sidecar (the local Python
+helper process that runs the AI models), and the installed models.
 
 ## 2. Stage 01 — Generate
 
@@ -67,10 +69,10 @@ To make a character:
    body. It proves the pipeline without a GPU; it does not produce a likeness. A likeness needs
    TRELLIS.2 and an NVIDIA card.
 
-5. Check the **Height (m)** field. The default is 1.7. CAUTION: this is the size every later
-   stage believes. Sprites frame at pixels-per-metre, so a character that keeps the backend's own
-   scale bakes about 30 px tall. Clear the field only when you want the backend scale; the job
-   then warns and states the measured height.
+5. Check the **Height (m)** field. The default is 1.7. CAUTION: this is the size every later stage
+   believes. Sprites frame at pixels-per-metre, so a character that keeps the backend's own scale
+   bakes about 30 px tall. Clear the field only when you want the backend scale; the job then warns
+   and states the measured height.
 
 6. Change the options if you need to. The form comes from the backend's own schema. Only the values
    you change travel to the command.
@@ -109,7 +111,8 @@ To rig a character:
 
 1. Select the track. Use the arrow keys to move between the two cards.
 
-2. For Track A, check the body path. Two bodies are bundled, `ubc-male` and `ubc-female`; `ubc-male` is the default.
+2. For Track A, check the body path. Two bodies are bundled, `ubc-male` and `ubc-female`; `ubc-male`
+   is the default.
 
 3. Select **Run rig**.
 

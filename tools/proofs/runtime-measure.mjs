@@ -1,3 +1,4 @@
+// Opt-in legacy reference only; Deno executes inside the archived checkout, never current dev flows.
 // Sequential paired runs; a failed image/process is recorded once, never auto-retried.
 import { strict as assert } from 'node:assert';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';

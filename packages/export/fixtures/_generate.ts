@@ -10,7 +10,7 @@ import { promises as fs } from 'node:fs';
  * margin and a darker 1px inner border, so any region-crop mistake in an
  * exporter is visually unmissable. depth/mask are gray16 with in/out contrast.
  *
- *   deno run --allow-read --allow-write --allow-env --allow-ffi \
+ *   node tools/run.mjs \
  *     packages/export/fixtures/_generate.ts
  */
 import { encode as encodePng } from 'fast-png';

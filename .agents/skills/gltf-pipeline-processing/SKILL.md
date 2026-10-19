@@ -26,8 +26,10 @@ const bytes = await io.writeBinary(doc); // Uint8Array for the asset store
 ```
 
 Register extensions and **decoders up front** — reads of Draco/meshopt-compressed inputs fail
-without them, and user files arrive compressed constantly. Avoid Node-only helpers (e.g. sharp-based
-`textureCompress`) in Deno code paths; texture work happens elsewhere in this pipeline anyway.
+without them, and user files arrive compressed constantly. Use the existing importer IO setup. glTF
+pixel IO resolves to `@spritebook/image` through the npm override; do not reintroduce Sharp/libvips
+through texture helpers such as `textureCompress`. Private decoder/CJS-relative assets must survive
+packaging unchanged.
 
 ## The canonicalization recipe
 

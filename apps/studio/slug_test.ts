@@ -3,7 +3,7 @@ import { test } from 'node:test';
  * The slug preview vs core's CharacterIdSchema: the studio mirrors the rule
  * for live feedback, and this test CROSS-CHECKS every sample against the
  * real schema so the mirror can never drift silently. Runs under the root
- * Deno config, so @spritebook/schema resolves.
+ * npm workspace, so @spritebook/schema resolves.
  */
 import { assert, assertEquals } from '@std/assert';
 import { CharacterIdSchema } from '@spritebook/schema';

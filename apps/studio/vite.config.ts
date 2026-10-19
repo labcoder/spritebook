@@ -16,7 +16,7 @@ export default defineConfig({
   optimizeDeps: {
     // Keep first-start optimization bounded; Rust outputs are excluded from the watcher above.
     noDiscovery: true,
-    esbuildOptions: { target: 'esnext' },
+    rolldownOptions: { transform: { target: 'esnext' } },
     include: [
       'three',
       'three/webgpu',

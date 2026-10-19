@@ -4,10 +4,39 @@ Local Python sidecar for SpriteBook (P3-T2). One per session, owned by core, loc
 wire contract is FROZEN in `packages/schema/sidecar.ts` (contractVersion **1**); NDJSON job events
 use the `packages/schema/jobs.ts` vocabulary with strict shapes — no extra fields, ever.
 
+## Installed candidates
+
+The Node launcher provides an absolute owned uv path. Core uses `uv run --frozen` against the
+shipped Python source, with a lock-specific `sidecar-<hash>` environment under the platform's
+writable `spritebook/runtime/` data directory. Windows uses `%LOCALAPPDATA%`; Mac uses
+`~/Library/Application Support`; Linux uses `$XDG_DATA_HOME` or `~/.local/share`.
+`UV_PROJECT_ENVIRONMENT` remains an explicit override. Python bytecode is disabled for immutable
+installed resources. No virtual environment or weights are copied from the builder.
+
+F4's fresh-profile base sync, handshake and shutdown pass with an empty PATH; real
+registry-installed U?-Net prep also passes. This does **not** install optional CUDA backends. For
+the incumbent adapters, set absolute paths outside the checkout:
+
+- `SPRITEBOOK_TRELLIS2_CODE`: an explicitly prepared TRELLIS.2 source directory; its optional
+  dependencies still require the verified wheel procedure below.
+- `SPRITEBOOK_UNIRIG_HOME` and `SPRITEBOOK_UNIRIG_PYTHON`: a prepared UniRig source tree and its
+  separate Python interpreter. The legacy source defaults under retired spikes are not an installed
+  runtime recipe. Missing prerequisites refuse with `backend-missing` before inference.
+- Authenticate gated Hub access using `hf auth login` or `HF_TOKEN`. The Node downloader also reads
+  `HF_TOKEN_PATH` / `$HF_HOME/token`, sends credentials only to HTTPS huggingface.co and strips them
+  at CDN redirects. It never records token values. See the
+  [Hub environment contract](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables).
+
+**Open model gate:** the existing TRELLIS.2 CUDA stack has evaluation-only and unlicensed components
+listed in the BOM. DINOv3 remains manually gated and absent from its registry file set; upstream may
+fetch it after authentication. Fully declared fresh/offline generation and UniRig environment
+provisioning are not established by the Node port. They remain explicit roadmap gates, rather than
+an implicit dependency on an old HF cache or a builder's deleted environment.
+
 ## How core launches it
 
 ```
-SPRITEBOOK_SIDECAR_TOKEN=<per-session token>  uv run --project sidecar spritebook-sidecar --port 0
+SPRITEBOOK_SIDECAR_TOKEN=<per-session token>  uv run --frozen --project sidecar spritebook-sidecar --port 0
 ```
 
 - The token travels in the **`SPRITEBOOK_SIDECAR_TOKEN`** env var (never argv). Missing/empty token
@@ -87,12 +116,12 @@ pinned by sha256 in `wheels.lock.json`; `uv` installs them from those verified b
 Two more things this stack needs, neither of which `uv` can supply:
 
 - **The `trellis2` package itself has no packaging metadata upstream** — it is imported from a
-  source checkout, not installed. Clone it and point the adapter at it:
-  `git clone --depth 1 https://github.com/microsoft/TRELLIS.2.git sidecar/.deps/trellis2`, or set
+  source checkout, not installed. Clone it and point the adapter at it: `git clone --depth 1
+  https://github.com/microsoft/TRELLIS.2.git sidecar/.deps/trellis2`, or set
   `SPRITEBOOK_TRELLIS2_CODE` to wherever it lives.
 - **DINOv3 is a manual gate.** `facebook/dinov3-vitl16-pretrain-lvd1689m` is the image conditioner
   and access is granted per person by Meta, so it cannot be installed through the registry. Request
-  it on the model's page, then `huggingface-cli login`. Meta's licence permits commercial use and
+  it on the model's page, then `hf auth login`. Meta's licence permits commercial use and
   redistribution; the price is an attribution — **"Built with DINOv3"** must appear in the product's
   UI, docs or about page.
 
@@ -108,9 +137,9 @@ and the adapter shims the move; an unpinned upgrade would walk away from the shi
 ## rembg model-path mechanism (verified against the pinned 2.0.77 source)
 
 In rembg 2.0.77, `BaseSession.__init__` resolves the model file by calling
-`cls.download_models(...)`, and `U2netSession.download_models` calls
-`pooch.retrieve(<github url>, md5, path=U2NET_HOME)` — pooch **downloads** whenever the file is
-missing or its hash mismatches, so the `U2NET_HOME` env var alone cannot guarantee offline behavior.
+`cls.download_models(...)`, and `U2netSession.download_models` calls `pooch.retrieve(<github url>,
+md5, path=U2NET_HOME)` — pooch **downloads** whenever the file is missing or its hash mismatches, so
+the `U2NET_HOME` env var alone cannot guarantee offline behavior.
 
 The adapter therefore never uses `new_session()`/`U2NET_HOME`. It:
 
@@ -135,5 +164,5 @@ uv run --project sidecar python -m spritebook_sidecar.selftest
 Runs the real server on an ephemeral port and covers auth (401), handshake shape, echo end-to-end
 over real HTTP (exact event sequences, strict key sets, artifact on disk), the `failAt` error path,
 unknown adapter, 409 single-flight, the pose heuristic on synthetic silhouettes, the rembg
-`model-missing` fast-fail (no network, no weight needed), and `/shutdown`. Prints one
-`PASS … checks OK` line and exits nonzero on failure. No pytest — stdlib assert + tempfile.
+`model-missing` fast-fail (no network, no weight needed), and `/shutdown`. Prints one `PASS … checks
+OK` line and exits nonzero on failure. No pytest — stdlib assert + tempfile.

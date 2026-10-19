@@ -1,10 +1,11 @@
 # Replacing Deno without losing the renderer
 
 Research snapshot: **2026-10-18**. The maintainer has confirmed Tauri, a TypeScript core/CLI, and
-replacing Deno, and approved [migration in this repository](migration-strategy.md). Production still
-runs Deno. The [F2 experiment](renderer-qualification.md) adds isolated runtime pins and measured
-Windows renderer evidence. The [finalized roadmap](roadmap.md) targets supported Node LTS and
-qualifies Node/Dawn first; shipping adoption is gated by the evidence below.
+replacing Deno, and approved [migration in this repository](migration-strategy.md). That reviewed
+baseline ran Deno; main now uses Node through the [F4 cutover](runtime-cutover.md). The
+[F2 experiment](renderer-qualification.md) adds isolated runtime pins and measured Windows renderer
+evidence. The [finalized roadmap](roadmap.md) targets supported Node LTS and qualifies Node/Dawn
+first; shipping adoption is gated by the evidence below.
 [Technology decisions](technology-options.md) records the settled scope and historical alternatives.
 
 ## The deadline and the actual dependency

@@ -12,8 +12,8 @@ import { join } from 'node:path';
  * the WebView2 debug port, which CI does not have. Without the env var the
  * test says so and asserts nothing, in the suite's honest-skip voice.
  *
- *   WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223 deno task dev:desktop
- *   deno task test:walkthrough
+ *   WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223 npm run dev:desktop
+ *   npm run test:walkthrough
  */
 import { assertEquals } from '@std/assert';
 import { Cdp } from './walkthrough.ts';

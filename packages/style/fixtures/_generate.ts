@@ -8,7 +8,7 @@
  *                     (root + shoulder). Boxes use per-face normals so their
  *                     edges are real creases for the outline stage.
  *
- *   deno run --allow-read --allow-write packages/style/fixtures/_generate.ts
+ *   node tools/run.mjs packages/style/fixtures/_generate.ts
  */
 // full npm specifier: this is a dev-only generator; the style runtime never
 // touches glTF (it reads AOV PNGs), so @gltf-transform/core stays out of the

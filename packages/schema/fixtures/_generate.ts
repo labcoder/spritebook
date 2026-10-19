@@ -4,7 +4,7 @@ import { promises as fs } from 'node:fs';
  * typed literals, validates it, and writes CANONICAL bytes. Deterministic —
  * rerunning must produce identical files.
  *
- *   deno run --allow-write packages/schema/fixtures/_generate.ts
+ *   node tools/run.mjs packages/schema/fixtures/_generate.ts
  */
 import { canonicalJson, parseWith } from '../canonical.ts';
 import { ModelEntrySchema } from '../registry.ts';

@@ -162,20 +162,44 @@ function mul4(a: ArrayLike<number>, b: ArrayLike<number>): Mat4 {
 /** N = T(0,ty,0) · Ry(180°?) · S(s)  and its exact inverse. */
 function normalizationMatrices(s: number, ty: number, rotate: boolean): { n: Mat4; nInv: Mat4 } {
   const r = rotate ? -1 : 1;
-  // deno-fmt-ignore
+  // dprint-ignore
   const n: Mat4 = [
-    r * s, 0, 0, 0,
-    0, s, 0, 0,
-    0, 0, r * s, 0,
-    0, ty, 0, 1,
+    r * s,
+    0,
+    0,
+    0,
+    0,
+    s,
+    0,
+    0,
+    0,
+    0,
+    r * s,
+    0,
+    0,
+    ty,
+    0,
+    1,
   ];
   // N⁻¹ = S(1/s) · Ry⁻¹ · T(0,-ty,0):
-  // deno-fmt-ignore
+  // dprint-ignore
   const nInv: Mat4 = [
-    r / s, 0, 0, 0,
-    0, 1 / s, 0, 0,
-    0, 0, r / s, 0,
-    0, -ty / s, 0, 1,
+    r / s,
+    0,
+    0,
+    0,
+    0,
+    1 / s,
+    0,
+    0,
+    0,
+    0,
+    r / s,
+    0,
+    0,
+    -ty / s,
+    0,
+    1,
   ];
   return { n, nInv };
 }

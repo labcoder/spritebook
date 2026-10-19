@@ -11,6 +11,11 @@ The product source is `42be3bbebfc783edb42fb64001aa9b2e3d638c98`; the control ru
 input hashes, commands, results and preserved local archive. The JSON is an observation, not a new
 product schema.
 
+The commands in this F0 transcript require its pinned legacy checkout. The current
+[Node proof](../tools/proofs/migration-baseline.ts) uses emitted modules; normal development no
+longer runs Deno. [F4 evidence](runtime-cutover.md) records paired pixels and preserved-copy
+rollback.
+
 ## What ran
 
 - The existing full suite, with Vulkan and `SPRITEBOOK_REQUIRE_GPU=1`: **817 passed, 6 failed, 5

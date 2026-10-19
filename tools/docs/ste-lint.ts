@@ -19,7 +19,7 @@ import { promises as fs } from 'node:fs';
  * Code spans, fenced blocks, tables, headings, and link targets are exempt:
  * command lines and file paths are technical names, not prose.
  *
- * Run: deno run --allow-read tools/docs/ste-lint.ts docs/guide.md docs/engines/*.md
+ * Run: node tools/run.mjs tools/docs/ste-lint.ts docs/guide.md docs/engines/*.md
  */
 
 const BANNED: Record<string, string> = {

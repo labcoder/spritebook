@@ -25,7 +25,7 @@ import { join } from 'node:path';
  * size — a handful of characters measures the same thing a hundred would, and
  * this run costs minutes instead of hours.
  *
- * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/deathcost.ts [--n 3]
+ * Run: SPRITEBOOK_GPU_BACKEND=vulkan node tools/run.mjs tools/proofs/deathcost.ts [--n 3]
  */
 import { runCli } from '../../packages/cli/dist/mod.js';
 

@@ -2,9 +2,6 @@
 // Release builds launch the app-owned Node runtime; development reads compiled packages.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-#[cfg(feature = "renderer-qualification")]
-mod qualification;
-
 use spritebook_lock::jobs::Jobs;
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -379,12 +376,6 @@ fn open_folder(path: String) -> Result<(), String> {
         .map_err(|e| format!("could not open {path}: {e}"))
 }
 
-#[cfg(feature = "renderer-qualification")]
-fn main() {
-    std::process::exit(qualification::run());
-}
-
-#[cfg(not(feature = "renderer-qualification"))]
 fn main() {
     tauri::Builder::default()
         .manage(Arc::new(Jobs::default()))

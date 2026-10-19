@@ -1,11 +1,11 @@
 # Export validation
 
-This page is for contributors working in the repository. The release zips do not
-include the repository, and the commands here assume a checkout.
+This page is for contributors working in the repository. The release zips do not include the
+repository, and the commands here assume a checkout.
 
 Exporters are pure projections of the `BakeManifest` — same manifest in, byte-identical files out.
-Their correctness is proven in three tiers; by standing decision, **real-engine
-smokes run once at the very end of the project**, not per phase.
+Their correctness is proven in three tiers; by standing decision, **real-engine smokes run once at
+the very end of the project**, not per phase.
 
 ## Tier 1 — automated, every CI run
 
@@ -24,11 +24,11 @@ smokes run once at the very end of the project**, not per phase.
 Set `GODOT4_BIN` to a Godot 4.x binary and run:
 
 ```
-deno test --allow-all packages/export/godot_smoke_test.ts
+npm run test:godot
 ```
 
 The test imports the exported project headlessly and asserts the SpriteFrames resource loads with
-the expected animations. It is skipped (loudly, as `ignored`) when `GODOT4_BIN` is unset.
+the expected animations. It is skipped (loudly, as `skipped`) when `GODOT4_BIN` is unset.
 
 ## Tier 3 — end-of-project manual checklist (Godot 4)
 
@@ -42,8 +42,8 @@ the expected animations. It is skipped (loudly, as `ignored`) when `GODOT4_BIN` 
    origin must sit at the feet, not at the middle of the cell.
 5. Play each direction: frames advance at the exported fps, loop cleanly, and show the correct
    character orientation (the asymmetric fixture's single arm makes wrong directions unmissable).
-6. Toggle nearest-neighbor filtering on the texture; make sure no bleed shows from neighboring atlas cells at
-   the sprite edges.
-7. Repeat 3–5 in Phaser 3 with the TexturePacker JSON (`this.load.atlas`) and in Aseprite
-   (`File → Import Sprite Sheet` on the PNG; Aseprite does not read the JSON — see
-   docs/engines/aseprite.md) as consumer spot-checks.
+6. Toggle nearest-neighbor filtering on the texture; make sure no bleed shows from neighboring atlas
+   cells at the sprite edges.
+7. Repeat 3–5 in Phaser 3 with the TexturePacker JSON (`this.load.atlas`) and in Aseprite (`File →
+   Import Sprite Sheet` on the PNG; Aseprite does not read the JSON — see docs/engines/aseprite.md)
+   as consumer spot-checks.

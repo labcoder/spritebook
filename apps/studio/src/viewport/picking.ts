@@ -1,5 +1,5 @@
 /**
- * The viewport's pure arithmetic, react- and three-free so the Deno suite can
+ * The viewport's pure arithmetic, react- and three-free so the Node suite can
  * hold it: screen-space joint picking (the viewport skill forbids raycasts on
  * skinned meshes — a raycast tests the BIND pose, so clicks miss the moment
  * the character moves), the mirror-partner rule, and the joint-edits file

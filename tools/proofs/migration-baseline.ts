@@ -2,9 +2,8 @@ import { runProcess } from '../testing/process.ts';
 import { promises as fs } from 'node:fs';
 /** F0-T4: preserve a small legacy workspace, exports and cold/warm measurements.
  * Run from the repo root with Vulkan (Windows/Linux) or Metal (macOS):
- * deno run --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 \
- *   --allow-run \
- *   tools/proofs/migration-baseline.ts .render-bench/f0/control
+ * node tools/run.mjs \
+ *    *   tools/proofs/migration-baseline.ts .render-bench/f0/control
  * The output directory must not exist. Existing controls are never replaced.
  */
 import { assert, assertEquals } from '@std/assert';

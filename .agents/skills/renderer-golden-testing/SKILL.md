@@ -26,8 +26,8 @@ structural tests never rot and never argue about thresholds.
 
 **2. Tolerant golden comparison** for everything perceptual (shading, outlines, dithers): compare
 per-pixel with a per-channel tolerance plus a max-differing-fraction, e.g. _pass if ≤0.5% of pixels
-differ by >2/255 per channel_. `npm:pixelmatch` works in Deno on raw RGBA buffers and produces a
-diff image.
+differ by >2/255 per channel_. `pixelmatch` works in Node on raw RGBA buffers and produces a diff
+image.
 
 ## Failure output is not optional
 
@@ -41,14 +41,14 @@ actual, expected, and a diff heatmap. A red-splat image localizes a regression i
 - **Do** assert byte-equality for a same-process double render of the same inputs — this is the
   nondeterminism canary, and it catches accidental entropy (map iteration order, time-seeded
   anything, uninitialized buffers) the moment it's introduced.
-- Pin `DENO_WEBGPU_BACKEND` in CI so comparisons are like-for-like.
+- Pin `SPRITEBOOK_GPU_BACKEND` in CI so comparisons are like-for-like.
 
 ## Golden lifecycle
 
 - Goldens are keyed `{test}-{stylePreset}-{pass}.png`, kept small (64–128 px cells keep the whole
   set a few MB — fine in-repo; move to LFS only if it grows).
-- Update only via the dedicated task (`deno task goldens:update -- <filter>`), never by loosening an
-  assertion to make red go green.
+- Update only via the dedicated task (`npm run goldens:update`), never by loosening an assertion to
+  make red go green.
 - Golden changes are reviewed **as images** in the PR (GitHub renders them side by side). A
   `rendererVersion` bump is expected to arrive with a golden-refresh commit whose message says _why_
   pixels changed; a golden change without a renderer change is a bug report.

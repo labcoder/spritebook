@@ -69,12 +69,12 @@ pixel-truth surface.
 
 ## Skills index
 
-| Skill                       | Reach for it when                                                                  |
-| --------------------------- | ---------------------------------------------------------------------------------- |
-| `webgpu-headless-rendering` | any code creating a GPUDevice, rendering offscreen, or reading pixels back in Deno |
-| `threejs-editor-viewport`   | any GUI 3D viewport: renderer choice, controls, gizmos, picking, disposal          |
-| `gltf-pipeline-processing`  | any code touching model files: import, transforms, skins, deterministic writes     |
-| `npr-sprite-stylization`    | the style stack: quantize, dither, outlines, temporal stability, flicker debugging |
-| `renderer-golden-testing`   | writing/fixing image tests, golden updates, CI-without-GPU strategy                |
+| Skill                       | Reach for it when                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| `webgpu-headless-rendering` | any code creating a GPUDevice, rendering offscreen, or reading pixels back in Node/Dawn |
+| `threejs-editor-viewport`   | any GUI 3D viewport: renderer choice, controls, gizmos, picking, disposal               |
+| `gltf-pipeline-processing`  | any code touching model files: import, transforms, skins, deterministic writes          |
+| `npr-sprite-stylization`    | the style stack: quantize, dither, outlines, temporal stability, flicker debugging      |
+| `renderer-golden-testing`   | writing/fixing image tests, golden updates, CI-without-GPU strategy                     |
 
 Planned (authored at p3 start): `animation-retargeting`, `sidecar-vram`.

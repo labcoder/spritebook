@@ -9,7 +9,7 @@ import { promises as fs } from 'node:fs';
  * set) is BUILT from the local download by the pack tooling, not committed
  * through this fixture.
  *
- *   deno run --allow-read --allow-write --allow-env --allow-ffi \
+ *   node tools/run.mjs \
  *     packages/anim/fixtures/_extract-ual.ts [ualGlbPath]
  */
 import { NodeIO } from '@gltf-transform/core';

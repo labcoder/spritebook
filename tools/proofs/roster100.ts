@@ -21,7 +21,7 @@ import { promises as fs } from 'node:fs';
  *   pivot   one style change across ALL of them, planned then executed
  *
  * Run:
- *   DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/roster100.ts [--n 100]
+ *   SPRITEBOOK_GPU_BACKEND=vulkan node tools/run.mjs tools/proofs/roster100.ts [--n 100]
  *
  * `--n` scales the roster (the pilot runs at 2 to time one character first).
  * Characters get a per-character SEED, so the roster is N different meshes;
@@ -31,13 +31,13 @@ import { promises as fs } from 'node:fs';
  * full invalidation. That IS the overnight soak workload — sample it from
  * outside with tools/proofs/soak.ts and read the two with one window each:
  *
- *   deno run --allow-all tools/proofs/soak.ts --out soak.ndjson --every 20 &
- *   DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/roster100.ts --n 100 --cycles 16 --keep
+ *   node tools/run.mjs tools/proofs/soak.ts --out soak.ndjson --every 20 &
+ *   SPRITEBOOK_GPU_BACKEND=vulkan node tools/run.mjs tools/proofs/roster100.ts --n 100 --cycles 16 --keep
  *
  * then read the two windows separately — the build phase is a step change, and
  * a slope fitted across it is a number about the phase boundary, not a leak:
  *
- *   deno run --allow-all tools/proofs/soak.ts --report soak.ndjson --from 300
+ *   node tools/run.mjs tools/proofs/soak.ts --report soak.ndjson --from 300
  */
 import { runCli } from '../../packages/cli/dist/mod.js';
 import { type BakePlan, BakePlanSchema } from '../../packages/schema/dist/mod.js';

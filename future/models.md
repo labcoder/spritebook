@@ -45,11 +45,11 @@ feeds rigging. [TRELLIS.2](https://github.com/microsoft/TRELLIS.2),
 [Pixal3D](https://github.com/TencentARC/Pixal3D),
 [Hunyuan3D 2.1](https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1)
 
-**Proposed prompt workflow:**
-`text → reference image → approve reference → image-to-3D → canonical mesh → rig → animate → sprites`.
-Preserve the prompt, image-model revision/seed, image hash, edits, and 3D receipt. The explicit
-reference checkpoint lets users correct a tattoo, prosthetic side, outfit, or pose before 3D
-inference. Label this as a composed workflow, rather than native text conditioning in Pixal3D.
+**Proposed prompt workflow:** `text → reference image → approve reference → image-to-3D → canonical
+mesh → rig → animate → sprites`. Preserve the prompt, image-model revision/seed, image hash, edits,
+and 3D receipt. The explicit reference checkpoint lets users correct a tattoo, prosthetic side,
+outfit, or pose before 3D inference. Label this as a composed workflow, rather than native text
+conditioning in Pixal3D.
 
 **Z-Image-Turbo** is a credible optional reference-image experiment: its official card describes a
 6B image model and its source has Apache-2.0 legal text. Encoder, VAE, converted weights, and runner

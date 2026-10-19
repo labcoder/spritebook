@@ -4,9 +4,9 @@ import { promises as fs } from 'node:fs';
  * app and record the transcript to docs/internal/proofs/walkthrough.md.
  *
  * Launch the app with the debug port first:
- *   WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223 deno task dev:desktop
+ *   WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223 npm run dev:desktop
  * then:
- *   deno run --allow-net=127.0.0.1 --allow-env --allow-write=docs/internal tools/proofs/walkthrough_journey.ts
+ *   node tools/run.mjs tools/proofs/walkthrough_journey.ts
  *
  * The journey itself lives in journey.ts so the gated regression test
  * (walkthrough_test.ts) runs the exact same steps.

@@ -35,8 +35,8 @@ is the reason a macOS or win-arm64 user gets a working app with no AI generation
 
 ## 3. Models install on demand, behind gates
 
-AI model weights are never bundled. Each backend is catalog data, never a
-hardcoded integration. Each catalog entry carries these facts:
+AI model weights are never bundled. Each backend is catalog data, never a hardcoded integration.
+Each catalog entry carries these facts:
 
 - the license, whether it needs acceptance, and its excluded territories
 - the platforms each version runs on
@@ -46,15 +46,15 @@ hardcoded integration. Each catalog entry carries these facts:
 At install time, your machine downloads the model files and checks them against pinned sha256
 hashes. Four gates run at install time:
 
-| Gate               | What it means                                                                                                                                                                                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| License acceptance | When a license needs explicit acceptance, the install stops until you pass `--accept-license`. Your acceptance is recorded in the install receipt.                                                            |
+| Gate               | What it means                                                                                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| License acceptance | When a license needs explicit acceptance, the install stops until you pass `--accept-license`. Your acceptance is recorded in the install receipt.                                                    |
 | Territory          | When a license excludes territories, declare yours with `--territory <ISO code>`. The declaration is recorded; SpriteBook never geolocates you. A declared territory on the excluded list is refused. |
-| Platform           | A CUDA-only version is refused on a machine without an NVIDIA GPU, with both sides named.                                                                                                                     |
-| VRAM               | The catalog carries measured floors, never README claims. At install time this gate warns only; the job-time preflight is the hard gate.                                                                      |
+| Platform           | A CUDA-only version is refused on a machine without an NVIDIA GPU, with both sides named.                                                                                                             |
+| VRAM               | The catalog carries measured floors, never README claims. At install time this gate warns only; the job-time preflight is the hard gate.                                                              |
 
-You see the terms before an install. `spritebook models list` lists each entry with its license
-and its excluded territories. The models pane in the GUI shows the license and, when acceptance is
+You see the terms before an install. `spritebook models list` lists each entry with its license and
+its excluded territories. The models pane in the GUI shows the license and, when acceptance is
 needed, an acceptance box. A failed gate prints a message that names the exact flag to use.
 
 The catalog today:
@@ -94,14 +94,14 @@ output as cleared for commercial work today. SpriteBook's output exception canno
 restriction is the licensor's, and only the licensor can lift it.
 
 This is not special to TRELLIS.2. An MIT badge on a generative-3D repo describes the model, not the
-stack. A survey of the field found no gen3d backend that passes all four ship gates. Every alternative
-fails earlier: territory carve-outs, Tencent components, or source-only builds. The survey rows are
-in [`docs/dependencies.md`](./dependencies.md).
+stack. A survey of the field found no gen3d backend that passes all four ship gates. Every
+alternative fails earlier: territory carve-outs, Tencent components, or source-only builds. The
+survey rows are in [`docs/dependencies.md`](./dependencies.md).
 
-A replacement for the encumbered stage is recorded as future work, not as done
-work. `o_voxel.postprocess.to_glb` is the single nvdiffrast call site on our path. The function does
-a UV unwrap and a texture bake. SpriteBook already has a WebGPU render core and a glTF pipeline for
-that work. Until that replacement lands, the limitation above stands.
+A replacement for the encumbered stage is recorded as future work, not as done work.
+`o_voxel.postprocess.to_glb` is the single nvdiffrast call site on our path. The function does a UV
+unwrap and a texture bake. SpriteBook already has a WebGPU render core and a glTF pipeline for that
+work. Until that replacement lands, the limitation above stands.
 
 One more gate on this backend: one prerequisite cannot be auto-installed. The image conditioner is
 Meta's gated `facebook/dinov3-vitl16-pretrain-lvd1689m` repo. Request access from Meta and supply a
@@ -112,8 +112,7 @@ with DINOv3".
 
 The Mixamo terms let you use the clips in your projects. The terms do not let anyone redistribute
 the clips. Thus SpriteBook never bundles Mixamo clips. You import your own Mixamo clips, and
-SpriteBook uses them in your workspace only. The rule: user imports are used,
-never redistributed.
+SpriteBook uses them in your workspace only. The rule: user imports are used, never redistributed.
 
 | Source                       | Terms                                   | SpriteBook posture                                  |
 | ---------------------------- | --------------------------------------- | --------------------------------------------------- |

@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
  * The mini-roster script (P3-T4 acceptance): ten characters, generated,
  * picked, baked and exported by ONE command with nobody watching.
  *
- *   deno run -A tools/roster/mini-roster.ts --out <dir> [--count 10]
+ *   node tools/run.mjs tools/roster/mini-roster.ts --out <dir> [--count 10]
  *
  * This is the honest form of "roster XL": the point is not that ten is a big
  * number, it is that the per-character path has no interactive step left in

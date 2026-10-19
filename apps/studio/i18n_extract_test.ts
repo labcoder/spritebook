@@ -33,7 +33,7 @@ test('src/ has zero non-literal callsites and es covers every id', async () => {
   assertEquals(
     missing,
     [],
-    `es is missing ${missing.length} ids - run \`deno task i18n:extract\` for paste-ready stubs`,
+    `es is missing ${missing.length} ids - run \`npm run i18n:extract -w spritebook-studio\` for paste-ready stubs`,
   );
 });
 

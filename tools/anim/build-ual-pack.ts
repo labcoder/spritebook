@@ -7,7 +7,7 @@ import { promises as fs } from 'node:fs';
  * single-animation, skeleton-only clip glbs + a canonical pack.json at
  * `packages/anim/packs/ual/`.
  *
- *   deno run --allow-read --allow-write --allow-env --allow-ffi \
+ *   node tools/run.mjs \
  *     tools/anim/build-ual-pack.ts [--src <vendor-assets dir>]
  *
  * --src defaults to C:/dev/vendor-assets (License.txt beside each library).

@@ -4,7 +4,7 @@
  * nothing fails silently). Severity is derived, never rewritten — a line
  * that parses as a JobEvent contributes its `t`; anything else is info.
  *
- * Dependency-free on purpose: the Deno suite holds the severity contract
+ * Dependency-free on purpose: the Node suite holds the severity contract
  * and the cap without a browser.
  */
 

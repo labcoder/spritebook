@@ -13,16 +13,15 @@ are unchanged.
 
 ## Runtime & shell
 
-| Dependency               | Role                                                                                                                                                                                                          | License             | Status           |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ---------------- |
-| Deno 2.x                 | TS runtime, workspace, WebGPU, tests                                                                                                                                                                          | MIT                 | std              |
-| zod 4.x                  | runtime validation for `@spritebook/schema`; v4 core rewrite + native JSON-Schema interop (pairs with D-009 `paramsSchema`)                                                                                   | MIT                 | std; lock-pinned |
-| Tauri 2.x (pin minor)    | app shell — **chosen by P0-T3 (D-005)**; `deno desktop` revisit trigger noted in D-005; in use since P4-T1 (`apps/studio/src-tauri`, pinned 2.11/2.6 + serde, serde_json, base64 crates — all MIT+Apache-2.0) | MIT+Apache-2.0      | std              |
-| wgpu (under Deno WebGPU) | GPU backend                                                                                                                                                                                                   | MIT/Apache-2.0 dual | std              |
+| Dependency      | Role                                                        | License                                       | Pin                  |
+| --------------- | ----------------------------------------------------------- | --------------------------------------------- | -------------------- |
+| Node LTS        | Core/CLI runtime; installed application owns its executable | MIT plus bundled notices                      | 24.22.0              |
+| zod             | Manifest/catalog/runtime validation                         | MIT                                           | 4.4.3                |
+| Tauri           | Desktop shell, selected by D-005 and retained by D-041      | MIT/Apache-2.0                                | lock-pinned 2.11/2.6 |
+| Dawn (`webgpu`) | Native headless WebGPU                                      | shipped BSD-3-Clause text; native audit below | 0.6.2                |
 
-F4 is porting the existing packages to a locked npm workspace. Node **24.22.0** remains the
-qualified runtime target; production cutover is recorded in the migration roadmap as each package
-group lands. Build/test dependencies below are not bundled in application resources:
+F4 uses a locked npm workspace and compiled JavaScript for the existing TypeScript packages.
+Build/test dependencies below are not bundled in application resources:
 
 | Dependency                                               | Role                                                                   | License           | Pin                                          |
 | -------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------- | -------------------------------------------- |
@@ -87,15 +86,18 @@ dependency notices; an internal renderer experiment is not clearance to distribu
 
 ## Core render, style, pack
 
-| Dependency        | Role                                                            | License     | Status       |
-| ----------------- | --------------------------------------------------------------- | ----------- | ------------ |
-| WGSL shader stack | NPR passes                                                      | ours        | —            |
-| fast-png          | PNG decode                                                      | MIT         | std          |
-| pixelmatch        | golden diffs                                                    | ISC         | std          |
-| OKLab math        | perceptual quantize                                             | ours (tiny) | implement    |
-| maxrects-packer   | atlasing                                                        | MIT         | std          |
-| gifenc            | contact-sheet artifacts only (player is interactive, never GIF) | MIT         | std          |
-| Mesa lavapipe     | CI software Vulkan                                              | MIT         | std, CI-only |
+| Dependency        | Role                                                            | License      | Status                              |
+| ----------------- | --------------------------------------------------------------- | ------------ | ----------------------------------- |
+| WGSL shader stack | NPR passes                                                      | ours         | —                                   |
+| fast-png          | PNG decode                                                      | MIT          | std                                 |
+| jpeg-js           | glTF JPEG byte decode/encode, shared image boundary             | BSD-3-Clause | 0.4.4, existing importer dependency |
+| ndarray           | Strided glTF image arrays                                       | MIT          | 1.0.19, retained legacy pin         |
+| `@types/ndarray`  | Development declarations only                                   | MIT          | 1.0.14                              |
+| pixelmatch        | golden diffs                                                    | ISC          | std                                 |
+| OKLab math        | perceptual quantize                                             | ours (tiny)  | implement                           |
+| maxrects-packer   | atlasing                                                        | MIT          | std                                 |
+| gifenc            | contact-sheet artifacts only (player is interactive, never GIF) | MIT          | std                                 |
+| Mesa lavapipe     | CI software Vulkan                                              | MIT          | std, CI-only                        |
 
 The shared image package also supplies glTF-Transform's byte-only `ndarray-pixels` boundary through
 an npm override. It uses existing `jpeg-js` **0.4.4** (BSD-3-Clause), `ndarray` **1.0.19** (MIT) and
@@ -133,14 +135,15 @@ archive and both license texts. It creates Python environments in user-writable 
 Python, wheels, model weights and backend code are provisioned on demand, never copied from a
 builder's environment. Runtime archive checksums live in `tools/runtime/downloads.json`.
 
-| Dependency             | Role                        | License                                                     | Status                                                                                                                                                              |
-| ---------------------- | --------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Python 3.11+ / PyTorch | runtime                     | PSF / BSD-3                                                 | std                                                                                                                                                                 |
-| rembg                  | background removal          | MIT                                                         | std; **per-weight**: u2net.onnx **✓ verified Apache-2.0** (2026-07-19, catalog entry `rembg-u2net`, hash-pinned); verify every future weight as it becomes an entry |
-| onnxruntime (CPU)      | rembg inference             | MIT                                                         | std; sidecar env only (uv-managed), CPU build — no CUDA requirement for imageprep                                                                                   |
-| ajv (npm, core-side)   | paramsSchema validation     | MIT                                                         | std; exact-pinned; validates adapter JSON Schemas in core BEFORE jobs reach the sidecar (D-009)                                                                     |
-| Pose check v1          | A-pose advisory             | ours (silhouette heuristic on rembg alpha — **no new dep**) | audit item 14                                                                                                                                                       |
-| MediaPipe Pose         | optional pose-check upgrade | Apache-2.0                                                  | later, catalog-installed extra                                                                                                                                      |
+| Dependency             | Role                              | License                                                     | Status                                                                                                                                                              |
+| ---------------------- | --------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| uv                     | Owned Python environment launcher | MIT OR Apache-2.0                                           | 0.12.10; official archive and license hashes pinned                                                                                                                 |
+| Python 3.11+ / PyTorch | runtime                           | PSF / BSD-3                                                 | std                                                                                                                                                                 |
+| rembg                  | background removal                | MIT                                                         | std; **per-weight**: u2net.onnx **✓ verified Apache-2.0** (2026-07-19, catalog entry `rembg-u2net`, hash-pinned); verify every future weight as it becomes an entry |
+| onnxruntime (CPU)      | rembg inference                   | MIT                                                         | std; sidecar env only (uv-managed), CPU build — no CUDA requirement for imageprep                                                                                   |
+| ajv (npm, core-side)   | paramsSchema validation           | MIT                                                         | std; exact-pinned; validates adapter JSON Schemas in core BEFORE jobs reach the sidecar (D-009)                                                                     |
+| Pose check v1          | A-pose advisory                   | ours (silhouette heuristic on rembg alpha — **no new dep**) | audit item 14                                                                                                                                                       |
+| MediaPipe Pose         | optional pose-check upgrade       | Apache-2.0                                                  | later, catalog-installed extra                                                                                                                                      |
 
 ## Generation backends (catalog — installed on demand)
 

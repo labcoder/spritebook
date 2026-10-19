@@ -36,36 +36,42 @@ shows its CLI twin for every action. See [`docs/prd.md`](docs/prd.md) for the pr
 
 ## Development
 
-The repo is a Deno workspace (`packages/*`; scaffolded at P1-T1, packages fill in over the roadmap
-phases). Requires [Deno](https://deno.com) 2.9.x.
-
-The [Node migration](future/roadmap.md#f4--migrate-the-existing-typescript-core-and-tauri-bridge) is
-active. Its npm workspace uses the version in `.node-version`: `npm ci --ignore-scripts`,
-`npm run build`, `npm run check` and `npm run test:schema` build the ported packages and verify the
-compiled schema contract. Building core's file-lock helper requires Rust/Cargo during development;
-installed artifacts include the binary. The remaining production CLI and desktop commands below still use Deno while
-their package groups are ported.
+Use **Node 24.22.0** (the pin in `.node-version`), npm, and Rust/Cargo. Windows runtime packaging
+also needs the Windows SDK's `mt.exe`. The repo is a locked npm workspace; product behavior remains
+TypeScript, compiled to JavaScript, with Tauri/React for the desktop and Node/Dawn for rendering.
 
 ```sh
-deno task dev             # the studio in a BROWSER (demo-data bridge, port 5174)
-deno task dev:desktop     # the studio as the real desktop app (Tauri window;
-                          #   first run compiles Rust - takes a few minutes)
-deno task build:desktop   # packaged NSIS installer
+npm ci --ignore-scripts
+npm run build                    # native ownership helpers, JavaScript and package assets
+npm run check                    # separate source, test and frontend type checks
+npm test                         # existing suites; explicit GPU/model/engine skips
+npm run cli -- doctor
 
-deno task test            # all workspace tests
-deno task test:watch      # test watcher
-deno task lint            # deno lint
-deno task fmt             # format (fmt:check in CI)
-deno task coverage        # tests + coverage report
-deno task hooks:install   # one-time: enables the conventional-commit hook
+npm run dev:web -w spritebook-studio  # browser demo, port 5174
+npm run dev:desktop               # real Tauri bridge; prepares the owned runtime first
+npm run build:desktop             # local Windows NSIS candidate
+npm run build:runtime             # complete portable CLI tree in .build/runtime
+
+npm run lint
+npm run fmt:check
+npm run coverage
+npm run hooks:install
 ```
 
-`dev` serves chrome/tokens/a11y against labeled demo data — real workspaces, the sidecar exam, and
-thumbnails need the desktop shell (`dev:desktop`), whose bridge spawns the core CLI.
+The Python sidecar needs uv **0.12.10** for source development: `uv sync --project sidecar
+--frozen`. Installed candidates include their own uv and create a lock-specific Python environment
+in writable application data. Model weights, optional CUDA environments and backend code remain
+separate prerequisites; see [sidecar setup](sidecar/README.md) and [licensing](docs/licensing.md).
 
-CI runs lint/format/tests on Linux, macOS, and Windows, plus a Linux lane with Mesa lavapipe
-(software Vulkan) used by the render suites from P2 on. Platform targets and known gaps:
-[`docs/platform-support.md`](docs/platform-support.md).
+For iterative work, run `npm run build:watch` and `npm run test:watch` in separate terminals. Tests
+exercise emitted modules. Browser mode uses labeled demo data; real workspaces, jobs and thumbnails
+use `dev:desktop`, whose bridge invokes the same compiled CLI.
+
+The [migration roadmap](future/roadmap.md) records the Windows evidence and remaining gates. CI uses
+Node on Linux, macOS and Windows, with a separate Linux lavapipe lane. Candidate artifacts are for
+qualification: native platform execution, fresh model provisioning, signing and native notices
+remain release gates. No Deno executable is needed for supported development, CI or application
+flows. Pinned legacy sources remain available through Git for preserved-copy rollback.
 
 ## License
 

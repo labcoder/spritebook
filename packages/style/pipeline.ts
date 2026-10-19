@@ -264,7 +264,7 @@ function clippedFlag(
         `camera; past that it clips. A BIGGER CELL DOES NOT HELP - the pivot row is ` +
         `h - paddingPx, so extra height goes above the character and none below. The knobs are ` +
         `paddingPx (linear), a lower elevationDeg, or fewer pixelsPerMeter. Before assuming the ` +
-        `mesh is buried, measure it: \`deno run --allow-all tools/proofs/meshfloor.ts\` reports ` +
+        `mesh is buried, measure it: \`node tools/run.mjs tools/proofs/meshfloor.ts\` reports ` +
         `the skinned mesh's minimum world Y per clip. Only if the BIND POSE is below zero is ` +
         `the mesh actually ungrounded, and only then does \`spritebook rig --feet-ground\` ` +
         `apply.`,

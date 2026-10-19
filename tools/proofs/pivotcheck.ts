@@ -24,7 +24,7 @@ import { join } from 'node:path';
  * the pivot row with every vertex still above Y=0. The +3 is foreshortening,
  * not a sink. An earlier note here called it unexplained; it is explained.
  *
- * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/pivotcheck.ts
+ * Run: SPRITEBOOK_GPU_BACKEND=vulkan node tools/run.mjs tools/proofs/pivotcheck.ts
  */
 import { decode as decodePng } from 'fast-png';
 import { runCli } from '../../packages/cli/dist/mod.js';

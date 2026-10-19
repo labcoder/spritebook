@@ -4,22 +4,21 @@
 
 Three processes, one contract:
 
-- **Core (TypeScript on Deno).** The product. Owns manifests, the job queue, the importer border,
-  the WebGPU render/style/pack/export pipeline, animation retargeting, caching, and the CLI.
-  Headless by design — Deno's WebGPU has no swapchain, which is exactly right for a batch renderer.
-  _Confirmed by the P0-T2 spike (D-004 ratified): ~190 f/s render+readback at 128 px on the dev GPU,
-  cross-process byte-deterministic; `spikes/webgpu/` doubles as the canary to re-run before any Deno
-  upgrade._
+- **Core (TypeScript on Node 24 LTS).** Owns manifests, jobs, the importer border, animation
+  retargeting, rendering/style/pack/export, caching and CLI composition. JavaScript is emitted by
+  TypeScript project references; normal package exports resolve the emitted modules. Headless WebGPU
+  uses pinned Dawn (`webgpu` 0.6.2), with explicit device/root disposal. F4's paired Windows
+  workload matches the legacy control's pixels; old PNG bytes and renderer cache identities differ.
 - **AI sidecar (Python).** Torch-based adapters for catalog models: background removal, image→3D
   backends, auto-rigging. Talks to core over a local contract (below). Installed per machine; never
   bundled.
 - **GUI shell (Tauri v2 — D-005 ratified, resolved by P0-T3).** React 19 + Vite + Base UI +
-  hand-authored tokens, with Deno as the sole JS toolchain (no Node). A projection of core: it
+  hand-authored tokens, built by Vite in the same locked npm workspace. A projection of core: it
   invokes CLI verbs, renders the NDJSON stream, and displays core-produced pixels. Three.js
   viewports are inspection instruments only — and must be able to degrade to core-rendered PNG
   sequences (Linux WebKitGTK caveat, see `spikes/shell/REPORT.md`). Production bridge rule from the
-  spike: per-job IPC channels, never global event names. A `deno desktop` revisit trigger is
-  recorded in D-005.
+  spike: per-job IPC channels, never global event names. Tauri remains the selected shell (D-041);
+  no alternative GUI port is scheduled.
 
 ```mermaid
 flowchart TB
@@ -57,10 +56,10 @@ flowchart TB
    camera preset, style preset, `rendererVersion`, backend@version+params — and bind to the
    immutable `characterId`. Output pixels are never hashed (GPUs are not cross-machine
    deterministic). Renaming a character invalidates nothing.
-4. **glTF at the border (D-012).** All ingestion (glb/gltf/obj/fbx-via-ufbx/vrm) normalizes to
-   canonical, uncompressed glTF with enforced conventions: +Y up, meters, faces +Z (VRM 0.x rotated
-   on import), feet at Y=0, uniform scale. Emits a persisted `PreflightReport`. Double-import of the
-   same source must produce identical bytes (CI-enforced).
+4. **glTF at the border (D-012).** All ingestion (glb/gltf/obj/fbx/vrm) normalizes to canonical,
+   uncompressed glTF with enforced conventions: +Y up, meters, faces +Z (VRM 0.x rotated on import),
+   feet at Y=0, uniform scale. Emits a persisted `PreflightReport`. Double-import of the same source
+   must produce identical bytes (CI-enforced).
 5. **Registry is data (D-009).** Three layers, npm-style: `catalog` (models.json: entries, versions,
    licenses, territories, VRAM/disk, `paramsSchema`) → `installed` (per-machine state under the
    platform local-data directory, or `SPRITEBOOK_MODELS_DIR`, verified hashes) → `pins` (per-project
@@ -102,23 +101,24 @@ upstream UniRig scripts) stays inside the sidecar process boundary; adapters ret
 - Repair verbs are core capabilities (p3): `rig --edits <patch>`, `--face-front`, `--feet-ground`,
   `--center`, `--rerun-with-hints`. The GUI's two-tier repair UI wraps them.
 
-## Module map (materialized as the `packages/*` Deno workspace at P1-T1; `gui` arrives p4, `sidecar` p3)
+## Module map (npm workspaces under `packages/*` and `apps/studio`)
 
-| Package            | Owns                                                                                      |
-| ------------------ | ----------------------------------------------------------------------------------------- |
-| `schema`           | All types in `data-models.ts`, validation, `ManifestPatch`, migrations                    |
-| `core`             | Queue, events, journal/undo, cache, orchestration                                         |
-| `importer`         | Border: readers (glTF-Transform, ufbx-wasm, obj2gltf), canonicalization, PreflightReport  |
-| `render`           | Headless WebGPU: MRT AOVs, skinning, readback                                             |
-| `style`            | NPR stack: quantize (OKLab), dither, outlines, temporal toolkit, flicker metric           |
-| `anim`             | Pack ingestion, humanoid retarget profile, clip sampling, preview clip emission           |
-| `pack`             | MaxRects atlasing, parallel-layout guarantee, contact sheets                              |
-| `gen`              | Generation pipeline: registry → sidecar → **the border** → GenerationResult; reprojection |
-| `export`           | Godot / Aseprite / TexturePacker / strips — projections of BakeManifest                   |
-| `registry`         | Catalog/installed/pins, gates, verify                                                     |
-| `cli`              | Verb surface (`gen, pick, rig, anim, look, bake, export, models, clone, rename, undo…`)   |
-| `gui`              | Shell app; framework-agnostic viewport classes                                            |
-| `sidecar` (Python) | Adapters: rembg, gen backends, rig backends                                               |
+| Package            | Owns                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| `schema`           | All types in `data-models.ts`, validation, `ManifestPatch`, migrations                          |
+| `core`             | Queue, events, journal/undo, cache, orchestration                                               |
+| `importer`         | Border: readers (glTF-Transform, three-FBX bridge, obj2gltf), canonicalization, PreflightReport |
+| `image`            | Shared PNG codec and PNG/JPEG ndarray boundary; avoids Sharp/libvips in the runtime             |
+| `render`           | Headless WebGPU: MRT AOVs, skinning, readback                                                   |
+| `style`            | NPR stack: quantize (OKLab), dither, outlines, temporal toolkit, flicker metric                 |
+| `anim`             | Pack ingestion, humanoid retarget profile, clip sampling, preview clip emission                 |
+| `pack`             | MaxRects atlasing, parallel-layout guarantee, contact sheets                                    |
+| `gen`              | Generation pipeline: registry → sidecar → **the border** → GenerationResult; reprojection       |
+| `export`           | Godot / Aseprite / TexturePacker / strips — projections of BakeManifest                         |
+| `registry`         | Catalog/installed/pins, gates, verify                                                           |
+| `cli`              | Verb surface (`gen, pick, rig, anim, look, bake, export, models, clone, rename, undo…`)         |
+| `gui`              | Shell app; framework-agnostic viewport classes                                                  |
+| `sidecar` (Python) | Adapters: rembg, gen backends, rig backends                                                     |
 
 ## Non-goals of the architecture
 
@@ -130,6 +130,26 @@ projections); no cross-machine render determinism assumptions, ever.
 The [workspace persistence protocol](workspace-persistence.md) defines the recoverable writer,
 canonical asset revisions, job ownership and consistent read projections. The
 [execution policy](execution-policy.md) defines project pins, receipt verification, declared consent
-and configuration-specific VRAM admission. These protocols preserve the laws above while the runtime
-is still Deno. The isolated [F2 Node/Dawn proof](../../future/renderer-qualification.md) qualifies
-the Windows renderer and resource layout; F4 owns the production runtime/CLI/toolchain port.
+and configuration-specific VRAM admission. These protocols preserve the laws above on Node. The
+[Windows renderer proof](../../future/renderer-qualification.md) and
+[F4 cutover evidence](../../future/runtime-cutover.md) record the runtime transition and remaining
+release gates.
+
+## Installed ownership
+
+Tauri launches app-owned Node and `runtime/core/cli.mjs` through the shared native process owner.
+The portable `spritebook` launcher owns the same worker tree. Native code handles process groups/
+Windows Job Objects and kernel file locks; TypeScript owns all product policy. Startup gates prevent
+workers escaping before assignment. Cancellation keeps each job's stdout/stderr channels separate.
+
+`SPRITEBOOK_RESOURCES` identifies immutable catalogs, shaders, clips, bodies and Python source.
+Source development resolves equivalent assets from compiled packages. `ubc-male` is the portable
+bundled body ID; explicit body paths remain supported. The installer includes the locked production
+package tree so importer CJS loaders and decoders retain their relative assets. It contains no
+source TypeScript, development node_modules, compiler, model weights or copied virtual environment.
+
+Owned uv uses frozen resolution. Installed Python environments live in writable platform application
+data, keyed by the sidecar lock; `UV_PROJECT_ENVIRONMENT` remains an explicit override. Runtime
+builds stage and seal the complete payload before publishing, and recover a previous generated
+payload if interrupted between directory renames. This builder guarantee is separate from F7's
+clean-machine installer upgrade/uninstall qualification.

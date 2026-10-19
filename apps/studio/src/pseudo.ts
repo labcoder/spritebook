@@ -2,7 +2,7 @@
  * The pseudo-locale transform (design-system hard commitment 3): every UI
  * string expands by at least 40% with accented characters, so a layout that
  * survives the pseudo locale survives real localization. Pure and
- * dependency-free so the Deno suite can hold the +40% guarantee.
+ * dependency-free so the Node suite can hold the +40% guarantee.
  */
 
 const ACCENTS: Record<string, string> = {

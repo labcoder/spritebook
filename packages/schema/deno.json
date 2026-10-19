@@ -1,8 +1,0 @@
-{
-  "name": "@spritebook/schema",
-  "version": "0.1.0",
-  "exports": "./mod.ts",
-  "imports": {
-    "zod": "npm:zod@4.4.3"
-  }
-}

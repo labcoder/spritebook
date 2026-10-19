@@ -3,11 +3,11 @@
 F1-T5 enforces the existing catalog contract at execution time. It does not install a new runtime,
 download weights automatically or qualify additional models/platforms.
 
-For a workspace `<root>/<character>`, core checks exactly `<root>/pins.json`. An explicit
-`--pins <file>` overrides that discovery, including for standalone `prep` and file-based bakes. This
-is the existing `ProjectPins` document: `models`, `packs` and `rendererVersion`. Discovery does not
-walk arbitrary ancestors. A missing implicit file means an unmanaged workspace; a present but
-invalid file or a missing explicit file is an error.
+For a workspace `<root>/<character>`, core checks exactly `<root>/pins.json`. An explicit `--pins
+<file>` overrides that discovery, including for standalone `prep` and file-based bakes. This is the
+existing `ProjectPins` document: `models`, `packs` and `rendererVersion`. Discovery does not walk
+arbitrary ancestors. A missing implicit file means an unmanaged workspace; a present but invalid
+file or a missing explicit file is an error.
 
 In a managed project every executed model/pack needs an exact pin. An explicit requested model
 version must agree. A missing pinned install never falls forward to a newer one. Unmanaged jobs
