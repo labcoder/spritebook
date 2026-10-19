@@ -12,10 +12,11 @@ import { sha256Bytes } from './dist/cache.js';
 import { createWorkspace, readWorkspace, workspacePaths } from './dist/workspace.js';
 import { moveManifestCursor, workspaceJob } from './dist/persistence.js';
 
-
 function child(workspace: string, mode: string) {
   return runProcess(process.execPath, [
-    fileURLToPath(new URL('./fixtures/persistence-worker.ts', import.meta.url)), workspace, mode,
+    fileURLToPath(new URL('./fixtures/persistence-worker.ts', import.meta.url)),
+    workspace,
+    mode,
   ]);
 }
 
@@ -84,9 +85,11 @@ test('undo/redo restores selected and transformed mesh bytes, including the firs
       assertEquals(new Uint8Array(await fs.readFile(paths.canonicalModel)), bytes);
     }
     const manifest = await fs.readFile(paths.manifest, 'utf8');
-    await assertRejects(() => pickResult(workspace, 'r1', { canonicalSource: `${workspace}/b.glb` }),
+    await assertRejects(
+      () => pickResult(workspace, 'r1', { canonicalSource: `${workspace}/b.glb` }),
       Error,
-      'hash mismatch',);
+      'hash mismatch',
+    );
     assertEquals(
       await fs.readFile(paths.manifest, 'utf8'),
       manifest,

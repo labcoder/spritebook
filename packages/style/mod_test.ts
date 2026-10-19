@@ -32,7 +32,10 @@ const CAM: CameraPreset = {
 };
 
 test('style seam: renders + styles end-to-end, files + events only', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const events = [];

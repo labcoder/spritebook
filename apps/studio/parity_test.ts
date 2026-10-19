@@ -38,19 +38,30 @@ import { rigRunArgs } from './src/rig.ts';
 import { editsFile } from './src/viewport/picking.ts';
 import { JointEditsFileSchema, parseWith } from '@spritebook/schema';
 
-const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const REPO = new URL('../../', import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 
 function io() {
   const out: string[] = [];
-  return { stdout: (s: string) => out.push(s), stderr: (s: string) => out.push(s), out };
+  return {
+    stdout: (s: string) => out.push(s),
+    stderr: (s: string) => out.push(s),
+    out,
+  };
 }
 
 /** Run a twin exactly as the GUI would, and say what it printed if it fails. */
 async function twin(args: string[], label: string): Promise<string[]> {
   const o = io();
   const code = await runCli([...args, '--json'], o);
-  assertEquals(code, 0, `${label} failed: spritebook ${args.join(' ')}\n${o.out.join('\n')}`);
+  assertEquals(
+    code,
+    0,
+    `${label} failed: spritebook ${args.join(' ')}\n${o.out.join('\n')}`,
+  );
   return o.out;
 }
 
@@ -78,7 +89,11 @@ test('CLI-twin parity: the GUI actions execute verbatim', async () => {
     let m = await manifestOf(ws);
     const gen = m.generation as { results: { id: string; seed: number }[] };
     assertEquals(gen.results.length, 2, 'two candidates recorded');
-    assertEquals(gen.results.map((r) => r.seed), [0, 1000], 'the stride convention holds');
+    assertEquals(
+      gen.results.map((r) => r.seed),
+      [0, 1000],
+      'the stride convention holds',
+    );
 
     // 2. More like this — the candidate card's re-roll. It reproduces the
     // parent's RECIPE with a new seed, and that recipe recorded candidates:2,
@@ -86,16 +101,35 @@ test('CLI-twin parity: the GUI actions execute verbatim', async () => {
     // where that surfaced; the card now says so on the button.
     await twin(moreLikeArgs(ws, 'parity', 'r1'), 'gen --more-like');
     m = await manifestOf(ws);
-    const after = (m.generation as { results: { id: string; params: { candidates?: number } }[] })
+    const after = (m.generation as {
+      results: { id: string; params: { candidates?: number } }[];
+    })
       .results;
-    assertEquals(after.length, 4, 'the parent recipe re-ran its two-candidate ladder');
-    assertEquals(after[0]!.params.candidates, 2, 'and the ladder is IN the recorded params');
+    assertEquals(
+      after.length,
+      4,
+      'the parent recipe re-ran its two-candidate ladder',
+    );
+    assertEquals(
+      after[0]!.params.candidates,
+      2,
+      'and the ladder is IN the recorded params',
+    );
 
     // 3. Save as canonical mesh — pick with the shipped defaults ON
-    await twin(pickArgs(ws, 'r1', { reproject: true, colorMatch: true }), 'pick');
+    await twin(
+      pickArgs(ws, 'r1', { reproject: true, colorMatch: true }),
+      'pick',
+    );
     m = await manifestOf(ws);
-    assertEquals((m.generation as { pickedResultId: string }).pickedResultId, 'r1');
-    assert(m.canonicalMesh !== undefined, 'the checkpoint the stage rail unlocks on');
+    assertEquals(
+      (m.generation as { pickedResultId: string }).pickedResultId,
+      'r1',
+    );
+    assert(
+      m.canonicalMesh !== undefined,
+      'the checkpoint the stage rail unlocks on',
+    );
 
     // 4. Record look — the Look stage's Apply, at a diverging elevation
     await twin(
@@ -121,20 +155,41 @@ test('CLI-twin parity: the GUI actions execute verbatim', async () => {
       'look (elevation diverged)',
     );
     m = await manifestOf(ws);
-    const look = m.look as { cameraOverrides?: { elevationDeg?: number }; stylePresetId: string };
-    assertEquals(look.cameraOverrides?.elevationDeg, 26.565, 'only the divergence travelled');
+    const look = m.look as {
+      cameraOverrides?: { elevationDeg?: number };
+      stylePresetId: string;
+    };
+    assertEquals(
+      look.cameraOverrides?.elevationDeg,
+      26.565,
+      'only the divergence travelled',
+    );
     assertEquals(look.stylePresetId, 'pixel');
 
     // 5. Enable clips — the Anim library's per-clip action, twice over
     await twin(
       animEnableArgs(ws, [
-        bindingSpec({ clipId: 'idle-loop', frames: 6, speed: 1, holdLast: false }),
-        bindingSpec({ clipId: 'walk-loop', frames: 8, speed: 1.5, holdLast: false }),
+        bindingSpec({
+          clipId: 'idle-loop',
+          frames: 6,
+          speed: 1,
+          holdLast: false,
+        }),
+        bindingSpec({
+          clipId: 'walk-loop',
+          frames: 8,
+          speed: 1.5,
+          holdLast: false,
+        }),
       ]),
       'anim --enable',
     );
     m = await manifestOf(ws);
-    let set = m.animationSet as { clipId: string; enabled: boolean; frames: number }[];
+    let set = m.animationSet as {
+      clipId: string;
+      enabled: boolean;
+      frames: number;
+    }[];
     assertEquals(set.map((b) => [b.clipId, b.frames, b.enabled]), [
       ['idle-loop', 6, true],
       ['walk-loop', 8, true],
@@ -151,9 +206,15 @@ test('CLI-twin parity: the GUI actions execute verbatim', async () => {
     // the canonical mesh, but motion needs the rig's skeleton first
     {
       const o = io();
-      const code = await runCli([...animPreviewArgs(ws, 'idle-loop'), '--json'], o);
+      const code = await runCli(
+        [...animPreviewArgs(ws, 'idle-loop'), '--json'],
+        o,
+      );
       assertEquals(code, 1, 'preview on an unrigged character must refuse');
-      assert(o.out.join('\n').includes('no rig'), `named the reason: ${o.out.join('\n')}`);
+      assert(
+        o.out.join('\n').includes('no rig'),
+        `named the reason: ${o.out.join('\n')}`,
+      );
     }
 
     // 7. Undo — the Edit menu / Ctrl+Z, over the same journal
@@ -192,14 +253,20 @@ test('CLI-twin parity: the GUI actions execute verbatim', async () => {
       { joint: 'thumb_03_l', delta: [0, 0.003, 0.001], mirrored: false },
     ]);
     parseWith(JointEditsFileSchema, doc, 'JointEditsFile from the viewport');
-    assertEquals(rigRunArgs(ws, { editsPath: 'p.json' }).slice(-2), ['--edits', 'p.json']);
+    assertEquals(rigRunArgs(ws, { editsPath: 'p.json' }).slice(-2), [
+      '--edits',
+      'p.json',
+    ]);
 
     // 11. Accept rig — refused HONESTLY here, which is itself the contract:
     // this character has no rig, and the twin says so rather than pretending
     const o = io();
     const code = await runCli([...acceptRigArgs(ws, false), '--json'], o);
     assertEquals(code, 1);
-    assert(o.out.join('\n').includes('no rig'), `named the reason: ${o.out.join('\n')}`);
+    assert(
+      o.out.join('\n').includes('no rig'),
+      `named the reason: ${o.out.join('\n')}`,
+    );
   } finally {
     await fs.rm(tmp, { recursive: true });
   }
@@ -207,7 +274,7 @@ test('CLI-twin parity: the GUI actions execute verbatim', async () => {
 
 test('CLI-twin parity: bake and export (GPU)', async (t) => {
   if (!(await tryGetGpu())) {
-    console.log('skip: no GPU adapter — the render twins need one');
+    t.skip('skip: no GPU adapter — the render twins need one');
     return;
   }
   const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
@@ -222,13 +289,19 @@ test('CLI-twin parity: bake and export (GPU)', async (t) => {
       }),
       'gen',
     );
-    await twin(pickArgs(ws, 'r1', { reproject: true, colorMatch: true }), 'pick');
+    await twin(
+      pickArgs(ws, 'r1', { reproject: true, colorMatch: true }),
+      'pick',
+    );
 
     // 12. Bake sheet — the Bake stage's primary action
     await twin(bakeArgs(ws), 'bake');
     const m = await manifestOf(ws);
     const bakeId = m.lastBakeId as string;
-    assert(typeof bakeId === 'string', 'the bake recorded itself on the manifest');
+    assert(
+      typeof bakeId === 'string',
+      'the bake recorded itself on the manifest',
+    );
     const bakeManifest = JSON.parse(
       await fs.readFile(`${ws}/bakes/bake-${bakeId}/manifest.json`, 'utf8'),
     );
@@ -242,8 +315,13 @@ test('CLI-twin parity: bake and export (GPU)', async (t) => {
       const stat = await fs.stat(`${out}/${target}`);
       assert(stat.isDirectory(), `${target} produced a folder`);
     }
-    const godot = [...readdirSync(`${out}/godot`, { withFileTypes: true })].map((e) => e.name);
-    assert(godot.some((n) => n.endsWith('.tres')), `the Godot resource exists: ${godot}`);
+    const godot = [...readdirSync(`${out}/godot`, { withFileTypes: true })].map(
+      (e) => e.name,
+    );
+    assert(
+      godot.some((n) => n.endsWith('.tres')),
+      `the Godot resource exists: ${godot}`,
+    );
   } finally {
     await fs.rm(tmp, { recursive: true });
   }
@@ -257,7 +335,8 @@ before(async () => {
   await twin(['models', 'install', 'fixture-gen'], 'install fixture');
 });
 after(async () => {
-  if (previousModelsRoot === undefined) delete process.env.SPRITEBOOK_MODELS_DIR;
-  else process.env.SPRITEBOOK_MODELS_DIR = previousModelsRoot;
+  if (previousModelsRoot === undefined) {
+    delete process.env.SPRITEBOOK_MODELS_DIR;
+  } else process.env.SPRITEBOOK_MODELS_DIR = previousModelsRoot;
   if (modelsRoot) await fs.rm(modelsRoot, { recursive: true });
 });

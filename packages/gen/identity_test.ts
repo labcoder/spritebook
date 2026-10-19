@@ -857,7 +857,8 @@ test('decals: a region decal on an UNSKINNED model is refused, not page-painted'
       `the refusal must name the fix (fit first, or place by uvRect): ${err.message}`,
     );
     await rejects(
-      () => fs.stat(`${dir}/out.glb`), { code: 'ENOENT' },
+      () => fs.stat(`${dir}/out.glb`),
+      { code: 'ENOENT' },
       'a refused decal writes no model',
     );
   });

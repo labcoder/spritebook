@@ -66,7 +66,10 @@ test('garbage manifests still produce six renderable stages', () => {
 // maintainer's first UX pass: a new pick (r3), a re-rig, and an ACCEPTANCE -
 // so the rig stage projects done now where the desktop run once showed warn.
 test('the real p3-exit manifest projects the states the UX pass left', async () => {
-  const raw = await fs.readFile(new URL('./fixtures/p3-exit-character.json', import.meta.url), 'utf8');
+  const raw = await fs.readFile(
+    new URL('./fixtures/p3-exit-character.json', import.meta.url),
+    'utf8',
+  );
   const s = stageStates(JSON.parse(raw));
   assertEquals(s[0].state, 'done', 'canonical mesh saved');
   assert(s[0].note.includes('pick r3'));

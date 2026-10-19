@@ -55,7 +55,11 @@ test('a claim bigger than the machine is refused, not waited on', async () => {
       Error,
       'could never start',
     );
-    assertEquals([...readdirSync(dir, { withFileTypes: true })].filter((e) => e.isFile()).length, 0, 'and left nothing');
+    assertEquals(
+      [...readdirSync(dir, { withFileTypes: true })].filter((e) => e.isFile()).length,
+      0,
+      'and left nothing',
+    );
   } finally {
     await fs.rm(dir, { recursive: true });
   }

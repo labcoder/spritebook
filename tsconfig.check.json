@@ -5,7 +5,13 @@
   },
   "include": [
     "packages/**/*.ts",
-    "tools/testing/**/*.ts"
+    "tools/testing/**/*.ts",
+    "tools/ci/**/*.ts",
+    "tools/docs/**/*.ts",
+    "tools/anim/**/*.ts",
+    "tools/registry/**/*.ts",
+    "tools/roster/**/*.ts",
+    "tools/proofs/**/*.ts"
   ],
   "exclude": [
     "**/dist/**"

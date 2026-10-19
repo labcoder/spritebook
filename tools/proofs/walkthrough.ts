@@ -34,9 +34,14 @@ export class Cdp {
   #pending = new Map<number, (m: CdpMsg) => void>();
 
   static async connect(port: number): Promise<Cdp> {
-    const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    const list = await (await fetch(`http://127.0.0.1:${port}/json/list`))
+      .json();
     const page = list.find((t: { type: string }) => t.type === 'page');
-    if (!page) throw new Error('no page target - is the app running with the debug port?');
+    if (!page) {
+      throw new Error(
+        'no page target - is the app running with the debug port?',
+      );
+    }
     const cdp = new Cdp();
     await new Promise<void>((resolve, reject) => {
       cdp.#ws = new WebSocket(page.webSocketDebuggerUrl);
@@ -53,7 +58,10 @@ export class Cdp {
     return cdp;
   }
 
-  call(method: string, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  call(
+    method: string,
+    params: Record<string, unknown> = {},
+  ): Promise<Record<string, unknown>> {
     const id = ++this.#id;
     this.#ws.send(JSON.stringify({ id, method, params }));
     return new Promise((resolve, reject) => {
@@ -98,11 +106,20 @@ export interface Modifiers {
 /** modifiers bitmask per CDP: Alt=1, Ctrl=2, Meta=4, Shift=8 */
 const maskOf = (m: Modifiers) => (m.alt ? 1 : 0) | (m.ctrl ? 2 : 0) | (m.shift ? 8 : 0);
 
-export async function press(cdp: Cdp, key: string, mods: Modifiers = {}): Promise<void> {
+export async function press(
+  cdp: Cdp,
+  key: string,
+  mods: Modifiers = {},
+): Promise<void> {
   const vk = VKEY[key];
   if (vk === undefined) throw new Error(`no vkey for ${key}`);
   const modifiers = maskOf(mods);
-  const base = { key, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers };
+  const base = {
+    key,
+    windowsVirtualKeyCode: vk,
+    nativeVirtualKeyCode: vk,
+    modifiers,
+  };
   // A full 'keyDown' (not 'rawKeyDown'), with text for the keys that carry it:
   // native activation - Enter clicking a focused button, Space toggling a
   // checkbox - only happens on the text-processing path, exactly as puppeteer
@@ -142,7 +159,8 @@ export async function evalJs<T>(cdp: Cdp, expr: string): Promise<T> {
   if ((r as { exceptionDetails?: unknown }).exceptionDetails) {
     throw new Error(
       `evalJs threw: ${
-        JSON.stringify((r as { exceptionDetails?: unknown }).exceptionDetails).slice(0, 300)
+        JSON.stringify((r as { exceptionDetails?: unknown }).exceptionDetails)
+          .slice(0, 300)
       }`,
     );
   }
@@ -185,7 +203,9 @@ export async function waitFor(
   const t0 = Date.now();
   for (;;) {
     if (await evalJs<boolean>(cdp, `!!(${expr})`)) return;
-    if (Date.now() - t0 > timeoutMs) throw new Error(`timeout waiting for ${what}`);
+    if (Date.now() - t0 > timeoutMs) {
+      throw new Error(`timeout waiting for ${what}`);
+    }
     await new Promise((r) => setTimeout(r, 250));
   }
 }

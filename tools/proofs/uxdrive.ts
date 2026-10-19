@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * UX-pass driver: one-shot CDP actions against the running desktop app, so a
  * reviewer (human or agent) can drive the REAL app step by step and screenshot
@@ -16,12 +17,18 @@
  */
 import { Cdp, evalJs, press, typeText } from './walkthrough.ts';
 
-const PORT = Number(Deno.env.get('SPRITEBOOK_CDP_PORT') ?? '9223');
-const OUT = new URL('../../docs/internal/proofs/uxpass2/', import.meta.url).pathname
+const PORT = Number(process.env['SPRITEBOOK_CDP_PORT'] ?? '9223');
+const OUT = new URL('../../docs/internal/proofs/uxpass2/', import.meta.url)
+  .pathname
   .replace(/^\/([A-Za-z]:)/, '$1');
 
-async function center(cdp: Cdp, selector: string): Promise<{ x: number; y: number }> {
-  const box = await evalJs<{ x: number; y: number; w: number; h: number } | null>(
+async function center(
+  cdp: Cdp,
+  selector: string,
+): Promise<{ x: number; y: number }> {
+  const box = await evalJs<
+    { x: number; y: number; w: number; h: number } | null
+  >(
     cdp,
     `(() => { const el = document.querySelector(${JSON.stringify(selector)});
        if (!el) return null; el.scrollIntoView({block:'center'});
@@ -35,20 +42,28 @@ async function center(cdp: Cdp, selector: string): Promise<{ x: number; y: numbe
 async function clickAt(cdp: Cdp, x: number, y: number): Promise<void> {
   const base = { x, y, button: 'left', clickCount: 1, pointerType: 'mouse' };
   await cdp.call('Input.dispatchMouseEvent', { ...base, type: 'mousePressed' });
-  await cdp.call('Input.dispatchMouseEvent', { ...base, type: 'mouseReleased' });
+  await cdp.call('Input.dispatchMouseEvent', {
+    ...base,
+    type: 'mouseReleased',
+  });
 }
 
-const [cmd, ...rest] = Deno.args;
+const [cmd, ...rest] = process.argv.slice(2);
 const cdp = await Cdp.connect(PORT);
 try {
   switch (cmd) {
     case 'shot': {
-      const { data } = await cdp.call('Page.captureScreenshot', { format: 'png' }) as {
+      const { data } = await cdp.call('Page.captureScreenshot', {
+        format: 'png',
+      }) as {
         data: string;
       };
-      await Deno.mkdir(OUT, { recursive: true });
+      await fs.mkdir(OUT, { recursive: true });
       const path = `${OUT}${rest[0] ?? 'shot'}.png`;
-      await Deno.writeFile(path, Uint8Array.from(atob(data), (c) => c.charCodeAt(0)));
+      await fs.writeFile(
+        path,
+        Uint8Array.from(atob(data), (c) => c.charCodeAt(0)),
+      );
       console.log(path);
       break;
     }
@@ -105,17 +120,17 @@ try {
       while (Date.now() < deadline) {
         if (await evalJs<boolean>(cdp, `Boolean(${expr})`)) {
           console.log('ready');
-          Deno.exit(0);
+          process.exit(0);
         }
         await new Promise((r) => setTimeout(r, 400));
       }
       console.error(`timeout waiting for ${expr}`);
-      Deno.exit(1);
+      process.exit(1);
       break;
     }
     default:
       console.error('unknown cmd');
-      Deno.exit(2);
+      process.exit(2);
   }
 } finally {
   cdp.close();

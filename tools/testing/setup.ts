@@ -6,7 +6,10 @@ import { disposeGpu } from '../../packages/render/dist/gpu.js';
 // the explicit sink/lock/crash regressions remain necessary alongside this handle guard.
 void process.stdout;
 void process.stderr;
-const snapshots = new WeakMap<TestContext | SuiteContext, Map<string, number>>();
+const snapshots = new WeakMap<
+  TestContext | SuiteContext,
+  Map<string, number>
+>();
 function resources(): Map<string, number> {
   const counts = new Map<string, number>();
   for (const name of process.getActiveResourcesInfo()) {
@@ -28,6 +31,10 @@ afterEach(async (context) => {
     await new Promise<void>((resolve) => setImmediate(resolve));
   }
   const leaked = extra();
-  assert.deepEqual(leaked, [], `Unreleased Node resources: ${JSON.stringify(leaked)}`);
+  assert.deepEqual(
+    leaked,
+    [],
+    `Unreleased Node resources: ${JSON.stringify(leaked)}`,
+  );
 });
 after(disposeGpu);

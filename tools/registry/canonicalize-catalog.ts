@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Validate and canonicalize the bundled model catalog. Entries are authored
  * by hand (or pasted from a draft); this tool is the only writer of the
@@ -12,14 +13,17 @@
 import { canonicalJson, ModelCatalogSchema, parseWith } from '@spritebook/schema';
 
 const target = decodeURIComponent(
-  new URL('../../packages/registry/catalog/models.json', import.meta.url).pathname
+  new URL('../../packages/registry/catalog/models.json', import.meta.url)
+    .pathname
     .replace(/^\/([A-Za-z]:)/, '$1'),
 );
-const source = Deno.args[0] ?? target;
+const source = process.argv.slice(2)[0] ?? target;
 const catalog = parseWith(
   ModelCatalogSchema,
-  JSON.parse(await Deno.readTextFile(source)),
+  JSON.parse(await fs.readFile(source, 'utf8')),
   'bundled ModelCatalog',
 );
-await Deno.writeTextFile(target, canonicalJson(catalog));
-console.log(`wrote ${target}: ${catalog.models.length} entries, canonical bytes`);
+await fs.writeFile(target, canonicalJson(catalog));
+console.log(
+  `wrote ${target}: ${catalog.models.length} entries, canonical bytes`,
+);

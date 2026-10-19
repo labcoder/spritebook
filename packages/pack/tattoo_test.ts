@@ -141,7 +141,10 @@ async function cells(b: Baked): Promise<Map<number, { data: Uint8Array; w: numbe
 }
 
 test('ACCEPTANCE: an asymmetric character keeps its side in all 8 directions', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const off = await bake(`${root}/off`, false);

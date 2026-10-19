@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The mini-roster script (P3-T4 acceptance): ten characters, generated,
  * picked, baked and exported by ONE command with nobody watching.
@@ -20,10 +21,10 @@
 import { runGenJob, runPickJob } from '@spritebook/gen';
 import { runBakeJob } from '@spritebook/pack';
 import { runExportJob } from '@spritebook/export';
-import { PIXEL_8 } from '@spritebook/style';
+import { PIXEL } from '@spritebook/style';
 import type { CameraPreset, JobEvent } from '@spritebook/schema';
 
-const args = Deno.args;
+const args = process.argv.slice(2);
 const flag = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
   const v = i < 0 ? undefined : args[i + 1];
@@ -34,7 +35,10 @@ const outRoot = flag('out') ?? './roster-out';
 const count = Number(flag('count') ?? '10');
 const sidecarDir = flag('sidecar') ??
   decodeURIComponent(
-    new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+    new URL('../../sidecar', import.meta.url).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      '$1',
+    ),
   );
 const modelsRoot = flag('models-dir');
 
@@ -73,19 +77,24 @@ function cutout(seed: number, w = 128, h = 192): Uint8Array {
   return data;
 }
 
-async function drain(events: AsyncIterable<JobEvent>, what: string): Promise<JobEvent[]> {
+async function drain(
+  events: AsyncIterable<JobEvent>,
+  what: string,
+): Promise<JobEvent[]> {
   const out: JobEvent[] = [];
   for await (const e of events) {
     out.push(e);
-    if (e.t === 'error') throw new Error(`${what} failed [${e.code}]: ${e.message}`);
+    if (e.t === 'error') {
+      throw new Error(`${what} failed [${e.code}]: ${e.message}`);
+    }
   }
   return out;
 }
 
 // tools/ sits outside the workspace members, so name the pinned npm
 // specifier directly rather than relying on a member's import map
-const { encode: encodePng } = await import('npm:fast-png@6.2.0');
-await Deno.mkdir(outRoot, { recursive: true });
+const { encode: encodePng } = await import('fast-png');
+await fs.mkdir(outRoot, { recursive: true });
 
 const t0 = performance.now();
 const perCharacter: number[] = [];
@@ -96,7 +105,7 @@ for (let i = 1; i <= count; i++) {
   const c0 = performance.now();
 
   const imagePath = `${outRoot}/${id}-source.png`;
-  await Deno.writeFile(
+  await fs.writeFile(
     imagePath,
     encodePng({ width: 128, height: 192, data: cutout(i) }),
   );
@@ -132,7 +141,7 @@ for (let i = 1; i <= count; i++) {
       characterId: id,
       modelPath: `${ws}/canonical/model.glb`,
       camera: CAM,
-      style: PIXEL_8,
+      style: PIXEL,
       frames: 2,
       outRoot: `${ws}/bakes`,
     }),
@@ -160,7 +169,9 @@ for (let i = 1; i <= count; i++) {
 const total = (performance.now() - t0) / 1000;
 const mean = perCharacter.reduce((a, b) => a + b, 0) / perCharacter.length;
 console.log('');
-console.log(`roster of ${count}: ${total.toFixed(2)}s total, ${mean.toFixed(2)}s per character`);
+console.log(
+  `roster of ${count}: ${total.toFixed(2)}s total, ${mean.toFixed(2)}s per character`,
+);
 console.log(
   'measures: image -> canonical glb (border) -> bake (render/style/pack) -> export.',
 );

@@ -15,7 +15,9 @@ export async function acquireFileLock(path: string) {
   try {
     const [line] = await Promise.race([
       once(lines, 'line'),
-      closed.then(() => { throw new Error(stderr || 'Workspace lock helper exited before acquisition.'); }),
+      closed.then(() => {
+        throw new Error(stderr || 'Workspace lock helper exited before acquisition.');
+      }),
     ]);
     if (line !== 'locked') throw new Error('Invalid workspace lock helper response.');
   } catch (error) {

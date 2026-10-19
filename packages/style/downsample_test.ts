@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import { assertEquals, assertThrows } from '@std/assert';
-import { areaAverageDownsample, clusterVoteDownsample, downsampleCoverage } from './dist/downsample.js';
+import {
+  areaAverageDownsample,
+  clusterVoteDownsample,
+  downsampleCoverage,
+} from './dist/downsample.js';
 
 // --- cluster-vote -----------------------------------------------------------
 

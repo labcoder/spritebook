@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Build the bundled canonical Track A bodies from the maintainer's Quaternius
  * Universal Base Characters download (CC0 1.0, verified 2026-07-20 —
@@ -20,11 +23,11 @@
  *   packages/rig/bodies/ubc-male/body.glb + body.json
  *   packages/rig/bodies/ubc-female/body.glb + body.json
  */
-import { NodeIO } from 'npm:@gltf-transform/core@4.4.1';
-import { prune, textureCompress } from 'npm:@gltf-transform/functions@4.4.1';
-import { buildCanonicalBody } from '../../packages/rig/fit.ts';
+import { NodeIO } from '@gltf-transform/core';
+import { prune, textureCompress } from '@gltf-transform/functions';
+import { buildCanonicalBody } from '../../packages/rig/dist/fit.js';
 
-const args = Deno.args;
+const args = process.argv.slice(2);
 const flag = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
   const v = i < 0 ? undefined : args[i + 1];
@@ -34,11 +37,18 @@ const flag = (name: string): string | undefined => {
 const srcRoot = flag('src') ??
   'C:/dev/vendor-assets/Universal Base Characters[Standard]/Base Characters/Godot - UE';
 const outRoot = flag('out') ?? decodeURIComponent(
-  new URL('../../packages/rig/bodies', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+  new URL('../../packages/rig/bodies', import.meta.url).pathname.replace(
+    /^\/([A-Za-z]:)/,
+    '$1',
+  ),
 );
 
 const BODIES = [
-  { file: 'Superhero_Male_FullBody', id: 'ubc-male', displayName: 'UBC Superhero (male build)' },
+  {
+    file: 'Superhero_Male_FullBody',
+    id: 'ubc-male',
+    displayName: 'UBC Superhero (male build)',
+  },
   {
     file: 'Superhero_Female_FullBody',
     id: 'ubc-female',
@@ -47,13 +57,13 @@ const BODIES = [
 ] as const;
 
 // stage: copy gltf+bin+textures, adding the `_png.png` aliases the exports ask for
-const stage = await Deno.makeTempDir({ prefix: 'ubc-stage-' });
-for await (const entry of Deno.readDir(srcRoot)) {
-  if (!entry.isFile) continue;
-  await Deno.copyFile(`${srcRoot}/${entry.name}`, `${stage}/${entry.name}`);
+const stage = await fs.mkdtemp(join(tmpdir(), 'ubc-stage-'));
+for await (const entry of await fs.readdir(srcRoot, { withFileTypes: true })) {
+  if (!entry.isFile()) continue;
+  await fs.copyFile(`${srcRoot}/${entry.name}`, `${stage}/${entry.name}`);
   if (entry.name.endsWith('.png') && !entry.name.endsWith('_png.png')) {
     const alias = entry.name.replace(/\.png$/, '_png.png');
-    await Deno.copyFile(`${srcRoot}/${entry.name}`, `${stage}/${alias}`);
+    await fs.copyFile(`${srcRoot}/${entry.name}`, `${stage}/${alias}`);
   }
 }
 
@@ -83,10 +93,10 @@ for (const body of BODIES) {
   }
   await doc.transform(prune());
   const glbPath = `${stage}/${body.file}.glb`;
-  await Deno.writeFile(glbPath, await io.writeBinary(doc));
+  await fs.writeFile(glbPath, await io.writeBinary(doc));
 
   const outDir = `${outRoot}/${body.id}`;
-  await Deno.mkdir(outDir, { recursive: true });
+  await fs.mkdir(outDir, { recursive: true });
   const result = await buildCanonicalBody({
     sourcePath: glbPath,
     outDir,
@@ -102,5 +112,5 @@ for (const body of BODIES) {
   );
 }
 
-await Deno.remove(stage, { recursive: true });
+await fs.rm(stage, { recursive: true });
 console.log('done - staging cleaned; the download itself was never touched');

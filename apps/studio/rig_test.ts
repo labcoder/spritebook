@@ -12,7 +12,10 @@ import { projectReport, rigRunArgs } from './src/rig.ts';
 // SNAPSHOT of the real exit workspace's report (fixtures/), taken 2026-08-07
 // after the maintainer's UX-pass re-rig - the live dir is a playground now.
 test('the real p3-exit report projects verbatim, worst tear first', async () => {
-  const raw = await fs.readFile(new URL('./fixtures/p3-exit-deform-report.json', import.meta.url), 'utf8');
+  const raw = await fs.readFile(
+    new URL('./fixtures/p3-exit-deform-report.json', import.meta.url),
+    'utf8',
+  );
   const v = projectReport(JSON.parse(raw))!;
   assertEquals(v.totalJoints, 52);
   assertEquals(

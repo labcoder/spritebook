@@ -48,44 +48,44 @@ function mockSidecar(token: string, opts: MockOpts = {}) {
   const ready = Promise.withResolvers<number>();
   const ev = (e: Record<string, unknown>) => JSON.stringify({ at: new Date().toISOString(), ...e });
   const handle = async (req: Request) => {
-      if (req.headers.get('authorization') !== `Bearer ${token}`) {
-        return new Response('{"error":"unauthorized"}', { status: 401 });
-      }
-      const url = new URL(req.url);
-      if (req.method === 'GET' && url.pathname === '/handshake') {
-        return Response.json({
-          contractVersion: opts.contractVersion ?? SIDECAR_CONTRACT_VERSION,
-          sidecarVersion: '0.1.0-mock',
-          python: '3.11.0',
-          adapters: [ECHO],
-        });
-      }
-      if (req.method === 'POST' && url.pathname === '/jobs') {
-        jobRequests++;
-        const body = await req.json();
-        opts.onJobBody?.(body);
-        const lines = opts.jobLines?.(body.jobId) ?? [
-          ev({ t: 'queued', jobId: body.jobId }),
-          ev({ t: 'started', jobId: body.jobId }),
-          ev({ t: 'progress', jobId: body.jobId, step: 'echo', done: 1, total: 1 }),
-          ev({ t: 'done', jobId: body.jobId, wallTimeS: 0.01 }),
-        ];
-        const stream = new ReadableStream<Uint8Array>({
-          start(controller) {
-            const enc = new TextEncoder();
-            for (const line of lines) {
-              if (line === '<CUT>') break;
-              controller.enqueue(enc.encode(line + '\n'));
-            }
-            controller.close();
-          },
-        });
-        return new Response(stream, {
-          headers: { 'Content-Type': 'application/x-ndjson' },
-        });
-      }
-      return new Response('{"error":"not found"}', { status: 404 });
-    };
+    if (req.headers.get('authorization') !== `Bearer ${token}`) {
+      return new Response('{"error":"unauthorized"}', { status: 401 });
+    }
+    const url = new URL(req.url);
+    if (req.method === 'GET' && url.pathname === '/handshake') {
+      return Response.json({
+        contractVersion: opts.contractVersion ?? SIDECAR_CONTRACT_VERSION,
+        sidecarVersion: '0.1.0-mock',
+        python: '3.11.0',
+        adapters: [ECHO],
+      });
+    }
+    if (req.method === 'POST' && url.pathname === '/jobs') {
+      jobRequests++;
+      const body = await req.json();
+      opts.onJobBody?.(body);
+      const lines = opts.jobLines?.(body.jobId) ?? [
+        ev({ t: 'queued', jobId: body.jobId }),
+        ev({ t: 'started', jobId: body.jobId }),
+        ev({ t: 'progress', jobId: body.jobId, step: 'echo', done: 1, total: 1 }),
+        ev({ t: 'done', jobId: body.jobId, wallTimeS: 0.01 }),
+      ];
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const enc = new TextEncoder();
+          for (const line of lines) {
+            if (line === '<CUT>') break;
+            controller.enqueue(enc.encode(line + '\n'));
+          }
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: { 'Content-Type': 'application/x-ndjson' },
+      });
+    }
+    return new Response('{"error":"not found"}', { status: 404 });
+  };
   const server = createServer(async (incoming, outgoing) => {
     try {
       const request = new Request(`http://127.0.0.1${incoming.url}`, {
@@ -97,16 +97,19 @@ function mockSidecar(token: string, opts: MockOpts = {}) {
       const response = await handle(request);
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
       outgoing.end(Buffer.from(await response.arrayBuffer()));
-    } catch (error) { outgoing.destroy(error as Error); }
+    } catch (error) {
+      outgoing.destroy(error as Error);
+    }
   });
   server.listen(0, '127.0.0.1', () => ready.resolve((server.address() as AddressInfo).port));
   return {
     port: ready.promise,
     jobRequests: () => jobRequests,
-    close: () => new Promise<void>((resolve, reject) => {
-      server.close((error) => error ? reject(error) : resolve());
-      server.closeAllConnections();
-    }),
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+        server.closeAllConnections();
+      }),
   };
 }
 
@@ -244,7 +247,9 @@ test('death rule: connection refused -> retryable sidecar-died', async () => {
   probe.listen(0, '127.0.0.1');
   await once(probe, 'listening');
   const port = (probe.address() as AddressInfo).port;
-  await new Promise<void>((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
+  await new Promise<void>((resolve, reject) =>
+    probe.close((error) => error ? reject(error) : resolve())
+  );
   const events = await collect(
     runSidecarJob({ port, token: 't', adapters: [ECHO] }, {
       jobId: JOB,

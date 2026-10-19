@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * A mechanical ASD-STE100 linter for the shipped docs (P4-T4).
  *
@@ -154,23 +155,30 @@ function lint(file: string, raw: string): Hit[] {
     for (const [bad, good] of Object.entries(BANNED)) {
       const re = new RegExp(`\\b${bad.replace(/ /g, '\\s+')}\\b`, 'i');
       if (re.test(low)) {
-        hits.push({ file, line: i + 1, rule: 'banned-word', detail: `"${bad}" -> use "${good}"` });
+        hits.push({
+          file,
+          line: i + 1,
+          rule: 'banned-word',
+          detail: `"${bad}" -> use "${good}"`,
+        });
       }
     }
   }
   return hits;
 }
 
-const files = Deno.args;
+const files = process.argv.slice(2);
 if (files.length === 0) {
   console.error('usage: ste-lint.ts <file.md> [...]');
-  Deno.exit(2);
+  process.exit(2);
 }
 let total = 0;
 for (const f of files) {
-  const hits = lint(f, await Deno.readTextFile(f));
+  const hits = lint(f, await fs.readFile(f, 'utf8'));
   total += hits.length;
-  for (const h of hits) console.log(`${h.file}:${h.line} [${h.rule}] ${h.detail}`);
+  for (const h of hits) {
+    console.log(`${h.file}:${h.line} [${h.rule}] ${h.detail}`);
+  }
 }
 console.log(total === 0 ? 'STE lint: clean' : `STE lint: ${total} finding(s)`);
-Deno.exit(total === 0 ? 0 : 1);
+process.exit(total === 0 ? 0 : 1);

@@ -280,7 +280,9 @@ test('importPack installs a valid pack into the packs root', async () => {
     for (const clip of pack.clips) {
       assertSameBytes(
         new Uint8Array(await fs.readFile(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`)),
-        new Uint8Array(await fs.readFile(`${packsRoot}/${pack.id}/${PACK_CLIP_DIR}/${clip.id}.glb`)),
+        new Uint8Array(
+          await fs.readFile(`${packsRoot}/${pack.id}/${PACK_CLIP_DIR}/${clip.id}.glb`),
+        ),
         `${clip.id}.glb`,
       );
     }

@@ -30,7 +30,10 @@ const camera: CameraPreset = {
 
 test('render seam: files + events only, valid vocabulary, artifacts are paths', async (t) => {
   const gpu = await tryGetGpu();
-  if (!gpu) { t.skip('No WebGPU adapter'); return; } // hosted CI without a GPU skips; lavapipe enforces
+  if (!gpu) {
+    t.skip('No WebGPU adapter');
+    return;
+  } // hosted CI without a GPU skips; lavapipe enforces
   const outDir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const spec: RenderJobSpec = {

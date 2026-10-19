@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { readdirSync, type Dirent, type Stats } from 'node:fs';
+import { type Dirent, readdirSync, type Stats } from 'node:fs';
 import { readCurrentBake } from './queries.ts';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 /**

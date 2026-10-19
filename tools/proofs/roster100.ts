@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The 100-character pivot at REAL settings (P4-T3 acceptance).
  *
@@ -38,22 +39,27 @@
  *
  *   deno run --allow-all tools/proofs/soak.ts --report soak.ndjson --from 300
  */
-import { runCli } from '../../packages/cli/mod.ts';
-import { type BakePlan, BakePlanSchema } from '../../packages/schema/mod.ts';
+import { runCli } from '../../packages/cli/dist/mod.js';
+import { type BakePlan, BakePlanSchema } from '../../packages/schema/dist/mod.js';
 
-const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const REPO = new URL('../../', import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const BODY = `${REPO}packages/rig/bodies/ubc-male`;
 
 const arg = (name: string, fallback: string): string => {
-  const i = Deno.args.indexOf(`--${name}`);
-  return i >= 0 && Deno.args[i + 1] !== undefined ? Deno.args[i + 1]! : fallback;
+  const i = process.argv.slice(2).indexOf(`--${name}`);
+  return i >= 0 && process.argv.slice(2)[i + 1] !== undefined
+    ? process.argv.slice(2)[i + 1]!
+    : fallback;
 };
 const N = Number(arg('n', '100'));
-const KEEP = Deno.args.includes('--keep');
-const SKIP_BUILD = Deno.args.includes('--skip-build');
+const KEEP = process.argv.slice(2).includes('--keep');
+const SKIP_BUILD = process.argv.slice(2).includes('--skip-build');
 /** every character on seed 0 — the weaker roster the first run measured */
-const SAME_SEED = Deno.args.includes('--same-seed');
+const SAME_SEED = process.argv.slice(2).includes('--same-seed');
 const ROOT = arg('root', `${REPO}.proof-roster100`);
 
 /**
@@ -71,7 +77,8 @@ const CLIPS = [
   { id: 'death01', frames: 10 },
 ];
 const DIRECTIONS = 8;
-const CELLS_PER_CHARACTER = CLIPS.reduce((n, c) => n + c.frames, 0) * DIRECTIONS;
+const CELLS_PER_CHARACTER = CLIPS.reduce((n, c) => n + c.frames, 0) *
+  DIRECTIONS;
 
 const lines: string[] = [];
 function say(s: string) {
@@ -89,15 +96,24 @@ function io(capture = true) {
     out,
   };
 }
-async function cli(args: string[], label: string, capture = true): Promise<string[]> {
+async function cli(
+  args: string[],
+  label: string,
+  capture = true,
+): Promise<string[]> {
   const o = io(capture);
   const code = await runCli(args, o);
-  if (code !== 0) throw new Error(`${label} exited ${code}:\n${o.out.slice(-12).join('\n')}`);
+  if (code !== 0) {
+    throw new Error(`${label} exited ${code}:\n${o.out.slice(-12).join('\n')}`);
+  }
   return o.out;
 }
 async function plan(extra: string[] = []): Promise<BakePlan> {
   const o = io(true);
-  await runCli(['bake', '--all', '--root', ROOT, '--plan', '--json', ...extra], o);
+  await runCli(
+    ['bake', '--all', '--root', ROOT, '--plan', '--json', ...extra],
+    o,
+  );
   return BakePlanSchema.parse(JSON.parse(o.out.at(-1)!));
 }
 const secs = (from: number) => (performance.now() - from) / 1000;
@@ -112,11 +128,13 @@ say(
     CLIPS.map((c) => `${c.id}:${c.frames}`).join(' ')
   })`,
 );
-say(`  = ${CELLS_PER_CHARACTER} cells/character, ${CELLS_PER_CHARACTER * N} for the roster`);
+say(
+  `  = ${CELLS_PER_CHARACTER} cells/character, ${CELLS_PER_CHARACTER * N} for the roster`,
+);
 say(`  root: ${ROOT}`);
 
 try {
-  await Deno.mkdir(ROOT, { recursive: true });
+  await fs.mkdir(ROOT, { recursive: true });
 
   // ------------------------------------------------------------- 1. build
   if (!SKIP_BUILD) {
@@ -194,10 +212,17 @@ try {
       `${cold.totals.staleFrames} frames`,
   );
   if (cold.totals.blocked > 0) {
-    for (const c of cold.characters.filter((x) => x.state === 'blocked').slice(0, 3)) {
+    for (
+      const c of cold.characters.filter((x) => x.state === 'blocked').slice(
+        0,
+        3,
+      )
+    ) {
       say(`  BLOCKED ${c.id}: ${c.note}`);
     }
-    throw new Error(`${cold.totals.blocked} characters cannot bake — see above`);
+    throw new Error(
+      `${cold.totals.blocked} characters cannot bake — see above`,
+    );
   }
   if (cold.totals.staleFrames !== CELLS_PER_CHARACTER * N) {
     say(
@@ -221,10 +246,16 @@ try {
   say(`\n## warm plan (${pad(warmPlanS)}s to plan ${N} characters)`);
   say(`  ${warm.totals.toBake} to bake · ${warm.totals.fresh} fresh`);
   if (warm.totals.toBake !== 0) {
-    for (const c of warm.characters.filter((x) => x.state !== 'fresh').slice(0, 3)) {
-      say(`  UNEXPECTED ${c.id} ${c.state}: ${c.reasons.map((r) => r.field).join(',')}`);
+    for (
+      const c of warm.characters.filter((x) => x.state !== 'fresh').slice(0, 3)
+    ) {
+      say(
+        `  UNEXPECTED ${c.id} ${c.state}: ${c.reasons.map((r) => r.field).join(',')}`,
+      );
     }
-    throw new Error('a warm roster must be zero work — the overnight pivot depends on it');
+    throw new Error(
+      'a warm roster must be zero work — the overnight pivot depends on it',
+    );
   }
   const warmRun = performance.now();
   await cli(['bake', '--all', '--root', ROOT], 'warm batch');
@@ -247,7 +278,10 @@ try {
     );
     const pivotEdit = performance.now();
     for (let i = 0; i < N; i++) {
-      await cli(['look', '--workspace', `${ROOT}/${id(i)}`, '--style', style], `look ${id(i)}`);
+      await cli(
+        ['look', '--workspace', `${ROOT}/${id(i)}`, '--style', style],
+        `look ${id(i)}`,
+      );
     }
     say(`  ${N} look changes recorded in ${pad(secs(pivotEdit))}s`);
 
@@ -257,16 +291,25 @@ try {
       `  plan: ${pivotPlan.totals.toBake} stale · ${pivotPlan.totals.fresh} fresh · ` +
         `${pivotPlan.totals.staleFrames} frames to render`,
     );
-    const fields = [...new Set(stale.flatMap((c) => c.reasons.map((r) => r.field)))];
+    const fields = [
+      ...new Set(stale.flatMap((c) => c.reasons.map((r) => r.field))),
+    ];
     say(`  every stale character's reason: ${fields.join(', ')}`);
-    if (stale.length !== N || fields.length !== 1 || fields[0] !== 'stylePresetHash') {
+    if (
+      stale.length !== N || fields.length !== 1 ||
+      fields[0] !== 'stylePresetHash'
+    ) {
       throw new Error(
         `the plan must name the style and nothing else: ${stale.length} stale, fields ${fields}`,
       );
     }
 
     const pivot0 = performance.now();
-    await cli(['bake', '--all', '--root', ROOT], `pivot batch ${cycle + 1}`, false);
+    await cli(
+      ['bake', '--all', '--root', ROOT],
+      `pivot batch ${cycle + 1}`,
+      false,
+    );
     const pivotS = secs(pivot0);
     say(
       `pivot batch ${pad(pivotS)}s = ${(pivotS / 60).toFixed(1)} min · ` +
@@ -281,34 +324,44 @@ try {
   // dropping it would leave the reader to open a hundred manifests by hand.
   say(`\n## morning report`);
   let framesTotal = 0;
-  let flaggedFrames = 0;
   const flagCounts = new Map<string, number>();
   const flagExample = new Map<string, string>();
   const flagged: string[] = [];
   const flicker: { id: string; pct: number }[] = [];
   for (let i = 0; i < N; i++) {
-    const m = JSON.parse(await Deno.readTextFile(`${ROOT}/${id(i)}/character.json`));
+    const m = JSON.parse(
+      await fs.readFile(`${ROOT}/${id(i)}/character.json`, 'utf8'),
+    );
     const bake = JSON.parse(
-      await Deno.readTextFile(`${ROOT}/${id(i)}/bakes/bake-${m.lastBakeId}/manifest.json`),
+      await fs.readFile(
+        `${ROOT}/${id(i)}/bakes/bake-${m.lastBakeId}/manifest.json`,
+        'utf8',
+      ),
     );
     framesTotal += bake.metrics.framesTotal;
     flicker.push({ id: id(i), pct: bake.metrics.flickerPct });
     const codes = new Set<string>();
     for (
-      const f of bake.flags as { code: string; message: string; frameRefs: unknown[] }[]
+      const f of bake.flags as {
+        code: string;
+        message: string;
+        frameRefs: unknown[];
+      }[]
     ) {
       codes.add(f.code);
       if (!flagExample.has(f.code)) flagExample.set(f.code, f.message);
-      flaggedFrames += f.frameRefs.length;
     }
     for (const c of codes) flagCounts.set(c, (flagCounts.get(c) ?? 0) + 1);
     if (codes.size > 0) flagged.push(id(i));
   }
   flicker.sort((a, b) => b.pct - a.pct);
-  const meanFlicker = flicker.reduce((n, f) => n + f.pct, 0) / Math.max(1, flicker.length);
+  const meanFlicker = flicker.reduce((n, f) => n + f.pct, 0) /
+    Math.max(1, flicker.length);
   // the batch's own report: JOB warnings, which no BakeManifest records
   try {
-    const report = JSON.parse(await Deno.readTextFile(`${ROOT}/bake-report.json`)) as {
+    const report = JSON.parse(
+      await fs.readFile(`${ROOT}/bake-report.json`, 'utf8'),
+    ) as {
       warnings: { code: string; characters: number; example: string }[];
     };
     // A QA flag is ALSO emitted as a warn event, so it would appear twice —
@@ -321,7 +374,9 @@ try {
       for (const w of jobOnly) {
         say(`
   job warning "${w.code}" on ${w.characters}/${N} characters:`);
-        for (const chunk of w.example.match(/[\s\S]{1,92}(\s|$)/g) ?? [w.example]) {
+        for (
+          const chunk of w.example.match(/[\s\S]{1,92}(\s|$)/g) ?? [w.example]
+        ) {
           say(`    ${chunk.trim()}`);
         }
       }
@@ -338,11 +393,17 @@ try {
       `spread ${spread.toFixed(2)}pp`,
   );
   if (spread === 0 && N > 1) {
-    say('  (zero spread — every character is identical; run without --same-seed for variety)');
+    say(
+      '  (zero spread — every character is identical; run without --same-seed for variety)',
+    );
   } else if (N > 1) {
     // the tail is where an unattended run's surprises live
     say(
-      `  worst five: ${flicker.slice(0, 5).map((f) => `${f.id} ${f.pct.toFixed(2)}%`).join(' · ')}`,
+      `  worst five: ${
+        flicker.slice(0, 5).map((f) => `${f.id} ${f.pct.toFixed(2)}%`).join(
+          ' · ',
+        )
+      }`,
     );
   }
   if (flagCounts.size === 0) {
@@ -353,7 +414,9 @@ try {
       // wrapped, because the remedy is the useful half and a 400-char line in
       // a terminal is a line nobody reads
       const msg = flagExample.get(code)!;
-      for (const chunk of msg.match(/.{1,92}(\s|$)/g) ?? [msg]) say(`    ${chunk.trim()}`);
+      for (const chunk of msg.match(/.{1,92}(\s|$)/g) ?? [msg]) {
+        say(`    ${chunk.trim()}`);
+      }
     }
     say(
       `\n  first characters to look at: ${flagged.slice(0, 8).join(', ')}${
@@ -363,12 +426,12 @@ try {
   }
   say(`\nTOTAL ${pad(secs(t0))}s = ${(secs(t0) / 60).toFixed(1)} min`);
 } finally {
-  await Deno.writeTextFile(
+  await fs.writeFile(
     `${REPO}docs/internal/proofs/roster100.md`,
     `# ${N}-character pivot at real settings (P4-T3)\n\nCaptured by ` +
       `\`tools/proofs/roster100.ts\`; regenerate rather than hand-editing.\n\n\`\`\`\n` +
       lines.join('\n') + '\n```\n',
   );
   console.log(`\nrecorded to docs/internal/proofs/roster100.md`);
-  if (!KEEP) await Deno.remove(ROOT, { recursive: true }).catch(() => {});
+  if (!KEEP) await fs.rm(ROOT, { recursive: true }).catch(() => {});
 }

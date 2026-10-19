@@ -220,7 +220,8 @@ test('exportStrips: an empty manifest is refused before outDir exists', async ()
         c.msg,
       );
       await rejects(
-        () => fs.stat(out), { code: 'ENOENT' },
+        () => fs.stat(out),
+        { code: 'ENOENT' },
         `${c.name}: a refusal must not leave an output directory behind`,
       );
     }

@@ -5,7 +5,13 @@ import { join } from 'node:path';
 import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import { canonicalJson, JobEventSchema, parseWith } from '@spritebook/schema';
 import { CAMERA_PRESETS, ManifestJournal } from '@spritebook/core';
-import { bakeSpecFromFlags, mergeAnimationSet, mirroringFor, provenanceOf, runCli } from './dist/mod.js';
+import {
+  bakeSpecFromFlags,
+  mergeAnimationSet,
+  mirroringFor,
+  provenanceOf,
+  runCli,
+} from './dist/mod.js';
 
 const now = () => '2026-07-12T00:00:00Z';
 const target = { kind: 'character', id: 'brave-knight' } as const;
@@ -14,7 +20,10 @@ const target = { kind: 'character', id: 'brave-knight' } as const;
 async function setupWorkspace(): Promise<{ manifest: string; original: string }> {
   const dir = await fs.mkdtemp(join(tmpdir(), 'sb-cli-'));
   const original = JSON.parse(
-    await fs.readFile(new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url), 'utf8'),
+    await fs.readFile(
+      new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url),
+      'utf8',
+    ),
   );
   const originalBytes = canonicalJson(original);
   const journal = new ManifestJournal(original, { now });
@@ -87,7 +96,10 @@ test('cli undo/redo restore and reapply patches; --json emits valid NDJSON', asy
 async function setupBadJournal(direction: 'undo' | 'redo') {
   const dir = await fs.mkdtemp(join(tmpdir(), 'sb-cli-bad-'));
   const doc = JSON.parse(
-    await fs.readFile(new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url), 'utf8'),
+    await fs.readFile(
+      new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url),
+      'utf8',
+    ),
   ) as Record<string, unknown>;
   const undoing = direction === 'undo';
   if (undoing) doc.displayName = 'Sir Bravery';
@@ -154,7 +166,10 @@ test('undo works on a workspace written by an older build', async () => {
   const dir = await fs.mkdtemp(join(tmpdir(), 'sb-cli-v2-'));
   try {
     const v3 = JSON.parse(
-      await fs.readFile(new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url), 'utf8'),
+      await fs.readFile(
+        new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url),
+        'utf8',
+      ),
     ) as Record<string, unknown>;
     // wind the fixture back to what a pre-D-029 build wrote
     const v2 = {
@@ -234,7 +249,16 @@ test('--seed 0 is a seed, not a bad argument', async (t) => {
   // is the parse and not a missing workspace.
   for (const bad of ['-1', '1.5']) {
     const c2 = collector();
-    const args = ['gen', '--workspace', workspace, '--character', 'c', '--image', 'i.png', '--seed'];
+    const args = [
+      'gen',
+      '--workspace',
+      workspace,
+      '--character',
+      'c',
+      '--image',
+      'i.png',
+      '--seed',
+    ];
     assertEquals(await runCli([...args, bad, '--json'], c2.io), 1, bad);
     const e = JSON.parse(c2.out[c2.out.length - 1]);
     assertEquals(e.code, 'bad-args', bad);
@@ -664,7 +688,16 @@ test('anim --list finds the bundled pack; --tag filters; --json is one document'
 test('gen --adjust refuses seed and prototype keys', async (t) => {
   const workspace = await fs.mkdtemp(join(tmpdir(), 'sb-cli-args-'));
   t.after(() => fs.rm(workspace, { recursive: true }));
-  const base = ['gen', '--character', 'hero', '--workspace', workspace, '--image', 'i.png', '--json'];
+  const base = [
+    'gen',
+    '--character',
+    'hero',
+    '--workspace',
+    workspace,
+    '--image',
+    'i.png',
+    '--json',
+  ];
   for (
     const [args, needle] of [
       // --adjust seed=N would be silently overridden by the hoisted seed, and

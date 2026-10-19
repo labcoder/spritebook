@@ -4,13 +4,19 @@ import { test } from 'node:test';
  * core's own progress events, an ETA that refuses to speak before it can, the
  * player's frame selection, and the flag→stage jump.
  */
-import { assert, assertEquals } from '@std/assert';
+import { assertEquals } from '@std/assert';
 import { etaSeconds, flagStage, readProgress, summarize } from './src/bakeprogress.ts';
 
 test('readProgress takes core progress events and nothing else', () => {
   assertEquals(
     readProgress(
-      JSON.stringify({ t: 'progress', jobId: 'bake', step: 'cells', done: 1, total: 4 }),
+      JSON.stringify({
+        t: 'progress',
+        jobId: 'bake',
+        step: 'cells',
+        done: 1,
+        total: 4,
+      }),
     ),
     { step: 'cells', done: 1, total: 4, fraction: 0.25 },
   );
@@ -18,7 +24,9 @@ test('readProgress takes core progress events and nothing else', () => {
   assertEquals(readProgress(JSON.stringify({ t: 'warn', code: 'x' })), null);
   assertEquals(readProgress('not json'), null);
   // a malformed total must not produce Infinity or NaN
-  const odd = readProgress(JSON.stringify({ t: 'progress', step: 'x', done: 3, total: 0 }))!;
+  const odd = readProgress(
+    JSON.stringify({ t: 'progress', step: 'x', done: 3, total: 0 }),
+  )!;
   assertEquals(odd.fraction, 1);
 });
 
@@ -38,12 +46,18 @@ test('the ETA stays silent until it can be honest', () => {
 });
 
 test('summarize refuses garbage instead of half-rendering it', () => {
-  for (const bad of [null, 42, 'x', {}, { frames: [] }]) assertEquals(summarize(bad), null);
+  for (const bad of [null, 42, 'x', {}, { frames: [] }]) {
+    assertEquals(summarize(bad), null);
+  }
 });
 
 test('a flag jumps to the stage that OWNS it, never a guess', () => {
   assertEquals(flagStage({ sourceStage: 'look' }), 'look');
   assertEquals(flagStage({ sourceStage: 'rig' }), 'rig');
   assertEquals(flagStage({}), 'bake', 'no source stated: stay put');
-  assertEquals(flagStage({ sourceStage: 'nonsense' }), 'bake', 'unknown: stay put');
+  assertEquals(
+    flagStage({ sourceStage: 'nonsense' }),
+    'bake',
+    'unknown: stay put',
+  );
 });

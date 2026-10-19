@@ -44,7 +44,9 @@ const base = (workspace: string) => ({
 
 async function installFixture(root: string, catalogPath = CATALOG): Promise<void> {
   const events = await Array.fromAsync(runInstallJob({
-    jobId: 'install', modelId: 'fixture-gen', root: join(root, 'models'),
+    jobId: 'install',
+    modelId: 'fixture-gen',
+    root: join(root, 'models'),
     catalog: await loadCatalog(catalogPath),
   }));
   assertEquals(events.at(-1)?.t, 'done', JSON.stringify(events.at(-1)));

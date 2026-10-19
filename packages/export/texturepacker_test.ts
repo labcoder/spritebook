@@ -177,7 +177,8 @@ test('exportTexturePacker refuses an empty manifest, no empty dir left behind', 
       const out = `${parent}/${c.name}`;
       await assertRejects(() => exportTexturePacker(manifest, BAKE, out, { fps: 8 }), Error, c.msg);
       await rejects(
-        () => fs.stat(out), { code: 'ENOENT' },
+        () => fs.stat(out),
+        { code: 'ENOENT' },
         `${c.name}: a refusal must not leave an output directory behind`,
       );
     }

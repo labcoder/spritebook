@@ -22,7 +22,13 @@ import { PIXEL } from '@spritebook/style';
 import { renderSignature, runRenderJob } from '@spritebook/render';
 import { tryGetGpu } from '../render/dist/gpu.js';
 import { exportGodot, parseTres, runExportJob, validateTres } from '@spritebook/export';
-import { buildCacheInputs, frameGrid, pivotFor, predictInvalidation, runBakeJob } from './dist/mod.js';
+import {
+  buildCacheInputs,
+  frameGrid,
+  pivotFor,
+  predictInvalidation,
+  runBakeJob,
+} from './dist/mod.js';
 
 const GLB = new URL('../style/fixtures/asymmetric.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -74,7 +80,10 @@ async function bake(
 }
 
 test('acceptance: bake -> rect identity, stability, invalidation, pivot, exporters', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const a = await bake(`${root}/a`);

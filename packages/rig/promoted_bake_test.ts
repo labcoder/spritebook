@@ -77,7 +77,9 @@ test('promotion is what lets the very next clip bake retarget at all', async () 
       startedAt: NOW(),
       wallTimeS: 1,
       output: {
-        gltfSha256: await sha256Bytes(new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel))),
+        gltfSha256: await sha256Bytes(
+          new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel)),
+        ),
         tris: 1,
         kind: 'mesh',
       },

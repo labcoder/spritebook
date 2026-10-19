@@ -54,7 +54,10 @@ const GLB = new URL('../style/fixtures/asymmetric.glb', import.meta.url).pathnam
 const NOW = () => '2026-07-12T00:00:00Z';
 
 test('pick A -> pick B -> undo bakes the restored mesh, not just its metadata', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const dir = await fs.mkdtemp(join(tmpdir(), 'sb-asset-undo-'));
   try {
     await createWorkspace({
@@ -115,7 +118,10 @@ test('pick A -> pick B -> undo bakes the restored mesh, not just its metadata', 
     const page = `${workspacePaths(dir).bakesDir}/bake-${before}/atlas_lit_0.png`;
     const expected = new Uint8Array(await fs.readFile(page));
     await pick('r2');
-    assertEquals(new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel)), variants[1]);
+    assertEquals(
+      new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel)),
+      variants[1],
+    );
     await run(['undo', '--manifest', workspacePaths(dir).manifest]);
     await bake();
     assertEquals(
@@ -123,7 +129,11 @@ test('pick A -> pick B -> undo bakes the restored mesh, not just its metadata', 
       before,
       'bake keys the actual restored input',
     );
-    assertEquals(new Uint8Array(await fs.readFile(page)), expected, 'the rerendered pixels agree too');
+    assertEquals(
+      new Uint8Array(await fs.readFile(page)),
+      expected,
+      'the rerendered pixels agree too',
+    );
   } finally {
     await fs.rm(dir, { recursive: true });
   }
@@ -185,7 +195,10 @@ function flips(m: BakeManifest): Array<[number, number]> {
 }
 
 test('acceptance: --mirror once, then mirrored from the workspace alone', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const raw = await fs.mkdtemp(join(tmpdir(), 'sb-mirror-ws-'));
   const dir = raw.replaceAll('\\', '/');
   const cache = `${dir}/cache`;
@@ -275,7 +288,10 @@ test('acceptance: --mirror once, then mirrored from the workspace alone', async 
 });
 
 test('acceptance: a workspace bake reproduces the last one exactly', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const raw = await fs.mkdtemp(join(tmpdir(), 'sb-bake-ws-'));
   const dir = raw.replaceAll('\\', '/');
   const cache = `${dir}/cache`;
@@ -422,7 +438,10 @@ test('acceptance: the bake manifest records the backend that really made it', as
   // manifest -> spec -> recipe -> BakeManifest.inputs path went unexercised.
   // `inputs` is a COMMITTED record - it is what "re-run exactly this" reads -
   // and it used to say `source-mesh@0` for a character a named backend made.
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const raw = await fs.mkdtemp(join(tmpdir(), 'sb-prov-e2e-'));
   const dir = raw.replaceAll('\\', '/');
   try {
@@ -436,7 +455,9 @@ test('acceptance: the bake manifest records the backend that really made it', as
       startedAt: NOW(),
       wallTimeS: 92.5,
       output: {
-        gltfSha256: await sha256Bytes(new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel))),
+        gltfSha256: await sha256Bytes(
+          new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel)),
+        ),
         tris: 14318,
         kind: 'mesh',
       },
@@ -489,7 +510,10 @@ test('bake says so, loudly, when the rig was never accepted', async (t) => {
   // at bake time. It cannot be a refusal: both rig tracks write accepted: false
   // ("theirs to set") and no verb sets it yet, so refusing would dead-end every
   // rigged character. Loud, actionable warn.
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const raw = await fs.mkdtemp(join(tmpdir(), 'sb-rig-warn-'));
   const dir = raw.replaceAll('\\', '/');
   const geometry = ['--directions', '2', '--cell', '48', '--json'];

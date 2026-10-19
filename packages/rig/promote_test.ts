@@ -69,7 +69,7 @@ test('the rigged bytes become the canonical mesh, and the hash follows', async (
     assertEquals(result.meshRepin?.gltfSha256, await sha256Bytes(bytes));
     assertEquals(result.meshRepin?.heightM, undefined, 'a rig does not restate height');
 
-    await rejects(() => fs.stat(workspacePaths(dir).canonicalModel), { code: 'ENOENT' },);
+    await rejects(() => fs.stat(workspacePaths(dir).canonicalModel), { code: 'ENOENT' });
     await setCanonicalMesh(dir, result.meshRepin!, { canonicalSource: result.canonicalSource });
     assertEquals(new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel)), bytes);
   });

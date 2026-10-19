@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /** F1-T3: real Editor mount in the desktop WebView; delayed jobs prove stale-completion guards.
  * Launch the dev shell with WebView2 CDP, then:
  * deno run --allow-net=127.0.0.1 --allow-read --allow-write tools/proofs/editor-ownership.ts 9224
@@ -5,8 +8,8 @@
  */
 import { Cdp } from './walkthrough.ts';
 import { fileURLToPath } from 'node:url';
-const c = await Cdp.connect(Number(Deno.args[0] ?? 9224));
-const root = await Deno.makeTempDir({ prefix: 'sb-desktop-owner-' });
+const c = await Cdp.connect(Number(process.argv.slice(2)[0] ?? 9224));
+const root = await fs.mkdtemp(join(tmpdir(), 'sb-desktop-owner-'));
 try {
   const args = [
     'gen',
@@ -17,7 +20,9 @@ try {
     '--model',
     'fixture-gen',
     '--image',
-    fileURLToPath(new URL('../../tests/fixtures/bulma-front.png', import.meta.url)),
+    fileURLToPath(
+      new URL('../../tests/fixtures/bulma-front.png', import.meta.url),
+    ),
     '--json',
   ];
   const r = await c.call('Runtime.evaluate', {
@@ -100,5 +105,5 @@ try {
   console.log(JSON.stringify(r, null, 2));
 } finally {
   c.close();
-  await Deno.remove(root, { recursive: true });
+  await fs.rm(root, { recursive: true });
 }

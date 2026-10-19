@@ -66,7 +66,8 @@ test('export seam: four targets, valid events, expected key files', async () => 
 });
 
 test('export seam: double export is byte-identical across every file', async () => {
-  const a = await fs.mkdtemp(join(tmpdir(), 'spritebook-')), b = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+  const a = await fs.mkdtemp(join(tmpdir(), 'spritebook-')),
+    b = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     await runAll(a);
     await runAll(b);
@@ -75,7 +76,11 @@ test('export seam: double export is byte-identical across every file', async () 
     // godot(.tres + lit png) + aseprite(json + png) + tp(json + png) + strips(2 strips + meta)
     assertEquals(fa.length, 9, 'the fixture projects to exactly 9 files');
     for (let i = 0; i < fa.length; i++) {
-      assertEquals(new Uint8Array(await fs.readFile(fa[i])), new Uint8Array(await fs.readFile(fb[i])), `differs: ${fa[i]}`);
+      assertEquals(
+        new Uint8Array(await fs.readFile(fa[i])),
+        new Uint8Array(await fs.readFile(fb[i])),
+        `differs: ${fa[i]}`,
+      );
     }
   } finally {
     await fs.rm(a, { recursive: true });

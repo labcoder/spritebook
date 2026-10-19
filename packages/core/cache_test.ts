@@ -92,7 +92,9 @@ test('DiskCacheStore.put is atomic: no torn value is ever served as a hit', asyn
     await store.put(key, JSON.stringify({ pixels: 'complete' }));
     // no stray temp files survive a successful write
     const leftovers: string[] = [];
-    for await (const e of await fs.readdir(dir, { withFileTypes: true })) if (e.name.includes('.tmp')) leftovers.push(e.name);
+    for await (const e of await fs.readdir(dir, { withFileTypes: true })) {
+      if (e.name.includes('.tmp')) leftovers.push(e.name);
+    }
     assertEquals(leftovers, [], 'the temp file is renamed, not left behind');
     assertEquals(await store.get(key), JSON.stringify({ pixels: 'complete' }));
   } finally {

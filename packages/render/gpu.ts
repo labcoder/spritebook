@@ -1,4 +1,3 @@
-
 /**
  * Device/adapter management + diagnostics (webgpu-headless-rendering skill).
  * `initGPU` returns either a usable device or throws an actionable error naming
@@ -9,17 +8,25 @@ import { type GpuContext, REQUIRED_LIMITS } from './contracts.ts';
 
 export function gpuBackend(): string {
   const selected = process.env.SPRITEBOOK_GPU_BACKEND ?? process.env.DENO_WEBGPU_BACKEND;
-  return selected === 'dx12' ? 'd3d12' : selected ?? (process.platform === 'darwin' ? 'metal' : 'vulkan');
+  return selected === 'dx12'
+    ? 'd3d12'
+    : selected ?? (process.platform === 'darwin' ? 'metal' : 'vulkan');
 }
 
 export async function initGPU(): Promise<GpuContext> {
   const { create, globals } = await import('webgpu').catch((cause) => {
-    throw Object.assign(new Error(`Cannot load the Dawn native addon: ${cause.message}`, { cause }), {
-      code: 'native-addon-load',
-    });
+    throw Object.assign(
+      new Error(`Cannot load the Dawn native addon: ${cause.message}`, { cause }),
+      {
+        code: 'native-addon-load',
+      },
+    );
   });
   Object.assign(globalThis, globals);
-  Object.defineProperty(navigator, 'gpu', { value: create([`backend=${gpuBackend()}`]), configurable: true });
+  Object.defineProperty(navigator, 'gpu', {
+    value: create([`backend=${gpuBackend()}`]),
+    configurable: true,
+  });
   const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
   if (!adapter) {
     delete (navigator as { gpu?: GPU }).gpu;
@@ -40,7 +47,9 @@ export async function initGPU(): Promise<GpuContext> {
   };
   device.lost.then((info) => {
     ctx.lost = { reason: String(info.reason), message: info.message };
-    if (info.reason !== 'destroyed') console.error(`device lost (retryable): ${info.reason} - ${info.message}`);
+    if (info.reason !== 'destroyed') {
+      console.error(`device lost (retryable): ${info.reason} - ${info.message}`);
+    }
   });
   return ctx;
 }
@@ -75,7 +84,10 @@ export async function tryGetGpu(): Promise<GpuContext | null> {
   try {
     return await getGpu();
   } catch (err) {
-    if (process.env['SPRITEBOOK_REQUIRE_GPU'] || (err as { code?: string })?.code === 'native-addon-load') throw err;
+    if (
+      process.env['SPRITEBOOK_REQUIRE_GPU'] ||
+      (err as { code?: string })?.code === 'native-addon-load'
+    ) throw err;
     return null;
   }
 }

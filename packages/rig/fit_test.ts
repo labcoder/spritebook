@@ -45,7 +45,13 @@ import {
   TriangleGrid,
 } from './dist/fit.js';
 import { boundsOf } from './dist/orient.js';
-import { loadRiggedAsset, restWorlds, type RiggedAsset, skinAll, skinMatrices } from './dist/skin.js';
+import {
+  loadRiggedAsset,
+  restWorlds,
+  type RiggedAsset,
+  skinAll,
+  skinMatrices,
+} from './dist/skin.js';
 
 /** Stage a case, build the canonical body, fit it, and hand back everything. */
 async function fitTo(

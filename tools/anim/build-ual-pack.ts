@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Build the bundled UAL animation pack (P3-T1; D-013: CC0 1.0 is what makes
  * the converted output committable) from the maintainer's local Quaternius
@@ -11,19 +12,21 @@
  *
  * --src defaults to C:/dev/vendor-assets (License.txt beside each library).
  */
-import { buildPack } from '../../packages/anim/pack.ts';
-import { PACK_CLIP_DIR, PACK_MANIFEST } from '../../packages/anim/contracts.ts';
+import { buildPack } from '../../packages/anim/dist/pack.js';
+import { PACK_CLIP_DIR, PACK_MANIFEST } from '../../packages/anim/dist/contracts.js';
 
 const here = new URL('.', import.meta.url);
 const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
 let src = 'C:/dev/vendor-assets';
-for (let i = 0; i < Deno.args.length; i++) {
-  if (Deno.args[i] === '--src' && Deno.args[i + 1]) {
-    src = Deno.args[++i].replaceAll('\\', '/').replace(/\/+$/, '');
+for (let i = 0; i < process.argv.slice(2).length; i++) {
+  if (process.argv.slice(2)[i] === '--src' && process.argv.slice(2)[i + 1]) {
+    src = process.argv.slice(2)[++i].replaceAll('\\', '/').replace(/\/+$/, '');
   } else {
-    console.error(`unknown argument "${Deno.args[i]}" — usage: build-ual-pack.ts [--src <dir>]`);
-    Deno.exit(2);
+    console.error(
+      `unknown argument "${process.argv.slice(2)[i]}" — usage: build-ual-pack.ts [--src <dir>]`,
+    );
+    process.exit(2);
   }
 }
 
@@ -32,12 +35,12 @@ const srcGlbs = [
   `${src}/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb`,
 ];
 for (const glb of srcGlbs) {
-  if (!(await Deno.stat(glb).catch(() => undefined))?.isFile) {
+  if (!(await fs.stat(glb).catch(() => undefined))?.isFile()) {
     console.error(
       `source not found: ${glb}\n(point --src at the directory holding ` +
         `"Universal Animation Library[Standard]" and "Universal Animation Library 2[Standard]")`,
     );
-    Deno.exit(1);
+    process.exit(1);
   }
 }
 
@@ -62,17 +65,19 @@ const pack = await buildPack({
 const bytesByCategory = new Map<string, { clips: number; bytes: number }>();
 let totalBytes = 0;
 for (const clip of pack.clips) {
-  const size = (await Deno.stat(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`)).size;
+  const size = (await fs.stat(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`)).size;
   const row = bytesByCategory.get(clip.category) ?? { clips: 0, bytes: 0 };
   row.clips++;
   row.bytes += size;
   bytesByCategory.set(clip.category, row);
   totalBytes += size;
 }
-const manifestBytes = (await Deno.stat(`${outDir}/${PACK_MANIFEST}`)).size;
+const manifestBytes = (await fs.stat(`${outDir}/${PACK_MANIFEST}`)).size;
 
 const fmtN = (n: number) => n.toLocaleString('en-US');
-console.log(`\npack "${pack.id}" v${pack.version} (${pack.license}) -> ${outDir}`);
+console.log(
+  `\npack "${pack.id}" v${pack.version} (${pack.license}) -> ${outDir}`,
+);
 console.log(`built in ${((performance.now() - t0) / 1000).toFixed(1)}s\n`);
 console.log('category      clips        bytes');
 for (const [category, row] of [...bytesByCategory.entries()].sort()) {

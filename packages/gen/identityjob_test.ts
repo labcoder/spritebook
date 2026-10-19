@@ -282,7 +282,10 @@ async function propGlb(path: string, lift = 0): Promise<void> {
 // ---------------------------------------------------------------------------
 
 test('identity: a decal-only run changes the canonical bytes and the manifest follows', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   // picked WITH reprojection — the order Track A documents (pick, then
   // reproject, then identity). RGB backend textures are no longer the reason:
   // compositeDecals normalizes any channel layout at its decode boundary, and
@@ -320,7 +323,9 @@ test('identity: a decal-only run changes the canonical bytes and the manifest fo
       'the decal changed the canonical bytes',
     );
 
-    const report = JSON.parse(await fs.readFile(artifact(events, 'identity-decals-report'), 'utf8'));
+    const report = JSON.parse(
+      await fs.readFile(artifact(events, 'identity-decals-report'), 'utf8'),
+    );
     assertGreater(report.changedTexels, 0, 'the decal painted real texels');
     assertEquals(report.missed, [], 'nothing silently missed');
 
@@ -354,7 +359,10 @@ test('identity: a decal-only run changes the canonical bytes and the manifest fo
 });
 
 test('identity: refused when nothing is picked, naming `spritebook pick`', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     const gen = await collect(runGenJob(genOpts(f)));
@@ -416,7 +424,10 @@ test('identity: refused when no operation is given', async () => {
 });
 
 test('identity: bone mask -> attachments -> decals, in that order, all journaled', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   // a plain pick suffices: the canonical mesh is replaced by the mini body
   // below, so the fixture texture never reaches the decal compositor
   const f = await pickedWorkspace(false);
@@ -481,7 +492,9 @@ test('identity: bone mask -> attachments -> decals, in that order, all journaled
     );
 
     // every stage really landed, on ONE file
-    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(paths.canonicalModel)));
+    const doc = await new NodeIO().readBinary(
+      new Uint8Array(await fs.readFile(paths.canonicalModel)),
+    );
     const joint = doc.getRoot().listNodes().find((n) => n.getName() === 'forearm-r');
     assert(
       joint?.listChildren().some((c) => c.getName() === 'attach-sword'),

@@ -1,15 +1,9 @@
-# P1-T1 CI: enforce the working agreements on every push/PR.
-# Kept free & simple: standard hosted runners only. Deno pinned per the
-# D-004 canary rider (upgrade deliberately; re-run the GPU test lane first).
 name: ci
 
 on:
   push:
     branches: [main]
   pull_request:
-
-env:
-  DENO_VERSION: '2.9.2'
 
 jobs:
   checks:
@@ -21,22 +15,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: ${{ env.DENO_VERSION }}
-      - name: format
-        run: deno fmt --check
-      - name: lint
-        run: deno lint
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm run fmt:check
+      - run: npm run lint
+      - run: npm run check
+      - run: npm run build:web -w spritebook-studio
       - name: commit lint (PR range)
         if: github.event_name == 'pull_request'
         run: node tools/ci/commit-lint.mjs --range origin/${{ github.base_ref }}..HEAD
       - name: tests required (PR)
         if: github.event_name == 'pull_request'
-        run: deno run --allow-run tools/ci/tests-required.ts --base origin/${{ github.base_ref }}
+        run: node tools/ci/tests-required.ts --base origin/${{ github.base_ref }}
       - name: BOM guard (PR)
         if: github.event_name == 'pull_request'
-        run: deno run --allow-run --allow-read tools/ci/bom-guard.ts --base origin/${{ github.base_ref }}
+        run: node tools/ci/bom-guard.ts --base origin/${{ github.base_ref }}
 
   test:
     strategy:
@@ -46,59 +41,62 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@v2
+      - uses: actions/setup-node@v4
         with:
-          deno-version: ${{ env.DENO_VERSION }}
-      - name: test
-        run: deno task test
-      - name: coverage (ubuntu only)
+          node-version-file: .node-version
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.10'
+      - run: npm ci --ignore-scripts
+      - name: prepare the weightless sidecar test environment
+        run: uv sync --project sidecar --frozen
+      - name: tests and coverage (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
-        run: deno task coverage
-      - name: upload coverage artifact
+        run: npm run coverage
+      - name: tests (macOS and Windows)
+        if: matrix.os != 'ubuntu-latest'
+        run: npm test
+      - name: upload coverage
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: .coverage
 
-  # Software-Vulkan lane: the render suites run here (hosted runners have no GPU).
-  # Mesa lavapipe gives a real-if-slow WebGPU adapter — good for the structural
-  # golden suite, the double-render byte canary, and the width-100 strip. Pixels
-  # are NOT compared against hardware goldens here (a separate set; would poison
-  # both). DENO_WEBGPU_BACKEND is pinned so comparisons are like-for-like, and
-  # SPRITEBOOK_REQUIRE_GPU turns a missing adapter into a hard failure so a broken
-  # lane can't masquerade as "all render tests skipped, green".
+  # Software rendering exercises structural assertions; it does not qualify native GPUs/desktop apps.
   lavapipe:
     runs-on: ubuntu-latest
     env:
-      DENO_WEBGPU_BACKEND: vulkan
+      SPRITEBOOK_GPU_BACKEND: vulkan
+      SPRITEBOOK_REQUIRE_GPU: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@v2
+      - uses: actions/setup-node@v4
         with:
-          deno-version: ${{ env.DENO_VERSION }}
+          node-version-file: .node-version
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.10'
       - name: install Mesa lavapipe
         run: |
           sudo apt-get update
           sudo apt-get install -y mesa-vulkan-drivers vulkan-tools
-      - name: lavapipe adapter smoke
+      - name: confirm software adapter
         run: vulkaninfo --summary | grep -i llvmpipe
-      # render structural/canary/strip + the style GPU seam (render->style e2e).
-      # The style CPU pipeline + perceptual goldens are deterministic over
-      # committed AOV fixtures, so they also run GPU-free on the hosted `test`
-      # matrix; here they additionally exercise the live render->style seam.
-      # cli included so doctor's HEALTHY branch (signature + probe) runs on a
-      # lane that actually has an adapter, not only on the dev box
-      - name: render + style + pack/export + cli suites (software Vulkan)
-        env:
-          SPRITEBOOK_REQUIRE_GPU: '1'
-        run: deno test --allow-read --allow-write --allow-env --allow-ffi packages/render/ packages/style/ packages/pack/ packages/export/ packages/cli/
-      - name: render throughput probe
-        run: deno run --allow-read --allow-write --allow-env --allow-ffi packages/render/bench.ts .render-bench
-      - name: upload throughput report
+      - run: npm ci --ignore-scripts
+      - run: uv sync --project sidecar --frozen
+      - run: npm run build
+      - name: render/style/pack/export/CLI structural and image checks
+        run: node tools/test.mjs packages/render packages/style packages/pack packages/export packages/cli
+      - name: throughput trend
+        run: node packages/render/bench.ts .render-bench/ci
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: render-throughput
-          path: .render-bench/throughput.json
+          path: .render-bench/ci/throughput.json
           if-no-files-found: warn

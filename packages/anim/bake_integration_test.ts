@@ -33,7 +33,10 @@ const CAM: CameraPreset = {
 };
 
 test('acceptance: multi-clip bake — exact counts, clip ids, previews', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const events: JobEvent[] = [];

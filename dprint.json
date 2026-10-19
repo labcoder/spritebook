@@ -1,0 +1,41 @@
+{
+  "lineWidth": 100,
+  "indentWidth": 2,
+  "newLineKind": "lf",
+  "typescript": {
+    "deno": true,
+    "quoteStyle": "preferSingle",
+    "lineWidth": 100
+  },
+  "json": {
+    "deno": true,
+    "lineWidth": 100
+  },
+  "markdown": {
+    "deno": true
+  },
+  "includes": [
+    "**/*.{ts,tsx,js,mjs,cjs,json,md}"
+  ],
+  "excludes": [
+    "**/node_modules",
+    "**/dist",
+    "**/target",
+    ".build",
+    ".render-bench",
+    "spikes",
+    "docs/internal",
+    "packages/schema/fixtures",
+    "packages/anim/packs",
+    "packages/rig/bodies",
+    "packages/registry/catalog",
+    "future/baseline",
+    "future/qualification",
+    "**/*-lock.json"
+  ],
+  "plugins": [
+    "./node_modules/@dprint/typescript/plugin.wasm",
+    "./node_modules/@dprint/json/plugin.wasm",
+    "./node_modules/@dprint/markdown/plugin.wasm"
+  ]
+}

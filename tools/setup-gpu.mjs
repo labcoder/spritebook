@@ -13,7 +13,10 @@ const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 /** Dawn's qualified Windows Vulkan loader must sit beside dawn.node (D-049). */
 export async function installVulkan(target) {
-  assert(process.platform === 'win32' && process.arch === 'x64', 'Windows x64 loader only');
+  assert(
+    process.platform === 'win32' && process.arch === 'x64',
+    'Windows x64 loader only',
+  );
   const cache = fileURLToPath(new URL('../.build/', import.meta.url));
   await mkdir(cache, { recursive: true });
   const zipPath = join(cache, `vulkan-${VULKAN_VERSION}.zip`);
@@ -21,7 +24,9 @@ export async function installVulkan(target) {
     if (error.code !== 'ENOENT') throw error;
   });
   if (!zip) {
-    const response = await fetch(`https://sdk.lunarg.com/sdk/download/${VULKAN_VERSION}/windows/VulkanRT-X64-${VULKAN_VERSION}-Components.zip?Human=true`);
+    const response = await fetch(
+      `https://sdk.lunarg.com/sdk/download/${VULKAN_VERSION}/windows/VulkanRT-X64-${VULKAN_VERSION}-Components.zip?Human=true`,
+    );
     assert(response.ok, `Vulkan loader: HTTP ${response.status}`);
     zip = new Uint8Array(await response.arrayBuffer());
     assert.equal(sha(zip), ARCHIVE_HASH, 'Vulkan archive checksum');
@@ -30,18 +35,33 @@ export async function installVulkan(target) {
   assert.equal(sha(zip), ARCHIVE_HASH, 'cached Vulkan archive checksum');
   const temp = await mkdtemp(join(tmpdir(), 'spritebook-vulkan-'));
   try {
-    execFileSync('tar.exe', ['-xf', zipPath, '-C', temp], { windowsHide: true });
+    execFileSync('tar.exe', ['-xf', zipPath, '-C', temp], {
+      windowsHide: true,
+    });
     const root = join(temp, `VulkanRT-X64-${VULKAN_VERSION}-Components`);
-    assert.equal(sha(await readFile(join(root, 'x64/vulkan-1.dll'))), LOADER_HASH, 'Vulkan loader checksum');
+    assert.equal(
+      sha(await readFile(join(root, 'x64/vulkan-1.dll'))),
+      LOADER_HASH,
+      'Vulkan loader checksum',
+    );
     await mkdir(target, { recursive: true });
-    await copyFile(join(root, 'x64/vulkan-1.dll'), join(target, 'vulkan-1.dll'));
-    await copyFile(join(root, 'VulkanRT-License.txt'), join(target, 'VulkanRT-License.txt'));
+    await copyFile(
+      join(root, 'x64/vulkan-1.dll'),
+      join(target, 'vulkan-1.dll'),
+    );
+    await copyFile(
+      join(root, 'VulkanRT-License.txt'),
+      join(target, 'VulkanRT-License.txt'),
+    );
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url) && process.platform === 'win32') {
+if (
+  process.argv[1] === fileURLToPath(import.meta.url) &&
+  process.platform === 'win32'
+) {
   const addon = dirname(fileURLToPath(import.meta.resolve('webgpu')));
   await installVulkan(join(addon, 'dist', `win32-${process.arch}`));
 }

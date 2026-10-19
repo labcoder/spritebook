@@ -18,7 +18,7 @@
  */
 import {
   active,
-  Cdp,
+  type Cdp,
   evalJs,
   fmt,
   type FocusInfo,
@@ -43,7 +43,10 @@ export interface JourneyResult {
   findings: string[];
 }
 
-export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<JourneyResult> {
+export async function runJourney(
+  cdp: Cdp,
+  opts: JourneyOptions,
+): Promise<JourneyResult> {
   const lines: string[] = [];
   const say = (s: string) => {
     lines.push(s);
@@ -74,8 +77,13 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
       await tabTo(cdp, match, what, say, maxHops);
       return true;
     } catch (e) {
-      finding(`${(e as Error).message} - BRIDGED with programmatic focus(${bridgeSelector})`);
-      await evalJs(cdp, `document.querySelector(${JSON.stringify(bridgeSelector)})?.focus()`);
+      finding(
+        `${(e as Error).message} - BRIDGED with programmatic focus(${bridgeSelector})`,
+      );
+      await evalJs(
+        cdp,
+        `document.querySelector(${JSON.stringify(bridgeSelector)})?.focus()`,
+      );
       return false;
     }
   };
@@ -83,15 +91,28 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
   const hasText = (f: FocusInfo, t: string) => f.text.toLowerCase().includes(t.toLowerCase());
   const hasLabel = (f: FocusInfo, t: string) => f.label.toLowerCase().includes(t.toLowerCase());
   const checked = () =>
-    evalJs<boolean>(cdp, `document.activeElement?.getAttribute?.('aria-checked') === 'true'`);
+    evalJs<boolean>(
+      cdp,
+      `document.activeElement?.getAttribute?.('aria-checked') === 'true'`,
+    );
 
   say(`# Full-journey keyboard-only walkthrough`);
-  say(`bridge: ${await evalJs(cdp, `(window.__TAURI__ ? 'tauri (real CLI)' : 'browser-demo')`)}`);
+  say(
+    `bridge: ${await evalJs(
+      cdp,
+      `(window.__TAURI__ ? 'tauri (real CLI)' : 'browser-demo')`,
+    )}`,
+  );
 
   // a COLD app is still hydrating when CDP answers - vite compiles on the
   // first request and React mounts after that. Tab into a blank page moves
   // nothing, which reads as "everything unreachable"; wait for the chrome.
-  await waitFor(cdp, `document.querySelector('[role=tab]')`, 'the app to hydrate', 60_000);
+  await waitFor(
+    cdp,
+    `document.querySelector('[role=tab]')`,
+    'the app to hydrate',
+    60_000,
+  );
 
   // ---------------------------------------------------------------- 0 gallery
   say('\n## 0 - gallery: set the projects root');
@@ -104,8 +125,17 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
   // Home selects+focuses the first tab, which is always the gallery
   await reach((f) => f.role === 'tab', 'the tab strip', '[role=tab]', 40);
   await press(cdp, 'Home');
-  await waitFor(cdp, `document.querySelector('#projectsroot')`, 'the gallery toolbar', 5_000);
-  await reach((f) => f.id === 'projectsroot', 'projects root input', '#projectsroot');
+  await waitFor(
+    cdp,
+    `document.querySelector('#projectsroot')`,
+    'the gallery toolbar',
+    5_000,
+  );
+  await reach(
+    (f) => f.id === 'projectsroot',
+    'projects root input',
+    '#projectsroot',
+  );
   await press(cdp, 'End');
   await evalJs(cdp, `document.activeElement.select()`);
   await typeText(cdp, opts.root);
@@ -120,9 +150,18 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
 
   // ------------------------------------------------------------ 1 new character
   say('\n## 1 - new character tab');
-  await reach((f) => hasLabel(f, 'New character'), 'the + (new character) button', '.tabnew');
+  await reach(
+    (f) => hasLabel(f, 'New character'),
+    'the + (new character) button',
+    '.tabnew',
+  );
   await press(cdp, 'Enter');
-  await waitFor(cdp, `document.querySelector('#gname')`, 'the Generate form', 5_000);
+  await waitFor(
+    cdp,
+    `document.querySelector('#gname')`,
+    'the Generate form',
+    5_000,
+  );
   await focusAfter('opening the new-character tab');
 
   say('\n## 2 - generate: name, image, backend, run');
@@ -145,7 +184,9 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
   );
   if (!(await checked())) {
     await press(cdp, 'Space');
-    if (!(await checked())) finding('backend role=radio did not select on Space');
+    if (!(await checked())) {
+      finding('backend role=radio did not select on Space');
+    }
   }
   // arrows are the contract the radio role announces: move+select, then back
   await press(cdp, 'ArrowRight');
@@ -154,13 +195,18 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     `document.activeElement?.getAttribute?.('role') === 'radio' && document.activeElement.getAttribute('aria-checked') === 'true' && !document.activeElement.textContent.includes('Fixture')`,
   );
   if (!arrowMoved) {
-    finding('backend radiogroup arrows do not move selection (the role promises they do)');
+    finding(
+      'backend radiogroup arrows do not move selection (the role promises they do)',
+    );
   } else {
     await press(cdp, 'ArrowLeft');
   }
   if (
     !(await checked()) ||
-    !(await evalJs<boolean>(cdp, `document.activeElement.textContent.includes('Fixture')`))
+    !(await evalJs<boolean>(
+      cdp,
+      `document.activeElement.textContent.includes('Fixture')`,
+    ))
   ) {
     await evalJs(
       cdp,
@@ -179,11 +225,20 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
   // without a height keeps the backend's unit-box scale and bakes ~30px)
   await reach((f) => f.id === 'gheight', 'the height field', '#gheight', 20);
   const heightVal = await evalJs<string>(cdp, `document.activeElement.value`);
-  if (heightVal !== '1.7') finding(`the height field defaults to "${heightVal}", not 1.7`);
+  if (heightVal !== '1.7') {
+    finding(`the height field defaults to "${heightVal}", not 1.7`);
+  }
   // the count control ships DEFAULT 2 - reach it and read the default back
-  await reach((f) => f.id === 'gencount', 'the candidates count', '#gencount', 20);
+  await reach(
+    (f) => f.id === 'gencount',
+    'the candidates count',
+    '#gencount',
+    20,
+  );
   const countVal = await evalJs<string>(cdp, `document.activeElement.value`);
-  if (countVal !== '2') finding(`the candidates count defaults to ${countVal}, not 2`);
+  if (countVal !== '2') {
+    finding(`the candidates count defaults to ${countVal}, not 2`);
+  }
   await reach(
     (f) => f.tag === 'button' && hasText(f, 'Generate model'),
     'Generate model',
@@ -210,7 +265,12 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
   );
   // the panel reads the catalog asynchronously - wait for its fields the way
   // a sighted user would, then sweep
-  await waitFor(cdp, `document.querySelector('.gmore #opt-seed')`, 'the panel catalog', 20_000);
+  await waitFor(
+    cdp,
+    `document.querySelector('.gmore #opt-seed')`,
+    'the panel catalog',
+    20_000,
+  );
   await reach((f) => f.id === 'gmcount', 'Generate-more count', '#gmcount', 60);
   await reach((f) => f.id === 'opt-seed', 'the seed field', '#opt-seed', 40);
   await reach(
@@ -265,7 +325,12 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
   );
   // With the roving contract, only the SELECTED radio is a tab stop - reach
   // the group, then move selection to Track A with the arrow keys.
-  await reach((f) => f.role === 'radio', 'the track radiogroup', '[role=radio]', 30);
+  await reach(
+    (f) => f.role === 'radio',
+    'the track radiogroup',
+    '[role=radio]',
+    30,
+  );
   for (let hops = 0; hops < 3; hops++) {
     const onTrackA = await evalJs<boolean>(
       cdp,
@@ -274,15 +339,24 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     if (onTrackA) break;
     await press(cdp, 'ArrowRight');
   }
-  if (!(await evalJs<boolean>(cdp, `document.activeElement.textContent.includes('Track A')`))) {
-    finding('Track A is not reachable with arrow keys inside the track radiogroup');
+  if (
+    !(await evalJs<boolean>(
+      cdp,
+      `document.activeElement.textContent.includes('Track A')`,
+    ))
+  ) {
+    finding(
+      'Track A is not reachable with arrow keys inside the track radiogroup',
+    );
     await evalJs(
       cdp,
       `[...document.querySelectorAll('[role=radio]')].find(r => r.textContent.includes('Track A'))?.click()`,
     );
   } else if (!(await checked())) {
     await press(cdp, 'Space');
-    if (!(await checked())) finding('Track A radio did not select on Space or arrows');
+    if (!(await checked())) {
+      finding('Track A radio did not select on Space or arrows');
+    }
   }
   await reach(
     (f) => f.tag === 'button' && hasText(f, 'Run rig'),
@@ -306,7 +380,12 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     'button',
     60,
   );
-  await reach((f) => f.tag === 'button' && hasText(f, 'Accept rig'), 'Accept rig', 'button', 60);
+  await reach(
+    (f) => f.tag === 'button' && hasText(f, 'Accept rig'),
+    'Accept rig',
+    'button',
+    60,
+  );
   await press(cdp, 'Enter');
   await waitFor(
     cdp,
@@ -325,7 +404,12 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     40,
   );
   await press(cdp, 'Enter');
-  await waitFor(cdp, `document.querySelector('#clipsearch')`, 'the anim stage', 15_000);
+  await waitFor(
+    cdp,
+    `document.querySelector('#clipsearch')`,
+    'the anim stage',
+    15_000,
+  );
   await reach((f) => f.id === 'clipsearch', 'clip search', '#clipsearch', 40);
   await typeText(cdp, 'idle-loop');
   await waitFor(
@@ -372,19 +456,33 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     '.vptransport button',
     40,
   );
-  const tpBefore = await evalJs<string>(cdp, `document.activeElement.textContent`);
+  const tpBefore = await evalJs<string>(
+    cdp,
+    `document.activeElement.textContent`,
+  );
   await press(cdp, 'Enter');
-  const tpAfter = await evalJs<string>(cdp, `document.activeElement.textContent`);
-  if (tpBefore === tpAfter) finding('transport Play/Pause did not toggle on Enter');
+  const tpAfter = await evalJs<string>(
+    cdp,
+    `document.activeElement.textContent`,
+  );
+  if (tpBefore === tpAfter) {
+    finding('transport Play/Pause did not toggle on Enter');
+  }
   await reach(
     (f) => hasLabel(f, 'Scrub the clip'),
     'the scrub slider',
     '.vptransport input[type=range]',
     10,
   );
-  const scrubBefore = await evalJs<number>(cdp, `Number(document.activeElement.value)`);
+  const scrubBefore = await evalJs<number>(
+    cdp,
+    `Number(document.activeElement.value)`,
+  );
   await press(cdp, 'ArrowRight');
-  const scrubAfter = await evalJs<number>(cdp, `Number(document.activeElement.value)`);
+  const scrubAfter = await evalJs<number>(
+    cdp,
+    `Number(document.activeElement.value)`,
+  );
   if (!(scrubAfter > scrubBefore)) finding('scrub slider ignored ArrowRight');
 
   // ------------------------------------------------------------------- 6 look
@@ -396,13 +494,29 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
     40,
   );
   await press(cdp, 'Enter');
-  await waitFor(cdp, `document.querySelector('#lookcam')`, 'the look stage', 15_000);
-  await reach((f) => f.id === 'lookcam', 'camera preset select', '#lookcam', 30);
+  await waitFor(
+    cdp,
+    `document.querySelector('#lookcam')`,
+    'the look stage',
+    15_000,
+  );
+  await reach(
+    (f) => f.id === 'lookcam',
+    'camera preset select',
+    '#lookcam',
+    30,
+  );
   await reach((f) => f.id === 'lookelev', 'elevation slider', '#lookelev', 10);
   // the slider's keyboard contract: one arrow press moves a USABLE amount
-  const evBefore = await evalJs<number>(cdp, `Number(document.activeElement.value)`);
+  const evBefore = await evalJs<number>(
+    cdp,
+    `Number(document.activeElement.value)`,
+  );
   await press(cdp, 'ArrowUp');
-  const evAfter = await evalJs<number>(cdp, `Number(document.activeElement.value)`);
+  const evAfter = await evalJs<number>(
+    cdp,
+    `Number(document.activeElement.value)`,
+  );
   if (Math.abs(evAfter - evBefore) < 0.1) {
     finding(
       `elevation slider moves ${(evAfter - evBefore).toFixed(3)} deg per arrow press - ` +
@@ -452,7 +566,12 @@ export async function runJourney(cdp: Cdp, opts: JourneyOptions): Promise<Journe
   );
   say('  pressing Enter on Bake sheet... (GPU render)');
   await press(cdp, 'Enter');
-  await waitFor(cdp, `document.querySelector('#playclip')`, 'the review player', 600_000);
+  await waitFor(
+    cdp,
+    `document.querySelector('#playclip')`,
+    'the review player',
+    600_000,
+  );
   await focusAfter('the bake');
   await reach(
     (f) => f.tag === 'button' && (hasText(f, 'Pause') || hasText(f, 'Play')),

@@ -1,44 +1,62 @@
-/**
- * Working-agreement check: every new dependency gets a row in
- * docs/dependencies.md in the same change (AGENTS.md; BOM rule).
- * Compares deno.lock package names against the base ref and requires each
- * newly appearing npm/jsr package to be mentioned in docs/dependencies.md.
- *
- *   deno run --allow-run --allow-read tools/ci/bom-guard.ts --base origin/main
- */
-const baseIdx = Deno.args.indexOf('--base');
-const base = baseIdx >= 0 ? Deno.args[baseIdx + 1] : 'origin/main';
+/** Every new direct npm dependency needs a role/license row in the BOM. */
+import { execFileSync } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 
-async function git(...args: string[]): Promise<{ ok: boolean; out: string }> {
-  const res = await new Deno.Command('git', { args, stdout: 'piped', stderr: 'null' }).output();
-  return { ok: res.code === 0, out: new TextDecoder().decode(res.stdout) };
+export function dependencyNames(text: string): string[] {
+  const manifest = JSON.parse(text);
+  return [
+    ...new Set([
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.devDependencies ?? {}),
+      ...Object.keys(manifest.optionalDependencies ?? {}),
+    ]),
+  ].filter((name) => !name.startsWith('@spritebook/'));
 }
 
-function packageNames(lock: string): Set<string> {
-  const names = new Set<string>();
-  // top-level specifier keys: "npm:name@version" / "jsr:@scope/name@version"
-  for (const m of lock.matchAll(/"(?:npm|jsr):((?:@[\w.-]+\/)?[\w.-]+)@/g)) names.add(m[1]);
-  return names;
+function git(...args: string[]): string {
+  return execFileSync('git', args, { encoding: 'utf8', windowsHide: true });
 }
 
-const head = await Deno.readTextFile('deno.lock').catch(() => '');
-const baseLock = await git('show', `${base}:deno.lock`);
-const before = packageNames(baseLock.ok ? baseLock.out : '');
-const after = packageNames(head);
-const added = [...after].filter((n) => !before.has(n));
-
-if (added.length === 0) {
-  console.log('bom-guard: no new dependencies');
-  Deno.exit(0);
+if (import.meta.main) {
+  const args = process.argv.slice(2);
+  const base = args.includes('--base') ? args[args.indexOf('--base') + 1] : 'origin/main';
+  git('rev-parse', '--verify', base);
+  const manifestPath =
+    /^(?:package\.json|packages\/[^/]+\/package\.json|apps\/studio\/package\.json)$/;
+  const beforeFiles = git('ls-tree', '-r', '--name-only', base).split('\n');
+  const before = new Set(
+    beforeFiles.filter((path) => manifestPath.test(path))
+      .flatMap((path) => dependencyNames(git('show', `${base}:${path}`))),
+  );
+  // The F4 migration range starts before the npm workspace existed.
+  if (
+    !beforeFiles.includes('package.json') && beforeFiles.includes('deno.lock')
+  ) {
+    for (
+      const match of git('show', `${base}:deno.lock`).matchAll(
+        /"(?:npm|jsr):((?:@[\w.-]+\/)?[\w.-]+)@/g,
+      )
+    ) {
+      before.add(match[1]);
+    }
+  }
+  const afterFiles = git('ls-files').split('\n').filter((path) => manifestPath.test(path));
+  const after = new Set(
+    (await Promise.all(
+      afterFiles.map(async (path) => dependencyNames(await readFile(path, 'utf8'))),
+    )).flat(),
+  );
+  const added = [...after].filter((name) => !before.has(name));
+  const bom = (await readFile('docs/dependencies.md', 'utf8')).toLowerCase();
+  const missing = added.filter((name) =>
+    !bom.includes(name.toLowerCase().replace(/^@[\w.-]+\//, ''))
+  );
+  if (missing.length) {
+    console.error(
+      `bom-guard: add role/license rows to docs/dependencies.md for: ${missing.join(', ')}`,
+    );
+    process.exitCode = 1;
+  } else {
+    console.log(`bom-guard: ok (${added.length} new direct dependencies)`);
+  }
 }
-
-const bom = (await Deno.readTextFile('docs/dependencies.md')).toLowerCase();
-const missing = added.filter((n) => !bom.includes(n.toLowerCase().replace(/^@[\w.-]+\//, '')));
-
-if (missing.length > 0) {
-  console.error('bom-guard: new dependencies missing from docs/dependencies.md:');
-  for (const n of missing) console.error(`  ${n}`);
-  console.error('add a row with role + license in the same change (AGENTS.md).');
-  Deno.exit(1);
-}
-console.log(`bom-guard: ok (${added.length} new dep(s), all in the BOM)`);

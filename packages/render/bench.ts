@@ -10,7 +10,7 @@ import { promises as fs } from 'node:fs';
  *     packages/render/bench.ts [outDir=.render-bench]
  */
 import type { CameraPreset } from '@spritebook/schema';
-import { type RenderJobSpec, runRenderJob } from './mod.ts';
+import { disposeGpu, type RenderJobSpec, runRenderJob } from '@spritebook/render';
 
 const outDir = process.argv.slice(2)[0] ?? '.render-bench';
 const FIXTURE = new URL('./fixtures/skinned-column.glb', import.meta.url)
@@ -45,7 +45,10 @@ for await (const e of runRenderJob(spec)) {
   } else if (e.t === 'artifact' && e.kind === 'throughput') {
     console.log(await fs.readFile(e.path, 'utf8'));
   } else if (e.t === 'done') {
-    console.log(`bench: 8 directions x 16 frames in ${e.wallTimeS.toFixed(2)}s`);
+    console.log(
+      `bench: 8 directions x 16 frames in ${e.wallTimeS.toFixed(2)}s`,
+    );
   }
 }
-if (failed) process.exit(1);
+await disposeGpu();
+if (failed) process.exitCode = 1;

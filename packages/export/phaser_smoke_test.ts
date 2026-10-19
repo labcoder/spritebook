@@ -63,7 +63,10 @@ async function cdpEval(port: number, expression: string): Promise<unknown> {
   }
 }
 
-test('phaser smoke: real Phaser parses the exported atlas in a real browser', { skip: !PORT }, async (t) => {
+test(
+  'phaser smoke: real Phaser parses the exported atlas in a real browser',
+  { skip: !PORT },
+  async (t) => {
     const phaserSrc = await fs.readFile(PHASER_JS, 'utf8').catch(() => null);
     if (phaserSrc === null) {
       t.skip('Phaser package unavailable');
@@ -122,4 +125,5 @@ test('phaser smoke: real Phaser parses the exported atlas in a real browser', { 
     } finally {
       await fs.rm(out, { recursive: true }).catch(() => {});
     }
-});
+  },
+);

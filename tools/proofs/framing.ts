@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * How big does a cell have to be for a REAL clip set?
  *
@@ -29,11 +32,14 @@
  */
 // the exact pin packages/pack and packages/cli carry; tools/ is not a
 // workspace member, so the specifier is spelled out rather than mapped
-import { decode as decodePng } from 'npm:fast-png@6.2.0';
-import { runCli } from '../../packages/cli/mod.ts';
-import { BakeManifestSchema, type FrameRecord, parseWith } from '../../packages/schema/mod.ts';
+import { decode as decodePng } from 'fast-png';
+import { runCli } from '../../packages/cli/dist/mod.js';
+import { BakeManifestSchema, type FrameRecord, parseWith } from '../../packages/schema/dist/mod.js';
 
-const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const REPO = new URL('../../', import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const BODY = `${REPO}packages/rig/bodies/ubc-male`;
 
@@ -51,12 +57,18 @@ const say = (s: string) => {
 
 function io() {
   const out: string[] = [];
-  return { stdout: (s: string) => out.push(s), stderr: (s: string) => out.push(s), out };
+  return {
+    stdout: (s: string) => out.push(s),
+    stderr: (s: string) => out.push(s),
+    out,
+  };
 }
 async function cli(args: string[], label: string): Promise<void> {
   const o = io();
   const code = await runCli(args, o);
-  if (code !== 0) throw new Error(`${label} exited ${code}:\n${o.out.slice(-10).join('\n')}`);
+  if (code !== 0) {
+    throw new Error(`${label} exited ${code}:\n${o.out.slice(-10).join('\n')}`);
+  }
 }
 
 interface Extent {
@@ -93,11 +105,13 @@ function extentOf(
   };
 }
 
-const tmp = await Deno.makeTempDir();
+const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
 const ws = `${tmp}/framing`;
 try {
   say('# How big does a cell have to be for a real clip set?');
-  say(`  measured at ppm ${PPM} in a ${BIG_CELL} cell (oversized so nothing clips)`);
+  say(
+    `  measured at ppm ${PPM} in a ${BIG_CELL} cell (oversized so nothing clips)`,
+  );
   say(`  clips: ${CLIPS}`);
 
   await cli(
@@ -129,29 +143,45 @@ try {
   ], 'fit');
   await cli(['anim', '--enable', CLIPS, '--workspace', ws], 'anim');
   await cli(
-    ['bake', '--workspace', ws, '--cell', BIG_CELL, '--ppm', PPM, '--padding', '6'],
+    [
+      'bake',
+      '--workspace',
+      ws,
+      '--cell',
+      BIG_CELL,
+      '--ppm',
+      PPM,
+      '--padding',
+      '6',
+    ],
     'bake',
   );
 
   const manifestPath = `${ws}/character.json`;
-  const character = JSON.parse(await Deno.readTextFile(manifestPath));
+  const character = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
   const bakeDir = `${ws}/bakes/bake-${character.lastBakeId}`;
   const bake = parseWith(
     BakeManifestSchema,
-    JSON.parse(await Deno.readTextFile(`${bakeDir}/manifest.json`)),
+    JSON.parse(await fs.readFile(`${bakeDir}/manifest.json`, 'utf8')),
     'BakeManifest',
   );
   say(`  ${bake.frames.length} frames, ${bake.atlases.length} atlas pages`);
   if (bake.flags.length > 0) {
-    say(`  WARNING: the oversized bake still flagged: ${bake.flags.map((f) => f.code).join(', ')}`);
+    say(
+      `  WARNING: the oversized bake still flagged: ${bake.flags.map((f) => f.code).join(', ')}`,
+    );
   } else {
-    say('  the oversized bake raised no flags, so every silhouette is fully present');
+    say(
+      '  the oversized bake raised no flags, so every silhouette is fully present',
+    );
   }
 
   // decode each LIT page once; frames index into them by rect
   const pages = new Map<number, { data: Uint8Array; width: number }>();
   for (const page of bake.atlases.filter((a) => a.pass === 'lit')) {
-    const png = decodePng(await Deno.readFile(`${bakeDir}/${page.png}`));
+    const png = decodePng(
+      new Uint8Array(await fs.readFile(`${bakeDir}/${page.png}`)),
+    );
     pages.set(page.pageIndex, {
       data: new Uint8Array(png.data as unknown as ArrayLike<number>),
       width: png.width,
@@ -191,7 +221,7 @@ try {
   );
 
   // ------------------------------------------------------------- the verdict
-  const { STANDARD_30 } = await import('../../packages/core/presets.ts');
+  const { STANDARD_30 } = await import('../../packages/core/dist/presets.js');
   const pad = STANDARD_30.paddingPx;
   const idle = perClip.get('idle-loop') ?? [];
   say('\n## what this means for the default preset');
@@ -236,12 +266,12 @@ try {
     );
   }
 } finally {
-  await Deno.writeTextFile(
+  await fs.writeFile(
     `${REPO}docs/internal/proofs/framing.md`,
     '# Cell sizing for a real clip set (P4-T3 follow-up)\n\nCaptured by ' +
       '`tools/proofs/framing.ts`; regenerate rather than hand-editing.\n\n```\n' +
       lines.join('\n') + '\n```\n',
   );
   console.log('\nrecorded to docs/internal/proofs/framing.md');
-  await Deno.remove(tmp, { recursive: true }).catch(() => {});
+  await fs.rm(tmp, { recursive: true }).catch(() => {});
 }

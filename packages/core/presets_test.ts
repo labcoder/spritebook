@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
-import { CAMERA_PRESETS, DEFAULT_CAMERA_PRESET_ID, resolveCamera, STANDARD_30 } from './dist/presets.js';
+import {
+  CAMERA_PRESETS,
+  DEFAULT_CAMERA_PRESET_ID,
+  resolveCamera,
+  STANDARD_30,
+} from './dist/presets.js';
 
 test('every preset is keyed by its own id', () => {
   for (const [key, preset] of Object.entries(CAMERA_PRESETS)) {

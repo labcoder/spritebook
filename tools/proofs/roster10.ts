@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The P4-T3 scale proof: ten real characters, baked as a batch, then a look
  * change on one of them, and the plan's prediction checked against what the
@@ -19,12 +22,15 @@
  * Run:  DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/roster10.ts
  * Add --keep to leave the roster on disk for inspection.
  */
-import { runCli } from '../../packages/cli/mod.ts';
-import { type BakePlan, BakePlanSchema } from '../../packages/schema/mod.ts';
+import { runCli } from '../../packages/cli/dist/mod.js';
+import { type BakePlan, BakePlanSchema } from '../../packages/schema/dist/mod.js';
 
-const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const REPO = new URL('../../', import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
-const KEEP = Deno.args.includes('--keep');
+const KEEP = process.argv.slice(2).includes('--keep');
 
 const NAMES = [
   'bulma',
@@ -55,7 +61,11 @@ function io(capture = false) {
   };
 }
 
-async function cli(args: string[], label: string, capture = false): Promise<string[]> {
+async function cli(
+  args: string[],
+  label: string,
+  capture = false,
+): Promise<string[]> {
   const o = io(capture);
   const code = await runCli(args, o);
   if (code !== 0) {
@@ -68,7 +78,10 @@ async function cli(args: string[], label: string, capture = false): Promise<stri
 /** The plan as a document, without printing it. */
 async function plan(root: string, extra: string[] = []): Promise<BakePlan> {
   const o = io(true);
-  await runCli(['bake', '--all', '--root', root, '--plan', '--json', ...extra], o);
+  await runCli(
+    ['bake', '--all', '--root', root, '--plan', '--json', ...extra],
+    o,
+  );
   return BakePlanSchema.parse(JSON.parse(o.out.at(-1)!));
 }
 
@@ -78,8 +91,8 @@ function say(s: string) {
 }
 
 const t0 = performance.now();
-const root = KEEP ? `${REPO}.proof-roster10` : await Deno.makeTempDir();
-if (KEEP) await Deno.mkdir(root, { recursive: true });
+const root = KEEP ? `${REPO}.proof-roster10` : await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+if (KEEP) await fs.mkdir(root, { recursive: true });
 
 try {
   // ---------------------------------------------------------------- build
@@ -88,13 +101,29 @@ try {
   for (const id of NAMES) {
     const ws = `${root}/${id}`;
     await cli(
-      ['gen', '--workspace', ws, '--character', id, '--image', IMAGE, '--model', 'fixture-gen'],
+      [
+        'gen',
+        '--workspace',
+        ws,
+        '--character',
+        id,
+        '--image',
+        IMAGE,
+        '--model',
+        'fixture-gen',
+      ],
       `gen ${id}`,
       true,
     );
-    await cli(['pick', '--workspace', ws, '--result', 'r1'], `pick ${id}`, true);
+    await cli(
+      ['pick', '--workspace', ws, '--result', 'r1'],
+      `pick ${id}`,
+      true,
+    );
   }
-  say(`built ${NAMES.length} characters in ${((performance.now() - build0) / 1000).toFixed(1)}s`);
+  say(
+    `built ${NAMES.length} characters in ${((performance.now() - build0) / 1000).toFixed(1)}s`,
+  );
 
   // ------------------------------------------------------- 1. cold batch
   const cold = await plan(root);
@@ -103,7 +132,10 @@ try {
     `  ${cold.totals.toBake} to bake, ${cold.totals.fresh} fresh, ` +
       `${cold.totals.blocked} blocked, ${cold.totals.staleFrames} frames to render`,
   );
-  assert(cold.totals.toBake === NAMES.length, 'every character is work when nothing is baked');
+  assert(
+    cold.totals.toBake === NAMES.length,
+    'every character is work when nothing is baked',
+  );
   assert(cold.totals.blocked === 0, 'nothing is blocked');
   assert(
     cold.characters.every((c) => c.state === 'never-baked'),
@@ -120,7 +152,9 @@ try {
 
   // every character now has a bake on its manifest
   for (const id of NAMES) {
-    const m = JSON.parse(await Deno.readTextFile(`${root}/${id}/character.json`));
+    const m = JSON.parse(
+      await fs.readFile(`${root}/${id}/character.json`, 'utf8'),
+    );
     assert(typeof m.lastBakeId === 'string', `${id} recorded its bake`);
   }
 
@@ -131,12 +165,17 @@ try {
     `  ${warm.totals.toBake} to bake, ${warm.totals.fresh} fresh, ` +
       `${warm.totals.cachedFrames} frames already baked`,
   );
-  assert(warm.totals.toBake === 0, 'a warm roster is NO work — the overnight pivot depends on it');
+  assert(
+    warm.totals.toBake === 0,
+    'a warm roster is NO work — the overnight pivot depends on it',
+  );
   assert(warm.totals.fresh === NAMES.length, 'all ten fresh');
 
   const warm0 = performance.now();
   await cli(['bake', '--all', '--root', root], 'warm batch');
-  say(`warm batch: ${((performance.now() - warm0) / 1000).toFixed(1)}s (it should render nothing)`);
+  say(
+    `warm batch: ${((performance.now() - warm0) / 1000).toFixed(1)}s (it should render nothing)`,
+  );
 
   // ------------------------------------------- 3. one look change, planned
   const changed = 'piccolo';
@@ -153,10 +192,18 @@ try {
   for (const c of after.characters) {
     if (c.state === 'fresh') continue;
     say(`  ${c.displayName} (${c.id}) — ${c.state}, ${c.staleFrames} frames`);
-    for (const r of c.reasons) say(`      · ${r.field}: ${r.why.slice(0, 88)}…`);
+    for (const r of c.reasons) {
+      say(`      · ${r.field}: ${r.why.slice(0, 88)}…`);
+    }
   }
-  assert(after.totals.toBake === 1, `exactly one character is stale (saw ${after.totals.toBake})`);
-  assert(after.totals.fresh === NAMES.length - 1, 'the other nine are untouched');
+  assert(
+    after.totals.toBake === 1,
+    `exactly one character is stale (saw ${after.totals.toBake})`,
+  );
+  assert(
+    after.totals.fresh === NAMES.length - 1,
+    'the other nine are untouched',
+  );
   const stale = after.characters.find((c) => c.state === 'stale')!;
   assert(stale.id === changed, `the stale one is ${changed}`);
   assert(
@@ -184,9 +231,14 @@ try {
   const pivotS = (performance.now() - pivot0) / 1000;
 
   const bakeManifest = async (id: string) => {
-    const m = JSON.parse(await Deno.readTextFile(`${root}/${id}/character.json`));
+    const m = JSON.parse(
+      await fs.readFile(`${root}/${id}/character.json`, 'utf8'),
+    );
     return JSON.parse(
-      await Deno.readTextFile(`${root}/${id}/bakes/bake-${m.lastBakeId}/manifest.json`),
+      await fs.readFile(
+        `${root}/${id}/bakes/bake-${m.lastBakeId}/manifest.json`,
+        'utf8',
+      ),
     );
   };
   const changedBake = await bakeManifest(changed);
@@ -208,12 +260,17 @@ try {
   const untouched = NAMES.filter((n) => n !== changed);
   for (const id of untouched) {
     const m = await bakeManifest(id);
-    assert(m.inputs.stylePresetHash !== changedBake.inputs.stylePresetHash, `${id} kept its style`);
+    assert(
+      m.inputs.stylePresetHash !== changedBake.inputs.stylePresetHash,
+      `${id} kept its style`,
+    );
   }
   say(`  the other ${untouched.length} were not re-rendered`);
 
-  say(`\nTOTAL ${((performance.now() - t0) / 1000).toFixed(1)}s — all assertions held`);
-  await Deno.writeTextFile(
+  say(
+    `\nTOTAL ${((performance.now() - t0) / 1000).toFixed(1)}s — all assertions held`,
+  );
+  await fs.writeFile(
     `${REPO}docs/internal/proofs/roster10.md`,
     `# ${NAMES.length}-character roster proof (P4-T3)\n\nCaptured by ` +
       `\`tools/proofs/roster10.ts\`; regenerate rather than hand-editing.\n\n\`\`\`\n` +
@@ -221,7 +278,7 @@ try {
   );
   say(`\nrecorded to docs/internal/proofs/roster10.md`);
 } finally {
-  if (!KEEP) await Deno.remove(root, { recursive: true }).catch(() => {});
+  if (!KEEP) await fs.rm(root, { recursive: true }).catch(() => {});
 }
 
 function assert(cond: boolean, why: string): void {

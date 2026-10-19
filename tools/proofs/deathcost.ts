@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The D-035 product question, settled with bytes: should the shipped default be
  * sized for a clip set that contains a lying-down death?
@@ -24,9 +27,12 @@
  *
  * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/deathcost.ts [--n 3]
  */
-import { runCli } from '../../packages/cli/mod.ts';
+import { runCli } from '../../packages/cli/dist/mod.js';
 
-const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const REPO = new URL('../../', import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const BODY = `${REPO}packages/rig/bodies/ubc-male`;
 
@@ -34,8 +40,8 @@ const WITH_DEATH = 'idle-loop:8,walk-loop:8,jog-fwd-loop:8,sprint-loop:6,punch-j
 const NO_DEATH = 'idle-loop:8,walk-loop:8,jog-fwd-loop:8,sprint-loop:6,punch-jab:6';
 
 const arg = (n: string, d: string) => {
-  const i = Deno.args.indexOf(`--${n}`);
-  return i >= 0 && Deno.args[i + 1] !== undefined ? Deno.args[i + 1]! : d;
+  const i = process.argv.slice(2).indexOf(`--${n}`);
+  return i >= 0 && process.argv.slice(2)[i + 1] !== undefined ? process.argv.slice(2)[i + 1]! : d;
 };
 const N = Number(arg('n', '3'));
 
@@ -46,21 +52,27 @@ const say = (s: string) => {
 };
 function io() {
   const out: string[] = [];
-  return { stdout: (s: string) => out.push(s), stderr: (s: string) => out.push(s), out };
+  return {
+    stdout: (s: string) => out.push(s),
+    stderr: (s: string) => out.push(s),
+    out,
+  };
 }
 async function cli(args: string[], label: string): Promise<string[]> {
   const o = io();
-  if (await runCli(args, o) !== 0) throw new Error(`${label}: ${o.out.slice(-10).join('\n')}`);
+  if (await runCli(args, o) !== 0) {
+    throw new Error(`${label}: ${o.out.slice(-10).join('\n')}`);
+  }
   return o.out;
 }
 
 /** total bytes under a directory, recursively */
 async function bytesOf(dir: string): Promise<number> {
   let total = 0;
-  for await (const e of Deno.readDir(dir)) {
+  for await (const e of await fs.readdir(dir, { withFileTypes: true })) {
     const p = `${dir}/${e.name}`;
-    if (e.isDirectory) total += await bytesOf(p);
-    else if (e.isFile) total += (await Deno.stat(p)).size;
+    if (e.isDirectory()) total += await bytesOf(p);
+    else if (e.isFile()) total += (await fs.stat(p)).size;
   }
   return total;
 }
@@ -84,7 +96,7 @@ async function measure(
   pad: string,
   clips: string,
 ): Promise<Result> {
-  const root = await Deno.makeTempDir();
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     let bakeBytes = 0;
     let frames = 0;
@@ -118,7 +130,10 @@ async function measure(
         '--out',
         `${ws}/rig`,
       ], `fit ${id(i)}`);
-      await cli(['anim', '--enable', clips, '--workspace', ws], `anim ${id(i)}`);
+      await cli(
+        ['anim', '--enable', clips, '--workspace', ws],
+        `anim ${id(i)}`,
+      );
       const out = await cli(
         ['bake', '--workspace', ws, '--cell', cell, '--padding', pad],
         `bake ${id(i)}`,
@@ -129,10 +144,13 @@ async function measure(
         flaggedFrames += Number(m[1]);
         edges = m[2]!;
       }
-      const manifest = JSON.parse(await Deno.readTextFile(`${ws}/character.json`));
+      const manifest = JSON.parse(
+        await fs.readFile(`${ws}/character.json`, 'utf8'),
+      );
       const bakeDir = `${ws}/bakes/bake-${manifest.lastBakeId}`;
       bakeBytes += await bytesOf(bakeDir);
-      frames = JSON.parse(await Deno.readTextFile(`${bakeDir}/manifest.json`)).frames.length;
+      frames = JSON.parse(await fs.readFile(`${bakeDir}/manifest.json`, 'utf8')).frames
+        .length;
     }
     return {
       label,
@@ -145,13 +163,15 @@ async function measure(
       edges,
     };
   } finally {
-    await Deno.remove(root, { recursive: true }).catch(() => {});
+    await fs.rm(root, { recursive: true }).catch(() => {});
   }
 }
 
 const mb = (b: number) => (b / 1024 / 1024).toFixed(2);
 
-say(`# Does the shipped default have to carry the death clip? (${N} characters per config)`);
+say(
+  `# Does the shipped default have to carry the death clip? (${N} characters per config)`,
+);
 const results: Result[] = [];
 for (
   const [label, cell, pad, clips] of [
@@ -165,7 +185,9 @@ for (
 }
 
 say('');
-say('  config                cell/pad   clips        frames   MB/char   flagged frames');
+say(
+  '  config                cell/pad   clips        frames   MB/char   flagged frames',
+);
 for (const r of results) {
   say(
     `  ${r.label.padEnd(21)} ${(r.cell + '/' + r.pad).padEnd(10)} ${r.clips.padEnd(12)} ` +
@@ -174,7 +196,12 @@ for (const r of results) {
   );
 }
 
-const [shipped, shippedNo, cheap, trap] = results as [Result, Result, Result, Result];
+const [shipped, shippedNo, cheap, trap] = results as [
+  Result,
+  Result,
+  Result,
+  Result,
+];
 say('');
 say('## what the numbers say');
 say(
@@ -205,7 +232,7 @@ if (trap.flaggedFrames > 0) {
   );
 }
 
-await Deno.writeTextFile(
+await fs.writeFile(
   `${REPO}docs/internal/proofs/deathcost.md`,
   '# Does the default have to carry the death clip? (D-035 follow-up)\n\nCaptured by ' +
     '`tools/proofs/deathcost.ts`; regenerate rather than hand-editing.\n\n```\n' +

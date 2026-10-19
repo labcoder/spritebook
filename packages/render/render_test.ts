@@ -73,13 +73,18 @@ function alphaBBox(lit: Uint8Array, w: number, h: number) {
 
 test('render: AOV pages are cellPx-sized, one per direction x frame x pass', async (t) => {
   const s = await setup();
-  if (!s) { t.skip('No WebGPU adapter'); return; }
+  if (!s) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const outDir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const { summary, throughputPath } = await s.renderer.renderAll(outDir, 2);
     assertEquals(summary.cellPx, { w: 128, h: 128 });
     assertEquals(summary.pageCount, 8 * 2 * AOV_TARGETS.length);
-    const img = decodePng(new Uint8Array(await fs.readFile(`${summary.framesDir}/d00_f000_lit.png`)));
+    const img = decodePng(
+      new Uint8Array(await fs.readFile(`${summary.framesDir}/d00_f000_lit.png`)),
+    );
     assertEquals([img.width, img.height], [128, 128]);
     const tp = JSON.parse(await fs.readFile(throughputPath, 'utf8'));
     assert(tp.frames === 16 && tp.fps > 0, 'throughput report has real numbers');
@@ -91,12 +96,19 @@ test('render: AOV pages are cellPx-sized, one per direction x frame x pass', asy
 test('render: depth and mask AOVs encode drawn vs background correctly', async (t) => {
   // exercises the non-trivial png.ts paths: r32float->gray16 and r32uint->gray16
   const s = await setup({ pivot: 'center' });
-  if (!s) { t.skip('No WebGPU adapter'); return; }
+  if (!s) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const outDir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const { summary } = await s.renderer.renderAll(outDir, 1);
-    const depth = decodePng(new Uint8Array(await fs.readFile(`${summary.framesDir}/d00_f000_depth.png`)));
-    const mask = decodePng(new Uint8Array(await fs.readFile(`${summary.framesDir}/d00_f000_mask.png`)));
+    const depth = decodePng(
+      new Uint8Array(await fs.readFile(`${summary.framesDir}/d00_f000_depth.png`)),
+    );
+    const mask = decodePng(
+      new Uint8Array(await fs.readFile(`${summary.framesDir}/d00_f000_mask.png`)),
+    );
     const dd = depth.data as Uint16Array;
     const md = mask.data as Uint16Array;
     // corner (0,0) is background: depth cleared to far (1.0 -> 65535), mask empty (0)
@@ -117,7 +129,10 @@ test('render: depth and mask AOVs encode drawn vs background correctly', async (
 
 test('render: pivot lands on the world-locked feet-baseline pixel', async (t) => {
   const s = await setup();
-  if (!s) { t.skip('No WebGPU adapter'); return; }
+  if (!s) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   // feet-baseline ⇒ (w/2, h - paddingPx) = (64, 120)
   assertEquals(s.framing.pivotPx, { x: 64, y: 120 });
 });
@@ -126,7 +141,10 @@ test('render: centered silhouette stays strictly inside the padding on all sides
   // center pivot: the whole silhouette is framed around the cell centre, so the
   // strict all-sides alpha-in-padding invariant (atlas-bleed margins) holds.
   const s = await setup({ pivot: 'center' });
-  if (!s) { t.skip('No WebGPU adapter'); return; }
+  if (!s) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const [lit] = await s.renderer.capturePadded(0, 0);
   const { w, h } = s.cam.cellPx;
   const pad = s.cam.paddingPx;
@@ -144,7 +162,10 @@ test('render: feet-baseline grounds the feet at the baseline row', async (t) => 
   // the baseline into the bottom padding — that sub-baseline margin is the footprint
   // landing zone by design; the bleed margins that must stay clear are top/left/right.
   const s = await setup(); // feet-baseline (default)
-  if (!s) { t.skip('No WebGPU adapter'); return; }
+  if (!s) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const [lit] = await s.renderer.capturePadded(0, 0);
   const { w, h } = s.cam.cellPx;
   const pad = s.cam.paddingPx;
@@ -161,7 +182,10 @@ test('render: feet-baseline grounds the feet at the baseline row', async (t) => 
 
 test('render: same-process double render is byte-identical (nondeterminism canary)', async (t) => {
   const s = await setup();
-  if (!s) { t.skip('No WebGPU adapter'); return; }
+  if (!s) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const a = await s.renderer.capturePadded(2, 5);
   const b = await s.renderer.capturePadded(2, 5);
   for (let k = 0; k < a.length; k++) {
@@ -176,7 +200,10 @@ test('render: same-process double render is byte-identical (nondeterminism canar
 test('render: width-100 padded readback matches the per-row reference (strip test)', async (t) => {
   // row = 100*4 = 400 bytes -> padded to 512: exercises both the alignment and the strip
   const s = await setup({ cellPx: { w: 100, h: 128 } });
-  if (!s) { t.skip('No WebGPU adapter'); return; }
+  if (!s) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const padded = await s.renderer.capturePadded(0, 0);
   const rows = await s.renderer.captureRowByRow(0, 0);
   for (let k = 0; k < padded.length; k++) {

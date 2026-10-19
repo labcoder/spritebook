@@ -18,9 +18,9 @@
   ],
   "dependencies": {
     "@gltf-transform/core": "4.4.1",
-    "fast-png": "6.2.0",
     "@spritebook/core": "0.1.0",
     "@spritebook/schema": "0.1.0",
+    "fast-png": "6.2.0",
     "webgpu": "0.6.2"
   }
 }

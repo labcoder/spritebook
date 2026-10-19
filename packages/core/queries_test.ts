@@ -22,7 +22,10 @@ test('core, CLI and artifacts follow the selected bake through undo, never direc
     });
     const manifestPath = workspacePaths(workspace).manifest;
     const bake = JSON.parse(
-      await fs.readFile(new URL('../schema/fixtures/valid/bake-manifest.json', import.meta.url), 'utf8'),
+      await fs.readFile(
+        new URL('../schema/fixtures/valid/bake-manifest.json', import.meta.url),
+        'utf8',
+      ),
     );
     Object.assign(bake, { schemaVersion: SCHEMA_VERSION, characterId: 'hero' });
     bake.inputs.characterId = 'hero';

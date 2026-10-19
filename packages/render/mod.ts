@@ -95,7 +95,11 @@ export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent
       t: 'error',
       jobId,
       at: at(),
-      code: lost ? 'device-lost' : (err as { code?: string })?.code === 'native-addon-load' ? 'native-addon-load' : 'render-failed',
+      code: lost
+        ? 'device-lost'
+        : (err as { code?: string })?.code === 'native-addon-load'
+        ? 'native-addon-load'
+        : 'render-failed',
       message,
       retryable: lost,
     };

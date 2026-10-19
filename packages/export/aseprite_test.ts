@@ -213,7 +213,8 @@ test('exportAseprite refuses an empty manifest instead of writing an empty dir',
       const out = `${parent}/${c.name}`;
       await assertRejects(() => exportAseprite(manifest, BAKE, out, { fps: 8 }), Error, c.msg);
       await rejects(
-        () => fs.stat(out), { code: 'ENOENT' },
+        () => fs.stat(out),
+        { code: 'ENOENT' },
         `${c.name}: a refusal must not leave an output directory behind`,
       );
     }

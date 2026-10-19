@@ -29,7 +29,8 @@ test('full-journey keyboard-only walkthrough: zero findings', async (t) => {
   // a fresh root per run - the journey creates a character and must not
   // collide with an earlier one
   const root = await fs.mkdtemp(join(tmpdir(), 'sb-walkthrough-'));
-  const image = new URL('../../tests/fixtures/bulma-front.png', import.meta.url).pathname
+  const image = new URL('../../tests/fixtures/bulma-front.png', import.meta.url)
+    .pathname
     .replace(/^\/([A-Za-z]:)/, '$1').replaceAll('/', '\\');
 
   const cdp = await Cdp.connect(Number(port));

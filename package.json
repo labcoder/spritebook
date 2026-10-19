@@ -3,34 +3,51 @@
   "version": "0.9.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=24.22.0 <25"
-  },
   "workspaces": [
     "packages/*",
     "apps/studio"
   ],
   "scripts": {
     "build": "npm run build:host && node tools/setup-gpu.mjs && tsc -b && node tools/copy-assets.mjs",
-    "check": "tsc -p tsconfig.check.json",
+    "check": "tsc -p tsconfig.check.json && npm run check:web -w spritebook-studio && npm run check:tests -w spritebook-studio",
     "test": "node tools/test.mjs",
     "test:schema": "node --test packages/schema/*_test.ts",
-    "lint": "biome lint .",
-    "fmt": "biome format --write .",
-    "fmt:check": "biome format .",
+    "lint": "biome lint . --error-on-warnings",
+    "fmt": "dprint fmt",
+    "fmt:check": "dprint check",
     "hooks:install": "git config core.hooksPath .githooks",
     "build:host": "node tools/build-host.mjs",
     "pretest": "npm run build",
-    "cli": "node packages/cli/dist/entry.js"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.5.15",
-    "@std/assert": "npm:@jsr/std__assert@1.0.19",
-    "@types/node": "24.19.2",
-    "typescript": "7.0.2",
-    "@webgpu/types": "0.1.74"
+    "cli": "node packages/cli/dist/entry.js",
+    "test:gpu": "node tools/test.mjs --gpu packages/render packages/style",
+    "test:real": "node tools/test.mjs --real packages/cli/real_backends_test.ts",
+    "test:watch": "node --import ./tools/testing/setup.ts --test --watch --test-concurrency=1 \"packages/*/*_test.ts\" \"apps/studio/*_test.ts\" \"tools/ci/*_test.ts\" \"tools/testing/*_test.ts\" \"tools/proofs/*_test.ts\"",
+    "coverage": "node tools/test.mjs --coverage",
+    "goldens:update": "node tools/run.mjs packages/style/fixtures/_gen-goldens.ts",
+    "test:godot": "node tools/test.mjs packages/export/godot_smoke_test.ts",
+    "test:aseprite": "node tools/test.mjs packages/export/aseprite_smoke_test.ts",
+    "test:unity": "node tools/test.mjs packages/export/unity_smoke_test.ts",
+    "test:phaser": "node tools/test.mjs packages/export/phaser_smoke_test.ts",
+    "test:walkthrough": "node tools/test.mjs tools/proofs/walkthrough_test.ts",
+    "build:watch": "tsc -b --watch",
+    "precoverage": "npm run build"
   },
   "overrides": {
     "@jsr/std__internal": "1.0.12"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@dprint/json": "0.25.2",
+    "@dprint/markdown": "0.26.0",
+    "@dprint/typescript": "0.96.1",
+    "@std/assert": "npm:@jsr/std__assert@1.0.19",
+    "@types/node": "24.19.2",
+    "@webgpu/types": "0.1.74",
+    "dprint": "0.64.0",
+    "rolldown": "1.1.5",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24.22.0 <25"
   }
 }

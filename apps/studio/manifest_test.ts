@@ -16,7 +16,10 @@ import { toCard } from './src/manifest.ts';
 // day it became the maintainer's playground - pinning against it meant every
 // UX session broke the suite.
 test('the real p3-exit manifest projects with every card field', async () => {
-  const raw = await fs.readFile(new URL('./fixtures/p3-exit-character.json', import.meta.url), 'utf8');
+  const raw = await fs.readFile(
+    new URL('./fixtures/p3-exit-character.json', import.meta.url),
+    'utf8',
+  );
   const c = toCard('bulma-fixed', JSON.parse(raw));
   assertEquals(c.id, 'bulma-fixed');
   assertEquals(

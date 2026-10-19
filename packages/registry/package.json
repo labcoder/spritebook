@@ -13,7 +13,7 @@
     "dist"
   ],
   "dependencies": {
-    "@spritebook/schema": "0.1.0",
-    "@spritebook/core": "0.1.0"
+    "@spritebook/core": "0.1.0",
+    "@spritebook/schema": "0.1.0"
   }
 }

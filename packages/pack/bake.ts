@@ -544,7 +544,9 @@ async function recomputeClips(
         const f = String(id.frame).padStart(3, '0');
         cells.get('lit')!.set(
           fik,
-          new Uint8Array(await fs.readFile(`${styleResult.styledDir}/${id.clipId}/d${d}_f${f}.png`)),
+          new Uint8Array(
+            await fs.readFile(`${styleResult.styledDir}/${id.clipId}/d${d}_f${f}.png`),
+          ),
         );
         const src = srcs.find((x) => x.clipId === id.clipId)!;
         const aov = await readAov(src.framesDir, id.direction, id.frame);
@@ -623,7 +625,10 @@ async function recompute(
       const fik = frameIdKey(id);
       const d = String(id.direction).padStart(2, '0');
       const f = String(id.frame).padStart(3, '0');
-      cells.get('lit')!.set(fik, new Uint8Array(await fs.readFile(`${styleResult.styledDir}/d${d}_f${f}.png`)));
+      cells.get('lit')!.set(
+        fik,
+        new Uint8Array(await fs.readFile(`${styleResult.styledDir}/d${d}_f${f}.png`)),
+      );
       const aov = await readAov(src.framesDir, id.direction, id.frame);
       const one = aov1x(aov, s);
       cells.get('albedo')!.set(fik, encodePagePng(one.albedo, 'rgba8'));

@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The feet-baseline pivot question, with numbers for all three options.
  *
@@ -22,12 +25,15 @@
  *
  * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/pivotoptions.ts
  */
-import { decode as decodePng } from 'npm:fast-png@6.2.0';
-import { runCli } from '../../packages/cli/mod.ts';
-import { BakeManifestSchema, parseWith } from '../../packages/schema/mod.ts';
-import { STANDARD_30 } from '../../packages/core/presets.ts';
+import { decode as decodePng } from 'fast-png';
+import { runCli } from '../../packages/cli/dist/mod.js';
+import { BakeManifestSchema, parseWith } from '../../packages/schema/dist/mod.js';
+import { STANDARD_30 } from '../../packages/core/dist/presets.js';
 
-const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const REPO = new URL('../../', import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const BODY = `${REPO}packages/rig/bodies/ubc-male`;
 const CLIPS = 'idle-loop:8,walk-loop:8,jog-fwd-loop:8,sprint-loop:6,punch-jab:6,death01:10';
@@ -43,11 +49,17 @@ const say = (s: string) => {
 };
 function io() {
   const out: string[] = [];
-  return { stdout: (s: string) => out.push(s), stderr: (s: string) => out.push(s), out };
+  return {
+    stdout: (s: string) => out.push(s),
+    stderr: (s: string) => out.push(s),
+    out,
+  };
 }
 async function cli(args: string[], label: string) {
   const o = io();
-  if (await runCli(args, o) !== 0) throw new Error(`${label}: ${o.out.slice(-10).join('\n')}`);
+  if (await runCli(args, o) !== 0) {
+    throw new Error(`${label}: ${o.out.slice(-10).join('\n')}`);
+  }
 }
 
 interface Row {
@@ -57,7 +69,7 @@ interface Row {
   below: number;
 }
 
-const tmp = await Deno.makeTempDir();
+const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
 const ws = `${tmp}/c`;
 try {
   await cli([
@@ -97,11 +109,13 @@ try {
     String(PROBE_PAD),
   ], 'probe bake');
 
-  const character = JSON.parse(await Deno.readTextFile(`${ws}/character.json`));
+  const character = JSON.parse(
+    await fs.readFile(`${ws}/character.json`, 'utf8'),
+  );
   const bakeDir = `${ws}/bakes/bake-${character.lastBakeId}`;
   const bake = parseWith(
     BakeManifestSchema,
-    JSON.parse(await Deno.readTextFile(`${bakeDir}/manifest.json`)),
+    JSON.parse(await fs.readFile(`${bakeDir}/manifest.json`, 'utf8')),
     'BakeManifest',
   );
   say('# The feet-baseline pivot question, measured');
@@ -111,14 +125,17 @@ try {
   );
   say(
     `  probe flags: ${
-      bake.flags.map((f) => f.code).join(', ') || 'none — nothing was cut, so ' +
+      bake.flags.map((f) => f.code).join(', ') ||
+      'none — nothing was cut, so ' +
         'every `below` below is the TRUE extent'
     }`,
   );
 
   const pages = new Map<number, { data: Uint8Array; width: number }>();
   for (const page of bake.atlases.filter((a) => a.pass === 'lit')) {
-    const png = decodePng(await Deno.readFile(`${bakeDir}/${page.png}`));
+    const png = decodePng(
+      new Uint8Array(await fs.readFile(`${bakeDir}/${page.png}`)),
+    );
     pages.set(page.pageIndex, {
       data: new Uint8Array(png.data as unknown as ArrayLike<number>),
       width: png.width,
@@ -130,7 +147,11 @@ try {
     let last = -1;
     for (let y = 0; y < f.atlas.h; y++) {
       for (let x = 0; x < f.atlas.w; x++) {
-        if (page.data[((f.atlas.y + y) * page.width + (f.atlas.x + x)) * 4 + 3]! !== 0) {
+        if (
+          page
+            .data[((f.atlas.y + y) * page.width + (f.atlas.x + x)) * 4 + 3]! !==
+            0
+        ) {
           last = y;
           break;
         }
@@ -154,7 +175,9 @@ try {
   say('\n## the ground band, per clip (px below the pivot row)');
   say('  clip              min   max  spread');
   const byClip = new Map<string, number[]>();
-  for (const r of rows) byClip.set(r.clipId, [...(byClip.get(r.clipId) ?? []), r.below]);
+  for (const r of rows) {
+    byClip.set(r.clipId, [...(byClip.get(r.clipId) ?? []), r.below]);
+  }
   for (const [clipId, list] of [...byClip].sort()) {
     const lo = Math.min(...list), hi = Math.max(...list);
     say(
@@ -173,7 +196,9 @@ try {
   const areaAt = (pad: number) => (cell.w - 2 * pad) * (cell.h - 2 * pad);
   const now = areaAt(STANDARD_30.paddingPx);
   const then = areaAt(needPad);
-  say('\n## (a) keep the bounds-centre anchor, raise paddingPx until nothing clips');
+  say(
+    '\n## (a) keep the bounds-centre anchor, raise paddingPx until nothing clips',
+  );
   say(
     `  padding needed: ${needPad} px (max band ${max} + 1), against today's ${STANDARD_30.paddingPx}`,
   );
@@ -184,7 +209,9 @@ try {
       `(${((1 - then / now) * 100).toFixed(0)}% of the drawable cell given up)`,
   );
   if (cell.w - 2 * needPad <= 0) {
-    say('  which is NEGATIVE — the padding needed exceeds the cell. (a) cannot work at this cell.');
+    say(
+      '  which is NEGATIVE — the padding needed exceeds the cell. (a) cannot work at this cell.',
+    );
   } else {
     const char = 1.7 * PPM;
     say(
@@ -199,9 +226,13 @@ try {
   say(
     '  Anchoring there shifts the pivot down by exactly `below` on that frame, so the',
   );
-  say('  variation in `below` IS how far the pivot moves in world terms frame to frame.');
+  say(
+    '  variation in `below` IS how far the pivot moves in world terms frame to frame.',
+  );
   const perDir = new Map<number, number[]>();
-  for (const r of rows) perDir.set(r.direction, [...(perDir.get(r.direction) ?? []), r.below]);
+  for (const r of rows) {
+    perDir.set(r.direction, [...(perDir.get(r.direction) ?? []), r.below]);
+  }
   const dirSpreads = [...perDir.values()].map((l) => Math.max(...l) - Math.min(...l));
   say(`  jitter WITHIN a direction, worst: ${Math.max(...dirSpreads)} px`);
   say(`  jitter across the whole roster:   ${max - min} px`);
@@ -223,7 +254,9 @@ try {
   );
 
   // ------------------------------------------------------------- option (c)
-  say('\n## (c) keep the anchor; fire the bottom check only on GENUINE clipping');
+  say(
+    '\n## (c) keep the anchor; fire the bottom check only on GENUINE clipping',
+  );
   say('  padding  rows below  touching   genuinely cut   frames flagged today');
   for (const pad of [6, 8, 10, 12, 16, 20, 24, needPad]) {
     const avail = pad - 1;
@@ -247,12 +280,12 @@ try {
       `touch the last row.`,
   );
 } finally {
-  await Deno.writeTextFile(
+  await fs.writeFile(
     `${REPO}docs/internal/proofs/pivotoptions.md`,
     '# The feet-baseline pivot question (P4-T3 follow-up)\n\nCaptured by ' +
       '`tools/proofs/pivotoptions.ts`; regenerate rather than hand-editing.\n\n```\n' +
       lines.join('\n') + '\n```\n',
   );
   console.log('\nrecorded to docs/internal/proofs/pivotoptions.md');
-  await Deno.remove(tmp, { recursive: true }).catch(() => {});
+  await fs.rm(tmp, { recursive: true }).catch(() => {});
 }

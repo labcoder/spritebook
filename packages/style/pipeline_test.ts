@@ -118,7 +118,8 @@ test('outline-exceeds-padding QA flag fires only when width > padding', async ()
 });
 
 test('styleFromAovs is deterministic (byte-identical sprites + metrics)', async () => {
-  const a = await fs.mkdtemp(join(tmpdir(), 'spritebook-')), b = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+  const a = await fs.mkdtemp(join(tmpdir(), 'spritebook-')),
+    b = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const ra = await styleFromAovs(SRC, CAM, CEL_2, a);
     const rb = await styleFromAovs(SRC, CAM, CEL_2, b);

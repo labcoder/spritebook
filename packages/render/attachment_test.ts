@@ -241,7 +241,10 @@ function handAt(
 }
 
 test('ACCEPTANCE: a socketed sword bakes IN THE HAND, in every direction', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const dir = await fs.mkdtemp(join(tmpdir(), 'sb-attach-'));
   try {
     const armed = `${dir}/armed.glb`;
@@ -307,7 +310,10 @@ test('ACCEPTANCE: a socketed sword bakes IN THE HAND, in every direction', async
 });
 
 test('ACCEPTANCE: the sword STAYS in the hand while the clip swings it', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const dir = await fs.mkdtemp(join(tmpdir(), 'sb-attach-clip-'));
   try {
     const armed = `${dir}/armed.glb`;

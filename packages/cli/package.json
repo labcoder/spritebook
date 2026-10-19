@@ -9,11 +9,13 @@
       "default": "./dist/mod.js"
     }
   },
+  "bin": {
+    "spritebook": "./dist/entry.js"
+  },
   "files": [
     "dist"
   ],
   "dependencies": {
-    "fast-png": "6.2.0",
     "@gltf-transform/core": "4.4.1",
     "@spritebook/anim": "0.1.0",
     "@spritebook/core": "0.1.0",
@@ -24,9 +26,7 @@
     "@spritebook/render": "0.1.0",
     "@spritebook/rig": "0.1.0",
     "@spritebook/schema": "0.1.0",
-    "@spritebook/style": "0.1.0"
-  },
-  "bin": {
-    "spritebook": "./dist/entry.js"
+    "@spritebook/style": "0.1.0",
+    "fast-png": "6.2.0"
   }
 }

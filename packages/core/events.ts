@@ -1,4 +1,4 @@
-import { openSync, writeSync, closeSync } from 'node:fs';
+import { closeSync, openSync, writeSync } from 'node:fs';
 /**
  * The NDJSON emitter — one JobEvent per line, matching @spritebook/schema
  * EXACTLY (every emitted event is validated; every line is canonical JSON).

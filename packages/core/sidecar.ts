@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessByStdio } from 'node:child_process';
+import { type ChildProcessByStdio, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { Readable } from 'node:stream';
 
@@ -253,18 +253,22 @@ async function readListeningLine(
 export async function startSidecar(cfg: SidecarConfig): Promise<SidecarHandle> {
   const token = mintToken();
   const proc = spawn(cfg.uvBin ?? 'uv', [
-      'run',
-      '--project',
-      cfg.sidecarDir,
-      'spritebook-sidecar',
-      '--port',
-      String(cfg.port ?? 0),
-    ], {
-      env: { ...process.env, [SIDECAR_TOKEN_ENV]: token },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    });
-  const exited = once(proc, 'close').then(([code, signal]) => ({ code: code ?? -1, signal, success: code === 0 }));
+    'run',
+    '--project',
+    cfg.sidecarDir,
+    'spritebook-sidecar',
+    '--port',
+    String(cfg.port ?? 0),
+  ], {
+    env: { ...process.env, [SIDECAR_TOKEN_ENV]: token },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  const exited = once(proc, 'close').then(([code, signal]) => ({
+    code: code ?? -1,
+    signal,
+    success: code === 0,
+  }));
   void exited.catch(() => {});
   await once(proc, 'spawn');
 
@@ -272,7 +276,8 @@ export async function startSidecar(cfg: SidecarConfig): Promise<SidecarHandle> {
   const stderrLines: string[] = [];
   const stderrTail = () => stderrLines.join('\n');
   (async () => {
-    const reader = (Readable.toWeb(proc.stderr) as ReadableStream<Uint8Array<ArrayBuffer>>).pipeThrough(new TextDecoderStream()).getReader();
+    const reader = (Readable.toWeb(proc.stderr) as ReadableStream<Uint8Array<ArrayBuffer>>)
+      .pipeThrough(new TextDecoderStream()).getReader();
     let carry = '';
     try {
       while (true) {

@@ -140,13 +140,17 @@ test('clone refuses to reuse the id or overwrite a character', async () => {
   const src = await character();
   const dest = `${src}-clone`;
   try {
-    await assertRejects(() => cloneCharacter(src, dest, { id: 'knight', now: NOW }),
+    await assertRejects(
+      () => cloneCharacter(src, dest, { id: 'knight', now: NOW }),
       Error,
-      'NEW id',);
+      'NEW id',
+    );
     await cloneCharacter(src, dest, { id: 'knight-two', now: NOW });
-    await assertRejects(() => cloneCharacter(src, dest, { id: 'knight-three', now: NOW }),
+    await assertRejects(
+      () => cloneCharacter(src, dest, { id: 'knight-three', now: NOW }),
       Error,
-      'never overwrites',);
+      'never overwrites',
+    );
   } finally {
     await fs.rm(src, { recursive: true });
     await fs.rm(dest, { recursive: true }).catch(() => {});
@@ -234,9 +238,11 @@ test('clone cannot overwrite a destination whose creation intent is committed', 
       JSON.stringify({ version: 1, doc, patches: [], cursor: 0 }),
     );
     await fs.rm(path);
-    await assertRejects(() => cloneCharacter(source, dest, { id: 'copy' }),
+    await assertRejects(
+      () => cloneCharacter(source, dest, { id: 'copy' }),
       Error,
-      'already exists',);
+      'already exists',
+    );
     assertEquals(await fs.readFile(`${dest}/payload.txt`, 'utf8'), 'accepted');
     assertEquals((await readWorkspace(dest)).displayName, 'Accepted destination');
   } finally {
@@ -261,9 +267,11 @@ test('clone refuses a nested destination, including a dot-prefixed child', async
   const source = await character();
   try {
     for (const child of ['child', '..child']) {
-      await assertRejects(() => cloneCharacter(source, `${source}/${child}`, { id: 'copy' }),
+      await assertRejects(
+        () => cloneCharacter(source, `${source}/${child}`, { id: 'copy' }),
         Error,
-        'outside the source',);
+        'outside the source',
+      );
     }
   } finally {
     await fs.rm(source, { recursive: true });

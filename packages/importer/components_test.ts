@@ -5,7 +5,11 @@ import { test } from 'node:test';
  * seams and specks) and the true positive (a real second body).
  */
 import { assert, assertEquals } from '@std/assert';
-import { connectedComponents, disconnectedWarning, SIGNIFICANT_FRACTION } from './dist/components.js';
+import {
+  connectedComponents,
+  disconnectedWarning,
+  SIGNIFICANT_FRACTION,
+} from './dist/components.js';
 
 /** A quad at x-offset `dx`, as 4 verts + 2 triangles appended to the buffers. */
 function quad(pos: number[], idx: number[], dx: number, copies = 1): void {

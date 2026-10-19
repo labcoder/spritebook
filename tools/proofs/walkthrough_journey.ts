@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Run the full-journey keyboard-only walkthrough against the running desktop
  * app and record the transcript to docs/internal/proofs/walkthrough.md.
@@ -15,9 +16,11 @@ import { runJourney } from './journey.ts';
 
 const ROOT = 'C:\\dev\\Mighty\\tools\\spritebook\\.proof-ux\\projects';
 const IMAGE = 'C:\\dev\\Mighty\\tools\\spritebook\\tests\\fixtures\\bulma-front.png';
-const NAME = Deno.args[0] ?? 'kb-hero';
+const NAME = process.argv.slice(2)[0] ?? 'kb-hero';
 
-const cdp = await Cdp.connect(Number(Deno.env.get('SPRITEBOOK_CDP_PORT') ?? '9223'));
+const cdp = await Cdp.connect(
+  Number(process.env['SPRITEBOOK_CDP_PORT'] ?? '9223'),
+);
 const { trace, findings } = await runJourney(cdp, {
   root: ROOT,
   image: IMAGE,
@@ -25,13 +28,14 @@ const { trace, findings } = await runJourney(cdp, {
   log: (s) => console.log(s),
 });
 
-await Deno.writeTextFile(
+await fs.writeFile(
   'docs/internal/proofs/walkthrough.md',
   `# Full-journey keyboard-only walkthrough\n\nCaptured ${
     new Date().toISOString()
   } by \`tools/proofs/walkthrough_journey.ts\` against the running desktop app; ` +
-    'regenerate rather than hand-editing.\n\n```\n' + trace.join('\n') + '\n```\n',
+    'regenerate rather than hand-editing.\n\n```\n' + trace.join('\n') +
+    '\n```\n',
 );
 console.log('\nrecorded to docs/internal/proofs/walkthrough.md');
 cdp.close();
-Deno.exit(findings.length === 0 ? 0 : 1);
+process.exit(findings.length === 0 ? 0 : 1);

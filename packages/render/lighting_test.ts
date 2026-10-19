@@ -103,7 +103,10 @@ function ndlFacingCamera(): number {
 }
 
 test('the lit AOV is exactly albedo * (ambient + (1-ambient)*ndl), sRGB-encoded once', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const ndl = ndlFacingCamera();
   const shadeFactor = AMBIENT + (1 - AMBIENT) * ndl;
 
@@ -144,7 +147,10 @@ test('what the rig costs a camera-facing surface, from the rig itself', async (t
   // DERIVED from AMBIENT rather than pinned at a measured percentage, so
   // changing the rig moves this test's expectation with it instead of failing
   // it — the loss was 26% at the 0.12 that shipped first and is 19% at 0.30.
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const got = await shade([1, 1, 1, 1]);
   assert(got);
 

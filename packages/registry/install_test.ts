@@ -129,7 +129,11 @@ test('install: a tampered download is refused - staging swept, nothing lands', a
     assertStringIncludes(err.message, 'refusing to install');
     assert(!events.some((e) => e.t === 'done'), 'no done after refusal');
 
-    assertEquals(await fs.readdir(rig.root, { withFileTypes: true }), [], 'staging gone, no model dir');
+    assertEquals(
+      await fs.readdir(rig.root, { withFileTypes: true }),
+      [],
+      'staging gone, no model dir',
+    );
   } finally {
     await fs.rm(rig.tmp, { recursive: true });
   }
@@ -264,7 +268,9 @@ test('install: VRAM warns (below-min and unknown) but NEVER blocks', async () =>
   const below = await installRig({}, { minVramGb: 10 });
   try {
     const events = await collect(
-      install(below, { detected: { platform: 'windows-cuda', vramGb: 8 , virtualization: { virtualized: false } } }),
+      install(below, {
+        detected: { platform: 'windows-cuda', vramGb: 8, virtualization: { virtualized: false } },
+      }),
     );
     const [warn] = ofType(events, 'warn');
     assertEquals(warn.code, 'vram-below-min');
@@ -280,7 +286,13 @@ test('install: VRAM warns (below-min and unknown) but NEVER blocks', async () =>
   const unknown = await installRig({}, { minVramGb: 10 });
   try {
     const events = await collect(
-      install(unknown, { detected: { platform: 'windows-cuda', vramGb: null , virtualization: { virtualized: false } } }),
+      install(unknown, {
+        detected: {
+          platform: 'windows-cuda',
+          vramGb: null,
+          virtualization: { virtualized: false },
+        },
+      }),
     );
     assertEquals(ofType(events, 'warn')[0].code, 'vram-unknown');
     assertEquals(events.at(-1)!.t, 'done');

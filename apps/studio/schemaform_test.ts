@@ -11,7 +11,10 @@ import { adjustArg, resolveOpDefaults, schemaFields } from './src/schemaform.ts'
 
 test('trellis2 gen3d: real schema -> renderable fields with shipped defaults', async () => {
   const catalog = JSON.parse(
-    await fs.readFile(new URL('../../packages/registry/catalog/models.json', import.meta.url), 'utf8'),
+    await fs.readFile(
+      new URL('../../packages/registry/catalog/models.json', import.meta.url),
+      'utf8',
+    ),
   );
   const t2 = catalog.models.find((m: { id: string }) => m.id === 'trellis2-4b');
   const v = t2.versions[0];
@@ -46,7 +49,10 @@ test('the gen form never offers a knob only retexture accepts', async () => {
   // two operations, so `resolution` was an editable option on a GENERATE
   // screen — and the CLI then refused it. The form asks for gen3d's set now.
   const catalog = JSON.parse(
-    await fs.readFile(new URL('../../packages/registry/catalog/models.json', import.meta.url), 'utf8'),
+    await fs.readFile(
+      new URL('../../packages/registry/catalog/models.json', import.meta.url),
+      'utf8',
+    ),
   );
   const v = catalog.models.find((m: { id: string }) => m.id === 'trellis2-4b').versions[0];
   const resolved = resolveOpDefaults(v.defaults, v.operationDefaults, 'gen3d');

@@ -1,3 +1,5 @@
+import { runProcess } from '../testing/process.ts';
+import { promises as fs } from 'node:fs';
 /**
  * The soak sampler (P4-T3): does a long unattended run end with flat memory?
  *
@@ -33,8 +35,10 @@
  *   deno run --allow-all tools/proofs/soak.ts --report soak.ndjson
  */
 const arg = (name: string, fallback = ''): string => {
-  const i = Deno.args.indexOf(`--${name}`);
-  return i >= 0 && Deno.args[i + 1] !== undefined ? Deno.args[i + 1]! : fallback;
+  const i = process.argv.slice(2).indexOf(`--${name}`);
+  return i >= 0 && process.argv.slice(2)[i + 1] !== undefined
+    ? process.argv.slice(2)[i + 1]!
+    : fallback;
 };
 
 interface Sample {
@@ -51,11 +55,7 @@ interface Sample {
 
 async function run(cmd: string[]): Promise<string | null> {
   try {
-    const out = await new Deno.Command(cmd[0]!, {
-      args: cmd.slice(1),
-      stdout: 'piped',
-      stderr: 'null',
-    }).output();
+    const out = await runProcess(cmd[0]!, cmd.slice(1));
     if (!out.success) return null;
     return new TextDecoder().decode(out.stdout);
   } catch {
@@ -72,8 +72,10 @@ async function run(cmd: string[]): Promise<string | null> {
 async function sampleProcesses(
   name: string,
   drive: string,
-): Promise<{ rssMb: number; handles: number; procs: number; freeMb: number | null }> {
-  const isWindows = Deno.build.os === 'windows';
+): Promise<
+  { rssMb: number; handles: number; procs: number; freeMb: number | null }
+> {
+  const isWindows = (process.platform === 'win32' ? 'windows' : process.platform) === 'windows';
   if (isWindows) {
     // free space rides the SAME PowerShell call as the process table — one
     // subprocess per sample, not two, because the sampler must stay cheap
@@ -89,7 +91,8 @@ async function sampleProcesses(
       `(($p | Measure-Object HandleCount -Sum).Sum), @($p).Count, $d } ` +
       `else { '0 0 0 {0}' -f $d }`,
     ]);
-    const [ws, handles, procs, free] = (ps ?? '0 0 0 0').trim().split(/\s+/).map(Number);
+    const [ws, handles, procs, free] = (ps ?? '0 0 0 0').trim().split(/\s+/)
+      .map(Number);
     return {
       rssMb: Math.round((ws ?? 0) / 1024 / 1024),
       handles: handles ?? 0,
@@ -130,7 +133,10 @@ async function sampleVramMb(): Promise<number | null> {
 }
 
 /** Least-squares slope of y over elapsed hours — "flat" is |slope| near zero. */
-function slopePerHour(samples: Sample[], pick: (s: Sample) => number | null): number | null {
+function slopePerHour(
+  samples: Sample[],
+  pick: (s: Sample) => number | null,
+): number | null {
   const pts = samples
     .map((s) => [s.elapsedS / 3600, pick(s)] as const)
     .filter((p): p is readonly [number, number] => p[1] !== null);
@@ -156,7 +162,8 @@ function report(samples: Sample[]): string[] {
   lines.push(
     `soak: ${samples.length} samples over ${(last.elapsedS - first.elapsedS).toFixed(0)}s ` +
       `(${hours.toFixed(2)} h), every ~${
-        ((last.elapsedS - first.elapsedS) / Math.max(1, samples.length - 1)).toFixed(1)
+        ((last.elapsedS - first.elapsedS) / Math.max(1, samples.length - 1))
+          .toFixed(1)
       }s`,
   );
   const series: [string, (s: Sample) => number | null, string][] = [
@@ -216,14 +223,22 @@ interface Phase {
  */
 function parsePhases(log: string, offsetS: number): Phase[] {
   const at = (min: number) => min * 60 + offsetS;
-  const pivots = [...log.matchAll(/^## pivot (\d+)\/\d+ .*?\((-?[\d.]+) min in\)/gm)]
+  const pivots = [
+    ...log.matchAll(/^## pivot (\d+)\/\d+ .*?\((-?[\d.]+) min in\)/gm),
+  ]
     .map((m) => ({ n: Number(m[1]), startMin: Number(m[2]) }));
   const coldDurS = Number(/^cold batch ([\d.]+)s/m.exec(log)?.[1] ?? NaN);
   const phases: Phase[] = [];
   if (pivots.length > 0 && Number.isFinite(coldDurS)) {
     const coldStartMin = pivots[0]!.startMin - coldDurS / 60;
-    if (coldStartMin > 0) phases.push({ name: 'build', fromS: offsetS, toS: at(coldStartMin) });
-    phases.push({ name: 'cold bake', fromS: at(coldStartMin), toS: at(pivots[0]!.startMin) });
+    if (coldStartMin > 0) {
+      phases.push({ name: 'build', fromS: offsetS, toS: at(coldStartMin) });
+    }
+    phases.push({
+      name: 'cold bake',
+      fromS: at(coldStartMin),
+      toS: at(pivots[0]!.startMin),
+    });
   }
   for (let i = 0; i < pivots.length; i++) {
     const next = pivots[i + 1];
@@ -253,8 +268,15 @@ function parsePhases(log: string, offsetS: number): Phase[] {
  */
 function phaseReport(all: Sample[], phases: Phase[]): string[] {
   const lines: string[] = [];
-  lines.push('  phase        window (h)      samples   RSS floor/peak    handles floor/peak');
-  const floors: { name: string; rss: number; handles: number; samples: number }[] = [];
+  lines.push(
+    '  phase        window (h)      samples   RSS floor/peak    handles floor/peak',
+  );
+  const floors: {
+    name: string;
+    rss: number;
+    handles: number;
+    samples: number;
+  }[] = [];
   for (const p of phases) {
     const inPhase = all.filter((s) => s.elapsedS >= p.fromS && s.elapsedS < p.toS);
     if (inPhase.length === 0) continue;
@@ -271,7 +293,12 @@ function phaseReport(all: Sample[], phases: Phase[]): string[] {
         `${String(hLo).padStart(6)}/${String(hHi).padEnd(6)}`,
     );
     if (p.name.startsWith('pivot')) {
-      floors.push({ name: p.name, rss: lo, handles: hLo, samples: inPhase.length });
+      floors.push({
+        name: p.name,
+        rss: lo,
+        handles: hLo,
+        samples: inPhase.length,
+      });
     }
   }
   // A PARTIAL phase has no floor. The minimum of thirteen samples taken while a
@@ -342,7 +369,7 @@ function phaseReport(all: Sample[], phases: Phase[]): string[] {
 }
 
 if (arg('report')) {
-  const text = await Deno.readTextFile(arg('report'));
+  const text = await fs.readFile(arg('report'), 'utf8');
   const all = text.split('\n').filter(Boolean).map((l) => JSON.parse(l) as Sample);
   // `--from` / `--to` (elapsed seconds) window the analysis. That is not
   // cherry-picking as long as the window is stated, and it is necessary when
@@ -367,10 +394,10 @@ if (arg('report')) {
   // copied off the machine, where birth time means nothing.
   const phaseLog = arg('phases');
   if (phaseLog) {
-    const log = await Deno.readTextFile(phaseLog);
+    const log = await fs.readFile(phaseLog, 'utf8');
     let offsetS = Number(arg('phase-offset', 'NaN'));
     if (!Number.isFinite(offsetS)) {
-      const birth = (await Deno.stat(phaseLog)).birthtime;
+      const birth = (await fs.stat(phaseLog)).birthtime;
       offsetS = birth ? birth.getTime() / 1000 - all[0]!.t + all[0]!.elapsedS : 0;
     }
     const phases = parsePhases(log, offsetS);
@@ -388,7 +415,7 @@ if (arg('report')) {
 } else {
   const out = arg('out', 'soak.ndjson');
   const everyS = Number(arg('every', '15'));
-  const name = arg('proc', 'deno');
+  const name = arg('proc', 'node');
   const drive = arg('drive', 'C');
   const untilS = Number(arg('for', '0')); // 0 = until killed
   const started = performance.now();
@@ -397,18 +424,25 @@ if (arg('report')) {
       untilS > 0 ? ` for ${untilS}s` : ' (until killed)'
     }`,
   );
-  const file = await Deno.open(out, { create: true, write: true, append: true });
+  await using file = await fs.open(out, 'a');
   const enc = new TextEncoder();
   const samples: Sample[] = [];
   for (;;) {
     const elapsedS = (performance.now() - started) / 1000;
-    const [proc, vramMb] = await Promise.all([sampleProcesses(name, drive), sampleVramMb()]);
-    const s: Sample = { t: Math.round(Date.now() / 1000), elapsedS, ...proc, vramMb };
+    const [proc, vramMb] = await Promise.all([
+      sampleProcesses(name, drive),
+      sampleVramMb(),
+    ]);
+    const s: Sample = {
+      t: Math.round(Date.now() / 1000),
+      elapsedS,
+      ...proc,
+      vramMb,
+    };
     samples.push(s);
     await file.write(enc.encode(JSON.stringify(s) + '\n'));
     if (untilS > 0 && elapsedS >= untilS) break;
     await new Promise((r) => setTimeout(r, everyS * 1000));
   }
-  file.close();
   for (const line of report(samples)) console.log(line);
 }

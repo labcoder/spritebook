@@ -1,3 +1,5 @@
+import { runProcess } from '../testing/process.ts';
+import { promises as fs } from 'node:fs';
 /** F0-T4: preserve a small legacy workspace, exports and cold/warm measurements.
  * Run from the repo root with Vulkan (Windows/Linux) or Metal (macOS):
  * deno run --allow-read --allow-write --allow-env --allow-ffi --allow-net=127.0.0.1 \
@@ -5,61 +7,66 @@
  *   tools/proofs/migration-baseline.ts .render-bench/f0/control
  * The output directory must not exist. Existing controls are never replaced.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { readWorkspace, setLook } from '../../packages/core/mod.ts';
-import { BakeManifestSchema, canonicalJson } from '../../packages/schema/mod.ts';
-import { PIXEL } from '../../packages/style/mod.ts';
+import { assert, assertEquals } from '@std/assert';
+import { readWorkspace, setLook } from '../../packages/core/dist/mod.js';
+import { BakeManifestSchema, canonicalJson } from '../../packages/schema/dist/mod.js';
+import { PIXEL } from '../../packages/style/dist/mod.js';
 
 const repo = decodeURIComponent(new URL('../../', import.meta.url).pathname)
   .replace(/^\/([A-Za-z]:)/, '$1');
-const out = Deno.args[0] ?? '.render-bench/f0/control';
-await Deno.mkdir(out); // EEXIST protects the original control, including failed runs.
+const out = process.argv.slice(2)[0] ?? '.render-bench/f4/control';
+await fs.mkdir(out); // EEXIST protects the original control, including failed runs.
 const workspace = `${out}/workspace`;
 const models = `${out}/models`;
-const transcript: { args: string[]; code: number; stdout: string[]; stderr: string[] }[] = [];
+const transcript: {
+  args: string[];
+  code: number;
+  stdout: string[];
+  stderr: string[];
+}[] = [];
 
 async function cli(args: string[]) {
   // Match Tauri's process-per-verb execution, including runtime/adapter startup.
-  const result = await new Deno.Command(Deno.execPath(), {
-    args: [
-      'run',
-      '--allow-read',
-      '--allow-write',
-      '--allow-env',
-      '--allow-ffi',
-      '--allow-net=127.0.0.1',
-      '--allow-run=uv,nvidia-smi',
-      `${repo}packages/cli/mod.ts`,
-      ...args,
-      '--json',
-    ],
-    stdout: 'piped',
-    stderr: 'piped',
-  }).output();
+  const result = await runProcess(process.execPath, [
+    `${repo}packages/cli/dist/entry.js`,
+    ...args,
+    '--json',
+  ]);
   const lines = (bytes: Uint8Array) =>
     new TextDecoder().decode(bytes).split(/\r?\n/).filter(Boolean);
-  const stdout = lines(result.stdout), stderr = lines(result.stderr), code = result.code;
+  const stdout = lines(result.stdout),
+    stderr = lines(result.stderr),
+    code = result.code;
   transcript.push({ args, code, stdout, stderr });
-  await Deno.writeTextFile(`${out}/commands.json`, JSON.stringify(transcript, null, 2) + '\n');
-  assertEquals(code, 0, `${args[0]} failed:\n${[...stdout, ...stderr].join('\n')}`);
+  await fs.writeFile(
+    `${out}/commands.json`,
+    JSON.stringify(transcript, null, 2) + '\n',
+  );
+  assertEquals(
+    code,
+    0,
+    `${args[0]} failed:\n${[...stdout, ...stderr].join('\n')}`,
+  );
   return stdout;
 }
 
 async function hash(path: string) {
-  const bytes = await Deno.readFile(path);
+  const bytes = new Uint8Array(await fs.readFile(path));
   const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
-const git = await new Deno.Command('git', { args: ['rev-parse', 'HEAD'], cwd: repo }).output();
+const git = await runProcess('git', ['rev-parse', 'HEAD'], { cwd: repo });
 assert(git.success, 'recording the exact source commit is required');
 const sourceCommit = new TextDecoder().decode(git.stdout).trim();
 const startedAt = new Date().toISOString();
 const inputs: Record<string, string> = {};
 for (
   const path of [
-    'deno.json',
-    'deno.lock',
+    'package.json',
+    'package-lock.json',
+    '.node-version',
     'tools/proofs/migration-baseline.ts',
     'tests/fixtures/bulma-front.png',
     'packages/style/fixtures/asymmetric.glb',
@@ -105,7 +112,13 @@ await cli([
   `${workspace}/rig`,
 ]);
 await cli(['rig', '--accept', '--workspace', workspace]);
-await cli(['anim', '--enable', 'idle-loop:4,walk-loop:4,punch-jab:4', '--workspace', workspace]);
+await cli([
+  'anim',
+  '--enable',
+  'idle-loop:4,walk-loop:4,punch-jab:4',
+  '--workspace',
+  workspace,
+]);
 await cli([
   'look',
   '--workspace',
@@ -129,7 +142,10 @@ for (const superSample of [1, 2, 4] as const) {
   // The CLI has no supersample flag; use its existing journaled core capability.
   await setLook(workspace, {
     ...look,
-    overrides: { ...look.overrides, temporal: { ...PIXEL.temporal, superSample } },
+    overrides: {
+      ...look.overrides,
+      temporal: { ...PIXEL.temporal, superSample },
+    },
   }, { label: `Baseline ${superSample}x` });
 
   let coldPages: Record<string, string> | undefined;
@@ -149,20 +165,37 @@ for (const superSample of [1, 2, 4] as const) {
     assert(character.lastBakeId, 'bake must record its current output');
     const bakeDir = `${workspace}/bakes/bake-${character.lastBakeId}`;
     const manifest = BakeManifestSchema.parse(
-      JSON.parse(await Deno.readTextFile(`${bakeDir}/manifest.json`)),
+      JSON.parse(await fs.readFile(`${bakeDir}/manifest.json`, 'utf8')),
     );
-    assertEquals(manifest.frames.length, 96, '3 clips x 4 samples x 8 directions');
-    assertEquals(manifest.metrics.cacheHitPct, temperature === 'cold' ? 0 : 100);
+    assertEquals(
+      manifest.frames.length,
+      96,
+      '3 clips x 4 samples x 8 directions',
+    );
+    assertEquals(
+      manifest.metrics.cacheHitPct,
+      temperature === 'cold' ? 0 : 100,
+    );
     const pages: Record<string, string> = {};
-    for (const page of manifest.atlases) pages[page.png] = await hash(`${bakeDir}/${page.png}`);
+    for (const page of manifest.atlases) {
+      pages[page.png] = await hash(`${bakeDir}/${page.png}`);
+    }
     if (temperature === 'cold') {
       coldPages = pages;
       coldBakeId = manifest.bakeId;
     } else {
-      assertEquals(manifest.bakeId, coldBakeId, 'cache must preserve bake identity');
-      assertEquals(pages, coldPages, 'warm cache must preserve every shipped AOV page');
+      assertEquals(
+        manifest.bakeId,
+        coldBakeId,
+        'cache must preserve bake identity',
+      );
+      assertEquals(
+        pages,
+        coldPages,
+        'warm cache must preserve every shipped AOV page',
+      );
     }
-    await Deno.writeTextFile(
+    await fs.writeFile(
       `${out}/s${superSample}-${temperature}-manifest.json`,
       canonicalJson(manifest) + '\n',
     );
@@ -193,14 +226,20 @@ const report = {
   sourceCommit,
   startedAt,
   finishedAt: new Date().toISOString(),
-  runtime: Deno.version,
-  platform: Deno.build,
-  backend: Deno.env.get('DENO_WEBGPU_BACKEND'),
+  runtime: { node: process.versions.node, v8: process.versions.v8 },
+  platform: { os: process.platform, arch: process.arch },
+  backend: process.env.SPRITEBOOK_GPU_BACKEND ??
+    (process.platform === 'darwin' ? 'metal' : 'vulkan'),
   fixtureBackend: 'fixture-gen (not model inference)',
   coldMeaning:
     'empty frame cache per supersample; fresh CLI process per verb; OS/driver caches untouched',
   inputs,
   measurements,
 };
-await Deno.writeTextFile(`${out}/report.json`, JSON.stringify(report, null, 2) + '\n');
-console.log(`Control retained at ${out}; copy it before any migration experiment.`);
+await fs.writeFile(
+  `${out}/report.json`,
+  JSON.stringify(report, null, 2) + '\n',
+);
+console.log(
+  `Control retained at ${out}; copy it before any migration experiment.`,
+);

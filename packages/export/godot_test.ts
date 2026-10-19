@@ -12,7 +12,12 @@ import { assert, assertEquals, assertStringIncludes, assertThrows } from '@std/a
 import { type BakeManifest, BakeManifestSchema, parseWith } from '@spritebook/schema';
 import { DEFAULT_FPS } from '@spritebook/pack/contracts';
 import { exportGodot } from './dist/godot.js';
-import { parseTres, TresParseError, type TresSubResource, validateTres } from './dist/tres-parse.js';
+import {
+  parseTres,
+  TresParseError,
+  type TresSubResource,
+  validateTres,
+} from './dist/tres-parse.js';
 
 const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const FIXTURE_DIR = win(new URL('fixtures/bake-aabbccdd', import.meta.url));

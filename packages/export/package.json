@@ -13,9 +13,9 @@
     "dist"
   ],
   "dependencies": {
-    "fast-png": "6.2.0",
-    "@spritebook/schema": "0.1.0",
     "@spritebook/pack": "0.1.0",
-    "@spritebook/render": "0.1.0"
+    "@spritebook/render": "0.1.0",
+    "@spritebook/schema": "0.1.0",
+    "fast-png": "6.2.0"
   }
 }

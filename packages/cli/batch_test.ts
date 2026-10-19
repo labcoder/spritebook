@@ -232,7 +232,15 @@ test('an empty root plans nothing and succeeds', async () => {
 
 test('a root that is not there fails by name, not by stack trace', async () => {
   const o = io();
-  assertEquals(await runCli(['bake', '--all', '--root', `${await fs.mkdtemp(join(tmpdir(), 'spritebook-'))}/nope`], o), 1);
+  assertEquals(
+    await runCli([
+      'bake',
+      '--all',
+      '--root',
+      `${await fs.mkdtemp(join(tmpdir(), 'spritebook-'))}/nope`,
+    ], o),
+    1,
+  );
   assert(o.all().includes('Cannot read the roster root'), o.all());
 });
 

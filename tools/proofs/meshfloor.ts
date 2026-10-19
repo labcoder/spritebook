@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * How far does the SKINNED MESH actually go below the ground plane?
  *
@@ -24,20 +27,30 @@
  * With no `--body` it builds a Track A fitted character the way the roster
  * proof does, which is the configuration the 100-character run flagged.
  */
-import { NodeIO } from 'npm:@gltf-transform/core@4.4.1';
-import { runCli } from '../../packages/cli/mod.ts';
-import { loadClip, loadSkeletonRestFromFile, UAL_HUMANOID } from '../../packages/anim/profile.ts';
-import { retargetClip } from '../../packages/anim/retarget.ts';
-import { sampleClip } from '../../packages/anim/sample.ts';
-import { loadRiggedAsset, skinAll, skinMatrices } from '../../packages/rig/skin.ts';
+import { NodeIO } from '@gltf-transform/core';
+import { runCli } from '../../packages/cli/dist/mod.js';
+import {
+  loadClip,
+  loadSkeletonRestFromFile,
+  UAL_HUMANOID,
+} from '../../packages/anim/dist/profile.js';
+import { retargetClip } from '../../packages/anim/dist/retarget.js';
+import { sampleClip } from '../../packages/anim/dist/sample.js';
+import { loadRiggedAsset, skinAll, skinMatrices } from '../../packages/rig/dist/skin.js';
 
-const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const REPO = new URL('../../', import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 const PACK = `${REPO}packages/anim/packs/ual`;
 const arg = (n: string, d = '') => {
-  const i = Deno.args.indexOf(`--${n}`);
-  return i >= 0 && Deno.args[i + 1] !== undefined ? Deno.args[i + 1]! : d;
+  const i = process.argv.slice(2).indexOf(`--${n}`);
+  return i >= 0 && process.argv.slice(2)[i + 1] !== undefined ? process.argv.slice(2)[i + 1]! : d;
 };
-const CLIPS = arg('clips', 'idle-loop,walk-loop,jog-fwd-loop,sprint-loop,punch-jab,death01')
+const CLIPS = arg(
+  'clips',
+  'idle-loop,walk-loop,jog-fwd-loop,sprint-loop,punch-jab,death01',
+)
   .split(',');
 const PPM = 32;
 
@@ -49,11 +62,17 @@ const say = (s: string) => {
 
 function io() {
   const out: string[] = [];
-  return { stdout: (s: string) => out.push(s), stderr: (s: string) => out.push(s), out };
+  return {
+    stdout: (s: string) => out.push(s),
+    stderr: (s: string) => out.push(s),
+    out,
+  };
 }
 async function cli(args: string[], label: string) {
   const o = io();
-  if (await runCli(args, o) !== 0) throw new Error(`${label}: ${o.out.slice(-8).join('\n')}`);
+  if (await runCli(args, o) !== 0) {
+    throw new Error(`${label}: ${o.out.slice(-8).join('\n')}`);
+  }
 }
 
 /** column-major 4x4 multiply, into `o` */
@@ -97,7 +116,7 @@ async function fittedBody(into: string): Promise<string> {
   return `${ws}/canonical/model.glb`;
 }
 
-const tmp = await Deno.makeTempDir();
+const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
 try {
   const body = arg('body') || await fittedBody(tmp);
   const asset = await loadRiggedAsset(body);
@@ -118,17 +137,26 @@ try {
         );
       }
     }
-    const skinned = skinAll(asset, skinMatrices(worlds, asset.inverseBind, asset.jointCount));
+    const skinned = skinAll(
+      asset,
+      skinMatrices(worlds, asset.inverseBind, asset.jointCount),
+    );
     let mn = Infinity;
-    for (let v = 0; v < asset.vertexCount; v++) mn = Math.min(mn, skinned[v * 3 + 1]!);
+    for (let v = 0; v < asset.vertexCount; v++) {
+      mn = Math.min(mn, skinned[v * 3 + 1]!);
+    }
     return mn;
   };
 
   say(`# skinned-mesh floor — ${body.split(/[\\/]/).at(-1)}`);
   const bind = floorOf((i) => asset.bindLocals.subarray(i * 16, i * 16 + 16) as Float32Array);
-  say(`  bind pose: minY ${bind.toFixed(4)} m = ${(bind * PPM).toFixed(2)} px at ppm ${PPM}`);
+  say(
+    `  bind pose: minY ${bind.toFixed(4)} m = ${(bind * PPM).toFixed(2)} px at ppm ${PPM}`,
+  );
   say('');
-  say('  clip            footContactMaxErrM     mesh minY        px      verdict');
+  say(
+    '  clip            footContactMaxErrM     mesh minY        px      verdict',
+  );
 
   let worstClip = '';
   let worst = Infinity;
@@ -136,9 +164,17 @@ try {
     const path = `${PACK}/clips/${clipId}.glb`;
     const doc = await new NodeIO().read(path);
     const src = await loadSkeletonRestFromFile(path);
-    const clip = loadClip(doc, doc.getRoot().listAnimations()[0]!.getName(), clipId);
+    const clip = loadClip(
+      doc,
+      doc.getRoot().listAnimations()[0]!.getName(),
+      clipId,
+    );
     const r = retargetClip(clip, src, tgt, UAL_HUMANOID);
-    const poses = sampleClip(r.clip, tgt, { frames: 8, speed: 1, holdLast: false });
+    const poses = sampleClip(r.clip, tgt, {
+      frames: 8,
+      speed: 1,
+      holdLast: false,
+    });
     const idx = new Map(poses.jointNames.map((n, i) => [n, i]));
     let mn = Infinity;
     for (let f = 0; f < poses.frames; f++) {
@@ -147,7 +183,10 @@ try {
         floorOf((i) => {
           const j = idx.get(asset.jointNames[i]!);
           if (j === undefined) {
-            return asset.bindLocals.subarray(i * 16, i * 16 + 16) as Float32Array;
+            return asset.bindLocals.subarray(
+              i * 16,
+              i * 16 + 16,
+            ) as Float32Array;
           }
           const o = (f * poses.jointNames.length + j) * 16;
           return poses.data.subarray(o, o + 16) as Float32Array;
@@ -170,7 +209,9 @@ try {
     `  worst: ${worstClip} at ${worst.toFixed(4)} m = ${(worst * PPM).toFixed(2)} px below Y=0`,
   );
   if (worst >= -0.005) {
-    say('  The retarget keeps the mesh on the floor. Any `bottom` clipping is NOT a sink.');
+    say(
+      '  The retarget keeps the mesh on the floor. Any `bottom` clipping is NOT a sink.',
+    );
   } else {
     say(
       `  Real penetration. Note WHICH clips: a death animation compressing into the ground\n` +
@@ -179,11 +220,12 @@ try {
     );
   }
 } finally {
-  await Deno.writeTextFile(
+  await fs.writeFile(
     `${REPO}docs/internal/proofs/meshfloor.md`,
     '# Skinned-mesh floor (P4-T3 follow-up)\n\nCaptured by `tools/proofs/meshfloor.ts`; ' +
-      'regenerate rather than hand-editing.\n\n```\n' + lines.join('\n') + '\n```\n',
+      'regenerate rather than hand-editing.\n\n```\n' + lines.join('\n') +
+      '\n```\n',
   );
   console.log('\nrecorded to docs/internal/proofs/meshfloor.md');
-  await Deno.remove(tmp, { recursive: true }).catch(() => {});
+  await fs.rm(tmp, { recursive: true }).catch(() => {});
 }

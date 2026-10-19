@@ -1,4 +1,3 @@
-
 /**
  * Render identity + health as PLAIN DATA (D-004: nothing GPU-shaped crosses the
  * seam — strings, numbers, and JSON-safe records only).
@@ -26,9 +25,13 @@ import { RENDERER_VERSION } from './contracts.ts';
 export async function renderSignature(): Promise<string> {
   const gpu = await getGpu();
   const hash = await sha256Hex(canonicalJson({
-    runtime: process.version, platform: process.platform, arch: process.arch,
-    dawn: '0.6.2', png: `native-zlib-1/${process.versions.zlib}`,
-    backend: gpuBackend(), adapter: gpu.adapterInfo,
+    runtime: process.version,
+    platform: process.platform,
+    arch: process.arch,
+    dawn: '0.6.2',
+    png: `native-zlib-1/${process.versions.zlib}`,
+    backend: gpuBackend(),
+    adapter: gpu.adapterInfo,
   }));
   return `${RENDERER_VERSION}#${hash.slice(0, 8)}`;
 }

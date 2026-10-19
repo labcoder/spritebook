@@ -24,13 +24,16 @@ F4 is porting the existing packages to a locked npm workspace. Node **24.22.0** 
 qualified runtime target; production cutover is recorded in the migration roadmap as each package
 group lands. Build/test dependencies below are not bundled in application resources:
 
-| Dependency | Role | License | Pin |
-| --- | --- | --- | --- |
-| TypeScript | Compile JavaScript/declarations and separately check source/tests | Apache-2.0 | 7.0.2, retained from Studio |
-| `@types/node` | Node API declarations | MIT | 24.19.2 |
-| `@std/assert` / `@jsr/std__internal` | Existing assertions through JSR's npm-compatible registry | MIT | 1.0.19 / 1.0.12, retained from the Deno lock |
-| `@biomejs/biome` | Development formatter/linter | MIT OR Apache-2.0 | 2.5.15 |
-| `@vitejs/plugin-react` | Studio's existing React integration, made compatible with Vite 8 | MIT | 6.0.1 |
+| Dependency                                               | Role                                                                   | License           | Pin                                          |
+| -------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------- | -------------------------------------------- |
+| TypeScript                                               | Compile JavaScript/declarations and separately check source/tests      | Apache-2.0        | 7.0.2, retained from Studio                  |
+| `@types/node`                                            | Node API declarations                                                  | MIT               | 24.19.2                                      |
+| `@std/assert` / `@jsr/std__internal`                     | Existing assertions through JSR's npm-compatible registry              | MIT               | 1.0.19 / 1.0.12, retained from the Deno lock |
+| `@biomejs/biome`                                         | Development linter                                                     | MIT OR Apache-2.0 | 2.5.15                                       |
+| `@vitejs/plugin-react`                                   | Studio's existing React integration, made compatible with Vite 8       | MIT               | 6.0.1                                        |
+| `dprint`                                                 | Retain the existing formatting engine without executing Deno           | MIT               | 0.64.0                                       |
+| `@dprint/typescript`, `@dprint/json`, `@dprint/markdown` | Locally installed formatter Wasm plugins; no first-run plugin download | MIT               | 0.96.1 / 0.25.2 / 0.26.0                     |
+| `rolldown`                                               | Bundle compiled core/CLI; reuse Studio's existing bundler              | MIT               | 1.1.5                                        |
 
 The previous React plugin 5.1.4 declared Vite support only through 7, preventing a clean npm
 workspace install with the already-pinned Vite 8.1.4. The
@@ -43,17 +46,17 @@ dependency graph; F1-T3 uses them to cancel owned CLI descendants and clean up o
 
 F4's small `spritebook-lock` helper reuses **windows-sys 0.61.2** and **libc 0.2.189**
 (MIT/Apache-2.0). It preserves kernel file locks across Node process death using `LockFileEx` or
-`flock`, without moving workspace policy into Rust. Its Cargo lock is committed; development
-builds need Rust, while installed applications include the compiled helper. No FFI package or
-timeout-based replacement for F1's workspace locks is added.
+`flock`, without moving workspace policy into Rust. Its Cargo lock is committed; development builds
+need Rust, while installed applications include the compiled helper. No FFI package or timeout-based
+replacement for F1's workspace locks is added.
 
-F4 promotes F2's qualified renderer into `@spritebook/render` with pinned `webgpu`
-**0.6.2**. Its npm metadata says MIT, but its actual `LICENSE.md` is **BSD-3-Clause** (Dawn/Tint);
-retain the shipped text. The addon runs on an app-owned **Node 24.22.0** (MIT plus Node's
-bundled third-party notices). Its npm transitives are `debug` (MIT), `ms` (MIT) and
-`@webgpu/types` **0.1.74** (BSD-3-Clause); the deployed loader imports none of them. Windows shader DLLs and
-native transitive notices require an explicit artifact audit before a shipping claim; do not copy
-the entire npm distribution on the strength of its metadata label.
+F4 promotes F2's qualified renderer into `@spritebook/render` with pinned `webgpu` **0.6.2**. Its
+npm metadata says MIT, but its actual `LICENSE.md` is **BSD-3-Clause** (Dawn/Tint); retain the
+shipped text. The addon runs on an app-owned **Node 24.22.0** (MIT plus Node's bundled third-party
+notices). Its npm transitives are `debug` (MIT), `ms` (MIT) and `@webgpu/types` **0.1.74**
+(BSD-3-Clause); the deployed loader imports none of them. Windows shader DLLs and native transitive
+notices require an explicit artifact audit before a shipping claim; do not copy the entire npm
+distribution on the strength of its metadata label.
 
 The Windows Vulkan proof bundles the **LunarG Vulkan Runtime 1.4.341.0** x64 loader (MIT/Apache-2.0,
 with its complete `VulkanRT-License.txt`). Its official Components archive is SHA-256 pinned in the

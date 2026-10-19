@@ -134,7 +134,10 @@ const rtOpts = (f: Fixture, over: Record<string, unknown> = {}) => ({
 });
 
 test('ACCEPTANCE: the surface survives, the paint changes, the parent is named', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     await genOnce(f);
@@ -202,7 +205,10 @@ test('ACCEPTANCE: the surface survives, the paint changes, the parent is named',
 });
 
 test('a different seed paints differently; the same seed reproduces', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     await genOnce(f);
@@ -227,7 +233,10 @@ test('a different seed paints differently; the same seed reproduces', async (t) 
 });
 
 test('refusals name what is wrong and what could work', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     await genOnce(f);

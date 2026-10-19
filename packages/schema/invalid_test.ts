@@ -240,7 +240,7 @@ test('JobEvent rejects unknown discriminants and bad timestamps', () => {
 
 test('migration refuses documents newer than this build', () => {
   const err = assertThrows(() =>
-    migrateCharacterManifest({ schemaVersion: 99, id: 'brave-knight' }),
+    migrateCharacterManifest({ schemaVersion: 99, id: 'brave-knight' })
   );
   assert((err as Error).message.includes('newer than this build'));
 });

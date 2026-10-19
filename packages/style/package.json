@@ -13,10 +13,10 @@
     "dist"
   ],
   "dependencies": {
-    "fast-png": "6.2.0",
-    "pixelmatch": "5.3.0",
     "@spritebook/core": "0.1.0",
     "@spritebook/render": "0.1.0",
-    "@spritebook/schema": "0.1.0"
+    "@spritebook/schema": "0.1.0",
+    "fast-png": "6.2.0",
+    "pixelmatch": "5.3.0"
   }
 }

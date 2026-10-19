@@ -169,13 +169,14 @@ async function* executeRetextureJob(
       );
     }
     const parentPaths = resultPaths(opts.workspace, parent.id);
-    const parentBytes = await fs.readFile(parentPaths.model).then((bytes) => new Uint8Array(bytes)).catch(() => {
-      throw new RetextureFail(
-        'no-parent-mesh',
-        `Result "${parent.id}" has no canonical mesh at ${parentPaths.model}, so there is ` +
-          `nothing to repaint. The receipt survives a deleted file; the mesh does not.`,
-      );
-    });
+    const parentBytes = await fs.readFile(parentPaths.model).then((bytes) => new Uint8Array(bytes))
+      .catch(() => {
+        throw new RetextureFail(
+          'no-parent-mesh',
+          `Result "${parent.id}" has no canonical mesh at ${parentPaths.model}, so there is ` +
+            `nothing to repaint. The receipt survives a deleted file; the mesh does not.`,
+        );
+      });
     const parentHeightM = await heightOf(parentBytes);
     // the SOURCE image conditions the texture, exactly as it did for `gen` —
     // repainting from a different reference is a different feature

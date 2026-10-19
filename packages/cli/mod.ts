@@ -1408,7 +1408,10 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       if (manifest.lastBakeId !== undefined) {
         try {
           const bakeManifest = JSON.parse(
-            await fs.readFile(`${wsPaths(workspace).bakesDir}/bake-${manifest.lastBakeId}/manifest.json`, 'utf8'),
+            await fs.readFile(
+              `${wsPaths(workspace).bakesDir}/bake-${manifest.lastBakeId}/manifest.json`,
+              'utf8',
+            ),
           );
           staleFrames = Array.isArray(bakeManifest.frames) ? bakeManifest.frames.length : 0;
         } catch {
@@ -2743,4 +2746,3 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
   emit({ t: 'done', jobId, at: now(), wallTimeS: 0 }, 'ok');
   return 0;
 }
-

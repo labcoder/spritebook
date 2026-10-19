@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Do the rendered feet land on the recorded pivot?
  *
@@ -23,26 +26,39 @@
  *
  * Run: DENO_WEBGPU_BACKEND=vulkan deno run --allow-all tools/proofs/pivotcheck.ts
  */
-import { decode as decodePng } from 'npm:fast-png@6.2.0';
-import { runCli } from '../../packages/cli/mod.ts';
-import { BakeManifestSchema, parseWith } from '../../packages/schema/mod.ts';
+import { decode as decodePng } from 'fast-png';
+import { runCli } from '../../packages/cli/dist/mod.js';
+import { BakeManifestSchema, parseWith } from '../../packages/schema/dist/mod.js';
 
-const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const REPO = new URL('../../', import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
 const BODY = `${REPO}packages/rig/bodies/ubc-male`;
 
 function io() {
   const out: string[] = [];
-  return { stdout: (s: string) => out.push(s), stderr: (s: string) => out.push(s), out };
+  return {
+    stdout: (s: string) => out.push(s),
+    stderr: (s: string) => out.push(s),
+    out,
+  };
 }
 async function cli(args: string[], label: string): Promise<void> {
   const o = io();
   const code = await runCli(args, o);
-  if (code !== 0) throw new Error(`${label} exited ${code}:\n${o.out.slice(-10).join('\n')}`);
+  if (code !== 0) {
+    throw new Error(`${label} exited ${code}:\n${o.out.slice(-10).join('\n')}`);
+  }
 }
 
 /** first and last rows of the cell that carry any alpha */
-function rows(rgba: Uint8Array, pageW: number, r: { x: number; y: number; w: number; h: number }) {
+function rows(
+  rgba: Uint8Array,
+  pageW: number,
+  r: { x: number; y: number; w: number; h: number },
+) {
   let first = -1;
   let last = -1;
   for (let y = 0; y < r.h; y++) {
@@ -61,8 +77,13 @@ function rows(rgba: Uint8Array, pageW: number, r: { x: number; y: number; w: num
   return { first, last };
 }
 
-async function measure(cell: string, padding: string, ppm: string, useClips: boolean) {
-  const tmp = await Deno.makeTempDir();
+async function measure(
+  cell: string,
+  padding: string,
+  ppm: string,
+  useClips: boolean,
+) {
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const ws = `${tmp}/pc`;
   try {
     await cli(
@@ -95,7 +116,9 @@ async function measure(cell: string, padding: string, ppm: string, useClips: boo
       ],
       'fit',
     );
-    if (useClips) await cli(['anim', '--enable', 'idle-loop:4', '--workspace', ws], 'anim');
+    if (useClips) {
+      await cli(['anim', '--enable', 'idle-loop:4', '--workspace', ws], 'anim');
+    }
     await cli(
       [
         'bake',
@@ -112,15 +135,19 @@ async function measure(cell: string, padding: string, ppm: string, useClips: boo
       ],
       'bake',
     );
-    const character = JSON.parse(await Deno.readTextFile(`${ws}/character.json`));
+    const character = JSON.parse(
+      await fs.readFile(`${ws}/character.json`, 'utf8'),
+    );
     const dir = `${ws}/bakes/bake-${character.lastBakeId}`;
     const bake = parseWith(
       BakeManifestSchema,
-      JSON.parse(await Deno.readTextFile(`${dir}/manifest.json`)),
+      JSON.parse(await fs.readFile(`${dir}/manifest.json`, 'utf8')),
       'BakeManifest',
     );
     const lit = bake.atlases.find((a) => a.pass === 'lit')!;
-    const png = decodePng(await Deno.readFile(`${dir}/${lit.png}`));
+    const png = decodePng(
+      new Uint8Array(await fs.readFile(`${dir}/${lit.png}`)),
+    );
     const data = new Uint8Array(png.data as unknown as ArrayLike<number>);
     const f = bake.frames[0]!;
     const { first, last } = rows(data, png.width, f.atlas);
@@ -131,19 +158,34 @@ async function measure(cell: string, padding: string, ppm: string, useClips: boo
         `alpha rows ${String(first).padStart(3)}..${String(last).padStart(3)} · ` +
         `feet are ${last - f.pivotPx.y >= 0 ? '+' : ''}${last - f.pivotPx.y} from the pivot`,
     );
-    return { cellH, pivotY: f.pivotPx.y, first, last, padding: Number(padding) };
+    return {
+      cellH,
+      pivotY: f.pivotPx.y,
+      first,
+      last,
+      padding: Number(padding),
+    };
   } finally {
-    await Deno.remove(tmp, { recursive: true }).catch(() => {});
+    await fs.rm(tmp, { recursive: true }).catch(() => {});
   }
 }
 
 console.log('# Do the rendered feet land on the recorded pivot?');
-console.log('  (a `feet-baseline` pivot is row h - paddingPx; the feet should sit ON it)');
+console.log(
+  '  (a `feet-baseline` pivot is row h - paddingPx; the feet should sit ON it)',
+);
 const results = [];
-for (const [cell, padding] of [['64', '6'], ['128x128', '6'], ['128x128', '16'], ['64', '2']]) {
+for (
+  const [cell, padding] of [['64', '6'], ['128x128', '6'], ['128x128', '16'], [
+    '64',
+    '2',
+  ]]
+) {
   results.push(await measure(cell!, padding!, '32', false));
 }
-console.log('\n# the same, with a retargeted clip rather than the bind-pose stub');
+console.log(
+  '\n# the same, with a retargeted clip rather than the bind-pose stub',
+);
 results.push(await measure('128x128', '6', '32', true));
 
 console.log('\n## verdict');

@@ -267,7 +267,10 @@ async function cellOf(
 }
 
 test('acceptance: a mirrored bake flips every pass, marks it, and styles half', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const on = await bake(`${root}/on`, true);

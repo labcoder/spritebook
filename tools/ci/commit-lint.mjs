@@ -6,7 +6,18 @@ import { execFileSync } from 'node:child_process';
  *   node tools/ci/commit-lint.mjs --file .git/COMMIT_EDITMSG
  *   node tools/ci/commit-lint.mjs --range origin/main..HEAD
  */
-const TYPES = ['feat', 'fix', 'docs', 'chore', 'test', 'refactor', 'perf', 'ci', 'build', 'style'];
+const TYPES = [
+  'feat',
+  'fix',
+  'docs',
+  'chore',
+  'test',
+  'refactor',
+  'perf',
+  'ci',
+  'build',
+  'style',
+];
 const HEADER = new RegExp(`^(${TYPES.join('|')})(\\([a-z0-9-]+\\))?!?: .+`);
 
 function checkMessage(msg) {
@@ -18,7 +29,9 @@ function checkMessage(msg) {
     return `not a conventional commit header: "${header}"\n` +
       `  expected: <type>(<scope>)?: <subject>  with type in {${TYPES.join(', ')}}`;
   }
-  if (header.length > 72) return `header exceeds 72 chars (${header.length}): "${header}"`;
+  if (header.length > 72) {
+    return `header exceeds 72 chars (${header.length}): "${header}"`;
+  }
   return null;
 }
 
@@ -33,7 +46,9 @@ if (args[0] === '--file') {
     failures++;
   }
 } else if (args[0] === '--range') {
-  const raw = execFileSync('git', ['log', '--format=%H%x00%B%x01', args[1]], { encoding: 'utf8' });
+  const raw = execFileSync('git', ['log', '--format=%H%x00%B%x01', args[1]], {
+    encoding: 'utf8',
+  });
   for (const entry of raw.split('\x01')) {
     const [hash, body] = entry.split('\x00');
     if (!body?.trim()) continue;

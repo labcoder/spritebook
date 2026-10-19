@@ -142,7 +142,9 @@ async function decalFootprints(
   marked: { manifest: BakeManifest; bakeDir: string },
 ) {
   const pageP = decodePng(new Uint8Array(await fs.readFile(`${plain.bakeDir}/atlas_albedo_0.png`)));
-  const pageM = decodePng(new Uint8Array(await fs.readFile(`${marked.bakeDir}/atlas_albedo_0.png`)));
+  const pageM = decodePng(
+    new Uint8Array(await fs.readFile(`${marked.bakeDir}/atlas_albedo_0.png`)),
+  );
   const byDirP = new Map(plain.manifest.frames.map((f) => [f.direction, f.atlas]));
   const byDirM = new Map(marked.manifest.frames.map((f) => [f.direction, f.atlas]));
   const masks = new Map<number, { mask: Uint8Array; w: number; h: number }>();
@@ -162,7 +164,10 @@ async function decalFootprints(
 }
 
 test('ACCEPTANCE: fit -> decal -> bake, and the tattoo stays on its own arm', async (t) => {
-  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  if (!(await tryGetGpu())) {
+    t.skip('No WebGPU adapter');
+    return;
+  }
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     // 1. the real Track A front half: bundled body fitted to a fixture target

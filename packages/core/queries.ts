@@ -82,7 +82,9 @@ export async function readBakeArtifact(workspace: string, kind: 'thumb' | 'atlas
     const clips = [...new Set(bake.manifest.frames.map((f) => f.clipId))];
     for (const clip of clips) {
       try {
-        return Buffer.from(new Uint8Array(await fs.readFile(artifactPath(bake.dir, `contact-${clip}.gif`))))
+        return Buffer.from(
+          new Uint8Array(await fs.readFile(artifactPath(bake.dir, `contact-${clip}.gif`))),
+        )
           .toString('base64');
       } catch (e) {
         if (!((e as NodeJS.ErrnoException)?.code === 'ENOENT')) throw e;

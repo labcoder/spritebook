@@ -135,7 +135,10 @@ const genOpts = (f: Fixture, over: Record<string, unknown> = {}) => ({
 });
 
 test('ACCEPTANCE: image -> gen -> canonical textured glb with full provenance', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     const events = await collect(runGenJob(genOpts(f)));
@@ -202,7 +205,10 @@ test('ACCEPTANCE: image -> gen -> canonical textured glb with full provenance', 
 });
 
 test('ACCEPTANCE: the same seed reproduces the same canonical bytes', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const a = await setup();
   const b = await setup();
   try {
@@ -221,7 +227,10 @@ test('ACCEPTANCE: the same seed reproduces the same canonical bytes', async (t) 
 });
 
 test('ACCEPTANCE: a different seed produces a different mesh', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     const first = await collect(runGenJob(genOpts(f)));
@@ -245,7 +254,10 @@ test('ACCEPTANCE: a different seed produces a different mesh', async (t) => {
 });
 
 test('ACCEPTANCE: invalid --adjust params are refused core-side, no backend run', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     // textureSize 999 is not in the entry's enum, and tris is over maximum
@@ -261,7 +273,9 @@ test('ACCEPTANCE: invalid --adjust params are refused core-side, no backend run'
     // nothing was generated: no workspace results, no manifest mutation
     let results = 0;
     try {
-      for await (const _ of await fs.readdir(`${f.workspace}/results`, { withFileTypes: true })) results++;
+      for await (const _ of await fs.readdir(`${f.workspace}/results`, { withFileTypes: true })) {
+        results++;
+      }
     } catch {
       // no results dir at all is the strongest form of "nothing ran"
     }
@@ -272,7 +286,10 @@ test('ACCEPTANCE: invalid --adjust params are refused core-side, no backend run'
 });
 
 test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     const gen = await collect(runGenJob(genOpts(f)));
@@ -362,7 +379,10 @@ async function journalPatches(workspace: string) {
 }
 
 test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     const gen = await collect(runGenJob(genOpts(f)));
@@ -398,7 +418,9 @@ test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', async
 
     // the staging temps do not outlive the step
     const strays: string[] = [];
-    for await (const e of await fs.readdir(workspacePaths(f.workspace).canonicalDir, { withFileTypes: true })) {
+    for await (
+      const e of await fs.readdir(workspacePaths(f.workspace).canonicalDir, { withFileTypes: true })
+    ) {
       if (e.name.includes('.tmp.')) strays.push(e.name);
     }
     assertEquals(strays, [], 'no staging temps left in canonical/');
@@ -408,7 +430,10 @@ test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', async
 });
 
 test('gen says so when nobody declared what size the character is', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     // Without --height the border does not rescale, so the mesh keeps whatever
@@ -441,7 +466,10 @@ test('gen says so when nobody declared what size the character is', async (t) =>
 });
 
 test('ACCEPTANCE: gen --candidates makes N receipts and ranks them', async (t) => {
-  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar unavailable');
+    return;
+  }
   const f = await setup();
   try {
     const events = await collect(runGenJob(genOpts(f, { candidates: 3 })));

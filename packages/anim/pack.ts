@@ -146,9 +146,11 @@ export async function buildPack(opts: BuildPackOptions): Promise<AnimPack> {
   let skeletonNames: string | undefined;
 
   for (const srcPath of opts.srcGlbs) {
-    const srcBytes = await fs.readFile(srcPath).then((bytes) => new Uint8Array(bytes)).catch((err) => {
-      throw new Error(`buildPack: cannot read source glb ${srcPath}: ${message(err)}`);
-    });
+    const srcBytes = await fs.readFile(srcPath).then((bytes) => new Uint8Array(bytes)).catch(
+      (err) => {
+        throw new Error(`buildPack: cannot read source glb ${srcPath}: ${message(err)}`);
+      },
+    );
     const probe = await io.readBinary(srcBytes);
     probe.setLogger(SILENT);
     const animNames = probe.getRoot().listAnimations().map((a) => a.getName());

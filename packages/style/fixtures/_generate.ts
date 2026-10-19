@@ -1,4 +1,3 @@
-
 /**
  * Style fixture generator (deterministic; run once, the glb is checked in):
  *  - asymmetric.glb   a tiny rigged character: a body box + ONE arm box on +X
