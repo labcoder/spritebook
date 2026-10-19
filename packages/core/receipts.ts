@@ -50,6 +50,8 @@ export interface ReceiptOptions {
   /** overrides the default undo-stack label */
   label?: string;
   now?: () => string;
+  /** Staged GLB published with this patch, never before it. */
+  canonicalSource?: string;
 }
 
 export interface PickOptions extends ReceiptOptions {
@@ -102,7 +104,7 @@ export async function appendGenerationResult(
       op: [{ op: 'add', path: '/generation/results/-', value: valid }],
       label: opts.label ?? `Generate ${valid.id} (${valid.backend.modelId})`,
     };
-  }, opts.now);
+  }, opts);
 }
 
 /**
@@ -154,7 +156,7 @@ export async function pickResult(
       ],
       label: opts.label ?? `Pick ${resultId}`,
     };
-  }, opts.now);
+  }, opts);
 }
 
 /**
@@ -181,7 +183,7 @@ export async function discardResult(
       op: [{ op: 'replace', path: `/generation/results/${index}/discarded`, value: true }],
       label: opts.label ?? `Discard ${resultId}`,
     };
-  }, opts.now);
+  }, opts);
 }
 
 /**
@@ -212,7 +214,7 @@ export async function setCanonicalMesh(
       label: opts.label ??
         (fields.reprojected === true ? 'Reproject canonical mesh' : 'Update canonical mesh'),
     };
-  }, opts.now);
+  }, opts);
 }
 
 /**
@@ -247,7 +249,7 @@ export async function setRigState(
           ? `Edit ${rig.jointEdits.length} joint${rig.jointEdits.length === 1 ? '' : 's'}`
           : `Rig (${rig.jointCount} joints, track ${rig.track})`),
     };
-  }, opts.now);
+  }, opts);
 }
 
 /**
@@ -277,7 +279,7 @@ export async function setLook(
       }],
       label: opts.label,
     };
-  }, opts.now);
+  }, opts);
 }
 
 /**
@@ -303,7 +305,7 @@ export async function setAnimationSet(
       }],
       label: opts.label,
     };
-  }, opts.now);
+  }, opts);
 }
 
 export interface IdentityFields {
@@ -383,7 +385,7 @@ export async function setIdentity(
       op.push(canonicalMeshOp(manifest, fields.canonicalMesh));
     }
     return { op, label: opts.label ?? `Identity: ${parts.join(', ')}` };
-  }, opts.now);
+  }, opts);
 }
 
 export interface BakeRecord {
@@ -443,7 +445,7 @@ export async function recordBake(
       op.push(setOp('/lastBakeId', record.lastBakeId, manifest.lastBakeId));
     }
     return { op, label: opts.label ?? `Bake ${record.lastBakeId}` };
-  }, opts.now);
+  }, opts);
 }
 
 /**
@@ -469,9 +471,9 @@ function canonicalMeshOp(
 function commit(
   workspace: string,
   build: (manifest: CharacterManifest) => { op: JsonPatchOp[]; label: string },
-  now?: () => string,
+  opts: ReceiptOptions,
 ): Promise<CharacterManifest> {
-  return commitManifest(workspacePaths(workspace).manifest, build, now);
+  return commitManifest(workspacePaths(workspace).manifest, build, opts.now, opts.canonicalSource);
 }
 
 export { writeAtomic } from './persistence.ts';

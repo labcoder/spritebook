@@ -44,7 +44,7 @@ import {
   workspacePaths,
 } from '@spritebook/core';
 import { applyRig } from './apply.ts';
-import { promoteToCanonical } from './promote.ts';
+import { prepareCanonicalPromotion } from './promote.ts';
 import { deformCheck } from './deform.ts';
 import { applyOrientationFixes, detectFacingFile } from './orient.ts';
 import { componentsOfFile, disconnectedWarning } from '@spritebook/importer';
@@ -431,8 +431,8 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
       // heightM is NOT re-stated: rigging adds a skeleton to the vertices it
       // was given and does not change how tall the character stands, so
       // carrying the pick's height forward is the truthful move
-      const promotion = await promoteToCanonical(opts.workspace, riggedPath);
-      if (!promotion.promoted) {
+      const promotion = await prepareCanonicalPromotion(opts.workspace, riggedPath);
+      if (!promotion.ready) {
         yield {
           t: 'warn',
           jobId,
@@ -452,11 +452,10 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
         // apart, a single undo would restore the pre-rig RigState while
         // canonical/model.glb still held the rigged mesh.
         await setRigState(opts.workspace, rigState, {
-          ...(promotion.promoted && promotion.meshRepin
-            ? { canonicalMesh: promotion.meshRepin }
-            : {}),
+          ...(promotion.ready ? { canonicalSource: promotion.canonicalSource } : {}),
+          ...(promotion.ready && promotion.meshRepin ? { canonicalMesh: promotion.meshRepin } : {}),
         });
-        if (promotion.promoted) {
+        if (promotion.ready) {
           yield {
             t: 'artifact',
             jobId,

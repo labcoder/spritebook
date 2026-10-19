@@ -5,7 +5,7 @@
  * `bake --clips` failing at retarget with "target skeleton is missing the hips
  * joint" immediately after a rig that reported success.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import {
   appendGenerationResult,
   createWorkspace,
@@ -15,7 +15,7 @@ import {
   sha256Bytes,
   workspacePaths,
 } from '@spritebook/core';
-import { promoteToCanonical } from './promote.ts';
+import { prepareCanonicalPromotion } from './promote.ts';
 
 const NOW = () => '2026-07-12T00:00:00Z';
 const sha = (c: string) => c.repeat(64);
@@ -59,12 +59,13 @@ Deno.test('the rigged bytes become the canonical mesh, and the hash follows', as
     const bytes = Uint8Array.from([1, 2, 3, 4, 5]);
     await Deno.writeFile(rigged, bytes);
 
-    const result = await promoteToCanonical(dir, rigged);
-    assert(result.promoted, 'promoted');
+    const result = await prepareCanonicalPromotion(dir, rigged);
+    assert(result.ready, 'promoted');
     assertEquals(result.meshRepin?.gltfSha256, await sha256Bytes(bytes));
     assertEquals(result.meshRepin?.heightM, undefined, 'a rig does not restate height');
 
-    // the bytes really moved, not just the bookkeeping
+    await assertRejects(() => Deno.stat(workspacePaths(dir).canonicalModel), Deno.errors.NotFound);
+    await setCanonicalMesh(dir, result.meshRepin!, { canonicalSource: result.canonicalSource });
     assertEquals(await Deno.readFile(workspacePaths(dir).canonicalModel), bytes);
   });
 });
@@ -76,8 +77,8 @@ Deno.test('a fit restates its height; a rig deliberately does not', async () => 
   await withCharacter(async (dir) => {
     const src = `${dir}/fitted.glb`;
     await Deno.writeFile(src, Uint8Array.from([9, 9, 9]));
-    const fit = await promoteToCanonical(dir, src, 1.74);
-    assert(fit.promoted);
+    const fit = await prepareCanonicalPromotion(dir, src, 1.74);
+    assert(fit.ready);
     assertEquals(fit.meshRepin?.heightM, 1.74);
   });
 });
@@ -93,13 +94,16 @@ Deno.test('unchanged bytes need no patch', async () => {
     const src = `${dir}/rigged.glb`;
     await Deno.writeFile(src, bytes);
 
-    const first = await promoteToCanonical(dir, src);
-    assert(first.promoted && first.meshRepin, 'the first rig moves the hash');
-    await setCanonicalMesh(dir, first.meshRepin, { now: NOW });
+    const first = await prepareCanonicalPromotion(dir, src);
+    assert(first.ready && first.meshRepin, 'the first rig moves the hash');
+    await setCanonicalMesh(dir, first.meshRepin, {
+      now: NOW,
+      canonicalSource: first.canonicalSource,
+    });
     assertEquals((await readWorkspace(dir)).canonicalMesh?.gltfSha256, await sha256Bytes(bytes));
 
-    const again = await promoteToCanonical(dir, src);
-    assert(again.promoted);
+    const again = await prepareCanonicalPromotion(dir, src);
+    assert(again.ready);
     assertEquals(again.meshRepin, undefined, 'same bytes, nothing to re-pin');
   });
 });
@@ -108,9 +112,9 @@ Deno.test('nothing picked yet: the rig is kept, and the refusal says which verb'
   await withCharacter(async (dir) => {
     const src = `${dir}/rigged.glb`;
     await Deno.writeFile(src, Uint8Array.from([1]));
-    const result = await promoteToCanonical(dir, src);
-    assertEquals(result.promoted, false);
-    assert(!result.promoted && result.reason === 'no-canonical-mesh');
+    const result = await prepareCanonicalPromotion(dir, src);
+    assertEquals(result.ready, false);
+    assert(!result.ready && result.reason === 'no-canonical-mesh');
     // the source is untouched - the rig's real work is never thrown away over
     // bookkeeping, which is the same rule the job's catch already followed
     assertEquals((await Deno.stat(src)).isFile, true);
@@ -119,9 +123,9 @@ Deno.test('nothing picked yet: the rig is kept, and the refusal says which verb'
 
 Deno.test('an unreadable source is an io refusal carrying the real error', async () => {
   await withCharacter(async (dir) => {
-    const result = await promoteToCanonical(dir, `${dir}/does-not-exist.glb`);
-    assertEquals(result.promoted, false);
-    assert(!result.promoted && result.reason === 'io');
-    assert(!result.promoted && result.reason === 'io' && result.error instanceof Error);
+    const result = await prepareCanonicalPromotion(dir, `${dir}/does-not-exist.glb`);
+    assertEquals(result.ready, false);
+    assert(!result.ready && result.reason === 'io');
+    assert(!result.ready && result.reason === 'io' && result.error instanceof Error);
   });
 });

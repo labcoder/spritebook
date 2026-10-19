@@ -20,6 +20,8 @@ import {
   appendGenerationResult,
   createWorkspace,
   pickResult,
+  setCanonicalMesh,
+  sha256Bytes,
   workspacePaths,
 } from '@spritebook/core';
 import {
@@ -28,7 +30,7 @@ import {
   retargetClip,
   UAL_HUMANOID,
 } from '@spritebook/anim';
-import { promoteToCanonical } from './promote.ts';
+import { prepareCanonicalPromotion } from './promote.ts';
 
 const NOW = () => '2026-07-12T00:00:00Z';
 const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
@@ -62,6 +64,7 @@ Deno.test('promotion is what lets the very next clip bake retarget at all', asyn
       source: { kind: 'image', originalFilename: 'k.png', sha256: 'a'.repeat(64) },
       now: NOW,
     });
+    await unskinnedGlb(workspacePaths(dir).canonicalModel);
     await appendGenerationResult(dir, {
       id: 'r1',
       backend: { modelId: 'fixture-gen', version: '1.0' },
@@ -69,7 +72,11 @@ Deno.test('promotion is what lets the very next clip bake retarget at all', asyn
       seed: 7,
       startedAt: NOW(),
       wallTimeS: 1,
-      output: { gltfSha256: 'b'.repeat(64), tris: 1, kind: 'mesh' },
+      output: {
+        gltfSha256: await sha256Bytes(await Deno.readFile(workspacePaths(dir).canonicalModel)),
+        tris: 1,
+        kind: 'mesh',
+      },
       discarded: false,
     }, { now: NOW });
     await pickResult(dir, 'r1', { heightM: 1.8, texturedBy: 'backend', now: NOW });
@@ -93,8 +100,11 @@ Deno.test('promotion is what lets the very next clip bake retarget at all', asyn
     );
 
     // the rig's output becomes the character — the one thing that changes
-    const promotion = await promoteToCanonical(dir, RIGGED);
-    assert(promotion.promoted, 'promoted');
+    const promotion = await prepareCanonicalPromotion(dir, RIGGED);
+    assert(promotion.ready && promotion.meshRepin, 'prepared');
+    await setCanonicalMesh(dir, promotion.meshRepin, {
+      canonicalSource: promotion.canonicalSource,
+    });
 
     // AFTER: the same call, on the same workspace, retargets
     const after = await loadSkeletonRestFromFile(canonical);

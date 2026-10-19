@@ -1,3 +1,4 @@
+import { sha256Bytes } from './cache.ts';
 /**
  * `clone` and `rename` — the two verbs the identity law (D-011) makes cheap.
  * The rename half re-proves what P1 proved at the cache level (see
@@ -32,7 +33,7 @@ async function character(name = 'knight'): Promise<string> {
   const paths = workspacePaths(dir);
   const doc = JSON.parse(await Deno.readTextFile(paths.manifest));
   doc.canonicalMesh = {
-    gltfSha256: 'b'.repeat(64),
+    gltfSha256: await sha256Bytes(await Deno.readFile(`${dir}/canonical/model.glb`)),
     heightM: 1.8,
     texturedBy: 'backend',
     reprojected: false,

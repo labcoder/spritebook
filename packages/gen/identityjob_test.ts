@@ -425,11 +425,9 @@ Deno.test('identity: bone mask -> attachments -> decals, in that order, all jour
   const f = await pickedWorkspace(false);
   try {
     const paths = workspacePaths(f.workspace);
-    // fixture-gen meshes are unskinned, and masks and attachments address a
-    // skeleton — so stage a minimal skinned canonical mesh in its place. That
-    // makes the manifest's pinned hash stale on purpose: the run must repair
-    // it by re-pinning to the bytes it leaves on disk, asserted below.
-    await miniBodyGlb(paths.canonicalModel);
+    // Rigged fixture bytes must be published with their real hash, like a rig job.
+    const stagedBody = `${f.work}/body.glb`;
+    await miniBodyGlb(stagedBody);
     const bodyJson = `${f.work}/body.json`;
     await Deno.writeTextFile(bodyJson, JSON.stringify(MINI_BODY));
     const rig: RigState = {
@@ -442,7 +440,10 @@ Deno.test('identity: bone mask -> attachments -> decals, in that order, all jour
       sockets: [{ id: 'hand-r', bone: 'forearm-r', localOffset: [0, 0.1, 0] }],
       accepted: false,
     };
-    await setRigState(f.workspace, rig);
+    await setRigState(f.workspace, rig, {
+      canonicalSource: stagedBody,
+      canonicalMesh: { gltfSha256: await sha256Hex(await Deno.readFile(stagedBody)) },
+    });
 
     const prop = `${f.work}/prop.glb`;
     const replacement = `${f.work}/replacement.glb`;

@@ -202,7 +202,7 @@ export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<J
     let done = 0;
     let current = paths.canonicalModel;
     for (const stage of stages) {
-      const outPath = `${paths.canonicalDir}/identity-${stage.step}.tmp.glb`;
+      const outPath = `${paths.canonicalDir}/identity-${crypto.randomUUID()}-${stage.step}.tmp.glb`;
       tmp.push(outPath);
       let report: unknown;
       try {
@@ -242,16 +242,8 @@ export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<J
       };
     }
 
-    // every stage succeeded: the staged file becomes THE canonical mesh in
-    // one rename, so no reader ever sees a partially-identified character
-    await Deno.rename(current, paths.canonicalModel);
-
-    // the manifest must follow the bytes that are ACTUALLY on disk now — the
-    // same rule `pick --reproject` enforces, and what D-011 cache keys hang
-    // off. It rides in the SAME patch as the identity records below, because
-    // one undo of "add the tattoo" must not leave a manifest that claims no
-    // identity while pinning the tattooed bytes.
-    const bytes = await Deno.readFile(paths.canonicalModel);
+    // Core retains both revisions and publishes these staged bytes with the manifest patch.
+    const bytes = await Deno.readFile(current);
     const gltfSha256 = await sha256Hex(bytes);
     let meshRepin: { gltfSha256: string; heightM?: number } | undefined;
     if (gltfSha256 !== canonicalMesh.gltfSha256) {
@@ -285,7 +277,7 @@ export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<J
     }
     if (maskRegions.length > 0) fields.boneMask = mask;
     if (meshRepin) fields.canonicalMesh = meshRepin;
-    await setIdentity(opts.workspace, fields);
+    await setIdentity(opts.workspace, fields, { canonicalSource: current });
     committed = true; // the reports now describe the workspace, so they stay
     done++;
     yield { t: 'progress', jobId, at: at(), step: 'record', done, total };

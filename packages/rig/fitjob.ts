@@ -30,7 +30,7 @@ import {
 } from '@spritebook/schema';
 import { setRigState, workspacePaths } from '@spritebook/core';
 import { fitCanonicalBody, type FitReport } from './fit.ts';
-import { promoteToCanonical } from './promote.ts';
+import { prepareCanonicalPromotion } from './promote.ts';
 
 export interface FitJobOptions {
   jobId: string;
@@ -184,10 +184,10 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
       const paths = workspacePaths(opts.workspace);
       // the fit REPORTS the height it fitted to, so the re-pin carries it; no
       // need to re-measure, and a rig (which does not change height) passes none
-      const promotion = await promoteToCanonical(opts.workspace, fittedPath, report.heightM);
-      const promoted = promotion.promoted;
-      const meshRepin = promotion.promoted ? promotion.meshRepin : undefined;
-      if (!promotion.promoted) {
+      const promotion = await prepareCanonicalPromotion(opts.workspace, fittedPath, report.heightM);
+      const promoted = promotion.ready;
+      const meshRepin = promotion.ready ? promotion.meshRepin : undefined;
+      if (!promotion.ready) {
         yield {
           t: 'warn',
           jobId,
@@ -221,6 +221,7 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
       };
       try {
         await setRigState(opts.workspace, rigState, {
+          ...(promotion.ready ? { canonicalSource: promotion.canonicalSource } : {}),
           ...(meshRepin ? { canonicalMesh: meshRepin } : {}),
         });
         if (promoted) {

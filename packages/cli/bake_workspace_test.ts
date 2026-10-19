@@ -33,18 +33,97 @@ import {
   readWorkspace,
   recordBake,
   setRigState,
+  sha256Bytes,
   sha256Hex,
   workspacePaths,
 } from '@spritebook/core';
 import { tryGetGpu } from '../render/gpu.ts';
 import { runCli } from './mod.ts';
 import { rigForKey } from '@spritebook/pack';
+import { NodeIO } from '@gltf-transform/core';
+import { appendGenerationResult, resultPaths } from '@spritebook/core';
 
 const GLB = new URL('../style/fixtures/asymmetric.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
   '$1',
 );
 const NOW = () => '2026-07-12T00:00:00Z';
+
+Deno.test('pick A -> pick B -> undo bakes the restored mesh, not just its metadata', async () => {
+  if (!(await tryGetGpu())) return;
+  const dir = await Deno.makeTempDir({ prefix: 'sb-asset-undo-' });
+  try {
+    await createWorkspace({
+      workspace: dir,
+      characterId: 'asset-undo',
+      displayName: 'Asset undo',
+      source: {
+        kind: 'mesh',
+        originalFilename: 'asymmetric.glb',
+        sha256: await sha256Bytes(await Deno.readFile(GLB)),
+      },
+    });
+    const io = new NodeIO();
+    const doc = await io.readBinary(await Deno.readFile(GLB));
+    doc.getRoot().listMeshes()[0].listPrimitives()[0].setMaterial(
+      doc.createMaterial().setBaseColorFactor([1, 0, 0, 1]),
+    );
+    const variants = [await Deno.readFile(GLB), await io.writeBinary(doc)];
+    for (const [i, bytes] of variants.entries()) {
+      const id = `r${i + 1}`;
+      const paths = resultPaths(dir, id);
+      await Deno.mkdir(paths.dir, { recursive: true });
+      await Deno.writeFile(paths.model, bytes);
+      await appendGenerationResult(dir, {
+        id,
+        backend: { modelId: 'fixture-gen', version: '1.0.0' },
+        params: {},
+        seed: i,
+        startedAt: NOW(),
+        wallTimeS: 0,
+        output: { gltfSha256: await sha256Bytes(bytes), tris: 1, kind: 'mesh' },
+        discarded: false,
+      });
+    }
+    const run = async (args: string[]) => {
+      const c = collector();
+      assertEquals(await runCli([...args, '--json'], c.io), 0, [...c.out, ...c.err].join('\n'));
+    };
+    const pick = (id: string) =>
+      run(['pick', '--workspace', dir, '--result', id, '--no-color-match', '--no-reproject']);
+    const bake = () =>
+      run([
+        'bake',
+        '--workspace',
+        dir,
+        '--style',
+        'clean',
+        '--directions',
+        '2',
+        '--cell',
+        '64',
+        '--frames',
+        '2',
+      ]);
+    await pick('r1');
+    await bake();
+    const before = (await readWorkspace(dir)).lastBakeId!;
+    const page = `${workspacePaths(dir).bakesDir}/bake-${before}/atlas_lit_0.png`;
+    const expected = await Deno.readFile(page);
+    await pick('r2');
+    assertEquals(await Deno.readFile(workspacePaths(dir).canonicalModel), variants[1]);
+    await run(['undo', '--manifest', workspacePaths(dir).manifest]);
+    await bake();
+    assertEquals(
+      (await readWorkspace(dir)).lastBakeId,
+      before,
+      'bake keys the actual restored input',
+    );
+    assertEquals(await Deno.readFile(page), expected, 'the rerendered pixels agree too');
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
 
 function collector() {
   const out: string[] = [];
@@ -352,7 +431,11 @@ Deno.test('acceptance: the bake manifest records the backend that really made it
       seed: 42,
       startedAt: NOW(),
       wallTimeS: 92.5,
-      output: { gltfSha256: 'b'.repeat(64), tris: 14318, kind: 'mesh' },
+      output: {
+        gltfSha256: await sha256Bytes(await Deno.readFile(workspacePaths(dir).canonicalModel)),
+        tris: 14318,
+        kind: 'mesh',
+      },
       discarded: false,
     }, { now: NOW });
     await pickResult(dir, 'r1', { heightM: 1.81, texturedBy: 'backend', now: NOW });

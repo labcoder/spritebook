@@ -1,3 +1,4 @@
+import { sha256Bytes } from './cache.ts';
 /**
  * The roster scan (P4-T3): the cheap half of the batch story.
  *
@@ -36,7 +37,7 @@ async function member(
     await Deno.writeTextFile(paths.canonicalModel, `canonical ${id}`);
     const doc = JSON.parse(await Deno.readTextFile(paths.manifest));
     doc.canonicalMesh = {
-      gltfSha256: 'b'.repeat(64),
+      gltfSha256: await sha256Bytes(await Deno.readFile(paths.canonicalModel)),
       heightM: 1.8,
       texturedBy: 'backend',
       reprojected: false,

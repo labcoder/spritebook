@@ -9,12 +9,15 @@ import {
   parseWith,
 } from '@spritebook/schema';
 import { applyPatchOps, ManifestJournal } from './journal.ts';
+import { sha256Bytes } from './cache.ts';
+import { resultPaths, workspacePaths } from './workspace.ts';
 
 const held = new AsyncLocalStorage<Set<string>>();
 interface State {
   doc: CharacterManifest;
   patches: ManifestPatch[];
   cursor: number;
+  assetHash?: string | null;
 }
 
 /** OS locks release on process death. Never unlink the lock file (inode races). */
@@ -37,10 +40,12 @@ export async function withManifestLock<T>(path: string, run: () => Promise<T>): 
 }
 
 /** Unique staging plus file sync; directory-entry durability is not promised on power loss. */
-export async function writeAtomic(path: string, text: string): Promise<void> {
+export async function writeAtomic(path: string, text: string | Uint8Array): Promise<void> {
   const tmp = `${path}.${crypto.randomUUID()}.tmp`;
   try {
-    await Deno.writeTextFile(tmp, text, { createNew: true });
+    await Deno.writeFile(tmp, typeof text === 'string' ? new TextEncoder().encode(text) : text, {
+      createNew: true,
+    });
     {
       using file = await Deno.open(tmp, { write: true });
       await file.sync();
@@ -68,7 +73,81 @@ function validateState(raw: State, path: string): State {
   if (!Number.isInteger(raw.cursor) || raw.cursor < 0 || raw.cursor > patches.length) {
     throw new Error(`corrupt cursor file at "${path}" (journal has ${patches.length} patches)`);
   }
-  return { doc, patches, cursor: raw.cursor };
+  if (raw.assetHash !== undefined && raw.assetHash !== (doc.canonicalMesh?.gltfSha256 ?? null)) {
+    throw new Error(`Pending asset selection disagrees with the manifest at "${path}"`);
+  }
+  return {
+    doc,
+    patches,
+    cursor: raw.cursor,
+    ...(raw.assetHash === undefined ? {} : { assetHash: raw.assetHash }),
+  };
+}
+
+function revisionPath(path: string, hash: string) {
+  return `${workspacePaths(dirname(path)).canonicalDir}/revisions/${hash}.glb`;
+}
+
+async function fileExists(path: string) {
+  try {
+    await Deno.stat(path);
+    return true;
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) return false;
+    throw e;
+  }
+}
+
+async function retain(path: string, hash: string, bytes: Uint8Array): Promise<void> {
+  if (await sha256Bytes(bytes) !== hash) {
+    throw new Error(`Canonical asset hash mismatch at "${path}"; nothing was committed.`);
+  }
+  const revision = revisionPath(path, hash);
+  if (await fileExists(revision)) {
+    if (await sha256Bytes(await Deno.readFile(revision)) !== hash) {
+      throw new Error(`Corrupt asset revision "${revision}"`);
+    }
+    return;
+  }
+  await Deno.mkdir(dirname(revision), { recursive: true });
+  await writeAtomic(revision, bytes);
+}
+
+async function prepareAssets(
+  path: string,
+  before: CharacterManifest,
+  after: State,
+  source?: string,
+) {
+  const canonical = workspacePaths(dirname(path)).canonicalModel;
+  const current = before.canonicalMesh?.gltfSha256;
+  let managed = source !== undefined;
+  if (current && await fileExists(canonical)) {
+    await retain(path, current, await Deno.readFile(canonical));
+    managed = true;
+  }
+  const next = after.doc.canonicalMesh?.gltfSha256;
+  if (source) {
+    if (!next) throw new Error('A canonical asset requires its manifest hash.');
+    await retain(path, next, await Deno.readFile(source));
+  }
+  if (next && await fileExists(revisionPath(path, next))) {
+    await retain(path, next, await Deno.readFile(revisionPath(path, next)));
+    managed = true;
+  }
+  if (!managed) return;
+  if (next && !(await fileExists(revisionPath(path, next)))) {
+    // Legacy picks may still have their exact bytes; transformed history cannot be invented.
+    const result = after.doc.generation.results.find((r) => r.output.gltfSha256 === next);
+    const original = result ? resultPaths(dirname(path), result.id).model : undefined;
+    if (!original || !(await fileExists(original))) {
+      throw new Error(
+        `Historical canonical revision ${next} is unavailable; nothing was committed.`,
+      );
+    }
+    await retain(path, next, await Deno.readFile(original));
+  }
+  after.assetHash = next ?? null;
 }
 
 async function stateOf(path: string): Promise<State> {
@@ -91,6 +170,16 @@ async function stateOf(path: string): Promise<State> {
 }
 
 async function materialize(path: string, state: State): Promise<void> {
+  const canonical = workspacePaths(dirname(path)).canonicalModel;
+  if (state.assetHash) {
+    const bytes = await Deno.readFile(revisionPath(path, state.assetHash));
+    if (await sha256Bytes(bytes) !== state.assetHash) {
+      throw new Error('Corrupt canonical revision; recovery refused.');
+    }
+    await writeAtomic(canonical, bytes);
+  } else if (state.assetHash === null && await fileExists(canonical)) {
+    await Deno.remove(canonical);
+  }
   await writeAtomic(`${path}.journal.ndjson`, state.patches.map(canonicalJson).join(''));
   await writeAtomic(`${path}.journal.cursor`, String(state.cursor));
   await writeAtomic(path, canonicalJson(state.doc));
@@ -137,6 +226,7 @@ export async function commitManifest(
   path: string,
   build: (manifest: CharacterManifest) => { op: JsonPatchOp[]; label: string },
   now?: () => string,
+  canonicalSource?: string,
 ): Promise<CharacterManifest> {
   return await withManifestLock(path, async () => {
     await recover(path);
@@ -152,6 +242,7 @@ export async function commitManifest(
       patches: [...kept, patch],
       cursor: kept.length + 1,
     }, path);
+    await prepareAssets(path, state.doc, next, canonicalSource);
     await persist(path, next);
     return next.doc;
   });
@@ -186,6 +277,7 @@ export async function moveManifestCursor(path: string, direction: 'undo' | 'redo
         { code: 'invalid-manifest' },
       );
     }
+    await prepareAssets(path, state.doc, next);
     await persist(path, next);
     return patch;
   });

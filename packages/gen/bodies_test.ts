@@ -16,7 +16,12 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { Document, NodeIO } from '@gltf-transform/core';
 import type { GenerationResult, JobEvent } from '@spritebook/schema';
-import { appendGenerationResult, createWorkspace, resultPaths } from '@spritebook/core';
+import {
+  appendGenerationResult,
+  createWorkspace,
+  resultPaths,
+  sha256Bytes,
+} from '@spritebook/core';
 import type { CharacterId } from '@spritebook/schema';
 import { runPickJob } from './mod.ts';
 
@@ -71,7 +76,10 @@ async function workspaceWith(receipts: GenerationResult[]): Promise<string> {
   });
   const glb = await triangleGlb();
   for (const r of receipts) {
-    await appendGenerationResult(ws, r);
+    await appendGenerationResult(ws, {
+      ...r,
+      output: { ...r.output, gltfSha256: await sha256Bytes(glb) },
+    });
     const rp = resultPaths(ws, r.id);
     await Deno.mkdir(rp.dir, { recursive: true });
     await Deno.writeFile(rp.model, glb);

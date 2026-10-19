@@ -23,9 +23,19 @@ guarantee. File syncing helps persistence, but cross-platform directory-entry du
 sudden power loss is not promised. Legacy direct file readers are not transaction-aware; migrate the
 remaining GUI reads through core in F1-T4. Do not run old and new writers concurrently.
 
-F1-T1 extends this same commit point to canonical asset revisions and materialization. Until that
-step lands, metadata recovery does not repair the old asset-undo defect. Never test migration on the
-sealed F0 controls or original user workspaces.
+Canonical GLB revisions, including embedded textures, live under `canonical/revisions/<sha256>.glb`.
+Before intent, the writer verifies and retains the previous selected bytes and the staged new bytes.
+The pending record's optional `assetHash` must agree with its manifest; recovery materializes that
+complete revision before replacing metadata. Undo/redo selects the retained revision, and undoing a
+first pick removes its materialized canonical file. Rig and identity jobs submit staged files to the
+writer; they never replace accepted canonical bytes before committing their patch.
+
+Existing workspaces retain their schema and layout. Revisions are captured when first edited; legacy
+picks can recover from an exact surviving result file. Missing transformed history cannot be
+reconstructed honestly, so that undo refuses without changing the selected asset. Corrupt or
+mismatched selected/revision bytes refuse too. Revision files are deduplicated by hash and retained;
+there is no automatic history garbage collection. Metadata-only fixtures/workspaces without asset
+bytes remain readable. Never test migration on the sealed F0 controls or original user workspaces.
 
 Validation uses independent child processes: concurrent appenders retain both histories and their
 inverses; abrupt exit before intent and after each rename boundary recovers a coherent old/new

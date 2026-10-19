@@ -237,7 +237,8 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
             `colour-match pass did not run. The texture keeps the backend's own colours.`,
         };
       } else {
-        const matched = `${paths.canonicalDir}/pick-${opts.resultId}-matched.tmp.glb`;
+        const matched =
+          `${paths.canonicalDir}/pick-${crypto.randomUUID()}-${opts.resultId}-matched.tmp.glb`;
         tmp.push(matched);
         const stats = await colorMatchTexture({
           modelPath: staged,
@@ -309,7 +310,8 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
         };
         break reproject;
       }
-      const painted = `${paths.canonicalDir}/pick-${opts.resultId}-reprojected.tmp.glb`;
+      const painted =
+        `${paths.canonicalDir}/pick-${crypto.randomUUID()}-${opts.resultId}-reprojected.tmp.glb`;
       tmp.push(painted);
       try {
         const stats = await reprojectTexture({
@@ -348,12 +350,8 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       }
     }
 
-    // every stage succeeded: the staged file becomes THE canonical mesh in one
-    // rename, and the manifest follows it in ONE patch. Both the promotion and
-    // the re-pin land together, so `spritebook undo` after `pick --reproject`
-    // pops the whole step instead of half of it.
-    await Deno.rename(staged, canonicalPath);
-    const finalBytes = await Deno.readFile(canonicalPath);
+    // Core retains both revisions and publishes these staged bytes with the manifest patch.
+    const finalBytes = await Deno.readFile(staged);
     const repainted = reprojected || colorMatched;
     const suffix = reprojected && colorMatched
       ? ' (color-matched, reprojected)'
@@ -364,6 +362,7 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       : '';
     await pickResult(opts.workspace, opts.resultId, {
       label: `Pick ${opts.resultId}${suffix}`,
+      canonicalSource: staged,
       // the height is measured from the mesh: the receipt does not carry one,
       // and core refuses to invent it
       heightM: await heightOf(finalBytes),

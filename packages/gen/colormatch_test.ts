@@ -210,10 +210,17 @@ Deno.test('a pathological spread ratio is clamped, and says which channels', asy
 // ---------------------------------------------------------------------------
 
 Deno.test('pick colour-matches by default, pins the image sha, and one undo takes it back', async () => {
-  const { appendGenerationResult, applyPatchOps, createWorkspace, resultPaths } = await import(
+  const {
+    appendGenerationResult,
+    moveManifestCursor,
+    readWorkspace,
+    sha256Bytes,
+    createWorkspace,
+    resultPaths,
+  } = await import(
     '@spritebook/core'
   );
-  const { CharacterManifestSchema, ManifestPatchSchema, parseWith } = await import(
+  const { CharacterManifestSchema, parseWith } = await import(
     '@spritebook/schema'
   );
   const { runPickJob } = await import('./mod.ts');
@@ -237,6 +244,9 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
   await Deno.mkdir(`${ws}/source`, { recursive: true });
   await Deno.rename(img, `${ws}/source/${sha}.png`);
 
+  const rp = resultPaths(ws, 'r1');
+  await Deno.mkdir(rp.dir, { recursive: true });
+  await glbWithTexture(rp.model, 32, 32, () => [24, 106, 76]);
   const receipt = {
     id: 'r1',
     backend: { modelId: 'fixture-gen', version: '1.0.0' },
@@ -244,13 +254,14 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
     seed: 1,
     startedAt: '2026-07-30T00:00:00.000Z',
     wallTimeS: 1,
-    output: { gltfSha256: 'a'.repeat(64), tris: 1, kind: 'mesh' as const },
+    output: {
+      gltfSha256: await sha256Bytes(await Deno.readFile(rp.model)),
+      tris: 1,
+      kind: 'mesh' as const,
+    },
     discarded: false,
   };
   await appendGenerationResult(ws, receipt);
-  const rp = resultPaths(ws, 'r1');
-  await Deno.mkdir(rp.dir, { recursive: true });
-  await glbWithTexture(rp.model, 32, 32, () => [24, 106, 76]); // green texture
 
   // noReproject: this fixture is one synthetic triangle, which the real
   // reprojection pass rightly refuses; the reproject DEFAULT is covered by the
@@ -281,13 +292,9 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
   const canon = await textureOf(`${ws}/canonical/model.glb`);
   assert(canon[0] !== 24 || canon[2] !== 76, 'the canonical texture is the matched one');
 
-  // ONE journaled patch: a single undo restores the un-picked manifest whole
-  const lines = (await Deno.readTextFile(`${ws}/character.json.journal.ndjson`))
-    .split('\n').filter(Boolean);
-  const last = parseWith(ManifestPatchSchema, JSON.parse(lines[lines.length - 1]), 'patch');
-  const undone = applyPatchOps(m as never, last.inverse);
-  const back = parseWith(CharacterManifestSchema, undone, 'undone');
-  assertEquals(back.canonicalMesh, undefined, 'one undo pops promote+match together');
+  // Exercise the actual writer, including removal of the first selected asset.
+  await moveManifestCursor(`${ws}/character.json`, 'undo');
+  assertEquals((await readWorkspace(ws)).canonicalMesh, undefined);
 
   // and --no-color-match is honoured
   const events2: unknown[] = [];
