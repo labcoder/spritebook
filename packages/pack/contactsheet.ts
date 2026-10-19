@@ -9,10 +9,13 @@
  * bytes.
  */
 // @ts-types="./gifenc.d.ts"
-import gifenc from 'gifenc';
+import * as gifenc from 'gifenc';
 import { type FrameId, frameIdKey } from './contracts.ts';
 
-const { GIFEncoder, quantize, applyPalette } = gifenc;
+// Deno loads the CJS namespace as default; bundlers select the named ESM exports.
+const { GIFEncoder, quantize, applyPalette } = typeof gifenc.default === 'function'
+  ? gifenc
+  : gifenc.default;
 
 const BG: [number, number, number] = [240, 240, 240];
 

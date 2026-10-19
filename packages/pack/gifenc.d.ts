@@ -1,7 +1,6 @@
 /**
  * Minimal typings for npm:gifenc (untyped upstream) — just what pack uses.
- * gifenc ships CJS via `main` with no `exports` map, so named ESM imports are
- * not statically visible; import the default namespace and destructure.
+ * Named exports are shared by its CJS main and ESM bundle entry.
  */
 interface GifEncoderInstance {
   writeFrame(
@@ -14,9 +13,12 @@ interface GifEncoderInstance {
   bytes(): Uint8Array;
 }
 
+export function GIFEncoder(): GifEncoderInstance;
+export function quantize(rgba: Uint8Array, maxColors: number): number[][];
+export function applyPalette(rgba: Uint8Array, palette: number[][]): Uint8Array;
 declare const gifenc: {
-  GIFEncoder(): GifEncoderInstance;
-  quantize(rgba: Uint8Array, maxColors: number): number[][];
-  applyPalette(rgba: Uint8Array, palette: number[][]): Uint8Array;
+  GIFEncoder: typeof GIFEncoder;
+  quantize: typeof quantize;
+  applyPalette: typeof applyPalette;
 };
 export default gifenc;
