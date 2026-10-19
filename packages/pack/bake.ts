@@ -1,3 +1,4 @@
+import { projectPins } from '@spritebook/registry';
 /**
  * The bake orchestrator (P2-T3): canonical glb -> styled, packed, manifested
  * bake dir, entirely via files across the D-004 seams (render seam -> pure
@@ -24,7 +25,7 @@ import type {
   StylePreset,
 } from '@spritebook/schema';
 import { canonicalJson, RENDER_PASSES } from '@spritebook/schema';
-import { sha256Hex } from '@spritebook/core';
+import { sha256Hex, workspaceJob } from '@spritebook/core';
 import {
   AMBIENT,
   DEFAULT_LIGHT_FRAME,
@@ -42,6 +43,7 @@ import {
 } from '@spritebook/style';
 import {
   type Clip,
+  loadPack,
   loadPackClip,
   loadSkeletonRestFromFile,
   retargetClip,
@@ -71,6 +73,8 @@ import { buildContactSheet } from './contactsheet.ts';
 
 export interface BakeJobSpec {
   jobId: string;
+  workspace?: string;
+  pinsPath?: string;
   /** immutable character id (slug) — binds the cache */
   characterId: string;
   /** canonical glb from the importer border */
@@ -636,7 +640,7 @@ function decodeCell(bytes: Uint8Array, kind: 'rgba8' | 'gray16'): CellPlane {
 }
 
 /** Bake one character: render -> style -> pack -> manifest, files + events only. */
-export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
+async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
   const at = () => new Date().toISOString();
   const jobId = spec.jobId as JobEvent['jobId'];
   const t0 = performance.now();
@@ -646,6 +650,8 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
   // hoisted so the catch can release the recompute temp dir on ANY failure (m6)
   let cleanup: (() => Promise<void>) | undefined;
   try {
+    await projectPins(spec);
+    if (spec.clips?.length) await loadPack(spec.packDir ?? BUNDLED_PACK, spec);
     // model existence first (the friendlier error on every machine), THEN the
     // adapter-bound render signature — baking is a GPU operation either way
     try {
@@ -833,9 +839,13 @@ export async function* runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       t: 'error',
       jobId,
       at: at(),
-      code: 'bake-failed',
+      code: (err as { code?: string }).code ?? 'bake-failed',
       message: err instanceof Error ? err.message : String(err),
       retryable: false,
     };
   }
+}
+
+export function runBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
+  return workspaceJob(spec.workspace, () => executeBakeJob(spec));
 }

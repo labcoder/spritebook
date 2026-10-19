@@ -1,3 +1,4 @@
+import { canonicalJson, type LicenseInfo } from '@spritebook/schema';
 /**
  * Streaming sha256 (D-009): checkpoints are GB-scale, so hashing must never
  * buffer a whole file. std/crypto's digest consumes an async iterable of
@@ -26,4 +27,10 @@ export async function hashFile(path: string): Promise<string> {
     }
     throw err;
   }
+}
+
+export async function licenseFingerprint(license: LicenseInfo): Promise<string> {
+  return digestHex(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalJson(license))),
+  );
 }

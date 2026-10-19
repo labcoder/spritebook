@@ -13,3 +13,5 @@ export * from './pins.ts';
 export * from './gates.ts';
 export * from './hash.ts';
 export * from './install.ts';
+
+export * from './execution.ts';

@@ -23,10 +23,12 @@ import {
   adapterFor,
   BakeManifestSchema,
   canonicalJson,
+  defaultsFor,
   type ExportTargetId,
   ExportTargetIdSchema,
   type JobEvent,
   parseWith,
+  preflightVram,
   SCHEMA_VERSION,
 } from '@spritebook/schema';
 import type {
@@ -41,6 +43,7 @@ import type {
   StylePreset,
 } from '@spritebook/schema';
 import {
+  acquireVramLeaseEvents,
   CAMERA_PRESETS,
   DEFAULT_CAMERA_PRESET_ID,
   encodeEvent,
@@ -419,6 +422,8 @@ export function bakeSpecFromFlags(args: string[], resolved: BakeResolution): Bak
   const stored = resolveStyle(styleId, resolved.look?.overrides);
   return {
     jobId: 'bake',
+    workspace: flag(args, 'workspace'),
+    pinsPath: flag(args, 'pins'),
     characterId: resolved.character,
     modelPath: resolved.model,
     camera: resolveCamera(cameraPresetIdFor(args, resolved.look), {
@@ -626,6 +631,7 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
   rename: ['workspace', 'name'],
   clone: ['workspace', 'to', 'id', 'name'],
   rig: [
+    'catalog',
     'model',
     'out',
     'track-a',
@@ -652,6 +658,10 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
   models: ['models-dir', 'catalog', 'installed', 'accept-license', 'territory', 'from'],
   doctor: ['sidecar'],
 };
+
+for (const verb of ['gen', 'retexture', 'rig', 'prep', 'bake', 'anim']) {
+  VERB_FLAGS[verb] = [...VERB_FLAGS[verb], 'pins'];
+}
 
 /** Accepted everywhere. */
 const GLOBAL_FLAGS = ['json', 'log-append'] as const;
@@ -843,11 +853,11 @@ export async function resolveBake(
   if (workspace !== undefined && (flag(args, 'clips') !== undefined || stored.length > 0)) {
     try {
       const { loadPack } = await import('@spritebook/anim');
-      packId = (await loadPack(packDir)).id;
+      packId = (await loadPack(packDir, { workspace, pinsPath: flag(args, 'pins') })).id;
     } catch (err) {
       return fail(
         bakeId,
-        'bad-pack',
+        (err as { code?: string }).code ?? 'bad-pack',
         `Cannot read an animation pack at "${packDir}": ${
           err instanceof Error ? err.message : String(err)
         }`,
@@ -1544,6 +1554,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         const { BUNDLED_PACK } = await import('@spritebook/pack');
         const packDir = flag(args, 'packs') ?? BUNDLED_PACK;
         try {
+          await loadPack(packDir, { workspace, pinsPath: flag(args, 'pins') });
           const source = await loadPackClip(packDir, previewClip);
           const sourceRest = await loadSkeletonRestFromFile(
             `${packDir}/clips/${previewClip}.glb`,
@@ -1591,7 +1602,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         } catch (err) {
           return fail(
             'anim' as JobEvent['jobId'],
-            'preview-failed',
+            (err as { code?: string }).code ?? 'preview-failed',
             err instanceof Error ? err.message : String(err),
           );
         }
@@ -1652,7 +1663,10 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           packDirs.sort();
           const clipToPack = new Map<string, string>();
           for (const dir of packDirs) {
-            const pack = await loadPack(dir);
+            const pack = await loadPack(dir, {
+              workspace: flag(args, 'workspace'),
+              pinsPath: flag(args, 'pins'),
+            });
             for (const c of pack.clips) {
               if (!clipToPack.has(c.id)) clipToPack.set(c.id, pack.id);
             }
@@ -1736,7 +1750,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     } catch (err) {
       return fail(
         'anim' as JobEvent['jobId'],
-        'anim-failed',
+        (err as { code?: string }).code ?? 'anim-failed',
         err instanceof Error ? err.message : String(err),
       );
     }
@@ -1814,6 +1828,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
             sidecarDir: sidecarDir(),
             modelsRoot: flag(args, 'models-dir'),
             catalogPath: flag(args, 'catalog'),
+            pinsPath: flag(args, 'pins'),
           }),
           emit,
         );
@@ -1877,13 +1892,14 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           sidecarDir: sidecarDir(),
           modelsRoot: flag(args, 'models-dir'),
           catalogPath: flag(args, 'catalog'),
+          pinsPath: flag(args, 'pins'),
         }),
         emit,
       );
     } catch (err) {
       return fail(
         verb as JobEvent['jobId'],
-        'bad-args',
+        (err as { code?: string }).code ?? 'bad-args',
         err instanceof Error ? err.message : String(err),
       );
     }
@@ -1952,7 +1968,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     } catch (err) {
       return fail(
         'identity' as JobEvent['jobId'],
-        'bad-args',
+        (err as { code?: string }).code ?? 'bad-args',
         err instanceof Error ? err.message : String(err),
       );
     }
@@ -2272,7 +2288,10 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
 
       const backend = flag(args, 'backend') ?? 'unirig';
       const root = flag(args, 'models-dir') ?? registry.defaultModelsRoot();
-      const installed = await registry.resolveInstalled(root, backend);
+      const installed = await registry.resolvePinnedInstalled(root, backend, undefined, {
+        workspace: flag(args, 'workspace'),
+        pinsPath: flag(args, 'pins'),
+      });
       if (!installed) {
         // when this process's %LOCALAPPDATA% is a container overlay, SAY SO (D-039)
         return fail(
@@ -2290,7 +2309,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       // so the VRAM figure is resolved HERE, where the catalog already is. A
       // backend with no declared minimum claims nothing rather than a guess:
       // an invented number would queue jobs behind a ceiling nobody measured.
-      const catalog = await registry.loadCatalog();
+      const catalog = await registry.loadCatalog(flag(args, 'catalog'));
       const rigVersion = catalog.models.find((m) => m.id === backend)?.versions.find((
         v,
       ) => v.version === installed.version);
@@ -2303,6 +2322,8 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           outDir: out,
           sidecarDir,
           modelDir: registry.versionDir(root, backend, installed.version),
+          catalogPath: flag(args, 'catalog'),
+          pinsPath: flag(args, 'pins'),
           backend,
           ...(rigVersion?.minVramGb !== undefined ? { vramGb: rigVersion.minVramGb } : {}),
           vramBudgetGb,
@@ -2318,7 +2339,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     } catch (err) {
       return fail(
         'rig' as JobEvent['jobId'],
-        'bad-args',
+        (err as { code?: string }).code ?? 'bad-args',
         err instanceof Error ? err.message : String(err),
       );
     }
@@ -2342,7 +2363,9 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     const { SidecarSession } = await import('@spritebook/core');
     try {
       const root = flag(args, 'models-dir') ?? registry.defaultModelsRoot();
-      const installed = await registry.resolveInstalled(root, 'rembg-u2net');
+      const installed = await registry.resolvePinnedInstalled(root, 'rembg-u2net', undefined, {
+        pinsPath: flag(args, 'pins'),
+      });
       if (!installed) {
         return fail(
           'prep' as JobEvent['jobId'],
@@ -2358,9 +2381,35 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       const prepCatalog = await registry.loadCatalog(flag(args, 'catalog'));
       const prepEntry = prepCatalog.models.find((m) => m.id === 'rembg-u2net');
       const prepVersion = prepEntry?.versions.find((v) => v.version === installed.version);
-      const prepAdapter = prepVersion
-        ? adapterFor('rembg-u2net', prepVersion, 'imageprep')
-        : 'rembg';
+      if (!prepEntry || !prepVersion) {
+        return fail(
+          'prep' as JobEvent['jobId'],
+          'unknown-model',
+          'Installed image-prep version is not in the catalog',
+        );
+      }
+      await registry.verifyExecutionModel({
+        root,
+        catalog: prepCatalog,
+        entry: prepEntry,
+        version: prepVersion,
+        receipt: installed.receipt,
+      });
+      const prepParams = defaultsFor(prepVersion, 'imageprep');
+      const prepClaim = registry.executionVram(prepVersion, 'imageprep', prepParams);
+      const prepBudget = await registry.detectVramGb();
+      const memory = preflightVram(prepClaim, prepBudget);
+      if (!memory.ok) return fail('prep' as JobEvent['jobId'], memory.code, memory.message);
+      if (memory.warn) {
+        emit({
+          t: 'warn',
+          jobId: 'prep' as JobEvent['jobId'],
+          at: now(),
+          code: `vram-${memory.status}`,
+          message: memory.warn,
+        }, memory.warn);
+      }
+      const prepAdapter = adapterFor('rembg-u2net', prepVersion, 'imageprep');
       let sidecarDir = flag(args, 'sidecar') ?? Deno.env.get('SPRITEBOOK_SIDECAR_DIR');
       if (!sidecarDir) {
         const repoSidecar = decodeURIComponent(
@@ -2379,22 +2428,31 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       }
       await Deno.mkdir(out, { recursive: true });
       const session = new SidecarSession({ sidecarDir });
-      try {
-        return await pump(
-          session.run({
+      const events = async function* (): AsyncIterable<JobEvent> {
+        const lease = yield* acquireVramLeaseEvents({
+          gb: prepClaim ?? 0,
+          budgetGb: prepBudget,
+          jobId: 'prep' as JobEvent['jobId'],
+        }, now);
+        try {
+          yield* session.run({
             jobId: 'prep' as JobEvent['jobId'],
             kind: prepAdapter,
-            params: { imagePath: image, outDir: out, modelDir },
-          }),
-          emit,
-        );
+            params: { ...prepParams, imagePath: image, outDir: out, modelDir },
+          });
+        } finally {
+          await lease.release();
+        }
+      };
+      try {
+        return await pump(events(), emit);
       } finally {
         await session.dispose();
       }
     } catch (err) {
       return fail(
         'prep' as JobEvent['jobId'],
-        'prep-failed',
+        (err as { code?: string }).code ?? 'prep-failed',
         err instanceof Error ? err.message : String(err),
       );
     }
@@ -2431,7 +2489,11 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
             );
             for (const v of m.versions) {
               const size = `${(v.diskBytes / 1e9).toFixed(2).padStart(6)} GB`;
-              const vram = v.minVramGb ? `  >=${v.minVramGb} GiB VRAM` : '';
+              const vram = v.vramProfiles
+                ? '  config-specific VRAM profiles'
+                : v.minVramGb
+                ? `  >=${v.minVramGb} GiB VRAM`
+                : '';
               io.stdout(
                 `  ${v.version.padEnd(12)} ${size}  ${v.platforms.join(',')}${vram}${
                   v.installed ? '  [installed]' : ''
@@ -2647,7 +2709,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     } catch (err) {
       return fail(
         'export' as JobEvent['jobId'],
-        'bad-args',
+        (err as { code?: string }).code ?? 'bad-args',
         err instanceof Error ? err.message : String(err),
       );
     }

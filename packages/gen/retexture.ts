@@ -1,4 +1,4 @@
-import { workspaceJob } from '@spritebook/core';
+import { acquireVramLeaseEvents, type VramLease, workspaceJob } from '@spritebook/core';
 /**
  * `spritebook retexture` — keep the mesh, reroll the paint.
  *
@@ -61,9 +61,13 @@ import {
   defaultModelsRoot,
   detectPlatform,
   detectVramGb,
+  executionVram,
   gatePlatform,
   loadCatalog,
+  pinnedVersion,
+  projectPins,
   resolveInstalled,
+  verifyExecutionModel,
   versionDir,
   virtualizationNote,
 } from '@spritebook/registry';
@@ -92,6 +96,7 @@ export interface RetextureJobOptions {
   modelsRoot?: string;
   sidecarDir: string;
   catalogPath?: string;
+  pinsPath?: string;
   /** injected VRAM reading (tests); omitted -> the real probe */
   detectedVramGb?: number | null;
 }
@@ -140,6 +145,7 @@ async function* executeRetextureJob(
   yield { t: 'started', jobId, at: at() };
 
   let session: SidecarSession | undefined;
+  let lease: VramLease | undefined;
   try {
     // 1. the parent, and the mesh it is made of
     const manifest = await readWorkspace(opts.workspace);
@@ -201,7 +207,17 @@ async function* executeRetextureJob(
         }`,
       );
     }
-    const pool = opts.modelId ? candidates.filter((c) => c.entry.id === opts.modelId) : candidates;
+    const pins = await projectPins(opts);
+    if (opts.modelId) pinnedVersion(pins, 'models', opts.modelId, opts.version);
+    const pool = candidates.filter((c) =>
+      (!opts.modelId || c.entry.id === opts.modelId) &&
+      (!pins || Object.hasOwn(pins.models, c.entry.id))
+    );
+    if (!pool.length) {
+      throw Object.assign(new Error('No retexture backend is allowed by project pins'), {
+        code: 'pin-required',
+      });
+    }
 
     const root = opts.modelsRoot ?? defaultModelsRoot();
     // Resolve what is INSTALLED per entry, then match it against that entry's
@@ -212,9 +228,18 @@ async function* executeRetextureJob(
     // "the highest installed", which is not "the highest installed that can do
     // this", so the job would refuse with "install it" for something already
     // installed.
-    let chosen: { entry: ModelEntry; version: ModelVersion; installedVersion: string } | undefined;
+    let chosen: {
+      entry: ModelEntry;
+      version: ModelVersion;
+      installedVersion: string;
+      receipt: import('@spritebook/schema').InstallReceipt;
+    } | undefined;
     for (const entryId of [...new Set(pool.map((c) => c.entry.id))]) {
-      const installed = await resolveInstalled(root, entryId, opts.version);
+      const installed = await resolveInstalled(
+        root,
+        entryId,
+        pinnedVersion(pins, 'models', entryId, opts.version),
+      );
       if (!installed) continue;
       const match = pool.find((c) =>
         c.entry.id === entryId && c.version.version === installed.version
@@ -224,6 +249,7 @@ async function* executeRetextureJob(
           entry: match.entry,
           version: match.version,
           installedVersion: installed.version,
+          receipt: installed.receipt,
         };
         break;
       }
@@ -242,18 +268,6 @@ async function* executeRetextureJob(
     }
     const { entry, version } = chosen;
 
-    // 3. gates, in `gen`'s order: platform, then the hard VRAM preflight
-    const plat = gatePlatform(version, await detectPlatform());
-    if (!plat.ok) throw new RetextureFail(plat.code, plat.message);
-    const vram = preflightVram(
-      version.minVramGb,
-      opts.detectedVramGb !== undefined ? opts.detectedVramGb : await detectVramGb(),
-    );
-    if (!vram.ok) throw new RetextureFail(vram.code, vram.message);
-    if (vram.warn) {
-      yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
-    }
-
     // 4. params: the RETEXTURE defaults, which are not the gen ones
     const check = checkOpParams(entry.id, version, RETEXTURE, {
       ...defaultsFor(version, RETEXTURE),
@@ -262,6 +276,33 @@ async function* executeRetextureJob(
     });
     if (!check.ok) throw new RetextureFail('invalid-params', check.message);
     const params = check.params;
+
+    // 3. gates, in `gen`'s order: platform, then the hard VRAM preflight
+    const platform = await detectPlatform();
+    const plat = gatePlatform(version, platform);
+    if (!plat.ok) throw new RetextureFail(plat.code, plat.message);
+    const detectedVramGb = opts.detectedVramGb !== undefined
+      ? opts.detectedVramGb
+      : await detectVramGb();
+    const claimGb = executionVram(version, RETEXTURE, params);
+    const vram = preflightVram(claimGb, detectedVramGb);
+    if (!vram.ok) throw new RetextureFail(vram.code, vram.message);
+    if (vram.warn) {
+      yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
+    }
+
+    await verifyExecutionModel({
+      root,
+      catalog,
+      entry,
+      version,
+      receipt: chosen.receipt,
+      platform,
+    });
+    lease = yield* acquireVramLeaseEvents(
+      { gb: claimGb ?? 0, jobId, budgetGb: detectedVramGb },
+      at,
+    );
 
     const resultId = nextResultId(manifest);
     const rp = resultPaths(opts.workspace, resultId);
@@ -419,9 +460,10 @@ async function* executeRetextureJob(
       wallTimeS: Number(((performance.now() - t0) / 1000).toFixed(3)),
     };
   } catch (err) {
-    const fail = err instanceof RetextureFail
-      ? err
-      : new RetextureFail('retexture-failed', err instanceof Error ? err.message : String(err));
+    const fail = err instanceof RetextureFail ? err : new RetextureFail(
+      (err as { code?: string }).code ?? 'retexture-failed',
+      err instanceof Error ? err.message : String(err),
+    );
     yield {
       t: 'error',
       jobId,
@@ -432,6 +474,7 @@ async function* executeRetextureJob(
     };
   } finally {
     await session?.dispose();
+    await lease?.release();
   }
 }
 

@@ -35,6 +35,7 @@ interface CatalogVersion {
   version: string;
   diskBytes: number;
   minVramGb?: number;
+  vramProfiles?: { operation: string; params: Record<string, unknown>; minGb: number }[];
   installed: boolean;
   paramsSchema: unknown;
   defaults: Record<string, unknown>;
@@ -104,7 +105,9 @@ function BackendCards({ models, selectedId, onSelect, dimUnselected }: {
                 </span>
               )}
               {v?.minVramGb !== undefined && (
-                <span className='mbadge'>≥{v.minVramGb} GiB VRAM</span>
+                <span className='mbadge'>
+                  {v.vramProfiles ? t('VRAM depends on configuration') : `≥${v.minVramGb} GiB VRAM`}
+                </span>
               )}
               {v?.installed
                 ? <span className='mbadge ok'>{t('installed')}</span>
@@ -415,15 +418,18 @@ export function GenerateNew(
     [version, resolved],
   );
 
-  // F3: a card the health exam measured at >= 16 GiB should not pay the
-  // lowVram tax by default. The flip is an EXPLICIT value, so it travels in
-  // --adjust exactly like a hand change, and flipping it back sticks (the
-  // `in` guard never overrides a user's own choice).
+  // Only suggest the resident mode when the catalog has a matching measured claim.
   useEffect(() => {
-    if ((vramGb ?? 0) >= 16 && resolved['lowVram'] === true) {
+    const resident = version?.vramProfiles?.find((p) =>
+      p.operation === 'gen3d' &&
+      p.params.lowVram === false && Object.entries(p.params).every(([k, v]) =>
+        k === 'lowVram' || resolved[k] === v
+      )
+    );
+    if (resident && (vramGb ?? 0) >= resident.minGb && resolved['lowVram'] === true) {
       setValues((cur) => ('lowVram' in cur ? cur : { ...cur, lowVram: false }));
     }
-  }, [vramGb, resolved]);
+  }, [vramGb, resolved, version]);
 
   const workspace = `${projectsRoot}/${slug || '<id>'}`;
   const heightVal = heightM.trim() === '' ? undefined : Number(heightM);
@@ -670,7 +676,7 @@ export function GenerateNew(
           values={values}
           onChange={(k, v) => setValues((cur) => ({ ...cur, [k]: v }))}
         />
-        {(vramGb ?? 0) >= 16 && values['lowVram'] === false && resolved['lowVram'] === true && (
+        {values['lowVram'] === false && resolved['lowVram'] === true && (
           <span className='inote'>
             {t('lowVram is off — the health exam found')} {vramGb} GiB
           </span>

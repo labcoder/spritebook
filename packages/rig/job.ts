@@ -1,3 +1,12 @@
+import { basename, dirname } from 'node:path';
+import { adapterFor, defaultsFor, paramsSchemaFor, preflightVram } from '@spritebook/schema';
+import {
+  detectVramGb,
+  executionVram,
+  loadCatalog,
+  resolvePinnedInstalled,
+  verifyExecutionModel,
+} from '@spritebook/registry';
 import { workspaceJob } from '@spritebook/core';
 /**
  * The `rig` job (P3-T3): predict a skeleton, apply it, check it deforms, and
@@ -41,6 +50,7 @@ import {
   acquireVramLeaseEvents,
   setRigState,
   SidecarSession,
+  validateParams,
   type VramLease,
   workspacePaths,
 } from '@spritebook/core';
@@ -61,6 +71,8 @@ export interface RigJobOptions {
   sidecarDir: string;
   /** where the registry installed the backend's weights */
   modelDir: string;
+  catalogPath?: string;
+  pinsPath?: string;
   /** adapter id in the sidecar roster */
   backend?: string;
   seed?: number;
@@ -75,14 +87,9 @@ export interface RigJobOptions {
   /** character workspace; when given, the rig is recorded as a journaled
    * patch so `spritebook undo` can take a repair back */
   workspace?: string;
-  /**
-   * VRAM this backend holds while it predicts — the catalog's `minVramGb` for
-   * the installed version. Resolved by the CALLER, because this job takes a
-   * pre-resolved `modelDir` and deliberately never sees the catalog (see the
-   * note by the adapter id below). Omitted or 0 takes no lease.
-   */
+  /** Optional extra reservation; never lowers the core-verified catalog claim. */
   vramGb?: number;
-  /** total machine VRAM; null/undefined means no budgeting at all */
+  /** Total machine VRAM; omitted probes hardware, null records an unknown budget. */
   vramBudgetGb?: number | null;
   /** shared lease directory; defaults to the machine-wide one */
   vramLeaseDir?: string;
@@ -117,6 +124,36 @@ async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
   let session: SidecarSession | undefined;
   let lease: VramLease | undefined;
   try {
+    const backend = opts.backend ?? 'unirig';
+    const catalog = await loadCatalog(opts.catalogPath);
+    const entry = catalog.models.find((m) => m.id === backend && m.kind === 'rig');
+    const root = dirname(dirname(opts.modelDir));
+    const requested = basename(opts.modelDir);
+    if (basename(dirname(opts.modelDir)) !== backend) {
+      throw new RigFail(
+        'model-missing',
+        'Rig modelDir must name the selected catalog backend/version',
+      );
+    }
+    const installed = await resolvePinnedInstalled(root, backend, requested, opts);
+    const version = entry?.versions.find((v) => v.version === installed?.version);
+    if (!entry || !version || !installed) {
+      throw new RigFail(
+        'model-missing',
+        `No catalog-pinned rig install for ${backend}@${requested}`,
+      );
+    }
+    const params = { ...defaultsFor(version, 'rig'), seed: opts.seed ?? 0 };
+    const check = validateParams(paramsSchemaFor(version, 'rig'), params);
+    if (!check.ok) throw new RigFail('invalid-params', check.errors.join('; '));
+    const claimGb = Math.max(executionVram(version, 'rig', params) ?? 0, opts.vramGb ?? 0);
+    const budgetGb = opts.vramBudgetGb !== undefined ? opts.vramBudgetGb : await detectVramGb();
+    const vram = preflightVram(claimGb || undefined, budgetGb ?? null);
+    if (!vram.ok) throw new RigFail(vram.code, vram.message);
+    if (vram.warn) {
+      yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
+    }
+    await verifyExecutionModel({ root, catalog, entry, version, receipt: installed.receipt });
     await Deno.mkdir(opts.outDir, { recursive: true });
     // Taken BEFORE the orientation fixes and the facing check, cheap as those
     // are, because the alternative is worse: a job that rewrites the user's
@@ -125,9 +162,9 @@ async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
     // lease — it needs no GPU at all (D-026), so charging it for one would
     // stall the humanoid path behind the generic one for nothing.
     lease = yield* acquireVramLeaseEvents({
-      gb: opts.vramGb ?? 0,
+      gb: claimGb,
       jobId,
-      budgetGb: opts.vramBudgetGb,
+      budgetGb,
       ...(opts.vramLeaseDir !== undefined ? { dir: opts.vramLeaseDir } : {}),
     }, at);
     let meshPath = opts.modelPath;
@@ -237,17 +274,13 @@ async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
     }
 
     session = new SidecarSession({ sidecarDir: opts.sidecarDir });
-    // The catalog id doubling as the adapter id, which `gen` and `prep` stopped
-    // assuming: `adapterFor` is the general answer, and this job cannot ask it
-    // because it takes a pre-resolved modelDir and never sees the catalog. It
-    // is correct for unirig, whose two names match. A rig backend whose names
-    // differ has to thread the version through first.
-    const backend = opts.backend ?? 'unirig';
+
     for await (
       const e of session.run({
         jobId: `${opts.jobId}-predict` as JobEvent['jobId'],
-        kind: backend,
+        kind: adapterFor(entry.id, version, 'rig'),
         params: {
+          ...params,
           meshPath,
           outDir: opts.outDir,
           seed: opts.seed ?? 0,
@@ -492,9 +525,10 @@ async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
       wallTimeS: Number(((performance.now() - t0) / 1000).toFixed(3)),
     };
   } catch (err) {
-    const fail = err instanceof RigFail
-      ? err
-      : new RigFail('rig-failed', err instanceof Error ? err.message : String(err));
+    const fail = err instanceof RigFail ? err : new RigFail(
+      (err as { code?: string }).code ?? 'rig-failed',
+      err instanceof Error ? err.message : String(err),
+    );
     yield {
       t: 'error',
       jobId,

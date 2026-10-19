@@ -61,7 +61,7 @@ export const WeightFileSchema = z.strictObject({
 export type WeightFile = z.output<typeof WeightFileSchema>;
 
 export const ModelVersionSchema = z.strictObject({
-  version: z.string().min(1),
+  version: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]*$/, 'version path segment'),
   /** Staged multi-file releases are the norm (UniRig: skeleton + skin ckpts).
    * EMPTY is legal and meaningful: a backend that ships no weights at all —
    * procedural or bundled — still belongs in the catalog so it carries a
@@ -71,6 +71,13 @@ export const ModelVersionSchema = z.strictObject({
   platforms: z.array(PlatformSchema).min(1),
   /** MEASURED peak for the configured path, never README claims (sidecar-vram) */
   minVramGb: z.number().positive().optional(),
+  /** Conservative admission claims tied to measured operation/configuration paths. */
+  vramProfiles: z.array(z.strictObject({
+    operation: CapabilitySchema,
+    params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+    minGb: z.number().positive(),
+    evidence: z.string().min(1),
+  })).min(1).optional(),
   paramsSchema: JsonSchemaSchema,
   defaults: z.record(z.string(), z.unknown()),
   /** Everything this version can do. Absent means "the entry's `kind`, and only
@@ -294,7 +301,7 @@ export const InstallReceiptSchema = z.strictObject({
   /** every file as verified on disk (re-checked by `models verify`); empty
    * for a weightless backend, whose receipt records only that the gates ran */
   files: z.array(z.strictObject({
-    path: z.string().min(1),
+    path: WeightFileSchema.shape.path,
     sha256: z.string().regex(/^[0-9a-f]{64}$/),
     bytes: z.int().positive(),
   })),
@@ -303,6 +310,8 @@ export const InstallReceiptSchema = z.strictObject({
     name: z.string().min(1),
     spdx: z.string().optional(),
     at: z.string().min(1),
+    /** Hash of the catalog's complete declared license terms at acceptance. */
+    fingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
   }).nullable(),
   /** D-027: territory is an informed self-declaration (local-first, no
    * geolocation); required only when the license excludes territories */
@@ -341,8 +350,8 @@ export const AnimationPackSchema = z.strictObject({
 export type AnimationPack = z.output<typeof AnimationPackSchema>;
 
 export const ProjectPinsSchema = z.strictObject({
-  models: z.record(z.string(), z.string()),
-  packs: z.record(z.string(), z.string()),
+  models: z.record(z.string(), z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]*$/)),
+  packs: z.record(z.string(), z.string().min(1)),
   /**
    * The renderer build this project pins. NOTE: nothing reads it today — cache
    * keys carry `renderSignature()` (render/diagnostics.ts), which composes

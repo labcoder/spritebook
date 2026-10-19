@@ -49,7 +49,7 @@ import {
   rootUnderLocalAppData,
   type VirtualizationReport,
 } from './virtualization.ts';
-import { hashFile } from './hash.ts';
+import { hashFile, licenseFingerprint } from './hash.ts';
 
 /** Injectable downloader: fetch `url` into `destPath`, optionally reporting bytes so far. */
 export type Fetcher = (
@@ -297,6 +297,7 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
             name: entry.license.name,
             ...(entry.license.spdx !== undefined ? { spdx: entry.license.spdx } : {}),
             at: at(),
+            fingerprint: await licenseFingerprint(entry.license),
           }
           : null,
         ...(opts.territory !== undefined ? { territoryDeclared: opts.territory } : {}),
@@ -399,7 +400,10 @@ export async function* runVerifyJob(opts: VerifyJobOpts): AsyncIterable<JobEvent
         );
       }
       const pin = catVersion?.files.find((cf) => cf.path === f.path);
-      if (pin && pin.sha256 !== sha) {
+      if (catVersion && !pin) {
+        throw new JobFail('verify-failed', `Receipt file "${f.path}" is not pinned by the catalog`);
+      }
+      if (pin && (pin.sha256 !== sha || pin.bytes !== f.bytes)) {
         throw new JobFail(
           'verify-failed',
           `File "${f.path}" hashes ${sha} (matching its receipt) but the catalog now ` +
@@ -492,6 +496,7 @@ export interface ListedVersion {
   diskBytes: number;
   platforms: Platform[];
   minVramGb?: number;
+  vramProfiles?: ModelVersion['vramProfiles'];
   installed: boolean;
   /** the D-009 form contract, verbatim from the catalog entry */
   paramsSchema: ModelVersion['paramsSchema'];
@@ -543,6 +548,7 @@ export async function runListQuery(
       diskBytes: versionDiskBytes(v),
       platforms: v.platforms,
       ...(v.minVramGb !== undefined ? { minVramGb: v.minVramGb } : {}),
+      ...(v.vramProfiles ? { vramProfiles: v.vramProfiles } : {}),
       installed: installed.has(`${m.id}@${v.version}`),
       // D-009 made paramsSchema catalog data so option forms could render
       // from it; the list row is where a GUI reads the catalog, so the

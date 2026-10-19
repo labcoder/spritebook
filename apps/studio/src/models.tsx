@@ -18,6 +18,7 @@ interface ModelVersion {
   diskBytes: number;
   platforms: string[];
   minVramGb?: number;
+  vramProfiles?: unknown[];
   installed: boolean;
 }
 
@@ -98,7 +99,11 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
     <div className='mv'>
       <span className='mono mv-ver'>{v.version}</span>
       <span className='mono mv-size'>{gb(v.diskBytes)} GB</span>
-      {v.minVramGb !== undefined && <span className='mono mv-vram'>≥{v.minVramGb} GiB VRAM</span>}
+      {v.minVramGb !== undefined && (
+        <span className='mono mv-vram'>
+          {v.vramProfiles ? t('VRAM depends on configuration') : `≥${v.minVramGb} GiB VRAM`}
+        </span>
+      )}
       <span className='mono mv-plat' title={v.platforms.join(', ')}>
         {v.platforms.length} {t('platforms')}
       </span>

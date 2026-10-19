@@ -11,6 +11,11 @@ export const RECEIPT_FILE = 'receipt.json';
 
 /** `<root>/<modelId>/<version>` — one spelling for every module. */
 export function versionDir(root: string, id: string, version: string): string {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id) || !/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(version)) {
+    throw Object.assign(new Error(`Invalid model id/version path: ${id}@${version}`), {
+      code: 'invalid-pins',
+    });
+  }
   return `${root}/${id}/${version}`;
 }
 
@@ -97,7 +102,13 @@ export async function getReceipt(
   } catch (err) {
     throw new Error(`invalid JSON in ${path}: ${message(err)}`);
   }
-  return parseWith(InstallReceiptSchema, raw, `InstallReceipt (${path})`);
+  const receipt = parseWith(InstallReceiptSchema, raw, `InstallReceipt (${path})`);
+  if (receipt.modelId !== id || receipt.version !== version) {
+    throw Object.assign(new Error(`Receipt identity does not match ${id}@${version} at ${path}`), {
+      code: 'verify-failed',
+    });
+  }
+  return receipt;
 }
 
 export interface InstalledVersion {

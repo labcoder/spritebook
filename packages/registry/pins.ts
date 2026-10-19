@@ -1,9 +1,8 @@
 /**
  * Project pins (D-009): thin IO over ProjectPinsSchema. The pins document
  * maps model/pack ids to exact versions and carries rendererVersion for the
- * cache key (D-011). Enforcement — refusing to `gen` against an unpinned or
- * mismatched version — lands with the gen verb; byte-deterministic reading
- * and writing of the document lands here.
+ * cache key (D-011). Execution policy reads these pins before model/pack use; byte-deterministic
+ * reading and writing of the document live here.
  */
 import { canonicalJson, parseWith, type ProjectPins, ProjectPinsSchema } from '@spritebook/schema';
 

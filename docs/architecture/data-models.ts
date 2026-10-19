@@ -72,7 +72,13 @@ export interface ModelVersion {
   version: string; // "1.2"
   files: WeightFile[]; // disk size = sum(bytes), derived
   platforms: Platform[];
-  minVramGb?: number; // MEASURED peak for the configured path (sidecar-vram)
+  minVramGb?: number; // install advisory / single configured path
+  vramProfiles?: {
+    operation: 'gen3d' | 'rig' | 'imageprep' | 'retexture';
+    params: Record<string, string | number | boolean>;
+    minGb: number; // measured profile plus documented admission headroom
+    evidence: string;
+  }[];
   /** JSON Schema for adapter params — validates GenerationParams AND drives
    *  the GUI options form. Pixal3D: quality/textureSize; TripoSplat: gaussians. */
   paramsSchema: JSONSchema;

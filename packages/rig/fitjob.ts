@@ -18,8 +18,7 @@ import { workspaceJob } from '@spritebook/core';
  *     the tear. Failing the job would delete the evidence, and would teach a
  *     roster script to treat "imperfect" as "absent";
  *   - with a workspace, the fit lands as ONE journaled RigState patch, with
- *     runRigJob's warn-on-recording-failure discipline: the fit is on disk,
- *     and failing the job over bookkeeping would throw away real work.
+ *     acceptance failure is terminal, with intermediate output retained.
  */
 import type { CanonicalBody, JobEvent, RigState } from '@spritebook/schema';
 import {
@@ -58,8 +57,8 @@ class FitFail extends Error {
 }
 
 /**
- * Run one Track A fit. Event codes: fit-body-invalid, fit-failed (errors);
- * fit-stray-joints, fit-unprojected, fit-not-recorded (warns — a torn fit is
+ * Run one Track A fit. Event codes: fit-body-invalid, fit-failed, fit-not-recorded (errors);
+ * fit-stray-joints, fit-unprojected (warns — a torn fit is
  * reported, never fatal).
  */
 async function* executeFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {

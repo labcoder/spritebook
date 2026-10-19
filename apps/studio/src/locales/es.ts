@@ -7,6 +7,7 @@
  */
 export const es: Record<string, string> = {
   'Cancel job': 'Cancelar tarea',
+  'VRAM depends on configuration': 'La VRAM depende de la configuración',
   // gallery
   'no bake yet': 'sin bake todavía',
   'Open': 'Abrir',

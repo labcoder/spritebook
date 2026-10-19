@@ -62,10 +62,10 @@ flowchart TB
    on import), feet at Y=0, uniform scale. Emits a persisted `PreflightReport`. Double-import of the
    same source must produce identical bytes (CI-enforced).
 5. **Registry is data (D-009).** Three layers, npm-style: `catalog` (models.json: entries, versions,
-   licenses, territories, VRAM/disk, `paramsSchema`) → `installed` (per-machine state under
-   `~/.spritebook/models`, verified hashes) → `pins` (per-project exact versions). Backends and
-   **animation packs** are both catalog citizens. Gates (license acceptance, territory, VRAM
-   preflight) run before install and before jobs.
+   licenses, territories, VRAM/disk, `paramsSchema`) → `installed` (per-machine state under the
+   platform local-data directory, or `SPRITEBOOK_MODELS_DIR`, verified hashes) → `pins` (per-project
+   exact versions). Backends and **animation packs** are both catalog citizens. Gates (license
+   acceptance, territory, VRAM preflight) run before install and before jobs.
 6. **BakeManifest is canonical (D-010).** Frames, atlas pages, pivots, metrics, flags. Exporters are
    pure projections; AOV pages (normal/mask/depth) are rect-identical to the lit page — engines can
    swap textures under one layout.
@@ -124,3 +124,11 @@ upstream UniRig scripts) stays inside the sidecar process boundary; adapters ret
 
 No cloud services in the core path; no telemetry; no plugin system in 1.0 (exporters are in-tree
 projections); no cross-machine render determinism assumptions, ever.
+
+## F1 persistence and execution policy
+
+The [workspace persistence protocol](workspace-persistence.md) defines the recoverable writer,
+canonical asset revisions, job ownership and consistent read projections. The
+[execution policy](execution-policy.md) defines project pins, receipt verification, declared consent
+and configuration-specific VRAM admission. These protocols preserve the laws above while the runtime
+is still Deno; replacing that runtime is F2/F4 work.

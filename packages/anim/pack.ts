@@ -1,3 +1,4 @@
+import { type ExecutionContext, verifyPackPin } from '@spritebook/registry';
 /**
  * Animation-pack tooling (P3-T1; D-009 packs are catalog data, D-013 bundle
  * CC0 only). A pack on disk is a directory: `pack.json` (AnimPackSchema) +
@@ -312,12 +313,13 @@ function message(err: unknown): string {
  * Read + schema-validate `dir/pack.json` and verify every listed clip file
  * exists. Throws with the offending path(s) — never returns a half-valid pack.
  */
-export async function loadPack(dir: string): Promise<AnimPack> {
+export async function loadPack(dir: string, context: ExecutionContext = {}): Promise<AnimPack> {
   const pack = parseWith(
     AnimPackSchema,
     await readManifest(dir),
     `AnimPack (${dir}/${PACK_MANIFEST})`,
   );
+  await verifyPackPin(pack, context);
   const missing: string[] = [];
   for (const clip of pack.clips) {
     const path = `${dir}/${PACK_CLIP_DIR}/${clip.id}.glb`;

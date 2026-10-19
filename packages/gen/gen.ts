@@ -40,9 +40,11 @@ import { SidecarSession } from '@spritebook/core';
 import { acquireVramLeaseEvents, type VramLease } from '@spritebook/core';
 import {
   detectVramGb,
+  executionVram,
   gatePlatform,
   loadCatalog,
-  resolveInstalled,
+  resolvePinnedInstalled,
+  verifyExecutionModel,
   versionDir,
   virtualizationNote,
 } from '@spritebook/registry';
@@ -65,6 +67,7 @@ export interface GenJobOptions extends GenJobSpec {
   sidecarDir: string;
   /** injected catalog (tests); omitted -> the bundled one */
   catalogPath?: string;
+  pinsPath?: string;
   /** injected VRAM reading (tests); omitted -> the real probe */
   detectedVramGb?: number | null;
   /**
@@ -147,7 +150,7 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
       );
     }
     const root = opts.modelsRoot ?? defaultModelsRoot();
-    const installed = await resolveInstalled(root, entry.id, opts.version);
+    const installed = await resolvePinnedInstalled(root, entry.id, opts.version, opts);
     if (!installed) {
       // when this process's %LOCALAPPDATA% is a container overlay, SAY SO -
       // that split is what the old blind probe never caught (D-039)
@@ -166,31 +169,6 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
       );
     }
 
-    // 2. gates: platform, then the HARD job-time VRAM preflight
-    const platform = await detectPlatform();
-    const plat = gatePlatform(version, platform);
-    if (!plat.ok) throw new GenFail(plat.code, plat.message);
-    const detectedVramGb = opts.detectedVramGb !== undefined
-      ? opts.detectedVramGb
-      : await detectVramGb();
-    const vram = preflightVram(version.minVramGb, detectedVramGb);
-    if (!vram.ok) throw new GenFail(vram.code, vram.message);
-    if (vram.warn) {
-      yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
-    }
-
-    // 2b. the machine-wide lease. The preflight above asks "could this card
-    // ever run this model"; the lease asks "is the card free RIGHT NOW", which
-    // is a different question the moment a second SpriteBook process exists —
-    // and the Studio spawns one per job. Held for the whole sidecar run and
-    // released in the `finally` below, on every exit path.
-    lease = yield* acquireVramLeaseEvents({
-      gb: version.minVramGb ?? 0,
-      jobId,
-      budgetGb: detectedVramGb,
-      ...(opts.vramLeaseDir !== undefined ? { dir: opts.vramLeaseDir } : {}),
-    }, at);
-
     // 3. params validated against the CATALOG entry's schema, before spawning.
     // `defaultsFor`, not `version.defaults`: a parameter can differ per
     // operation on one model (trellis2's seed-retry budget is 2 here and 5 for
@@ -203,6 +181,41 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     });
     if (!check.ok) throw new GenFail('invalid-params', check.message);
     const params = check.params;
+
+    // 2. gates: platform, then the HARD job-time VRAM preflight
+    const platform = await detectPlatform();
+    const plat = gatePlatform(version, platform);
+    if (!plat.ok) throw new GenFail(plat.code, plat.message);
+    const detectedVramGb = opts.detectedVramGb !== undefined
+      ? opts.detectedVramGb
+      : await detectVramGb();
+    const claimGb = executionVram(version, 'gen3d', params);
+    const vram = preflightVram(claimGb, detectedVramGb);
+    if (!vram.ok) throw new GenFail(vram.code, vram.message);
+    if (vram.warn) {
+      yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
+    }
+
+    await verifyExecutionModel({
+      root,
+      catalog,
+      entry,
+      version,
+      receipt: installed.receipt,
+      platform,
+    });
+
+    // 2b. the machine-wide lease. The preflight above asks "could this card
+    // ever run this model"; the lease asks "is the card free RIGHT NOW", which
+    // is a different question the moment a second SpriteBook process exists —
+    // and the Studio spawns one per job. Held for the whole sidecar run and
+    // released in the `finally` below, on every exit path.
+    lease = yield* acquireVramLeaseEvents({
+      gb: claimGb ?? 0,
+      jobId,
+      budgetGb: detectedVramGb,
+      ...(opts.vramLeaseDir !== undefined ? { dir: opts.vramLeaseDir } : {}),
+    }, at);
 
     // 4. workspace + content-addressed source
     const paths = workspacePaths(opts.workspace);
@@ -462,9 +475,10 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
       wallTimeS: Number(((performance.now() - t0) / 1000).toFixed(3)),
     };
   } catch (err) {
-    const fail = err instanceof GenFail
-      ? err
-      : new GenFail('gen-failed', err instanceof Error ? err.message : String(err));
+    const fail = err instanceof GenFail ? err : new GenFail(
+      (err as { code?: string }).code ?? 'gen-failed',
+      err instanceof Error ? err.message : String(err),
+    );
     yield {
       t: 'error',
       jobId,

@@ -256,3 +256,23 @@ BakeManifest. Preview and export therefore follow undo/redo consistently.
 The existing `export --bake <dir>` remains available for exporting a specific historical bake.
 Choose either `--workspace` or `--bake`. All valued flags require one nonempty, space-separated
 value; missing or repeated valued flags fail before jobs or workspace writes start.
+
+## Exact project execution
+
+`gen`, `retexture`, `rig`, `prep`, `bake` and `anim` accept `--pins <file>`. Workspace jobs also
+check `<workspace parent>/pins.json` automatically. The document uses the existing shape:
+
+```json
+{"models":{"fixture-gen":"1.0.0"},"packs":{"ual":"1+2"},"rendererVersion":"legacy"}
+```
+
+Managed model/pack execution needs an exact matching pin. Missing installs, corrupt files,
+unaccepted declared terms, excluded territories and unsupported platforms refuse before inference;
+missing pinned versions never select a newer install. Standalone jobs without a pins file retain
+their existing version selection. Receipt verification rehashes model files on each execution.
+`rig` also accepts `--catalog <file>` for the same catalog override as generation/preparation.
+
+Memory admission uses the effective configuration's catalog profile, not another configuration's
+minimum. Unmeasured combinations refuse. `models list --json` exposes these profiles; its historical
+single minimum is advisory. See the [execution policy](architecture/execution-policy.md) for the
+consent fingerprint, unmanaged behavior, renderer-pin boundary and qualification limits.

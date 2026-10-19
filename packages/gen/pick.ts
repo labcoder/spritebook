@@ -189,7 +189,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
     // staged, not written straight to canonicalPath: the bytes and the
     // manifest have to change together, so nothing becomes canonical until
     // every stage of this verb has succeeded
-    let staged = `${paths.canonicalDir}/pick-${opts.resultId}.tmp.glb`;
+    let staged = `${paths.canonicalDir}/pick-${crypto.randomUUID()}-${opts.resultId}.tmp.glb`;
     tmp.push(staged);
     await Deno.writeFile(staged, bytes);
     yield { t: 'progress', jobId, at: at(), step: 'promote', done: ++done, total };
