@@ -136,6 +136,16 @@ for (const path of [...npmPackages].sort()) {
   npmNotices.push({ name: metadata.name, version: metadata.version, license: metadata.license });
 }
 await writeFile(`${payload}/notices/npm.json`, JSON.stringify(npmNotices, null, 2) + '\n');
+const stdLicense = await fetch(
+  'https://raw.githubusercontent.com/denoland/std/808fe203e0ce4da730880ad270179fdaa1f6fc7d/LICENSE',
+);
+assert(stdLicense.ok, `Standard-library license: HTTP ${stdLicense.status}`);
+const stdLicenseBytes = new Uint8Array(await stdLicense.arrayBuffer());
+assert.equal(
+  sha(stdLicenseBytes),
+  '0961f97da6619d5fe9ddb98649191d5ca6e958856ea5252f4cce7c9b85513819',
+);
+await writeFile(`${payload}/notices/deno-std-LICENSE`, stdLicenseBytes);
 await writeFile(
   `${out}/tauri.conf.json`,
   JSON.stringify(

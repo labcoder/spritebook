@@ -19,13 +19,24 @@ assert(['cold', 'warm'].includes(temperature) && ['false', 'true'].includes(mirr
 const out = resolve(outArg);
 const assets = fileURLToPath(new URL('../assets/', import.meta.url));
 const packDir = fileURLToPath(new URL('../anim/packs/ual/', import.meta.url));
-const modelPath = `${assets}/model.glb`;
+const asymmetric = Deno.args[5] === 'asymmetric';
+const modelPath = asymmetric
+  ? fileURLToPath(new URL('./fixtures/asymmetric.glb', import.meta.url))
+  : `${assets}/model.glb`;
 const style = structuredClone(PRESETS[styleId]);
 style.temporal.superSample = Number(sampleArg) as 1 | 2 | 4;
 const look = JSON.parse(await readFile(`${assets}/look.json`, 'utf8'));
 const camera = resolveCamera(look.cameraPresetId, look.cameraOverrides);
 await mkdir(out, { recursive: true });
 const events = [];
+const throughput: unknown[] = [];
+const writeTextFile = Deno.writeTextFile;
+Object.defineProperty(Deno, 'writeTextFile', {
+  value: async (path: string | URL, text: string, options?: Deno.WriteFileOptions) => {
+    if (String(path).endsWith('/throughput.json')) throughput.push(JSON.parse(text));
+    await writeTextFile(path, text, options);
+  },
+});
 const started = performance.now();
 let peakRss = memoryUsage().rss;
 const meter = setInterval(() => peakRss = Math.max(peakRss, memoryUsage().rss), 20);
@@ -40,7 +51,7 @@ try {
       camera,
       style,
       frames: 4,
-      clips: ['idle-loop', 'walk-loop', 'punch-jab'].map((clipId) => ({
+      clips: asymmetric ? undefined : ['idle-loop', 'walk-loop', 'punch-jab'].map((clipId) => ({
         clipId,
         frames: 4,
         speed: 1,
@@ -60,7 +71,7 @@ try {
   const bakeWallS = (performance.now() - started) / 1000;
   assert(manifestPath && events.at(-1)?.t === 'done', 'no completed bake');
   const manifest = BakeManifestSchema.parse(JSON.parse(await readFile(manifestPath, 'utf8')));
-  assert.equal(manifest.frames.length, 96);
+  assert.equal(manifest.frames.length, asymmetric ? 32 : 96);
   assert.equal(manifest.metrics.cacheHitPct, temperature === 'warm' ? 100 : 0);
   const palette = new Set<string>(
     JSON.parse(await readFile(resolve(manifestPath, '../style-result.json'), 'utf8')).paletteHex,
@@ -105,6 +116,7 @@ try {
         pages,
         adapter: gpu.adapterInfo,
         features: gpu.features,
+        throughput,
         frames: manifest.frames.length,
         cacheHitPct: manifest.metrics.cacheHitPct,
       },
