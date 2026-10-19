@@ -1,6 +1,6 @@
 // F2 experiment only: execute unchanged Deno modules. Delete during the F4 API port.
 import * as fs from 'node:fs/promises';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -21,6 +21,7 @@ globalThis.Deno = new Proxy({
   // Deno's byteOffset is zero; Buffer's pooled backing store breaks existing poses readers.
   readFile: async (path) => new Uint8Array(await fs.readFile(path)),
   readTextFile: (path) => fs.readFile(path, 'utf8'),
+  readTextFileSync: (path) => readFileSync(path, 'utf8'),
   writeFile: fs.writeFile,
   writeTextFile: (path, text) => fs.writeFile(path, text, 'utf8'),
   mkdir: fs.mkdir,

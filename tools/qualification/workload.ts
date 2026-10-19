@@ -81,7 +81,7 @@ try {
   for (const page of manifest.atlases) {
     const bytes = await readFile(resolve(manifestPath, `../${page.png}`));
     pages[page.png] = createHash('sha256').update(bytes).digest('hex');
-    const image = decode(bytes);
+    const image = decode(bytes, { checkCrc: true });
     assert.deepEqual([image.width, image.height], [page.sizePx, page.sizePx]);
     for (const frame of manifest.frames.filter((f) => f.atlas.pageIndex === page.pageIndex)) {
       assert.equal(frame.atlas.w, 100);

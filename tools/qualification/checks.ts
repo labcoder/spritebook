@@ -17,6 +17,7 @@ await import('../../packages/render/camera_test.ts');
 await import('../../packages/render/skinning_test.ts');
 await import('../../packages/render/placement_test.ts');
 await import('../../packages/render/poses_test.ts');
+await import('../../packages/render/png_test.ts');
 await import('../../packages/anim/profile_test.ts');
 await import('../../packages/anim/retarget_test.ts');
 await import('../../packages/style/pipeline_test.ts');

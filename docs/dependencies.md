@@ -39,6 +39,13 @@ load the system copy by basename. The Vulkan payload excludes FXC, DXC and their
 experiments with DXC are separate from that artifact. PE imports also require the Microsoft VC++
 runtime on the machine; it is not silently copied from Visual Studio.
 
+The qualified-candidate PNG writer uses Node's built-in `zlib` and CRC32, retaining `fast-png`
+decoding. This is a proof-only build substitution; production still uses the original codec. The
+copied Node license includes its native third-party notices. The artifact audit also exposes the
+existing `pako` 2.2.0 transitive declaration **MIT AND Zlib**, beyond this document's strict
+bundling allowlist. Release clearance must resolve that policy mismatch and the prebuilt addon's
+complete static dependency notices; an internal renderer experiment is not clearance to distribute.
+
 ## Core render, style, pack
 
 | Dependency        | Role                                                            | License     | Status       |

@@ -3,7 +3,7 @@ import { cp, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // This first artifact is deliberately Windows x64 only. Other targets need native runs.
 assert(process.platform === 'win32' && process.arch === 'x64', 'unqualified build target');
@@ -35,17 +35,46 @@ await mkdir(payload);
 const nodeDist = `${out}/node-dist/node-v${nodeVersion}-win-x64`;
 await copy(`${nodeDist}/node.exe`, `${payload}/node.exe`);
 await copy(`${nodeDist}/LICENSE`, `${payload}/notices/Node-LICENSE`);
-for (const entry of ['workload', 'checks', 'loss']) {
+const pngMap = `${out}/png-import-map.json`;
+const imports = {};
+const scopes = {};
+const rootConfig = JSON.parse(await readFile(`${repo}/deno.json`, 'utf8'));
+for (const member of rootConfig.workspace) {
+  const config = JSON.parse(await readFile(`${repo}/${member}/deno.json`, 'utf8'));
+  assert.equal(typeof config.exports, 'string');
+  imports[config.name] = pathToFileURL(resolve(repo, member, config.exports)).href;
+  scopes[pathToFileURL(resolve(repo, member) + '/').href] = {
+    ...config.imports,
+    'fast-png': pathToFileURL(`${here}/png.ts`).href,
+  };
+}
+imports['fast-png'] = pathToFileURL(`${here}/png.ts`).href;
+await writeFile(
+  pngMap,
+  JSON.stringify({ imports, scopes }),
+);
+for (const entry of ['control-workload', 'workload', 'checks', 'loss']) {
   await mkdir(`${payload}/core`, { recursive: true });
   execFileSync('deno', [
     'bundle',
-    '--config',
-    `${repo}/deno.json`,
+    ...(entry === 'control-workload' ? ['--config', `${repo}/deno.json`] : [
+      '--no-config',
+      '--node-modules-dir=manual',
+      '--lock',
+      `${repo}/deno.lock`,
+      '--import-map',
+      pngMap,
+    ]),
     '--frozen',
     '--output',
     `${payload}/core/${entry}.mjs`,
-    `${here}/${entry}.ts`,
+    `${here}/${entry === 'control-workload' ? 'workload' : entry}.ts`,
   ], { cwd: repo, stdio: 'inherit' });
+  if (entry !== 'control-workload') {
+    assert(
+      (await readFile(`${payload}/core/${entry}.mjs`, 'utf8')).includes('F2 PNG adapter accepts'),
+    );
+  }
 }
 for (const name of ['node-run.mjs', 'node-environment.mjs']) {
   await copy(`${here}/${name}`, `${payload}/${name}`);
@@ -86,6 +115,10 @@ await copy(
 for (const name of ['aov', 'goldens', 'asymmetric.glb']) {
   await copy(`${repo}/packages/style/fixtures/${name}`, `${payload}/core/fixtures/${name}`);
 }
+await copy(
+  `${repo}/packages/style/fixtures/asymmetric.glb`,
+  `${payload}/style/fixtures/asymmetric.glb`,
+);
 for (const name of await readdir(`${repo}/packages/anim/fixtures`)) {
   if (name.endsWith('.glb')) {
     await copy(`${repo}/packages/anim/fixtures/${name}`, `${payload}/core/fixtures/${name}`);
@@ -112,7 +145,7 @@ await writeFile(`${payload}/assets/look.json`, JSON.stringify(character.look) + 
 await copy(`${repo}/LICENSE`, `${payload}/notices/SpriteBook-LICENSE`);
 await copy(`${repo}/NOTICE`, `${payload}/notices/SpriteBook-NOTICE`);
 const npmPackages = new Set();
-for (const entry of ['workload', 'checks', 'loss']) {
+for (const entry of ['control-workload', 'workload', 'checks', 'loss']) {
   const bundle = await readFile(`${payload}/core/${entry}.mjs`, 'utf8');
   for (
     const match of bundle.matchAll(
@@ -154,7 +187,10 @@ await writeFile(
       identifier: 'dev.spritebook.rendererproof',
       build: { beforeBuildCommand: null, frontendDist: `${here}/frontend` },
       app: { windows: [] },
-      bundle: { resources: { [`${payload}/`]: 'renderer-runtime/' } },
+      bundle: {
+        resources: { [`${payload}/`]: 'renderer-runtime/' },
+        windows: { webviewInstallMode: { type: 'skip' } },
+      },
     },
     null,
     2,

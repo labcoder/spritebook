@@ -6,8 +6,9 @@ import { once } from 'node:events';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
-const [runtimeArg, outArg] = process.argv.slice(2);
+const [runtimeArg, outArg, backend = 'vulkan'] = process.argv.slice(2);
 assert(runtimeArg && outArg, 'usage: node measure.mjs <runtime-directory> <new-results>');
+assert(['vulkan', 'd3d12'].includes(backend), 'Windows backend must be vulkan or d3d12');
 const runtime = resolve(runtimeArg);
 const out = resolve(outArg);
 await mkdir(out);
@@ -41,16 +42,16 @@ async function run(engine, id, sample, style, temperature, mirror, fixture) {
     '--no-check',
     '--unstable-webgpu',
     '-A',
-    `${runtime}/core/workload.mjs`,
+    `${runtime}/core/control-workload.mjs`,
     ...args,
   ];
   const start = performance.now();
   const child = spawn(command, argv, {
     env: {
       ...process.env,
-      DENO_WEBGPU_BACKEND: 'vulkan',
+      DENO_WEBGPU_BACKEND: backend === 'd3d12' ? 'dx12' : 'vulkan',
       SPRITEBOOK_REQUIRE_GPU: '1',
-      SPRITEBOOK_GPU_BACKEND: 'vulkan',
+      SPRITEBOOK_GPU_BACKEND: backend,
       TEMP: temp,
       TMP: temp,
     },
@@ -136,6 +137,7 @@ try {
     `${out}/summary.json`,
     JSON.stringify(
       {
+        backend,
         timings,
         budgetMet: timings.every((t) => t.coldRegressionPct <= 10 && t.warmRegressionPct <= 10),
         measurements: measurements.length,
