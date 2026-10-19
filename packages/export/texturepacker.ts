@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * TexturePacker "JSON Hash" exporter (the flavor Phaser 3 / Unity consume) —
  * a pure projection of BakeManifest (D-010).
@@ -36,7 +37,7 @@
  * = false.
  */
 import type { FrameRecord } from '@spritebook/schema';
-import type { Exporter } from '../pack/contracts.ts';
+import type { Exporter } from '@spritebook/pack/contracts';
 import { assertNoSplitAnimations } from './split-guard.ts';
 
 const META_APP = 'spritebook';
@@ -97,7 +98,7 @@ export const exportTexturePacker: Exporter = async (manifest, bakeDir, outDir, _
   }
   if (manifest.frames.length === 0) throw new Error('exportTexturePacker: manifest has no frames');
   const sortedFrames = manifest.frames.toSorted(byClipDirFrame);
-  await Deno.mkdir(outDir, { recursive: true });
+  await fs.mkdir(outDir, { recursive: true });
 
   const written: string[] = [];
   for (const page of litPages) {
@@ -131,8 +132,8 @@ export const exportTexturePacker: Exporter = async (manifest, bakeDir, outDir, _
       },
     };
 
-    await Deno.copyFile(`${bakeDir}/${page.png}`, pngPath);
-    await Deno.writeTextFile(jsonPath, JSON.stringify(doc, null, 2) + '\n');
+    await fs.copyFile(`${bakeDir}/${page.png}`, pngPath);
+    await fs.writeFile(jsonPath, JSON.stringify(doc, null, 2) + '\n');
     written.push(jsonPath, pngPath);
   }
   return written.toSorted();

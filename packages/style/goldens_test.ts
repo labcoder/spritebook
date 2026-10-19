@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Per-preset perceptual goldens on the asymmetric fixture (P2-T2 acceptance).
  * The style stage is deterministic CPU over the committed AOVs, so the goldens
@@ -6,14 +10,14 @@
  * heatmap localizes a regression in seconds). Regenerate goldens only via
  * fixtures/_gen-goldens.ts, never by loosening the assertion.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { fileURLToPath } from 'node:url';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import pixelmatch from 'pixelmatch';
 import type { CameraPreset } from '@spritebook/schema';
-import type { AovSource } from './contracts.ts';
-import { styleFromAovs } from './pipeline.ts';
-import { PRESETS } from './presets.ts';
+import type { AovSource } from './dist/contracts.js';
+import { styleFromAovs } from './dist/pipeline.js';
+import { PRESETS } from './dist/presets.js';
 import { GOLDEN_FRAMES, goldenName } from './fixtures/golden-config.ts';
 
 const GOLDENS = fileURLToPath(new URL('./fixtures/goldens/', import.meta.url));
@@ -34,13 +38,13 @@ const CAM: CameraPreset = {
 };
 
 async function readRgba(path: string) {
-  const img = decodePng(await Deno.readFile(path));
+  const img = decodePng(new Uint8Array(await fs.readFile(path)));
   return { w: img.width, h: img.height, data: img.data as Uint8Array };
 }
 
-Deno.test('per-preset styled goldens on the asymmetric fixture', async () => {
+test('per-preset styled goldens on the asymmetric fixture', async () => {
   for (const [id, preset] of Object.entries(PRESETS)) {
-    const out = await Deno.makeTempDir();
+    const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
     try {
       const r = await styleFromAovs(SRC, CAM, preset, out);
       for (const [d, f] of GOLDEN_FRAMES) {
@@ -53,12 +57,12 @@ Deno.test('per-preset styled goldens on the asymmetric fixture', async () => {
           threshold: 0.1,
         });
         if (n > 0) {
-          await Deno.mkdir(FAILURES, { recursive: true });
+          await fs.mkdir(FAILURES, { recursive: true });
           const base = `${FAILURES}/${goldenName(id, d, f).replace('.png', '')}`;
           const png = (data: Uint8Array) => encodePng({ width: actual.w, height: actual.h, data });
-          await Deno.writeFile(`${base}-actual.png`, png(actual.data));
-          await Deno.writeFile(`${base}-expected.png`, png(expected.data));
-          await Deno.writeFile(`${base}-diff.png`, png(diff));
+          await fs.writeFile(`${base}-actual.png`, png(actual.data));
+          await fs.writeFile(`${base}-expected.png`, png(expected.data));
+          await fs.writeFile(`${base}-diff.png`, png(diff));
         }
         assert(
           n === 0,
@@ -66,7 +70,7 @@ Deno.test('per-preset styled goldens on the asymmetric fixture', async () => {
         );
       }
     } finally {
-      await Deno.remove(out, { recursive: true });
+      await fs.rm(out, { recursive: true });
     }
   }
 });

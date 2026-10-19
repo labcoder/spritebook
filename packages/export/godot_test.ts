@@ -1,14 +1,18 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Godot exporter tests against the checked-in fixture bake. parseTres +
  * validateTres are the everywhere-test for Godot correctness (real-engine
  * import smoke deferred to end-of-project); the doctrine test proves the
  * projection is byte-stable.
  */
-import { assert, assertEquals, assertStringIncludes, assertThrows } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertStringIncludes, assertThrows } from '@std/assert';
 import { type BakeManifest, BakeManifestSchema, parseWith } from '@spritebook/schema';
-import { DEFAULT_FPS } from '../pack/contracts.ts';
-import { exportGodot } from './godot.ts';
-import { parseTres, TresParseError, type TresSubResource, validateTres } from './tres-parse.ts';
+import { DEFAULT_FPS } from '@spritebook/pack/contracts';
+import { exportGodot } from './dist/godot.js';
+import { parseTres, TresParseError, type TresSubResource, validateTres } from './dist/tres-parse.js';
 
 const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const FIXTURE_DIR = win(new URL('fixtures/bake-aabbccdd', import.meta.url));
@@ -27,7 +31,7 @@ const anchorOf = (s: TresSubResource) => ({
 });
 
 async function fixtureManifest(): Promise<BakeManifest> {
-  const raw = JSON.parse(await Deno.readTextFile(`${FIXTURE_DIR}/manifest.json`));
+  const raw = JSON.parse(await fs.readFile(`${FIXTURE_DIR}/manifest.json`, 'utf8'));
   return parseWith(BakeManifestSchema, raw, 'fixture BakeManifest');
 }
 
@@ -87,16 +91,16 @@ const EXPECTED_TRES = [
   '}]',
 ].join('\n') + '\n';
 
-Deno.test('exportGodot: fixture projects to a parseable, manifest-valid SpriteFrames', async () => {
+test('exportGodot: fixture projects to a parseable, manifest-valid SpriteFrames', async () => {
   const manifest = await fixtureManifest();
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-'));
   try {
     const paths = await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
     assertEquals(paths, [...paths].sort(), 'returned paths must be sorted');
     assertEquals(paths.map(baseName), ['atlas_lit_0.png', 'fixture-char.tres']);
-    for (const p of paths) assert((await Deno.stat(p)).isFile, `missing written file: ${p}`);
+    for (const p of paths) assert((await fs.stat(p)).isFile(), `missing written file: ${p}`);
 
-    const parsed = parseTres(await Deno.readTextFile(`${out}/fixture-char.tres`));
+    const parsed = parseTres(await fs.readFile(`${out}/fixture-char.tres`, 'utf8'));
     validateTres(parsed, manifest);
     assertEquals(parsed.header, { type: 'SpriteFrames', loadSteps: 6, format: 3 });
     assertEquals(parsed.extResources.map((e) => e.id), ['1']);
@@ -112,16 +116,16 @@ Deno.test('exportGodot: fixture projects to a parseable, manifest-valid SpriteFr
     assertEquals(parsed.animations.map((a) => a.speed), [2, 2]);
     assertEquals(parsed.animations.map((a) => a.frames.length), [2, 2]);
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportGodot: .tres bytes match the specced Godot 4 shape exactly', async () => {
+test('exportGodot: .tres bytes match the specced Godot 4 shape exactly', async () => {
   const manifest = await fixtureManifest();
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-'));
   try {
     await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
-    const text = await Deno.readTextFile(`${out}/fixture-char.tres`);
+    const text = await fs.readFile(`${out}/fixture-char.tres`, 'utf8');
     assertEquals(text, EXPECTED_TRES);
     // spot-checks the spec calls out, independent of the golden above
     assertStringIncludes(text, '&"idle_d00"');
@@ -134,16 +138,16 @@ Deno.test('exportGodot: .tres bytes match the specced Godot 4 shape exactly', as
     assert(!text.includes('\r'), 'LF line endings only');
     assert(text.endsWith('}]\n'), 'ends with the closed animations array + newline');
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportGodot: every frame anchors on its recorded pivot, not the cell centre', async () => {
+test('exportGodot: every frame anchors on its recorded pivot, not the cell centre', async () => {
   const manifest = await fixtureManifest();
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-pivot-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-pivot-'));
   try {
     await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
-    const parsed = parseTres(await Deno.readTextFile(`${out}/fixture-char.tres`));
+    const parsed = parseTres(await fs.readFile(`${out}/fixture-char.tres`, 'utf8'));
     validateTres(parsed, manifest);
     // fixture pivot is (8, 14) in a 16x16 cell: 6 px BELOW the cell centre
     assertEquals(parsed.subResources.map(anchorOf), [
@@ -160,11 +164,11 @@ Deno.test('exportGodot: every frame anchors on its recorded pivot, not the cell 
       );
     }
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportGodot: a default 64 px bake anchors 26 px off the cell centre', async () => {
+test('exportGodot: a default 64 px bake anchors 26 px off the cell centre', async () => {
   // the concrete regression: `--cell 64 --padding 6` with pivot 'feet-baseline'
   // records (32, 58). Godot's default `centered` anchors at (32, 32), so every
   // character drew 26 px above its own feet and floated over the tile map.
@@ -180,21 +184,21 @@ Deno.test('exportGodot: a default 64 px bake anchors 26 px off the cell centre',
   }];
   plain.clips = [{ clipId: 'idle', frames: 1, speed: 1, holdLast: false, loop: true, fps: 2 }];
   const manifest = parseWith(BakeManifestSchema, plain, '64px default-bake manifest');
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-64-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-64-'));
   try {
     await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
-    const parsed = parseTres(await Deno.readTextFile(`${out}/fixture-char.tres`));
+    const parsed = parseTres(await fs.readFile(`${out}/fixture-char.tres`, 'utf8'));
     validateTres(parsed, manifest);
     const [sub] = parsed.subResources;
     assertEquals(anchorOf(sub), { x: 32, y: 58 }, 'origin sits on the feet');
     assertEquals(anchorOf(sub).y - sub.region.h / 2, 26, 'exactly the 26 px that were lost');
     assertEquals(sub.margin, { x: 0, y: 0, w: 0, h: 52 }, '52 px of trailing pad, no leading pad');
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportGodot: pivots on either side of the cell centre both land', async () => {
+test('exportGodot: pivots on either side of the cell centre both land', async () => {
   const plain = structuredClone(await fixtureManifest());
   // one per margin branch: leading pad, trailing pad, no pad, and a cell corner
   plain.frames[0].pivotPx = { x: 3, y: 14 };
@@ -202,10 +206,10 @@ Deno.test('exportGodot: pivots on either side of the cell centre both land', asy
   plain.frames[2].pivotPx = { x: 8, y: 8 };
   plain.frames[3].pivotPx = { x: 0, y: 16 };
   const manifest = parseWith(BakeManifestSchema, plain, 'per-frame pivot manifest');
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-pivots-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-pivots-'));
   try {
     await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
-    const parsed = parseTres(await Deno.readTextFile(`${out}/fixture-char.tres`));
+    const parsed = parseTres(await fs.readFile(`${out}/fixture-char.tres`, 'utf8'));
     validateTres(parsed, manifest);
     assertEquals(
       parsed.subResources.map(anchorOf),
@@ -218,20 +222,20 @@ Deno.test('exportGodot: pivots on either side of the cell centre both land', asy
       'a dead-centre pivot needs no pad at all',
     );
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportGodot: a held clip stops on its last frame, at its own rate', async () => {
+test('exportGodot: a held clip stops on its last frame, at its own rate', async () => {
   // `bake --clips death01:8!hold` then `export --targets godot` used to produce
   // a death animation that restarted forever, at whatever --fps said
   const plain = structuredClone(await fixtureManifest());
   plain.clips = [{ clipId: 'idle', frames: 2, speed: 1, holdLast: true, loop: false, fps: 12 }];
   const manifest = parseWith(BakeManifestSchema, plain, 'held-clip manifest');
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-hold-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-hold-'));
   try {
     await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
-    const text = await Deno.readTextFile(`${out}/fixture-char.tres`);
+    const text = await fs.readFile(`${out}/fixture-char.tres`, 'utf8');
     const parsed = parseTres(text);
     validateTres(parsed, manifest);
     assertEquals(parsed.animations.map((a) => a.loop), [false, false], 'holdLast must not loop');
@@ -239,11 +243,11 @@ Deno.test('exportGodot: a held clip stops on its last frame, at its own rate', a
     assertStringIncludes(text, '"loop": false,');
     assert(!text.includes('"loop": true,'), 'no animation may loop against the manifest');
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportGodot: two clips keep two different rates', async () => {
+test('exportGodot: two clips keep two different rates', async () => {
   // `--clips walk-loop:8,idle-loop:4` used to give both animations one speed
   const plain = structuredClone(await fixtureManifest());
   for (const direction of [0, 1]) {
@@ -261,10 +265,10 @@ Deno.test('exportGodot: two clips keep two different rates', async () => {
     { clipId: 'idle', frames: 2, speed: 1, holdLast: false, loop: true, fps: 2 },
   ];
   const manifest = parseWith(BakeManifestSchema, plain, 'two-clip manifest');
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-2clip-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-2clip-'));
   try {
     await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
-    const text = await Deno.readTextFile(`${out}/fixture-char.tres`);
+    const text = await fs.readFile(`${out}/fixture-char.tres`, 'utf8');
     const parsed = parseTres(text);
     validateTres(parsed, manifest);
     assertEquals(
@@ -279,69 +283,69 @@ Deno.test('exportGodot: two clips keep two different rates', async () => {
     );
     assert(!text.includes(`"speed": ${DEFAULT_FPS}.0`), 'opts.fps must not reach a timed clip');
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportGodot: a bake with no clips falls back to opts.fps and loops', async () => {
+test('exportGodot: a bake with no clips falls back to opts.fps and loops', async () => {
   // `clips` is optional, so every already-baked directory must still export
   const plain = structuredClone(await fixtureManifest());
   delete plain.clips;
   const manifest = parseWith(BakeManifestSchema, plain, 'legacy idle manifest');
   assertEquals(manifest.clips, undefined, 'the legacy shape really has no timing');
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-legacy-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-legacy-'));
   try {
     await exportGodot(manifest, FIXTURE_DIR, out, { fps: 24 });
-    const parsed = parseTres(await Deno.readTextFile(`${out}/fixture-char.tres`));
+    const parsed = parseTres(await fs.readFile(`${out}/fixture-char.tres`, 'utf8'));
     validateTres(parsed, manifest); // must not throw on the fallback
     assertEquals(parsed.animations.map((a) => a.speed), [24, 24]);
     assertEquals(parsed.animations.map((a) => a.loop), [true, true]);
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportGodot: double export is byte-identical (byte-stability doctrine)', async () => {
+test('exportGodot: double export is byte-identical (byte-stability doctrine)', async () => {
   const manifest = await fixtureManifest();
-  const outA = await Deno.makeTempDir({ prefix: 'sb-godot-a-' });
-  const outB = await Deno.makeTempDir({ prefix: 'sb-godot-b-' });
+  const outA = await fs.mkdtemp(join(tmpdir(), 'sb-godot-a-'));
+  const outB = await fs.mkdtemp(join(tmpdir(), 'sb-godot-b-'));
   try {
     const a = await exportGodot(manifest, FIXTURE_DIR, outA, { fps: DEFAULT_FPS });
     const b = await exportGodot(manifest, FIXTURE_DIR, outB, { fps: DEFAULT_FPS });
     assertEquals(a.map(baseName), b.map(baseName));
     for (let i = 0; i < a.length; i++) {
       assertEquals(
-        await Deno.readFile(a[i]),
-        await Deno.readFile(b[i]),
+        new Uint8Array(await fs.readFile(a[i])),
+        new Uint8Array(await fs.readFile(b[i])),
         `bytes differ: ${baseName(a[i])}`,
       );
     }
   } finally {
-    await Deno.remove(outA, { recursive: true });
-    await Deno.remove(outB, { recursive: true });
+    await fs.rm(outA, { recursive: true });
+    await fs.rm(outB, { recursive: true });
   }
 });
 
-Deno.test('exportGodot: copies the lit page bytes verbatim', async () => {
+test('exportGodot: copies the lit page bytes verbatim', async () => {
   const manifest = await fixtureManifest();
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-'));
   try {
     await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
     assertEquals(
-      await Deno.readFile(`${out}/atlas_lit_0.png`),
-      await Deno.readFile(`${FIXTURE_DIR}/atlas_lit_0.png`),
+      new Uint8Array(await fs.readFile(`${out}/atlas_lit_0.png`)),
+      new Uint8Array(await fs.readFile(`${FIXTURE_DIR}/atlas_lit_0.png`)),
     );
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('parseTres: corrupted output throws precise errors', async () => {
+test('parseTres: corrupted output throws precise errors', async () => {
   const manifest = await fixtureManifest();
-  const out = await Deno.makeTempDir({ prefix: 'sb-godot-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-godot-'));
   try {
     await exportGodot(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
-    const text = await Deno.readTextFile(`${out}/fixture-char.tres`);
+    const text = await fs.readFile(`${out}/fixture-char.tres`, 'utf8');
     parseTres(text); // sanity: the pristine text parses
 
     // one mutated char in a section header
@@ -369,6 +373,6 @@ Deno.test('parseTres: corrupted output throws precise errors', async () => {
       'not finite',
     );
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });

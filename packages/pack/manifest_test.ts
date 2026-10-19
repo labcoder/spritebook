@@ -1,9 +1,10 @@
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { test } from 'node:test';
+import { assert, assertEquals } from '@std/assert';
 import type { CacheKeyInputs } from '@spritebook/schema';
-import { assembleManifest, frameGrid } from './manifest.ts';
-import { bakeKey, frameKey } from './cache.ts';
-import { mirrorPlan } from './mirror.ts';
-import { frameIdKey, type PackLayout } from './contracts.ts';
+import { assembleManifest, frameGrid } from './dist/manifest.js';
+import { bakeKey, frameKey } from './dist/cache.js';
+import { mirrorPlan } from './dist/mirror.js';
+import { frameIdKey, type PackLayout } from './dist/contracts.js';
 
 const INPUTS: CacheKeyInputs = {
   characterId: 'test-char',
@@ -25,7 +26,7 @@ function layoutOf(ids = frameGrid(2, 2), cell = 16): PackLayout {
   };
 }
 
-Deno.test('assembleManifest: bakeId is the recipe-key prefix; folds style + cache state', async () => {
+test('assembleManifest: bakeId is the recipe-key prefix; folds style + cache state', async () => {
   const layout = layoutOf();
   const hits = new Set([frameIdKey(layout.rects[0].id), frameIdKey(layout.rects[1].id)]);
   const m = await assembleManifest({
@@ -62,7 +63,7 @@ Deno.test('assembleManifest: bakeId is the recipe-key prefix; folds style + cach
   assertEquals(m.atlases.map((a) => a.png).sort()[0], 'atlas_albedo_0.png');
 });
 
-Deno.test('unchanged recipe reproduces the same bakeId; frame keys stay stable', async () => {
+test('unchanged recipe reproduces the same bakeId; frame keys stay stable', async () => {
   const a = await assembleManifest({
     inputs: INPUTS,
     layout: layoutOf(),
@@ -105,7 +106,7 @@ function cellLayout(directions: number, w: number): PackLayout {
   };
 }
 
-Deno.test('D-008: a mirrored frame records the MIRRORED pivot x, y untouched', async () => {
+test('D-008: a mirrored frame records the MIRRORED pivot x, y untouched', async () => {
   // A mirrored cell is a horizontal flip, so its pivot flips with it. This went
   // unnoticed because every in-repo preset is feet-baseline/center on an even
   // cell, where the pivot is Math.round(w/2) and `w - x == x` — the bug is
@@ -145,7 +146,7 @@ Deno.test('D-008: a mirrored frame records the MIRRORED pivot x, y untouched', a
   }
 });
 
-Deno.test('the mirrored pivot fixes a centred pivot and survives an odd cell', async () => {
+test('the mirrored pivot fixes a centred pivot and survives an odd cell', async () => {
   const cases: Array<[number, number, number, string]> = [
     // [cell w, pivot x, mirrored x, why this case earns its place]
     [64, 32, 32, 'a centred pivot is its own mirror; w-1-x would give 31'],
@@ -177,7 +178,7 @@ Deno.test('the mirrored pivot fixes a centred pivot and survives an odd cell', a
   }
 });
 
-Deno.test('mirroring off: every frame keeps the pivot it was framed with', async () => {
+test('mirroring off: every frame keeps the pivot it was framed with', async () => {
   const m = await assembleManifest({
     inputs: INPUTS,
     layout: cellLayout(8, 64),
@@ -192,7 +193,7 @@ Deno.test('mirroring off: every frame keeps the pivot it was framed with', async
   assert(m.frames.every((f) => f.mirroredFrom === undefined), 'and no frame claims a source');
 });
 
-Deno.test('frameGrid: deterministic direction-major order', () => {
+test('frameGrid: deterministic direction-major order', () => {
   const g = frameGrid(2, 2);
   assertEquals(g.map(frameIdKey), [
     'idle/d00/f000',

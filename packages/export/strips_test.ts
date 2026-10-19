@@ -1,14 +1,19 @@
+import { rejects } from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Strip exporter tests against the checked-in fixture bake: crop correctness
  * is proven pixel-by-pixel against the atlas page, the meta JSON is checked
  * byte-exactly (fixed key order), and the doctrine test proves the projection
  * is byte-stable.
  */
-import { assertEquals, assertRejects } from 'jsr:@std/assert@1';
+import { assertEquals, assertRejects } from '@std/assert';
 import { decode as decodePng } from 'fast-png';
 import { type BakeManifest, BakeManifestSchema, parseWith } from '@spritebook/schema';
-import { DEFAULT_FPS } from '../pack/contracts.ts';
-import { exportStrips, type StripsMeta } from './strips.ts';
+import { DEFAULT_FPS } from '@spritebook/pack/contracts';
+import { exportStrips, type StripsMeta } from './dist/strips.js';
 
 const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const FIXTURE_DIR = win(new URL('fixtures/bake-aabbccdd', import.meta.url));
@@ -16,7 +21,7 @@ const FIXTURE_DIR = win(new URL('fixtures/bake-aabbccdd', import.meta.url));
 const baseName = (p: string) => p.slice(p.lastIndexOf('/') + 1);
 
 async function fixtureManifest(): Promise<BakeManifest> {
-  const raw = JSON.parse(await Deno.readTextFile(`${FIXTURE_DIR}/manifest.json`));
+  const raw = JSON.parse(await fs.readFile(`${FIXTURE_DIR}/manifest.json`, 'utf8'));
   return parseWith(BakeManifestSchema, raw, 'fixture BakeManifest');
 }
 
@@ -30,9 +35,9 @@ function crop(data: Uint8Array, imgW: number, x: number, y: number, w: number, h
   return out;
 }
 
-Deno.test('exportStrips: fixture -> 2 strips + meta json, sorted paths', async () => {
+test('exportStrips: fixture -> 2 strips + meta json, sorted paths', async () => {
   const manifest = await fixtureManifest();
-  const out = await Deno.makeTempDir({ prefix: 'sb-strips-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-strips-'));
   try {
     const paths = await exportStrips(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
     assertEquals(paths, [...paths].sort(), 'returned paths must be sorted');
@@ -42,16 +47,16 @@ Deno.test('exportStrips: fixture -> 2 strips + meta json, sorted paths', async (
       'fixture-char-strips.json',
     ]);
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportStrips: strip pixels match the atlas page rects exactly', async () => {
+test('exportStrips: strip pixels match the atlas page rects exactly', async () => {
   const manifest = await fixtureManifest();
-  const out = await Deno.makeTempDir({ prefix: 'sb-strips-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-strips-'));
   try {
     await exportStrips(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
-    const page = decodePng(await Deno.readFile(`${FIXTURE_DIR}/atlas_lit_0.png`));
+    const page = decodePng(new Uint8Array(await fs.readFile(`${FIXTURE_DIR}/atlas_lit_0.png`)));
     const pageData = page.data as Uint8Array;
     // fixture layout: d00 frames at page x = 0, 16; d01 frames at x = 32, 48
     const cases = [
@@ -59,7 +64,7 @@ Deno.test('exportStrips: strip pixels match the atlas page rects exactly', async
       { file: 'fixture-char-idle-d01-strip.png', srcX: [32, 48] },
     ];
     for (const c of cases) {
-      const strip = decodePng(await Deno.readFile(`${out}/${c.file}`));
+      const strip = decodePng(new Uint8Array(await fs.readFile(`${out}/${c.file}`)));
       assertEquals(strip.width, 32, `${c.file} width`);
       assertEquals(strip.height, 16, `${c.file} height`);
       assertEquals(strip.channels, 4, `${c.file} channels`);
@@ -73,13 +78,13 @@ Deno.test('exportStrips: strip pixels match the atlas page rects exactly', async
       }
     }
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportStrips: meta json is byte-exact with a fixed key order', async () => {
+test('exportStrips: meta json is byte-exact with a fixed key order', async () => {
   const manifest = await fixtureManifest();
-  const out = await Deno.makeTempDir({ prefix: 'sb-strips-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-strips-'));
   try {
     await exportStrips(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
     const expected = {
@@ -111,15 +116,15 @@ Deno.test('exportStrips: meta json is byte-exact with a fixed key order', async 
       ],
     };
     assertEquals(
-      await Deno.readTextFile(`${out}/fixture-char-strips.json`),
+      await fs.readFile(`${out}/fixture-char-strips.json`, 'utf8'),
       JSON.stringify(expected, null, 2) + '\n',
     );
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportStrips: each strip carries its own clip rate and loop mode', async () => {
+test('exportStrips: each strip carries its own clip rate and loop mode', async () => {
   const plain = structuredClone(await fixtureManifest());
   for (const direction of [0, 1]) {
     plain.frames.push({
@@ -136,11 +141,11 @@ Deno.test('exportStrips: each strip carries its own clip rate and loop mode', as
     { clipId: 'idle', frames: 2, speed: 1, holdLast: false, loop: true, fps: 2 },
   ];
   const manifest = parseWith(BakeManifestSchema, plain, 'two-clip manifest');
-  const out = await Deno.makeTempDir({ prefix: 'sb-strips-clips-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-strips-clips-'));
   try {
     await exportStrips(manifest, FIXTURE_DIR, out, { fps: DEFAULT_FPS });
     const meta = JSON.parse(
-      await Deno.readTextFile(`${out}/fixture-char-strips.json`),
+      await fs.readFile(`${out}/fixture-char-strips.json`, 'utf8'),
     ) as StripsMeta;
     assertEquals(
       meta.strips.map((s) => [s.clipId, s.direction, s.fps, s.loop]),
@@ -154,51 +159,51 @@ Deno.test('exportStrips: each strip carries its own clip rate and loop mode', as
     );
     assertEquals(meta.fps, DEFAULT_FPS, 'meta.fps stays the export-wide default');
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportStrips: an untimed bake falls back to opts.fps and loops', async () => {
+test('exportStrips: an untimed bake falls back to opts.fps and loops', async () => {
   const plain = structuredClone(await fixtureManifest());
   delete plain.clips;
   const manifest = parseWith(BakeManifestSchema, plain, 'legacy idle manifest');
-  const out = await Deno.makeTempDir({ prefix: 'sb-strips-legacy-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-strips-legacy-'));
   try {
     await exportStrips(manifest, FIXTURE_DIR, out, { fps: 24 });
     const meta = JSON.parse(
-      await Deno.readTextFile(`${out}/fixture-char-strips.json`),
+      await fs.readFile(`${out}/fixture-char-strips.json`, 'utf8'),
     ) as StripsMeta;
     assertEquals(meta.strips.map((s) => [s.fps, s.loop]), [[24, true], [24, true]]);
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('exportStrips: double export is byte-identical (byte-stability doctrine)', async () => {
+test('exportStrips: double export is byte-identical (byte-stability doctrine)', async () => {
   const manifest = await fixtureManifest();
-  const outA = await Deno.makeTempDir({ prefix: 'sb-strips-a-' });
-  const outB = await Deno.makeTempDir({ prefix: 'sb-strips-b-' });
+  const outA = await fs.mkdtemp(join(tmpdir(), 'sb-strips-a-'));
+  const outB = await fs.mkdtemp(join(tmpdir(), 'sb-strips-b-'));
   try {
     const a = await exportStrips(manifest, FIXTURE_DIR, outA, { fps: DEFAULT_FPS });
     const b = await exportStrips(manifest, FIXTURE_DIR, outB, { fps: DEFAULT_FPS });
     assertEquals(a.map(baseName), b.map(baseName));
     for (let i = 0; i < a.length; i++) {
       assertEquals(
-        await Deno.readFile(a[i]),
-        await Deno.readFile(b[i]),
+        new Uint8Array(await fs.readFile(a[i])),
+        new Uint8Array(await fs.readFile(b[i])),
         `bytes differ: ${baseName(a[i])}`,
       );
     }
   } finally {
-    await Deno.remove(outA, { recursive: true });
-    await Deno.remove(outB, { recursive: true });
+    await fs.rm(outA, { recursive: true });
+    await fs.rm(outB, { recursive: true });
   }
 });
 
-Deno.test('exportStrips: an empty manifest is refused before outDir exists', async () => {
+test('exportStrips: an empty manifest is refused before outDir exists', async () => {
   // all four exporters draw ONE boundary: refuse, and leave nothing behind
   const base = await fixtureManifest();
-  const parent = await Deno.makeTempDir({ prefix: 'sb-strips-empty-' });
+  const parent = await fs.mkdtemp(join(tmpdir(), 'sb-strips-empty-'));
   try {
     const cases: Array<{ name: string; patch: (m: BakeManifest) => void; msg: string }> = [
       { name: 'no-pages', patch: (m) => void (m.atlases = []), msg: 'no lit atlas pages' },
@@ -214,23 +219,21 @@ Deno.test('exportStrips: an empty manifest is refused before outDir exists', asy
         Error,
         c.msg,
       );
-      await assertRejects(
-        () => Deno.stat(out),
-        Deno.errors.NotFound,
-        undefined,
+      await rejects(
+        () => fs.stat(out), { code: 'ENOENT' },
         `${c.name}: a refusal must not leave an output directory behind`,
       );
     }
   } finally {
-    await Deno.remove(parent, { recursive: true });
+    await fs.rm(parent, { recursive: true });
   }
 });
 
-Deno.test('exportStrips: non-uniform cell size throws', async () => {
+test('exportStrips: non-uniform cell size throws', async () => {
   const manifest = await fixtureManifest();
   const bad = structuredClone(manifest);
   bad.frames[1].atlas.w = 8;
-  const out = await Deno.makeTempDir({ prefix: 'sb-strips-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-strips-'));
   try {
     await assertRejects(
       () => exportStrips(bad, FIXTURE_DIR, out, { fps: DEFAULT_FPS }),
@@ -238,6 +241,6 @@ Deno.test('exportStrips: non-uniform cell size throws', async () => {
       'cells must be uniform',
     );
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });

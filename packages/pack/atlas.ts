@@ -6,10 +6,10 @@
  * exact rect equality across the layouts used, because laws get proofs, not trust.
  *
  * PURE CPU: zero-filled page planes (transparent / zero), row-by-row typed-array copies,
- * fixed iteration order, no clock, no randomness. PNG encoding is fast-png (pure JS),
+ * fixed iteration order, no clock, no randomness. PNG encoding uses the qualified native codec,
  * rgba8 -> 8-bit RGBA, gray16 -> 16-bit single-channel, matching PAGE_KIND.
  */
-import { encode as encodePng } from 'fast-png';
+import { encode as encodePng } from '@spritebook/render/png';
 import { type CellPlane, frameIdKey, type PackLayout } from './contracts.ts';
 
 /**

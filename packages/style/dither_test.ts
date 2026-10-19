@@ -1,7 +1,8 @@
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { bayerMatrix, bayerValue } from './dither.ts';
+import { test } from 'node:test';
+import { assert, assertEquals } from '@std/assert';
+import { bayerMatrix, bayerValue } from './dist/dither.js';
 
-Deno.test('bayerMatrix(4) is the standard 4x4 Bayer, normalized', () => {
+test('bayerMatrix(4) is the standard 4x4 Bayer, normalized', () => {
   const m = bayerMatrix(4);
   // classic 4x4 threshold matrix / 16
   const expected = [
@@ -25,7 +26,7 @@ Deno.test('bayerMatrix(4) is the standard 4x4 Bayer, normalized', () => {
   assertEquals([...m], expected);
 });
 
-Deno.test('bayerValue tiles by matrix size and stays in [0,1)', () => {
+test('bayerValue tiles by matrix size and stays in [0,1)', () => {
   const m = bayerMatrix(4);
   assertEquals(bayerValue(m, 4, 0, 0), 0);
   assertEquals(bayerValue(m, 4, 1, 0), 0.5);
@@ -35,7 +36,7 @@ Deno.test('bayerValue tiles by matrix size and stays in [0,1)', () => {
   for (const v of m) assert(v >= 0 && v < 1);
 });
 
-Deno.test('bayerMatrix(8) has 64 distinct evenly-spaced thresholds', () => {
+test('bayerMatrix(8) has 64 distinct evenly-spaced thresholds', () => {
   const m = bayerMatrix(8);
   assertEquals(m.length, 64);
   const scaled = new Set([...m].map((v) => Math.round(v * 64)));

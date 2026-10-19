@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Clip CONTENT is a cache input (review F1): editing a pack clip glb in place
  * (the documented pack-upgrade flow) must invalidate — the binding spec alone
@@ -5,10 +9,10 @@
  * new bytes, an internally inconsistent bake dir (D-006). CPU-only: this pins
  * the key inputs; the GPU acceptance suite covers served-vs-recomputed parity.
  */
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import type { CameraPreset } from '@spritebook/schema';
 import { PIXEL } from '@spritebook/style';
-import { buildCacheInputs } from './bake.ts';
+import { buildCacheInputs } from './dist/bake.js';
 
 const MODEL = new URL('../anim/fixtures/humanoid-normal.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -28,8 +32,8 @@ const CAM: CameraPreset = {
 const SIG = 'test-signature';
 
 async function makePack(dir: string, clipBytes: Uint8Array): Promise<void> {
-  await Deno.mkdir(`${dir}/clips`, { recursive: true });
-  await Deno.writeFile(`${dir}/clips/x.glb`, clipBytes);
+  await fs.mkdir(`${dir}/clips`, { recursive: true });
+  await fs.writeFile(`${dir}/clips/x.glb`, clipBytes);
 }
 
 function spec(packDir: string, over: Record<string, unknown> = {}) {
@@ -45,15 +49,15 @@ function spec(packDir: string, over: Record<string, unknown> = {}) {
   };
 }
 
-Deno.test('clip bytes are a cache input; paths are not; bindings still are', async () => {
-  const root = await Deno.makeTempDir();
+test('clip bytes are a cache input; paths are not; bindings still are', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const bytes = Uint8Array.from([1, 2, 3, 4, 5]);
     await makePack(`${root}/p1`, bytes);
     const base = await buildCacheInputs(spec(`${root}/p1`), SIG);
 
     // in-place content edit -> different recipe
-    await Deno.writeFile(`${root}/p1/clips/x.glb`, Uint8Array.from([1, 2, 3, 4, 5, 6]));
+    await fs.writeFile(`${root}/p1/clips/x.glb`, Uint8Array.from([1, 2, 3, 4, 5, 6]));
     const edited = await buildCacheInputs(spec(`${root}/p1`), SIG);
     assert(
       edited.clipBindingHash !== base.clipBindingHash,
@@ -79,14 +83,14 @@ Deno.test('clip bytes are a cache input; paths are not; bindings still are', asy
     );
     assert(legacy.clipBindingHash !== base.clipBindingHash);
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });
 
-Deno.test('missing clip file fails actionably, naming clip and path', async () => {
-  const root = await Deno.makeTempDir();
+test('missing clip file fails actionably, naming clip and path', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
-    await Deno.mkdir(`${root}/empty/clips`, { recursive: true });
+    await fs.mkdir(`${root}/empty/clips`, { recursive: true });
     const err = await assertRejects(
       () => buildCacheInputs(spec(`${root}/empty`), SIG),
       Error,
@@ -94,6 +98,6 @@ Deno.test('missing clip file fails actionably, naming clip and path', async () =
     );
     assert(err.message.includes('x.glb'), 'error names the resolved path');
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });

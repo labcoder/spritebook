@@ -1,3 +1,8 @@
+import { runProcess } from '../../tools/testing/process.ts';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Aseprite smoke: the REAL Aseprite imports the exported sheet by the
  * documented procedure (docs/engines/aseprite.md) — File > Import Sprite
@@ -6,50 +11,33 @@
  * cell size round-trip. The tag step of the guide is manual in the UI, so the
  * script applies one tag from `frameTags` and asserts Aseprite accepted it.
  *
- * Gated like the Godot lane: `ignore` without ASEPRITE_BIN, and a
- * skip-that-says-so when the run permission is missing (`deno task
- * test:aseprite` grants it). The Godot lesson is carried over: the Lua script
- * chooses its own exit code, because a raised error in batch mode must never
- * become a hang or a hollow green.
+ * Gated on ASEPRITE_BIN. A configured but unavailable binary fails the lane.
+ * The Lua script chooses its own exit code so a batch error cannot pass silently.
  */
-import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertStringIncludes } from '@std/assert';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
-import { exportAseprite } from './aseprite.ts';
+import { exportAseprite } from './dist/aseprite.js';
 
-const ASEPRITE = Deno.env.get('ASEPRITE_BIN');
+const ASEPRITE = process.env['ASEPRITE_BIN'];
 
-async function canRun(bin: string): Promise<boolean> {
-  const { state } = await Deno.permissions.query({ name: 'run', command: bin });
-  return state === 'granted';
-}
 
 const BAKE = new URL('./fixtures/bake-aabbccdd', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
   '$1',
 );
 
-Deno.test({
-  name: 'aseprite smoke: the real Aseprite imports the exported sheet by the documented steps',
-  ignore: !ASEPRITE,
-  fn: async () => {
-    if (!(await canRun(ASEPRITE!))) {
-      console.log(
-        'skip: ASEPRITE_BIN is set but this run cannot spawn it - asserted NOTHING. ' +
-          'Use `deno task test:aseprite`, which grants --allow-run.',
-      );
-      return;
-    }
-    const out = await Deno.makeTempDir({ prefix: 'sb-ase-smoke-' });
+test('aseprite smoke: the real Aseprite imports the exported sheet by the documented steps', { skip: !ASEPRITE }, async () => {
+    const out = await fs.mkdtemp(join(tmpdir(), 'sb-ase-smoke-'));
     try {
       const manifest = parseWith(
         BakeManifestSchema,
-        JSON.parse(await Deno.readTextFile(`${BAKE}/manifest.json`)),
+        JSON.parse(await fs.readFile(`${BAKE}/manifest.json`, 'utf8')),
         'fixture BakeManifest',
       );
       await exportAseprite(manifest, BAKE, out, { fps: 8 });
 
       const jsonName = `${manifest.characterId}.ase.json`;
-      const doc = JSON.parse(await Deno.readTextFile(`${out}/${jsonName}`)) as {
+      const doc = JSON.parse(await fs.readFile(`${out}/${jsonName}`, 'utf8')) as {
         frames: { frame: { w: number; h: number } }[];
         meta: { image: string; frameTags: { name: string; from: number; to: number }[] };
       };
@@ -63,7 +51,7 @@ Deno.test({
       // aseprite -b exit -1 promptly (os.exit is unsupported in its
       // sandbox), so failure needs no exit-code plumbing.
       const script = `${out}/smoke.lua`;
-      await Deno.writeTextFile(
+      await fs.writeFile(
         script,
         [
           `local sprite = app.open("${out.replaceAll('\\', '/')}/${doc.meta.image}")`,
@@ -88,19 +76,14 @@ Deno.test({
         ].join('\n'),
       );
 
-      const run = new Deno.Command(ASEPRITE!, {
-        args: ['-b', '--script', script],
-        stdout: 'piped',
-        stderr: 'piped',
-      });
-      const { code, stdout, stderr } = await run.output();
+      const run = runProcess(ASEPRITE!, ['-b', '--script', script]);
+      const { code, stdout, stderr } = await run;
       const text = new TextDecoder().decode(stdout) + new TextDecoder().decode(stderr);
       assertEquals(code, 0, `aseprite exited ${code}:\n${text}`);
       assertStringIncludes(text, 'ASE-SMOKE-OK', text);
       assertStringIncludes(text, `frames=${doc.frames.length} `);
       assert(doc.meta.frameTags.length > 0, 'the fixture carries tags to wire');
     } finally {
-      await Deno.remove(out, { recursive: true }).catch(() => {});
+      await fs.rm(out, { recursive: true }).catch(() => {});
     }
-  },
 });

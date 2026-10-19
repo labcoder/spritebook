@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Raw horizontal strip exporter — a PURE PROJECTION of BakeManifest (D-010).
  *
@@ -6,7 +7,7 @@
  * `<characterId>-<clipId>-d<DD>-strip.png` (height = cell h, width =
  * frames * cell w). One `<characterId>-strips.json` describes the set, built
  * with a FIXED key order so the bytes never move (byte-stability doctrine,
- * packages/pack/contracts.ts). fast-png decodes and encodes losslessly, so
+ * packages/pack/contracts.ts). The independent decoder and native encoder preserve the pixel data, so
  * pixels cross unchanged; the single meta cellPx forces cells to be uniform
  * across the whole bake, which subsumes the per-strip uniformity assert.
  *
@@ -15,10 +16,11 @@
  * to flatten clips of different lengths onto one rate. `meta.fps` is only the
  * default an untimed clip falls back to.
  */
-import { decode as decodePng, encode as encodePng } from 'fast-png';
+import { decode as decodePng } from 'fast-png';
+import { encode as encodePng } from '@spritebook/render/png';
 import type { FrameRecord } from '@spritebook/schema';
-import type { Exporter } from '../pack/contracts.ts';
-import { frameIdKey } from '../pack/contracts.ts';
+import type { Exporter } from '@spritebook/pack/contracts';
+import { frameIdKey } from '@spritebook/pack/contracts';
 
 /** The schema leaves clipId free-form; file names must not be. */
 const SAFE_CLIP_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -101,7 +103,7 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
           'which has no lit page in the manifest',
       );
     }
-    const img = decodePng(await Deno.readFile(`${bakeDir}/${png}`));
+    const img = decodePng(new Uint8Array(await fs.readFile(`${bakeDir}/${png}`)));
     if (img.channels !== 4 || img.depth !== 8) {
       throw new Error(
         `exportStrips: ${png} is not rgba8 (channels=${img.channels}, depth=${img.depth})`,
@@ -141,7 +143,7 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
   // untimed clip keeps the old behaviour (opts.fps, looping)
   const timingByClip = new Map((manifest.clips ?? []).map((c) => [c.clipId, c]));
 
-  await Deno.mkdir(outDir, { recursive: true });
+  await fs.mkdir(outDir, { recursive: true });
   const written: string[] = [];
   const stripEntries: StripEntry[] = [];
   for (const g of groups) {
@@ -160,7 +162,7 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
       }
     }
     const file = `${manifest.characterId}-${g.clipId}-d${pad2(g.direction)}-strip.png`;
-    await Deno.writeFile(
+    await fs.writeFile(
       `${outDir}/${file}`,
       encodePng({ width: stripW, height: ch, data: strip }),
     );
@@ -196,7 +198,7 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
     strips: stripEntries,
   };
   const metaPath = `${outDir}/${manifest.characterId}-strips.json`;
-  await Deno.writeTextFile(metaPath, JSON.stringify(meta, null, 2) + '\n');
+  await fs.writeFile(metaPath, JSON.stringify(meta, null, 2) + '\n');
   written.push(metaPath);
   return written.sort();
 };

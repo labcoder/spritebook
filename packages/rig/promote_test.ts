@@ -10,7 +10,7 @@ import { join } from 'node:path';
  * `bake --clips` failing at retarget with "target skeleton is missing the hips
  * joint" immediately after a rig that reported success.
  */
-import { assert, assertEquals, assertRejects } from '@std/assert';
+import { assert, assertEquals } from '@std/assert';
 import {
   appendGenerationResult,
   createWorkspace,

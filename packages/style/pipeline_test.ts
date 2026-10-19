@@ -1,18 +1,22 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * P2-T2 acceptance (structural — runs anywhere from the committed AOV fixtures,
  * no GPU): palette-membership across a full clip, the flicker metric + per-preset
  * budget, the outline-exceeds-padding QA flag, and same-inputs determinism. The
  * perceptual per-preset goldens live in goldens_test.ts.
  */
-import { assert, assertEquals, assertRejects, assertThrows } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects, assertThrows } from '@std/assert';
 import { fileURLToPath } from 'node:url';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { CameraPreset } from '@spritebook/schema';
 import { parseWith, StylePresetSchema } from '@spritebook/schema';
-import { styleFromAovs } from './pipeline.ts';
-import { CEL_2, PAINTERLY, PIXEL, PRESETS } from './presets.ts';
+import { styleFromAovs } from './dist/pipeline.js';
+import { CEL_2, PAINTERLY, PIXEL, PRESETS } from './dist/presets.js';
 import { srgbToHex } from '@spritebook/core';
-import type { AovSource } from './contracts.ts';
+import type { AovSource } from './dist/contracts.js';
 
 const FRAMES = fileURLToPath(new URL('./fixtures/aov/frames/', import.meta.url));
 const SRC: AovSource = { framesDir: FRAMES, directions: 2, frames: 6, width: 256, height: 256 };
@@ -31,19 +35,19 @@ const CAM: CameraPreset = {
 const fn = (d: number, f: number) =>
   `d${String(d).padStart(2, '0')}_f${String(f).padStart(3, '0')}.png`;
 
-Deno.test('presets load and validate', () => {
+test('presets load and validate', () => {
   assertEquals(Object.keys(PRESETS).sort(), ['cel-2', 'clean', 'painterly', 'pixel']);
 });
 
-Deno.test('palette membership: every opaque pixel of a pixel style is a palette color', async () => {
-  const out = await Deno.makeTempDir();
+test('palette membership: every opaque pixel of a pixel style is a palette color', async () => {
+  const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const r = await styleFromAovs(SRC, CAM, PIXEL, out);
     const palette = new Set(r.paletteHex);
     let checked = 0;
     for (let d = 0; d < SRC.directions; d++) {
       for (let f = 0; f < SRC.frames; f++) {
-        const img = decodePng(await Deno.readFile(`${r.styledDir}/${fn(d, f)}`));
+        const img = decodePng(new Uint8Array(await fs.readFile(`${r.styledDir}/${fn(d, f)}`)));
         const data = img.data as Uint8Array;
         for (let p = 0; p < img.width * img.height; p++) {
           if (data[p * 4 + 3] === 0) continue; // transparent
@@ -55,11 +59,11 @@ Deno.test('palette membership: every opaque pixel of a pixel style is a palette 
     }
     assert(checked > 1000, `enough opaque pixels checked (${checked})`);
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('flicker is within each preset budget on the idle loop', async () => {
+test('flicker is within each preset budget on the idle loop', async () => {
   // Tight regression guards at ~2x MEASURED, not the roadmap 1.2% target - all
   // presets clear that with room. `pixel` earns the loosest of the three
   // because its stroke went to half a pixel: a 2-texel Sx stroke sits at the
@@ -77,7 +81,7 @@ Deno.test('flicker is within each preset budget on the idle loop', async () => {
     'clean': 9.0,
   };
   for (const [id, preset] of Object.entries(PRESETS)) {
-    const out = await Deno.makeTempDir();
+    const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
     try {
       const r = await styleFromAovs(SRC, CAM, preset, out);
       assert(
@@ -85,22 +89,22 @@ Deno.test('flicker is within each preset budget on the idle loop', async () => {
         `${id} flicker ${r.flickerPct.toFixed(3)}% exceeds budget ${budget[id]}%`,
       );
     } finally {
-      await Deno.remove(out, { recursive: true });
+      await fs.rm(out, { recursive: true });
     }
   }
 });
 
-Deno.test('outline-exceeds-padding QA flag fires only when width > padding', async () => {
+test('outline-exceeds-padding QA flag fires only when width > padding', async () => {
   // padding is 6; PIXEL outline width 0.5 -> no flag
-  const clean = await Deno.makeTempDir();
+  const clean = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const r = await styleFromAovs(SRC, CAM, PIXEL, clean);
     assert(!r.flags.some((f) => f.code === 'outline-exceeds-padding'), 'no flag at width 1');
   } finally {
-    await Deno.remove(clean, { recursive: true });
+    await fs.rm(clean, { recursive: true });
   }
   // width 8 > padding 6 -> flag with sourceStage 'look' + frameRefs
-  const wide = await Deno.makeTempDir();
+  const wide = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const preset = { ...PIXEL, outline: { ...PIXEL.outline!, widthPx: 8 } };
     const r = await styleFromAovs(SRC, CAM, preset, wide);
@@ -109,12 +113,12 @@ Deno.test('outline-exceeds-padding QA flag fires only when width > padding', asy
     assertEquals(flag!.sourceStage, 'look');
     assert(flag!.frameRefs.length > 0 && flag!.frameRefs[0].clipId.length > 0, 'frameRefs present');
   } finally {
-    await Deno.remove(wide, { recursive: true });
+    await fs.rm(wide, { recursive: true });
   }
 });
 
-Deno.test('styleFromAovs is deterministic (byte-identical sprites + metrics)', async () => {
-  const a = await Deno.makeTempDir(), b = await Deno.makeTempDir();
+test('styleFromAovs is deterministic (byte-identical sprites + metrics)', async () => {
+  const a = await fs.mkdtemp(join(tmpdir(), 'spritebook-')), b = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const ra = await styleFromAovs(SRC, CAM, CEL_2, a);
     const rb = await styleFromAovs(SRC, CAM, CEL_2, b);
@@ -122,25 +126,25 @@ Deno.test('styleFromAovs is deterministic (byte-identical sprites + metrics)', a
     assertEquals(ra.flickerPct, rb.flickerPct, 'flicker identical');
     for (let d = 0; d < SRC.directions; d++) {
       for (let f = 0; f < SRC.frames; f++) {
-        const pa = await Deno.readFile(`${a}/styled/${fn(d, f)}`);
-        const pb = await Deno.readFile(`${b}/styled/${fn(d, f)}`);
+        const pa = new Uint8Array(await fs.readFile(`${a}/styled/${fn(d, f)}`));
+        const pb = new Uint8Array(await fs.readFile(`${b}/styled/${fn(d, f)}`));
         assertEquals(pa, pb, `${fn(d, f)} differs between renders`);
       }
     }
   } finally {
-    await Deno.remove(a, { recursive: true });
-    await Deno.remove(b, { recursive: true });
+    await fs.rm(a, { recursive: true });
+    await fs.rm(b, { recursive: true });
   }
 });
 
-Deno.test('painterly: a bigger budget never shrinks the palette, and no entry is dead', async () => {
+test('painterly: a bigger budget never shrinks the palette, and no entry is dead', async () => {
   // This replaces an assertion that compared paletteHex.LENGTH against
   // pixel's maxColors. That passed while 25 of painterly's 32 entries were
   // duplicates of each other: it asserted the padding, not the palette. Entry
   // count was never the thing worth checking, because `nearestWithDist` breaks
   // ties with a strict `<`, so a duplicate entry can never be selected.
-  const out = await Deno.makeTempDir();
-  const out8 = await Deno.makeTempDir();
+  const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+  const out8 = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const painterly = await styleFromAovs(SRC, CAM, PAINTERLY, out);
     const pixel = await styleFromAovs(SRC, CAM, PIXEL, out8);
@@ -180,12 +184,12 @@ Deno.test('painterly: a bigger budget never shrinks the palette, and no entry is
     // collapse together. On a flat-shaded box that is most of the colour it has.
     assertEquals(painterly.paletteHex.length, 5, "the fixture's own distinct-colour ceiling");
   } finally {
-    await Deno.remove(out, { recursive: true });
-    await Deno.remove(out8, { recursive: true });
+    await fs.rm(out, { recursive: true });
+    await fs.rm(out8, { recursive: true });
   }
 });
 
-Deno.test('cluster-vote without a palette is refused, not silently blank', () => {
+test('cluster-vote without a palette is refused, not silently blank', () => {
   // Measured before this guard: a schema-valid preset with clusterVote and no
   // quantize wrote 64x64 sprites with opaque=0 and reported flickerPct 0.000 —
   // a perfect stability score for an image containing nothing.
@@ -194,11 +198,11 @@ Deno.test('cluster-vote without a palette is refused, not silently blank', () =>
   assertThrows(() => parseWith(StylePresetSchema, bad, 'StylePreset'), Error, 'clusterVote');
 });
 
-Deno.test('cluster-vote with an empty palette refuses at runtime too', async () => {
+test('cluster-vote with an empty palette refuses at runtime too', async () => {
   // Defence in depth: styleFromAovs takes a StylePreset object, so a caller
   // that skipped validation still must not produce a blank sprite reporting
   // success.
-  const out = await Deno.makeTempDir();
+  const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const bad = { ...PIXEL, id: 'blank-maker', quantize: undefined } as unknown as typeof PIXEL;
     const err = await assertRejects(() => styleFromAovs(SRC, CAM, bad, out), Error);
@@ -207,7 +211,7 @@ Deno.test('cluster-vote with an empty palette refuses at runtime too', async () 
       `the refusal explains the blank sprite: ${err.message}`,
     );
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
@@ -238,7 +242,7 @@ async function writeSyntheticAov(dir: string, sx: number, inset: number | Insets
   }
   const gray = new Uint16Array(sx * sx).fill(1000);
   const write = async (pass: string, data: Uint8Array | Uint16Array, channels: number) => {
-    await Deno.writeFile(
+    await fs.writeFile(
       `${dir}/d00_f000_${pass}.png`,
       encodePng({ width: sx, height: sx, data, channels, depth: channels === 1 ? 16 : 8 } as never),
     );
@@ -250,7 +254,7 @@ async function writeSyntheticAov(dir: string, sx: number, inset: number | Insets
   await write('mask', gray, 1);
 }
 
-Deno.test('silhouette-clipped fires when the character runs out of cell', async () => {
+test('silhouette-clipped fires when the character runs out of cell', async () => {
   // Nothing detected this before: camera.ts is explicit that the frustum never
   // depends on the model bounds, so a roster whose pixelsPerMeter x height
   // exceeds cellPx ships decapitated in every frame of every direction, and the
@@ -260,8 +264,8 @@ Deno.test('silhouette-clipped fires when the character runs out of cell', async 
   // style stage cannot reframe it - it only downsamples what the renderer
   // already produced.
   const sx = 32; // superSample 4 -> an 8x8 cell
-  const cut = await Deno.makeTempDir();
-  const fits = await Deno.makeTempDir();
+  const cut = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+  const fits = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     await writeSyntheticAov(cut, sx, 0); // touches every border
     await writeSyntheticAov(fits, sx, 8); // a clear margin all round
@@ -274,8 +278,8 @@ Deno.test('silhouette-clipped fires when the character runs out of cell', async 
     });
     const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 } };
 
-    const outCut = await Deno.makeTempDir();
-    const outFits = await Deno.makeTempDir();
+    const outCut = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+    const outFits = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
     try {
       const clipped = await styleFromAovs(src(cut), cam, PIXEL, outCut);
       const ok = await styleFromAovs(src(fits), cam, PIXEL, outFits);
@@ -304,24 +308,24 @@ Deno.test('silhouette-clipped fires when the character runs out of cell', async 
       );
       assert(/padding budget is exhausted/.test(fired!.message), 'and says what it means');
     } finally {
-      await Deno.remove(outCut, { recursive: true });
-      await Deno.remove(outFits, { recursive: true });
+      await fs.rm(outCut, { recursive: true });
+      await fs.rm(outFits, { recursive: true });
     }
   } finally {
-    await Deno.remove(cut, { recursive: true });
-    await Deno.remove(fits, { recursive: true });
+    await fs.rm(cut, { recursive: true });
+    await fs.rm(fits, { recursive: true });
   }
 });
 
-Deno.test('the flag reports HOW WIDE the contact is (D-035)', async () => {
+test('the flag reports HOW WIDE the contact is (D-035)', async () => {
   // Contact means the padding budget is spent; it never means pixels were lost,
   // and from the cell alone the two are indistinguishable. So the flag reports
   // the WIDTH rather than thresholding on it — that number is what separates
   // "the tip of the ground band grazed the last row" from "a body is being
   // sliced", and it used to be computed and thrown away.
   const sx = 32;
-  const wide = await Deno.makeTempDir();
-  const narrow = await Deno.makeTempDir();
+  const wide = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+  const narrow = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     // `bottom: 0` means the shape runs all the way to the bottom border
     await writeSyntheticAov(wide, sx, { top: 8, bottom: 0, left: 0, right: 0 });
@@ -334,8 +338,8 @@ Deno.test('the flag reports HOW WIDE the contact is (D-035)', async () => {
       height: sx,
     });
     const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 } };
-    const outW = await Deno.makeTempDir();
-    const outN = await Deno.makeTempDir();
+    const outW = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+    const outN = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
     try {
       const w = (await styleFromAovs(src(wide), cam, PIXEL, outW)).flags
         .find((f) => f.code === 'silhouette-clipped');
@@ -351,16 +355,16 @@ Deno.test('the flag reports HOW WIDE the contact is (D-035)', async () => {
       );
       assert(/at its widest/.test(w!.message), 'and says the number is a maximum, not a total');
     } finally {
-      await Deno.remove(outW, { recursive: true });
-      await Deno.remove(outN, { recursive: true });
+      await fs.rm(outW, { recursive: true });
+      await fs.rm(outN, { recursive: true });
     }
   } finally {
-    await Deno.remove(wide, { recursive: true });
-    await Deno.remove(narrow, { recursive: true });
+    await fs.rm(wide, { recursive: true });
+    await fs.rm(narrow, { recursive: true });
   }
 });
 
-Deno.test('the bottom edge is the ground band, and says so (D-034)', async () => {
+test('the bottom edge is the ground band, and says so (D-034)', async () => {
   // This test used to assert the flag said "standing IN the floor". That claim
   // was FALSE and is retracted: `camera.ts` pins world Y=0 at the bounds centre
   // only, so at elevation the ground plane projects as a BAND and a contact
@@ -372,8 +376,8 @@ Deno.test('the bottom edge is the ground band, and says so (D-034)', async () =>
   // and the fact that a bigger cell CANNOT help (rows below the pivot are
   // always paddingPx - 1), not an accusation about the mesh.
   const sx = 32;
-  const below = await Deno.makeTempDir();
-  const wide = await Deno.makeTempDir();
+  const below = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+  const wide = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     await writeSyntheticAov(below, sx, { top: 8, bottom: 0, left: 8, right: 8 });
     await writeSyntheticAov(wide, sx, { top: 8, bottom: 8, left: 0, right: 0 });
@@ -386,8 +390,8 @@ Deno.test('the bottom edge is the ground band, and says so (D-034)', async () =>
     });
     const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 } };
 
-    const outB = await Deno.makeTempDir();
-    const outW = await Deno.makeTempDir();
+    const outB = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+    const outW = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
     try {
       const b = (await styleFromAovs(src(below), cam, PIXEL, outB)).flags
         .find((f) => f.code === 'silhouette-clipped');
@@ -427,22 +431,22 @@ Deno.test('the bottom edge is the ground band, and says so (D-034)', async () =>
       );
       assert(!/feet-ground/.test(w!.message), `and grounding is not mentioned: ${w!.message}`);
     } finally {
-      await Deno.remove(outB, { recursive: true });
-      await Deno.remove(outW, { recursive: true });
+      await fs.rm(outB, { recursive: true });
+      await fs.rm(outW, { recursive: true });
     }
   } finally {
-    await Deno.remove(below, { recursive: true });
-    await Deno.remove(wide, { recursive: true });
+    await fs.rm(below, { recursive: true });
+    await fs.rm(wide, { recursive: true });
   }
 });
 
-Deno.test('bottom clipping on a CENTER pivot is framing, because Y=0 is not pinned', async () => {
+test('bottom clipping on a CENTER pivot is framing, because Y=0 is not pinned', async () => {
   // The grounding inference is only available on feet-baseline: a center pivot
   // puts the bounding-box middle on the middle row and world Y=0 lands wherever
   // the body's height puts it, so "below the pivot" says nothing about the floor.
   const sx = 32;
-  const dir = await Deno.makeTempDir();
-  const out = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+  const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     await writeSyntheticAov(dir, sx, { top: 8, bottom: 0, left: 8, right: 8 });
     const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 }, pivot: 'center' as const };
@@ -456,18 +460,18 @@ Deno.test('bottom clipping on a CENTER pivot is framing, because Y=0 is not pinn
     assert(!/feet-ground/.test(f!.message), `no grounding claim it cannot support: ${f!.message}`);
     assert(/lower pixelsPerMeter or raise cellPx/.test(f!.message), f!.message);
   } finally {
-    await Deno.remove(dir, { recursive: true });
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(dir, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });
 
-Deno.test('subject-degenerate fires on a near-empty sheet, and only there (W4d)', async () => {
+test('subject-degenerate fires on a near-empty sheet, and only there (W4d)', async () => {
   // UX pass 2 baked a retarget-collapsed character into a ~1.6%-coverage
   // smear and QA said "no flags": flicker measures temporal stability, and a
   // subject that is ABSENT is perfectly stable. Coverage is the missing axis.
   const sx = 32; // superSample 4 -> an 8x8 cell
-  const smear = await Deno.makeTempDir();
-  const healthy = await Deno.makeTempDir();
+  const smear = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+  const healthy = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     await writeSyntheticAov(smear, sx, 15); // a 2x2 speck: 1/256 = 0.4% at Sx
     await writeSyntheticAov(healthy, sx, 8); // a 16x16 body: 25%
@@ -480,8 +484,8 @@ Deno.test('subject-degenerate fires on a near-empty sheet, and only there (W4d)'
     });
     const cam = { ...CAM, cellPx: { w: sx / 4, h: sx / 4 } };
 
-    const outSmear = await Deno.makeTempDir();
-    const outHealthy = await Deno.makeTempDir();
+    const outSmear = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
+    const outHealthy = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
     try {
       const flagged = await styleFromAovs(src(smear), cam, PIXEL, outSmear);
       const clean = await styleFromAovs(src(healthy), cam, PIXEL, outHealthy);
@@ -504,11 +508,11 @@ Deno.test('subject-degenerate fires on a near-empty sheet, and only there (W4d)'
       assert(/collapsed or vanished/.test(fired!.message), 'and says what it means');
       assert(/Preview/.test(fired!.message), 'and points at the preview that shows it');
     } finally {
-      await Deno.remove(outSmear, { recursive: true });
-      await Deno.remove(outHealthy, { recursive: true });
+      await fs.rm(outSmear, { recursive: true });
+      await fs.rm(outHealthy, { recursive: true });
     }
   } finally {
-    await Deno.remove(smear, { recursive: true });
-    await Deno.remove(healthy, { recursive: true });
+    await fs.rm(smear, { recursive: true });
+    await fs.rm(healthy, { recursive: true });
   }
 });

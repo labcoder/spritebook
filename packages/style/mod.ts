@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * @spritebook/style - the NPR style stack behind the D-004 seam: StyleJobSpec
  * (plain data) in, styled sprite files + a StyleResult JSON out; no pixels or GPU
@@ -46,7 +49,7 @@ export async function* runStyleJob(spec: StyleJobSpec): AsyncIterable<JobEvent> 
   yield { t: 'started', jobId, at: at() };
 
   const s = spec.style.temporal.superSample;
-  const aovDir = await Deno.makeTempDir();
+  const aovDir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     // 1. render the supersampled AOVs (idle loop) via the render seam
     yield { t: 'progress', jobId, at: at(), step: 'render', done: 1, total: 3 };
@@ -92,7 +95,7 @@ export async function* runStyleJob(spec: StyleJobSpec): AsyncIterable<JobEvent> 
     // 3. write the StyleResult (palette + flicker + flags -> the packer folds it
     // into the BakeManifest at P2-T3) and announce artifacts
     const resultPath = `${spec.outDir}/style-result.json`;
-    await Deno.writeTextFile(resultPath, JSON.stringify(result, null, 2) + '\n');
+    await fs.writeFile(resultPath, JSON.stringify(result, null, 2) + '\n');
     yield { t: 'progress', jobId, at: at(), step: 'write', done: 3, total: 3 };
     yield { t: 'artifact', jobId, at: at(), kind: 'styled-frames', path: result.styledDir };
     yield { t: 'artifact', jobId, at: at(), kind: 'style-result', path: resultPath };
@@ -104,6 +107,6 @@ export async function* runStyleJob(spec: StyleJobSpec): AsyncIterable<JobEvent> 
     const message = err instanceof Error ? err.message : String(err);
     yield { t: 'error', jobId, at: at(), code: 'style-failed', message, retryable: false };
   } finally {
-    await Deno.remove(aovDir, { recursive: true }).catch(() => {});
+    await fs.rm(aovDir, { recursive: true }).catch(() => {});
   }
 }

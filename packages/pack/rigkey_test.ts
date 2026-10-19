@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * D-031: `accepted` is out of the cache key, and NOTHING else is.
  *
@@ -9,10 +10,10 @@
  * enumerated against RigState's own shape so a field added tomorrow fails this
  * file rather than quietly slipping the net.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { canonicalJson, type RigState, RigStateSchema } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
-import { rigForKey } from './cache.ts';
+import { rigForKey } from './dist/cache.js';
 
 const FULL: RigState = RigStateSchema.parse({
   track: 'B',
@@ -29,7 +30,7 @@ const FULL: RigState = RigStateSchema.parse({
 /** What `buildCacheInputs` will hash — the same expression, kept in step. */
 const keyOf = (rig: RigState) => sha256Hex(canonicalJson(rigForKey(rig)));
 
-Deno.test('accepting a rig does not move the cache key', async () => {
+test('accepting a rig does not move the cache key', async () => {
   // the whole point: `spritebook rig --accept` moves no vertex, so it must not
   // cost a re-bake of every frame this character has
   const before = await keyOf(FULL);
@@ -37,7 +38,7 @@ Deno.test('accepting a rig does not move the cache key', async () => {
   assertEquals(before, after, 'a human judgement is not a recipe change');
 });
 
-Deno.test('EVERY other RigState field still moves the key', async () => {
+test('EVERY other RigState field still moves the key', async () => {
   // enumerated from the schema rather than hand-listed, so a field added to
   // RigState lands here as a failure instead of as a silent cache collision
   const perturb: Record<string, RigState> = {
@@ -72,7 +73,7 @@ Deno.test('EVERY other RigState field still moves the key', async () => {
   }
 });
 
-Deno.test('the omission is by exclusion, so unknown fields stay IN', () => {
+test('the omission is by exclusion, so unknown fields stay IN', () => {
   // written as a rest-destructure on purpose: the failure mode of forgetting
   // to update rigForKey is a spurious MISS, never a wrong hit
   const withFuture = { ...FULL, someFutureGeometricField: 42 } as unknown as RigState;
@@ -81,7 +82,7 @@ Deno.test('the omission is by exclusion, so unknown fields stay IN', () => {
   assert(!('accepted' in kept), 'and the one field it does know about is gone');
 });
 
-Deno.test('an UNRIGGED bake keys exactly as it always did', async () => {
+test('an UNRIGGED bake keys exactly as it always did', async () => {
   // The no-rig sentinel has no `accepted` field, so D-031 cannot move it —
   // the one-time invalidation falls only on characters that HAVE a rig. Pinned
   // to the literal so a future change to the sentinel's shape (or to

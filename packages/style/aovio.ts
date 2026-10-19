@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Read the render module's AOV PNGs (files in, across the D-004 seam) into
  * decoded AovImage planes. lit/albedo/normal decode to 8-bit RGBA; depth/mask
@@ -9,7 +10,7 @@ import { aovFileName, type AovImage } from './contracts.ts';
 
 async function readPng(framesDir: string, direction: number, frame: number, pass: string) {
   const path = `${framesDir}/${aovFileName(direction, frame, pass)}`;
-  return decodePng(await Deno.readFile(path));
+  return decodePng(new Uint8Array(await fs.readFile(path)));
 }
 
 export async function readAov(

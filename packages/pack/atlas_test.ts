@@ -1,8 +1,9 @@
-import { assert, assertEquals, assertThrows } from 'jsr:@std/assert@1';
+import { test } from 'node:test';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 import { decode as decodePng } from 'fast-png';
-import { type CellPlane, frameIdKey, type PackLayout } from './contracts.ts';
-import { assertRectIdentity, composePage, encodePagePng } from './atlas.ts';
-import { packLayout } from './maxrects.ts';
+import { type CellPlane, frameIdKey, type PackLayout } from './dist/contracts.js';
+import { assertRectIdentity, composePage, encodePagePng } from './dist/atlas.js';
+import { packLayout } from './dist/maxrects.js';
 
 // Hand-built layout: two 2x2 cells on an 8px page, plus one on a second page.
 function twoCellLayout(): PackLayout {
@@ -41,7 +42,7 @@ function px(page: CellPlane, x: number, y: number): number[] {
 
 // --- composePage -------------------------------------------------------------
 
-Deno.test('composePage: rgba8 cells land at their rects, exact corner pixels', () => {
+test('composePage: rgba8 cells land at their rects, exact corner pixels', () => {
   const page = composePage(twoCellLayout(), 0, rgbaCells(), 'rgba8');
   assertEquals(page.w, 8);
   assertEquals(page.h, 8);
@@ -60,13 +61,13 @@ Deno.test('composePage: rgba8 cells land at their rects, exact corner pixels', (
   assertEquals(px(page, 7, 7), [0, 0, 0, 0]);
 });
 
-Deno.test('composePage: only rects of the requested page are composed', () => {
+test('composePage: only rects of the requested page are composed', () => {
   const page1 = composePage(twoCellLayout(), 1, rgbaCells(), 'rgba8');
   assertEquals(px(page1, 0, 0), [100, 101, 102, 103]); // idle/d01/f000
   assertEquals(px(page1, 5, 3), [0, 0, 0, 0]); // page-0 rect is absent here
 });
 
-Deno.test('composePage: gray16 cells land with 16-bit values intact', () => {
+test('composePage: gray16 cells land with 16-bit values intact', () => {
   const cells = new Map([
     ['idle/d00/f000', gray16Cell([0x1234, 0x2345, 0x3456, 0x4567])],
     ['idle/d00/f001', gray16Cell([0xfedc, 0xedcb, 0xdcba, 0xcba9])],
@@ -81,7 +82,7 @@ Deno.test('composePage: gray16 cells land with 16-bit values intact', () => {
   assertEquals(page.gray16![0], 0);
 });
 
-Deno.test('composePage: a missing cell throws with its key', () => {
+test('composePage: a missing cell throws with its key', () => {
   const cells = rgbaCells();
   cells.delete('idle/d00/f001');
   assertThrows(
@@ -91,20 +92,20 @@ Deno.test('composePage: a missing cell throws with its key', () => {
   );
 });
 
-Deno.test('composePage: a cell whose size mismatches its rect throws', () => {
+test('composePage: a cell whose size mismatches its rect throws', () => {
   const cells = rgbaCells();
   cells.set('idle/d00/f001', { w: 3, h: 2, rgba: new Uint8Array(24) });
   assertThrows(() => composePage(twoCellLayout(), 0, cells, 'rgba8'), Error, '3x2');
 });
 
-Deno.test('composePage: a cell missing the plane the page kind needs throws', () => {
+test('composePage: a cell missing the plane the page kind needs throws', () => {
   const cells = rgbaCells();
   cells.set('idle/d00/f001', gray16Cell([1, 2, 3, 4]));
   assertThrows(() => composePage(twoCellLayout(), 0, cells, 'rgba8'), Error, 'rgba');
   assertThrows(() => composePage(twoCellLayout(), 0, rgbaCells(), 'gray16'), Error, 'gray16');
 });
 
-Deno.test('composePage: pageIndex out of range and overflowing rects throw', () => {
+test('composePage: pageIndex out of range and overflowing rects throw', () => {
   assertThrows(
     () => composePage(twoCellLayout(), 2, rgbaCells(), 'rgba8'),
     RangeError,
@@ -117,7 +118,7 @@ Deno.test('composePage: pageIndex out of range and overflowing rects throw', () 
 
 // --- assertRectIdentity ------------------------------------------------------
 
-Deno.test('assertRectIdentity: one layout replayed five times passes (the law)', () => {
+test('assertRectIdentity: one layout replayed five times passes (the law)', () => {
   const layout = twoCellLayout();
   assertRectIdentity([layout, layout, layout, layout, layout]);
   // a value-identical copy passes too — identity is by value, not reference
@@ -126,7 +127,7 @@ Deno.test('assertRectIdentity: one layout replayed five times passes (the law)',
   assertRectIdentity([layout]);
 });
 
-Deno.test('assertRectIdentity: a mutated copy throws naming the divergence', () => {
+test('assertRectIdentity: a mutated copy throws naming the divergence', () => {
   const layout = twoCellLayout();
   const shifted = structuredClone(layout);
   shifted.rects[1].x += 1;
@@ -151,7 +152,7 @@ Deno.test('assertRectIdentity: a mutated copy throws naming the divergence', () 
 
 // --- encodePagePng -----------------------------------------------------------
 
-Deno.test('encodePagePng: gray16 round-trips through fast-png losslessly', () => {
+test('encodePagePng: gray16 round-trips through fast-png losslessly', () => {
   const cells = new Map([
     ['idle/d00/f000', gray16Cell([0x1234, 0x2345, 0x3456, 0x4567])],
     ['idle/d00/f001', gray16Cell([0xfedc, 0xedcb, 0xdcba, 0xcba9])],
@@ -168,7 +169,7 @@ Deno.test('encodePagePng: gray16 round-trips through fast-png losslessly', () =>
   assertEquals(decoded.data, page.gray16!);
 });
 
-Deno.test('encodePagePng: rgba8 round-trips through fast-png losslessly', () => {
+test('encodePagePng: rgba8 round-trips through fast-png losslessly', () => {
   const page = composePage(twoCellLayout(), 0, rgbaCells(), 'rgba8');
   const decoded = decodePng(encodePagePng(page, 'rgba8'));
   assertEquals(decoded.width, 8);
@@ -177,7 +178,7 @@ Deno.test('encodePagePng: rgba8 round-trips through fast-png losslessly', () => 
   assertEquals(decoded.data, page.rgba!);
 });
 
-Deno.test('encodePagePng: a plane missing the requested kind throws', () => {
+test('encodePagePng: a plane missing the requested kind throws', () => {
   const rgbaPage: CellPlane = { w: 2, h: 2, rgba: new Uint8Array(16) };
   const grayPage: CellPlane = { w: 2, h: 2, gray16: new Uint16Array(4) };
   assertThrows(() => encodePagePng(rgbaPage, 'gray16'), RangeError);
@@ -186,7 +187,7 @@ Deno.test('encodePagePng: a plane missing the requested kind throws', () => {
 
 // --- integration with packLayout --------------------------------------------
 
-Deno.test('composePage: a packLayout layout composes with every cell at its rect', () => {
+test('composePage: a packLayout layout composes with every cell at its rect', () => {
   const layout = packLayout([
     { id: { clipId: 'walk', direction: 0, frame: 0 }, w: 2, h: 2 },
     { id: { clipId: 'walk', direction: 0, frame: 1 }, w: 3, h: 1 },

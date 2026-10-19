@@ -1,3 +1,8 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Mirroring (D-008), proved on both sides of the seam:
  *  - CPU: the plan follows the frozen rule, each pass flips the way its data
@@ -11,18 +16,18 @@
  * The asymmetric fixture is deliberate: mirroring changes its pixels, so
  * "mirrored on == mirrored off" would be a false pass on a symmetric model.
  */
-import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import { fileURLToPath } from 'node:url';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { BakeManifest, CameraPreset, JobEvent, RenderPass } from '@spritebook/schema';
 import { BakeManifestSchema, parseWith, renderedDirections } from '@spritebook/schema';
 import { PIXEL } from '@spritebook/style';
-import { tryGetGpu } from '../render/gpu.ts';
-import { type CellPlane, frameIdKey, PAGE_KIND } from './contracts.ts';
-import { assertRenderedPrefix, flipCellPng, flipPlaneH, mirrorPlan } from './mirror.ts';
-import { buildCacheInputs, runBakeJob } from './bake.ts';
-import { predictInvalidation } from './cache.ts';
-import { frameGrid } from './manifest.ts';
+import { tryGetGpu } from '../render/dist/gpu.js';
+import { type CellPlane, frameIdKey, PAGE_KIND } from './dist/contracts.js';
+import { assertRenderedPrefix, flipCellPng, flipPlaneH, mirrorPlan } from './dist/mirror.js';
+import { buildCacheInputs, runBakeJob } from './dist/bake.js';
+import { predictInvalidation } from './dist/cache.js';
+import { frameGrid } from './dist/manifest.js';
 
 const GLB = fileURLToPath(new URL('../style/fixtures/asymmetric.glb', import.meta.url));
 const CAM: CameraPreset = {
@@ -45,7 +50,7 @@ const MIRROR_SOURCE = 1;
 // CPU: the plan
 // ---------------------------------------------------------------------------
 
-Deno.test('mirror plan: off renders everything; on renders the front half only', () => {
+test('mirror plan: off renders everything; on renders the front half only', () => {
   const off = mirrorPlan(8, false);
   assertEquals(off.rendered, [0, 1, 2, 3, 4, 5, 6, 7]);
   assertEquals(off.mirroredFrom.size, 0, 'D-008 default: nothing is mirrored');
@@ -88,7 +93,7 @@ function rgbaProbe(): CellPlane {
   return { w, h, rgba };
 }
 
-Deno.test('flip: color passes reverse columns and touch no channel', () => {
+test('flip: color passes reverse columns and touch no channel', () => {
   const src = rgbaProbe();
   for (const pass of ['lit', 'albedo'] as RenderPass[]) {
     const out = flipPlaneH(src, pass);
@@ -106,7 +111,7 @@ Deno.test('flip: color passes reverse columns and touch no channel', () => {
   }
 });
 
-Deno.test('flip: the normal pass negates X, or the mirrored half lights wrong', () => {
+test('flip: the normal pass negates X, or the mirrored half lights wrong', () => {
   const src = rgbaProbe();
   const out = flipPlaneH(src, 'normal');
   for (let y = 0; y < src.h; y++) {
@@ -124,7 +129,7 @@ Deno.test('flip: the normal pass negates X, or the mirrored half lights wrong', 
   assertEquals([...back.rgba!], [...src.rgba!], 'flip . flip == identity for normals');
 });
 
-Deno.test('flip: data passes reverse columns and never blend', () => {
+test('flip: data passes reverse columns and never blend', () => {
   const w = 3, h = 2;
   const gray16 = Uint16Array.from([1, 2, 3, 4, 5, 6]);
   for (const pass of ['depth', 'mask'] as RenderPass[]) {
@@ -133,7 +138,7 @@ Deno.test('flip: data passes reverse columns and never blend', () => {
   }
 });
 
-Deno.test('flip: the encoded-PNG path agrees with the plane path, per pass', () => {
+test('flip: the encoded-PNG path agrees with the plane path, per pass', () => {
   const src = rgbaProbe();
   for (const pass of ['lit', 'albedo', 'normal'] as RenderPass[]) {
     const png = encodePng({ width: src.w, height: src.h, data: src.rgba! });
@@ -150,7 +155,7 @@ Deno.test('flip: the encoded-PNG path agrees with the plane path, per pass', () 
   assertEquals([...(flipped.data as Uint16Array)], [3, 2, 1, 6, 5, 4]);
 });
 
-Deno.test('flip: a mis-sized cell is refused, never silently half-copied', () => {
+test('flip: a mis-sized cell is refused, never silently half-copied', () => {
   let threw = false;
   try {
     flipPlaneH({ w: 4, h: 4, rgba: new Uint8Array(8) }, 'lit');
@@ -165,7 +170,7 @@ Deno.test('flip: a mis-sized cell is refused, never silently half-copied', () =>
 // CPU: cache honesty (D-011)
 // ---------------------------------------------------------------------------
 
-Deno.test('cache: mirroring is part of the recipe, so the two bakes never share', async () => {
+test('cache: mirroring is part of the recipe, so the two bakes never share', async () => {
   const base = {
     characterId: 'asym',
     modelPath: GLB,
@@ -220,7 +225,7 @@ async function bake(
   return {
     manifest: parseWith(
       BakeManifestSchema,
-      JSON.parse(await Deno.readTextFile(manifestPath)),
+      JSON.parse(await fs.readFile(manifestPath, 'utf8')),
       'BakeManifest',
     ),
     bakeDir,
@@ -240,7 +245,7 @@ async function cellOf(
   const page = manifest.atlases.find((p) =>
     p.pass === pass && p.pageIndex === rec.atlas.pageIndex
   )!;
-  const img = decodePng(await Deno.readFile(`${bakeDir}/${page.png}`));
+  const img = decodePng(new Uint8Array(await fs.readFile(`${bakeDir}/${page.png}`)));
   const { x, y, w, h } = rec.atlas;
   if (PAGE_KIND[pass] === 'rgba8') {
     const src = img.data as Uint8Array;
@@ -261,14 +266,14 @@ async function cellOf(
   return { w, h, gray16 };
 }
 
-Deno.test('acceptance: a mirrored bake flips every pass, marks it, and styles half', async (t) => {
-  if (!(await tryGetGpu())) return;
-  const root = await Deno.makeTempDir();
+test('acceptance: a mirrored bake flips every pass, marks it, and styles half', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const on = await bake(`${root}/on`, true);
     const off = await bake(`${root}/off`, false);
 
-    await t.step('the manifest names which frames are flips, and of what', () => {
+    await t.test('the manifest names which frames are flips, and of what', () => {
       for (const f of on.manifest.frames) {
         if (f.direction === MIRRORED_DIRECTION) {
           assertEquals(
@@ -297,7 +302,7 @@ Deno.test('acceptance: a mirrored bake flips every pass, marks it, and styles ha
       );
     });
 
-    await t.step('mirroring OFF marks nothing (the D-008 default)', () => {
+    await t.test('mirroring OFF marks nothing (the D-008 default)', () => {
       assert(
         off.manifest.frames.every((f) => f.mirroredFrom === undefined),
         'an unmirrored bake claims no mirrors',
@@ -308,9 +313,9 @@ Deno.test('acceptance: a mirrored bake flips every pass, marks it, and styles ha
       );
     });
 
-    await t.step('only the rendered directions were styled', async () => {
+    await t.test('only the rendered directions were styled', async (t) => {
       const styled = (dir: string) =>
-        JSON.parse(Deno.readTextFileSync(`${dir}/style-result.json`)).directions;
+        JSON.parse(readFileSync(`${dir}/style-result.json`, 'utf8')).directions;
       assertEquals(
         styled(on.bakeDir),
         renderedDirections(CAM.directions, true).length,
@@ -320,7 +325,7 @@ Deno.test('acceptance: a mirrored bake flips every pass, marks it, and styles ha
       await Promise.resolve();
     });
 
-    await t.step('every pass of the mirrored direction is an exact flip', async () => {
+    await t.test('every pass of the mirrored direction is an exact flip', async () => {
       for (const pass of ['lit', 'albedo', 'normal', 'depth', 'mask'] as RenderPass[]) {
         for (let f = 0; f < FRAMES; f++) {
           const source = await cellOf(on.manifest, on.bakeDir, pass, MIRROR_SOURCE, f);
@@ -335,7 +340,7 @@ Deno.test('acceptance: a mirrored bake flips every pass, marks it, and styles ha
       }
     });
 
-    await t.step('the normal page really did negate X (not just move pixels)', async () => {
+    await t.test('the normal page really did negate X (not just move pixels)', async () => {
       const source = await cellOf(on.manifest, on.bakeDir, 'normal', MIRROR_SOURCE, 0);
       const mirrored = await cellOf(on.manifest, on.bakeDir, 'normal', MIRRORED_DIRECTION, 0);
       const w = source.w;
@@ -355,7 +360,7 @@ Deno.test('acceptance: a mirrored bake flips every pass, marks it, and styles ha
       assert(bent, 'the fixture has normals off the mirror plane, so X negation is observable');
     });
 
-    await t.step(
+    await t.test(
       'mirroring is not free for an asymmetric character (why it is opt-in)',
       async () => {
         const flipped = await cellOf(on.manifest, on.bakeDir, 'lit', MIRRORED_DIRECTION, 0);
@@ -373,7 +378,7 @@ Deno.test('acceptance: a mirrored bake flips every pass, marks it, and styles ha
       },
     );
 
-    await t.step('the GPU really rendered only the non-flip directions', () => {
+    await t.test('the GPU really rendered only the non-flip directions', () => {
       // the saving is the POINT of mirroring, so prove it at the source: the
       // render seam wrote AOVs for the rendered subset and nothing else
       const plan = mirrorPlan(CAM.directions, true);
@@ -393,11 +398,11 @@ Deno.test('acceptance: a mirrored bake flips every pass, marks it, and styles ha
       }
     });
 
-    await t.step('the bake says mirroring is on and what it means', () => {
+    await t.test('the bake says mirroring is on and what it means', () => {
       const warn = on.events.find((e) => e.t === 'warn' && e.code === 'mirroring-on');
       assert(warn, 'a mirrored bake warns that left/right differ at your peril');
     });
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });

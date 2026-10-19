@@ -1,4 +1,5 @@
-import { assert, assertAlmostEquals, assertEquals, assertThrows } from 'jsr:@std/assert@1';
+import { test } from 'node:test';
+import { assert, assertAlmostEquals, assertEquals, assertThrows } from '@std/assert';
 import { srgbToHex, srgbToLab } from '@spritebook/core';
 import {
   buildAdaptivePalette,
@@ -6,8 +7,8 @@ import {
   nearestIndex,
   nearestWithDist,
   paletteFromHex,
-} from './palette.ts';
-import type { Lab, Palette } from './contracts.ts';
+} from './dist/palette.js';
+import type { Lab, Palette } from './dist/contracts.js';
 
 /** Pool a list of sRGB colors into the K*3 OKLab Float32Array the builder wants. */
 function pool(colors: readonly (readonly [number, number, number])[]): Float32Array {
@@ -38,7 +39,7 @@ const SIX: ReadonlyArray<readonly [number, number, number]> = [
   [255, 0, 255],
 ];
 
-Deno.test('buildAdaptivePalette: deterministic, byte-identical across two runs', () => {
+test('buildAdaptivePalette: deterministic, byte-identical across two runs', () => {
   const colors: [number, number, number][] = [];
   for (let i = 0; i < 200; i++) {
     colors.push([(i * 53) % 256, (i * 97) % 256, (i * 29) % 256]);
@@ -51,7 +52,7 @@ Deno.test('buildAdaptivePalette: deterministic, byte-identical across two runs',
   assertEquals(a.lab, b.lab); // Float32Array compared element-wise
 });
 
-Deno.test('buildAdaptivePalette: size never exceeds maxColors', () => {
+test('buildAdaptivePalette: size never exceeds maxColors', () => {
   const colors: [number, number, number][] = [];
   for (let i = 0; i < 200; i++) {
     colors.push([(i * 53) % 256, (i * 97) % 256, (i * 29) % 256]);
@@ -61,27 +62,27 @@ Deno.test('buildAdaptivePalette: size never exceeds maxColors', () => {
   assert(p.size > 1, 'expected more than one box for 200 varied colors');
 });
 
-Deno.test('buildAdaptivePalette: N distinct colors with maxColors=N recovers them', () => {
+test('buildAdaptivePalette: N distinct colors with maxColors=N recovers them', () => {
   const p = buildAdaptivePalette(pool(SIX), 6);
   assertEquals(p.size, 6);
   assertEquals(paletteHexSet(p), new Set(SIX.map(([r, g, b]) => srgbToHex(r, g, b))));
 });
 
-Deno.test('buildAdaptivePalette: stops early when maxColors exceeds distinct colors', () => {
+test('buildAdaptivePalette: stops early when maxColors exceeds distinct colors', () => {
   const four = SIX.slice(0, 4);
   const p = buildAdaptivePalette(pool(four), 32);
   assertEquals(p.size, 4);
   assertEquals(paletteHexSet(p), new Set(four.map(([r, g, b]) => srgbToHex(r, g, b))));
 });
 
-Deno.test('buildAdaptivePalette: empty pool -> empty palette', () => {
+test('buildAdaptivePalette: empty pool -> empty palette', () => {
   const p = buildAdaptivePalette(new Float32Array(0), 8);
   assertEquals(p.size, 0);
   assertEquals(p.srgb.length, 0);
   assertEquals(p.lab.length, 0);
 });
 
-Deno.test('buildAdaptivePalette: lab stays consistent with srgb (lab[i] == srgbToLab(srgb[i]))', () => {
+test('buildAdaptivePalette: lab stays consistent with srgb (lab[i] == srgbToLab(srgb[i]))', () => {
   const p = buildAdaptivePalette(pool(SIX), 6);
   for (let i = 0; i < p.size; i++) {
     const [L, a, b] = srgbToLab(p.srgb[i * 3], p.srgb[i * 3 + 1], p.srgb[i * 3 + 2]);
@@ -91,7 +92,7 @@ Deno.test('buildAdaptivePalette: lab stays consistent with srgb (lab[i] == srgbT
   }
 });
 
-Deno.test('paletteFromHex: parses #rrggbb (and bare, mixed case) to correct bytes', () => {
+test('paletteFromHex: parses #rrggbb (and bare, mixed case) to correct bytes', () => {
   const p = paletteFromHex(['#FF0000', '00ff00', '#0000Ff']);
   assertEquals(p.size, 3);
   assertEquals(Array.from(p.srgb), [255, 0, 0, 0, 255, 0, 0, 0, 255]);
@@ -102,13 +103,13 @@ Deno.test('paletteFromHex: parses #rrggbb (and bare, mixed case) to correct byte
   assertAlmostEquals(p.lab[2], b, 1e-6);
 });
 
-Deno.test('paletteFromHex: rejects malformed colors', () => {
+test('paletteFromHex: rejects malformed colors', () => {
   assertThrows(() => paletteFromHex(['#ff00']), Error, 'invalid');
   assertThrows(() => paletteFromHex(['#gggggg']), Error, 'invalid');
   assertThrows(() => paletteFromHex(['red']), Error, 'invalid');
 });
 
-Deno.test('nearestIndex / nearestWithDist: exact palette color returns its own index at ~0 distance', () => {
+test('nearestIndex / nearestWithDist: exact palette color returns its own index at ~0 distance', () => {
   const p = paletteFromHex(['#ff0000', '#00ff00', '#0000ff']);
   const cases: [Lab, number][] = [
     [srgbToLab(255, 0, 0), 0],
@@ -123,7 +124,7 @@ Deno.test('nearestIndex / nearestWithDist: exact palette color returns its own i
   }
 });
 
-Deno.test('nearestWithDist: ties resolve to the lowest index; empty palette -> -1', () => {
+test('nearestWithDist: ties resolve to the lowest index; empty palette -> -1', () => {
   const dup = paletteFromHex(['#404040', '#404040', '#ff0000']);
   assertEquals(nearestIndex(dup, srgbToLab(64, 64, 64)), 0); // tie -> lowest index
 
@@ -133,7 +134,7 @@ Deno.test('nearestWithDist: ties resolve to the lowest index; empty palette -> -
   assertEquals(dist, Infinity);
 });
 
-Deno.test('hysteresis: keeps prev unless the candidate improves by more than eps', () => {
+test('hysteresis: keeps prev unless the candidate improves by more than eps', () => {
   // Values are exact binary fractions so the boundary comparison is unambiguous.
   // No history -> take the candidate.
   assertEquals(hysteresis(-1, 5, Infinity, 0.3, 0.02), 5);
@@ -158,7 +159,7 @@ function distinct(p: { srgb: Uint8Array; size: number }): number {
   return seen.size;
 }
 
-Deno.test('buildAdaptivePalette: every reported entry is a DISTINCT colour', () => {
+test('buildAdaptivePalette: every reported entry is a DISTINCT colour', () => {
   // The defect this pins: median cut selecting on extent alone kept halving one
   // dense cluster into boxes whose means rounded to the same sRGB triple, so a
   // palette reported N entries and offered far fewer. Measured on the committed
@@ -182,7 +183,7 @@ Deno.test('buildAdaptivePalette: every reported entry is a DISTINCT colour', () 
   }
 });
 
-Deno.test('buildAdaptivePalette: a dense cluster does not starve the outliers', () => {
+test('buildAdaptivePalette: a dense cluster does not starve the outliers', () => {
   // Population x extent is what makes this pass: selecting on extent alone
   // spends slots halving the cluster, and the four outliers - the only other
   // colours in the image - never get one.
@@ -196,7 +197,7 @@ Deno.test('buildAdaptivePalette: a dense cluster does not starve the outliers', 
   assert(p.size >= 5, `expected the 4 outliers plus the cluster, got ${p.size} entries`);
 });
 
-Deno.test('buildAdaptivePalette: a flat source reports its honest ceiling', () => {
+test('buildAdaptivePalette: a flat source reports its honest ceiling', () => {
   // Three distinct colours cannot make an 8-entry palette, and padding with
   // duplicates would be reporting slots the sprite can never use.
   const colors: [number, number, number][] = [];

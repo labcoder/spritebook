@@ -10,7 +10,7 @@ import { join } from 'node:path';
  */
 import { assert, assertAlmostEquals, assertEquals } from '@std/assert';
 import { NodeIO } from '@gltf-transform/core';
-import { mapPosesJoints, readPoses as renderReadPoses } from '../render/poses.ts';
+import { mapPosesJoints, readPoses as renderReadPoses } from '../render/dist/poses.js';
 import type { Clip } from './dist/contracts.js';
 import { loadClip, loadSkeletonRest } from './dist/profile.js';
 import { frameTimes, readPoses, sampleClip, writePoses } from './dist/sample.js';

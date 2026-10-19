@@ -1,6 +1,7 @@
-import { assert, assertEquals, assertThrows } from 'jsr:@std/assert@1';
-import { frameIdKey, type PackLayout } from './contracts.ts';
-import { type PackCell, packLayout, PINNED_PACKER_OPTIONS } from './maxrects.ts';
+import { test } from 'node:test';
+import { assert, assertEquals, assertThrows } from '@std/assert';
+import { frameIdKey, type PackLayout } from './dist/contracts.js';
+import { type PackCell, packLayout, PINNED_PACKER_OPTIONS } from './dist/maxrects.js';
 
 function cell(clipId: string, direction: number, frame: number, w: number, h: number): PackCell {
   return { id: { clipId, direction, frame }, w, h };
@@ -49,7 +50,7 @@ function assertSeparated(layout: PackLayout, gapPx: number): void {
 
 // --- determinism -------------------------------------------------------------
 
-Deno.test('packLayout: packing twice yields deep-equal layouts (the determinism canary)', () => {
+test('packLayout: packing twice yields deep-equal layouts (the determinism canary)', () => {
   assertEquals(packLayout(uniform16()), packLayout(uniform16()));
   assertEquals(packLayout(mixed()), packLayout(mixed()));
   // overflow config exercises the multi-page path too
@@ -58,13 +59,13 @@ Deno.test('packLayout: packing twice yields deep-equal layouts (the determinism 
   assertEquals(packLayout(mixed(), opts), packLayout(mixed(), opts));
 });
 
-Deno.test('packLayout: input order does not matter (canonical sort first)', () => {
+test('packLayout: input order does not matter (canonical sort first)', () => {
   const sorted = mixed();
   const scrambled = [3, 0, 6, 2, 5, 1, 4].map((i) => sorted[i]);
   assertEquals(packLayout(scrambled), packLayout(sorted));
 });
 
-Deno.test('packLayout: the pinned packer options stay pinned', () => {
+test('packLayout: the pinned packer options stay pinned', () => {
   // A change here changes every layout ever baked — treat as a format bump, not a tweak.
   assertEquals(PINNED_PACKER_OPTIONS, {
     smart: false,
@@ -76,7 +77,7 @@ Deno.test('packLayout: the pinned packer options stay pinned', () => {
   });
 });
 
-Deno.test('packLayout: pinned placement golden (fires if a packer update moves rects)', () => {
+test('packLayout: pinned placement golden (fires if a packer update moves rects)', () => {
   const layout = packLayout([cell('g', 0, 0, 96, 96), cell('g', 0, 1, 96, 96)]);
   assertEquals(layout, {
     pageCount: 1,
@@ -90,7 +91,7 @@ Deno.test('packLayout: pinned placement golden (fires if a packer update moves r
 
 // --- geometry laws -----------------------------------------------------------
 
-Deno.test('packLayout: rects stay inside the page bounds', () => {
+test('packLayout: rects stay inside the page bounds', () => {
   for (const layout of [packLayout(mixed()), packLayout(uniform16(), { maxPageSizePx: 256 })]) {
     for (const rect of layout.rects) {
       assert(rect.x >= 0 && rect.y >= 0, `${frameIdKey(rect.id)} at negative position`);
@@ -103,14 +104,14 @@ Deno.test('packLayout: rects stay inside the page bounds', () => {
   }
 });
 
-Deno.test('packLayout: no overlaps and the gap is respected (uniform + mixed, overflow too)', () => {
+test('packLayout: no overlaps and the gap is respected (uniform + mixed, overflow too)', () => {
   assertSeparated(packLayout(uniform16()), 2);
   assertSeparated(packLayout(mixed()), 2);
   assertSeparated(packLayout(uniform16(), { maxPageSizePx: 256, gapPx: 2 }), 2);
   assertSeparated(packLayout(mixed(), { maxPageSizePx: 256, gapPx: 7 }), 7);
 });
 
-Deno.test('packLayout: gapPx 0 packs flush without overlap', () => {
+test('packLayout: gapPx 0 packs flush without overlap', () => {
   const layout = packLayout([cell('g', 0, 0, 96, 96), cell('g', 0, 1, 96, 96)], { gapPx: 0 });
   assertEquals(layout.pageCount, 1);
   assertSeparated(layout, 0);
@@ -118,7 +119,7 @@ Deno.test('packLayout: gapPx 0 packs flush without overlap', () => {
 
 // --- page sizing -------------------------------------------------------------
 
-Deno.test('packLayout: page size is the smallest fitting power of two', () => {
+test('packLayout: page size is the smallest fitting power of two', () => {
   // 16x 96px + 2px gap: a 256 page holds 4, so 512 is the smallest single page
   const layout = packLayout(uniform16());
   assertEquals(layout.pageCount, 1);
@@ -131,7 +132,7 @@ Deno.test('packLayout: page size is the smallest fitting power of two', () => {
   }
 });
 
-Deno.test('packLayout: an exact-fit cell shares its page size (gap pads between rects only)', () => {
+test('packLayout: an exact-fit cell shares its page size (gap pads between rects only)', () => {
   const layout = packLayout([cell('a', 0, 0, 256, 256)], { maxPageSizePx: 256 });
   assertEquals(layout, {
     pageCount: 1,
@@ -147,7 +148,7 @@ Deno.test('packLayout: an exact-fit cell shares its page size (gap pads between 
   });
 });
 
-Deno.test('packLayout: overflow spills to more pages, all at the capped size', () => {
+test('packLayout: overflow spills to more pages, all at the capped size', () => {
   const layout = packLayout(uniform16(), { maxPageSizePx: 256 });
   assertEquals(layout.pageSizePx, 256);
   assertEquals(layout.pageCount, 4); // 4 cells per 256 page
@@ -155,7 +156,7 @@ Deno.test('packLayout: overflow spills to more pages, all at the capped size', (
   assertEquals([...pages].sort((a, b) => a - b), [0, 1, 2, 3]);
 });
 
-Deno.test('packLayout: a non-pot maxPageSizePx caps at the largest pot below it', () => {
+test('packLayout: a non-pot maxPageSizePx caps at the largest pot below it', () => {
   const layout = packLayout(uniform16(), { maxPageSizePx: 300 });
   assertEquals(layout.pageSizePx, 256);
   assertEquals(layout.pageCount, 4);
@@ -163,7 +164,7 @@ Deno.test('packLayout: a non-pot maxPageSizePx caps at the largest pot below it'
 
 // --- canonical order ---------------------------------------------------------
 
-Deno.test('packLayout: rects come back sorted by frameIdKey', () => {
+test('packLayout: rects come back sorted by frameIdKey', () => {
   const scrambled = [6, 2, 4, 0, 5, 3, 1].map((i) => mixed()[i]);
   const keys = packLayout(scrambled).rects.map((r) => frameIdKey(r.id));
   assertEquals(keys, [...keys].sort());
@@ -172,7 +173,7 @@ Deno.test('packLayout: rects come back sorted by frameIdKey', () => {
 
 // --- errors and edges --------------------------------------------------------
 
-Deno.test('packLayout: a single cell exceeding maxPageSizePx throws', () => {
+test('packLayout: a single cell exceeding maxPageSizePx throws', () => {
   assertThrows(
     () => packLayout([cell('big', 0, 0, 300, 10)], { maxPageSizePx: 256 }),
     RangeError,
@@ -181,7 +182,7 @@ Deno.test('packLayout: a single cell exceeding maxPageSizePx throws', () => {
   assertThrows(() => packLayout([cell('big', 0, 0, 10, 4096)]), RangeError, 'exceeds');
 });
 
-Deno.test('packLayout: duplicate frame ids throw', () => {
+test('packLayout: duplicate frame ids throw', () => {
   assertThrows(
     () => packLayout([cell('a', 0, 0, 8, 8), cell('a', 0, 0, 8, 8)]),
     Error,
@@ -189,7 +190,7 @@ Deno.test('packLayout: duplicate frame ids throw', () => {
   );
 });
 
-Deno.test('packLayout: invalid cell sizes and options throw', () => {
+test('packLayout: invalid cell sizes and options throw', () => {
   assertThrows(() => packLayout([cell('a', 0, 0, 0, 8)]), RangeError, 'invalid size');
   assertThrows(() => packLayout([cell('a', 0, 0, 8.5, 8)]), RangeError, 'invalid size');
   assertThrows(() => packLayout([cell('a', 0, 0, 8, 8)], { gapPx: -1 }), RangeError, 'gapPx');
@@ -197,11 +198,11 @@ Deno.test('packLayout: invalid cell sizes and options throw', () => {
   assertThrows(() => packLayout([cell('a', 0, 0, 8, 8)], { maxPageSizePx: 0 }), RangeError);
 });
 
-Deno.test('packLayout: empty input packs to zero pages', () => {
+test('packLayout: empty input packs to zero pages', () => {
   assertEquals(packLayout([]), { pageCount: 0, pageSizePx: 0, rects: [] });
 });
 
-Deno.test('packLayout: the mixed-layout golden pins exact coordinates (D-022 tripwire)', () => {
+test('packLayout: the mixed-layout golden pins exact coordinates (D-022 tripwire)', () => {
   // Captured from maxrects-packer@2.7.3 under PINNED_PACKER_OPTIONS. Atlas rects
   // feed cache-stable bakes whose keys do NOT include the packer version, so a
   // silent algorithm change would break "same inputs -> identical bytes" without

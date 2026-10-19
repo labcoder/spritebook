@@ -1,13 +1,17 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The bake seam speaks files + JobEvents only, including on failure — a broken
  * input yields a schema-valid error event, never a throw across the seam. The
  * happy path (a real GPU bake) is proven in integration_test.ts.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { JobEventSchema } from '@spritebook/schema';
 import type { CameraPreset } from '@spritebook/schema';
 import { PIXEL } from '@spritebook/style';
-import { runBakeJob } from './mod.ts';
+import { runBakeJob } from './dist/mod.js';
 
 const CAM: CameraPreset = {
   id: 'seam-30x2',
@@ -21,8 +25,8 @@ const CAM: CameraPreset = {
   orthographic: true,
 };
 
-Deno.test('bake seam: a missing model becomes an error EVENT, not a throw', async () => {
-  const out = await Deno.makeTempDir();
+test('bake seam: a missing model becomes an error EVENT, not a throw', async () => {
+  const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const events = [];
     for await (
@@ -43,6 +47,6 @@ Deno.test('bake seam: a missing model becomes an error EVENT, not a throw', asyn
     assert(err.t === 'error' && err.code === 'bake-failed', 'terminal error event');
     assert(!events.some((e) => e.t === 'done'), 'no done after failure');
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });

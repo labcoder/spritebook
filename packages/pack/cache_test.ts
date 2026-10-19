@@ -1,7 +1,11 @@
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import type { CacheKeyInputs } from '@spritebook/schema';
-import { artifactKey, bakeKey, BlobCache, frameKey, predictInvalidation } from './cache.ts';
-import { frameGrid } from './manifest.ts';
+import { artifactKey, bakeKey, BlobCache, frameKey, predictInvalidation } from './dist/cache.js';
+import { frameGrid } from './dist/manifest.js';
 
 function inputs(over: Partial<CacheKeyInputs> = {}): CacheKeyInputs {
   return {
@@ -18,7 +22,7 @@ function inputs(over: Partial<CacheKeyInputs> = {}): CacheKeyInputs {
   } as CacheKeyInputs;
 }
 
-Deno.test('frame keys: deterministic, distinct per coordinate, recipe-bound', async () => {
+test('frame keys: deterministic, distinct per coordinate, recipe-bound', async () => {
   const bake = await bakeKey(inputs());
   assert(/^[0-9a-f]{64}$/.test(bake));
   const k1 = await frameKey(bake, { clipId: 'idle', direction: 0, frame: 0 });
@@ -35,7 +39,7 @@ Deno.test('frame keys: deterministic, distinct per coordinate, recipe-bound', as
   assert(await artifactKey(bake, 'style-result') !== k1);
 });
 
-Deno.test('predictInvalidation: none when unchanged, all frames on a look change', () => {
+test('predictInvalidation: none when unchanged, all frames on a look change', () => {
   const grid = frameGrid(2, 3);
   assertEquals(predictInvalidation(inputs(), inputs(), grid), [], 'identical recipe -> none');
   const changed = predictInvalidation(inputs(), inputs({ stylePresetHash: '9'.repeat(64) }), grid);
@@ -43,8 +47,8 @@ Deno.test('predictInvalidation: none when unchanged, all frames on a look change
   assertEquals(changed, grid);
 });
 
-Deno.test('BlobCache: binary round-trip, misses, key discipline', async () => {
-  const dir = await Deno.makeTempDir();
+test('BlobCache: binary round-trip, misses, key discipline', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const cache = new BlobCache(dir);
     const key = 'ab'.repeat(32);
@@ -57,11 +61,11 @@ Deno.test('BlobCache: binary round-trip, misses, key discipline', async () => {
     // invalid keys throw — they are never silent misses
     await assertRejects(() => cache.get('not-a-key'), Error, 'sha256 hex');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('the light rig invalidates on its own, without a version bump', async () => {
+test('the light rig invalidates on its own, without a version bump', async () => {
   // The gap this closed, measured before it existed: four bakes of one
   // character under four different light rigs all produced bake id `8b7302cd`,
   // because CacheKeyInputs had no lighting field. Lighting changes every pixel,

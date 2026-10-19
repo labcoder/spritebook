@@ -1,3 +1,4 @@
+
 /**
  * Style fixture generator (deterministic; run once, the glb is checked in):
  *  - asymmetric.glb   a tiny rigged character: a body box + ONE arm box on +X
@@ -13,7 +14,7 @@
 // full npm specifier: this is a dev-only generator; the style runtime never
 // touches glTF (it reads AOV PNGs), so @gltf-transform/core stays out of the
 // style package's import map.
-import { Document, NodeIO } from 'npm:@gltf-transform/core@^4.4.1';
+import { Document, NodeIO } from '@gltf-transform/core';
 
 const here = new URL('.', import.meta.url);
 

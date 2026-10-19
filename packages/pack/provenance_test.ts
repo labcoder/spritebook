@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The two facts a glb cannot state — which rig the character is on, and which
  * backend produced it — reach the bake recipe (D-029 follow-through).
@@ -11,13 +15,13 @@
  *
  * CPU-only: this pins the key inputs, not pixels.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import type { CameraPreset, RigState } from '@spritebook/schema';
 import { canonicalJson } from '@spritebook/schema';
 import { sha256Hex } from '@spritebook/core';
 import { PIXEL } from '@spritebook/style';
-import { type BakeProvenance, buildCacheInputs } from './bake.ts';
-import { rigForKey } from './cache.ts';
+import { type BakeProvenance, buildCacheInputs } from './dist/bake.js';
+import { rigForKey } from './dist/cache.js';
 
 const MODEL = new URL('../anim/fixtures/humanoid-normal.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -54,7 +58,7 @@ const BACKEND: NonNullable<BakeProvenance['backend']> = {
   params: { quality: 'high' },
 };
 
-Deno.test('with no character to ask, the sentinels say so and nothing changed', async () => {
+test('with no character to ask, the sentinels say so and nothing changed', async () => {
   // The bare-file bake (`bake --model x.glb`) genuinely has no rig and no
   // backend, so the sentinels are the TRUE answer there - and every P2-era
   // cache entry for that path stays valid, which is why this is pinned.
@@ -67,7 +71,7 @@ Deno.test('with no character to ask, the sentinels say so and nothing changed', 
   assertEquals(await buildCacheInputs(spec, SIG, {}), bare);
 });
 
-Deno.test('the rig reaches the key, and a joint nudge moves it', async () => {
+test('the rig reaches the key, and a joint nudge moves it', async () => {
   const bare = await buildCacheInputs(spec, SIG);
   const rigged = await buildCacheInputs(spec, SIG, { rig: RIG });
   // D-031: what is hashed is the rig MINUS `accepted` — see rigForKey
@@ -90,7 +94,7 @@ Deno.test('the rig reaches the key, and a joint nudge moves it', async () => {
   assert(nudged.rigStateHash !== rigged.rigStateHash, 'a joint edit is a different rig');
 });
 
-Deno.test('the backend that made the character is recorded, params and all', async () => {
+test('the backend that made the character is recorded, params and all', async () => {
   const made = await buildCacheInputs(spec, SIG, { backend: BACKEND });
   assertEquals(made.backend.modelId, 'trellis2');
   assertEquals(made.backend.version, '4b');
@@ -104,7 +108,7 @@ Deno.test('the backend that made the character is recorded, params and all', asy
   assert(other.backend.paramsHash !== made.backend.paramsHash);
 });
 
-Deno.test('the two halves are independent, because a character can have one', async () => {
+test('the two halves are independent, because a character can have one', async () => {
   // `rig` works on a bare glb, so a character can carry a rig with no picked
   // result; and a freshly picked mesh has no rig yet. Neither half may drag
   // the other's sentinel along with it.
@@ -123,7 +127,7 @@ Deno.test('the two halves are independent, because a character can have one', as
   assertEquals(both.backend, backendOnly.backend);
 });
 
-Deno.test('renaming a character cannot reach the key at all', async () => {
+test('renaming a character cannot reach the key at all', async () => {
   // The property deriveCacheKeyInputs used to carry: displayName is not in
   // CacheKeyInputs and the schema is strict, so a rename is unable to
   // invalidate anything by construction rather than by care.
@@ -132,14 +136,14 @@ Deno.test('renaming a character cannot reach the key at all', async () => {
   assertEquals(inputs.characterId, 'c', 'identity binds on the immutable id');
 });
 
-Deno.test('ACCEPTANCE: renaming a character invalidates nothing, through the real verb', async () => {
+test('ACCEPTANCE: renaming a character invalidates nothing, through the real verb', async () => {
   // This lived in core/cache_test.ts and core/roster_test.ts against
   // `deriveCacheKeyInputs`, which no production path called. It belongs against
   // the derivation the bake actually runs. Renaming is the one mutation that
   // must never cost a user a re-bake, and `displayName` is not merely absent
   // from the recipe - CacheKeyInputs is strict, so it cannot be expressed.
   const { createWorkspace, readWorkspace, renameCharacter } = await import('@spritebook/core');
-  const raw = await Deno.makeTempDir({ prefix: 'sb-rename-key-' });
+  const raw = await fs.mkdtemp(join(tmpdir(), 'sb-rename-key-'));
   const ws = raw.replaceAll('\\', '/');
   try {
     await createWorkspace({
@@ -170,6 +174,6 @@ Deno.test('ACCEPTANCE: renaming a character invalidates nothing, through the rea
       'every cached frame of this character is still valid after a rename',
     );
   } finally {
-    await Deno.remove(raw, { recursive: true });
+    await fs.rm(raw, { recursive: true });
   }
 });

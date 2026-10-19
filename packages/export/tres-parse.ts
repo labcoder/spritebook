@@ -11,7 +11,7 @@
  * the emitter, so an ordering bug in godot.ts cannot cancel itself out here.
  */
 import type { BakeManifest } from '@spritebook/schema';
-import { atlasPageName } from '../pack/contracts.ts';
+import { atlasPageName } from '@spritebook/pack/contracts';
 
 export interface TresRect {
   x: number;

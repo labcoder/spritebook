@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * THE D-008 ACCEPTANCE (P3-T4): "the asymmetric character shows its tattoo on
  * the correct arm in all 8 directions."
@@ -17,13 +21,13 @@
  * asserting (2) proves the pipeline really can mirror and really was told not
  * to.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { decode as decodePng } from 'fast-png';
 import type { BakeManifest, CameraPreset, JobEvent } from '@spritebook/schema';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
 import { PIXEL } from '@spritebook/style';
-import { tryGetGpu } from '../render/gpu.ts';
-import { runBakeJob } from './mod.ts';
+import { tryGetGpu } from '../render/dist/gpu.js';
+import { runBakeJob } from './dist/mod.js';
 
 /** The one-armed fixture: its mass sits on ONE side, which is the mark. */
 const MODEL = new URL('../style/fixtures/asymmetric.glb', import.meta.url).pathname.replace(
@@ -70,7 +74,7 @@ async function bake(outRoot: string, mirroring: boolean): Promise<Baked> {
   return {
     manifest: parseWith(
       BakeManifestSchema,
-      JSON.parse(await Deno.readTextFile(manifestPath)),
+      JSON.parse(await fs.readFile(manifestPath, 'utf8')),
       'BakeManifest',
     ),
     bakeDir: manifestPath.slice(0, manifestPath.lastIndexOf('/')),
@@ -123,7 +127,7 @@ function differenceFraction(a: Uint8Array, b: Uint8Array): number {
 }
 
 async function cells(b: Baked): Promise<Map<number, { data: Uint8Array; w: number; h: number }>> {
-  const page = decodePng(await Deno.readFile(`${b.bakeDir}/atlas_lit_0.png`));
+  const page = decodePng(new Uint8Array(await fs.readFile(`${b.bakeDir}/atlas_lit_0.png`)));
   const data = page.data as Uint8Array;
   const out = new Map<number, { data: Uint8Array; w: number; h: number }>();
   for (const f of b.manifest.frames) {
@@ -136,14 +140,14 @@ async function cells(b: Baked): Promise<Map<number, { data: Uint8Array; w: numbe
   return out;
 }
 
-Deno.test('ACCEPTANCE: an asymmetric character keeps its side in all 8 directions', async (t) => {
-  if (!(await tryGetGpu())) return;
-  const root = await Deno.makeTempDir();
+test('ACCEPTANCE: an asymmetric character keeps its side in all 8 directions', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const off = await bake(`${root}/off`, false);
     assertEquals(off.manifest.frames.length, 8, 'all 8 directions baked');
 
-    await t.step('mirroring is OFF by default and nothing is a flip', () => {
+    await t.test('mirroring is OFF by default and nothing is a flip', () => {
       for (const f of off.manifest.frames) {
         assertEquals(
           f.mirroredFrom,
@@ -153,7 +157,7 @@ Deno.test('ACCEPTANCE: an asymmetric character keeps its side in all 8 direction
       }
     });
 
-    await t.step('every direction is genuinely rendered, not a reflection', async () => {
+    await t.test('every direction is genuinely rendered, not a reflection', async (t) => {
       // The direct proof: if this character were bilaterally symmetric, the
       // horizontal flip of direction d would BE direction (8-d). For the
       // one-armed fixture it must not be — that difference IS the tattoo
@@ -172,7 +176,7 @@ Deno.test('ACCEPTANCE: an asymmetric character keeps its side in all 8 direction
       }
     });
 
-    await t.step('and mirroring ON would have faked it - which is why it is opt-in', async () => {
+    await t.test('and mirroring ON would have faked it - which is why it is opt-in', async () => {
       const on = await bake(`${root}/on`, true);
       const mirrored = on.manifest.frames.filter((f) => f.mirroredFrom !== undefined);
       assertEquals(mirrored.length, 3, 'directions 5,6,7 came from flips');
@@ -195,6 +199,6 @@ Deno.test('ACCEPTANCE: an asymmetric character keeps its side in all 8 direction
       assert(on.manifest.bakeId !== off.manifest.bakeId, 'different recipe, different bake');
     });
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });

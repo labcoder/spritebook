@@ -1,14 +1,19 @@
+import { tryGetGpu } from '@spritebook/render';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The style seam (D-004): runStyleJob renders the Sx AOVs then styles them,
  * speaking only files + JobEvents. GPU-gated — hosted CI without an adapter
  * skips; SPRITEBOOK_REQUIRE_GPU (the lavapipe lane) forces it to run. The pure
  * CPU pipeline is covered exhaustively from committed fixtures in pipeline_test.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { JobEventSchema } from '@spritebook/schema';
 import type { CameraPreset } from '@spritebook/schema';
-import { runStyleJob } from './mod.ts';
-import { PIXEL } from './presets.ts';
+import { runStyleJob } from './dist/mod.js';
+import { PIXEL } from './dist/presets.js';
 
 const GLB = new URL('./fixtures/asymmetric.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -26,18 +31,9 @@ const CAM: CameraPreset = {
   orthographic: true,
 };
 
-async function hasGpu(): Promise<boolean> {
-  if (Deno.env.get('SPRITEBOOK_REQUIRE_GPU')) return true; // lavapipe: fail loud, never skip
-  try {
-    return !!(navigator.gpu && await navigator.gpu.requestAdapter());
-  } catch {
-    return false;
-  }
-}
-
-Deno.test('style seam: renders + styles end-to-end, files + events only', async () => {
-  if (!(await hasGpu())) return;
-  const out = await Deno.makeTempDir();
+test('style seam: renders + styles end-to-end, files + events only', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const events = [];
     for await (
@@ -69,7 +65,7 @@ Deno.test('style seam: renders + styles end-to-end, files + events only', async 
       assert('path' in a && typeof a.path === 'string', 'artifacts are file paths');
     }
 
-    const result = JSON.parse(await Deno.readTextFile(`${out}/style-result.json`));
+    const result = JSON.parse(await fs.readFile(`${out}/style-result.json`, 'utf8'));
     assertEquals(result.stylePresetId, 'pixel');
     // median cut yields <= maxColors (fewer if the fixture has fewer clusters)
     assert(
@@ -78,6 +74,6 @@ Deno.test('style seam: renders + styles end-to-end, files + events only', async 
     );
     assertEquals(result.cellPx, { w: 64, h: 64 });
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });

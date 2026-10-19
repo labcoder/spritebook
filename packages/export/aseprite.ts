@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Aseprite "JSON (array)" exporter — a pure projection of BakeManifest (D-010).
  *
@@ -32,7 +33,7 @@
  * `clips[].loop` from the manifest (or export godot/strips, which carry it).
  */
 import type { FrameRecord } from '@spritebook/schema';
-import type { Exporter } from '../pack/contracts.ts';
+import type { Exporter } from '@spritebook/pack/contracts';
 import { assertNoSplitAnimations } from './split-guard.ts';
 
 const META_APP = 'spritebook';
@@ -117,7 +118,7 @@ export const exportAseprite: Exporter = async (manifest, bakeDir, outDir, opts) 
   if (litPages.length === 0) throw new Error('exportAseprite: manifest has no lit atlas pages');
   if (manifest.frames.length === 0) throw new Error('exportAseprite: manifest has no frames');
   const sortedFrames = manifest.frames.toSorted(byClipDirFrame);
-  await Deno.mkdir(outDir, { recursive: true });
+  await fs.mkdir(outDir, { recursive: true });
 
   const written: string[] = [];
   for (const page of litPages) {
@@ -148,8 +149,8 @@ export const exportAseprite: Exporter = async (manifest, bakeDir, outDir, opts) 
       },
     };
 
-    await Deno.copyFile(`${bakeDir}/${page.png}`, pngPath);
-    await Deno.writeTextFile(jsonPath, JSON.stringify(doc, null, 2) + '\n');
+    await fs.copyFile(`${bakeDir}/${page.png}`, pngPath);
+    await fs.writeFile(jsonPath, JSON.stringify(doc, null, 2) + '\n');
     written.push(jsonPath, pngPath);
   }
   return written.toSorted();

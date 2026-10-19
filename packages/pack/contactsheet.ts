@@ -8,14 +8,10 @@
  * Deterministic: gifenc's quantize/applyPalette have no RNG; same cells -> same
  * bytes.
  */
-// @ts-types="./gifenc.d.ts"
-import * as gifenc from 'gifenc';
+import gifenc from 'gifenc';
 import { type FrameId, frameIdKey } from './contracts.ts';
 
-// Deno loads the CJS namespace as default; bundlers select the named ESM exports.
-const { GIFEncoder, quantize, applyPalette } = typeof gifenc.default === 'function'
-  ? gifenc
-  : gifenc.default;
+const { GIFEncoder, quantize, applyPalette } = gifenc;
 
 const BG: [number, number, number] = [240, 240, 240];
 

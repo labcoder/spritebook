@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The pooled-palette LAW, discriminated (review F10): a per-clip-palette
  * implementation of styleClipsFromAovs would pass a shape-only check, so this
@@ -5,15 +9,15 @@
  * OBSERVABLE — clip A styled jointly with B differs from A styled alone, and
  * every opaque pixel of BOTH clips lands in the ONE reported palette.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { CameraPreset } from '@spritebook/schema';
 import { parseWith, StylePresetSchema } from '@spritebook/schema';
-import { styleClipsFromAovs, styleFromAovs } from './pipeline.ts';
-import { PIXEL } from './presets.ts';
+import { styleClipsFromAovs, styleFromAovs } from './dist/pipeline.js';
+import { PIXEL } from './dist/presets.js';
 import { srgbToHex } from '@spritebook/core';
-import { aovFileName } from './contracts.ts';
-import type { ClipAovSource } from './pipeline.ts';
+import { aovFileName } from './dist/contracts.js';
+import type { ClipAovSource } from './dist/pipeline.js';
 
 const FRAMES = new URL('./fixtures/aov/frames/', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -36,14 +40,14 @@ const PASSES = ['lit', 'albedo', 'normal', 'depth', 'mask'];
 
 /** Clip B = the committed AOVs with lit hues rotated (r,g,b) -> (b,r,g). */
 async function makeRotatedClip(dir: string): Promise<void> {
-  await Deno.mkdir(dir, { recursive: true });
+  await fs.mkdir(dir, { recursive: true });
   for (let d = 0; d < DIRS; d++) {
     for (let f = 0; f < FRAME_N; f++) {
       for (const pass of PASSES) {
         const name = aovFileName(d, f, pass);
-        const bytes = await Deno.readFile(`${FRAMES}/${name}`);
+        const bytes = new Uint8Array(await fs.readFile(`${FRAMES}/${name}`));
         if (pass !== 'lit') {
-          await Deno.writeFile(`${dir}/${name}`, bytes);
+          await fs.writeFile(`${dir}/${name}`, bytes);
           continue;
         }
         const img = decodePng(bytes);
@@ -54,7 +58,7 @@ async function makeRotatedClip(dir: string): Promise<void> {
           px[p * 4 + 1] = r;
           px[p * 4 + 2] = g;
         }
-        await Deno.writeFile(
+        await fs.writeFile(
           `${dir}/${name}`,
           encodePng({ width: img.width, height: img.height, data: px }),
         );
@@ -72,8 +76,8 @@ function opaqueHexes(img: { width: number; height: number; data: Uint8Array }): 
   return out;
 }
 
-Deno.test('styleClipsFromAovs pools ONE palette across clips (observable)', async () => {
-  const root = await Deno.makeTempDir();
+test('styleClipsFromAovs pools ONE palette across clips (observable)', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const bDir = `${root}/clip-b-frames`;
     await makeRotatedClip(bDir);
@@ -116,7 +120,7 @@ Deno.test('styleClipsFromAovs pools ONE palette across clips (observable)', asyn
     const palette = new Set(joint.paletteHex);
     for (const clipId of ['a', 'b']) {
       const img = decodePng(
-        await Deno.readFile(`${joint.styledDir}/${clipId}/d00_f000.png`),
+        new Uint8Array(await fs.readFile(`${joint.styledDir}/${clipId}/d00_f000.png`)),
       );
       for (const hex of opaqueHexes(img as never)) {
         assert(palette.has(hex), `clip ${clipId} opaque pixel ${hex} outside the pooled palette`);
@@ -133,19 +137,19 @@ Deno.test('styleClipsFromAovs pools ONE palette across clips (observable)', asyn
       scarce,
       soloOut,
     );
-    const aJoint = await Deno.readFile(`${joint.styledDir}/a/d00_f000.png`);
-    const aSolo = await Deno.readFile(`${solo.styledDir}/d00_f000.png`);
+    const aJoint = new Uint8Array(await fs.readFile(`${joint.styledDir}/a/d00_f000.png`));
+    const aSolo = new Uint8Array(await fs.readFile(`${solo.styledDir}/d00_f000.png`));
     assert(
       aJoint.length !== aSolo.length || !aJoint.every((v, i) => v === aSolo[i]),
       'joint styling must differ from solo styling when another clip changes the pool',
     );
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });
 
-Deno.test('styleClipsFromAovs is deterministic across runs', async () => {
-  const root = await Deno.makeTempDir();
+test('styleClipsFromAovs is deterministic across runs', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const src: ClipAovSource = {
       clipId: 'a',
@@ -159,10 +163,10 @@ Deno.test('styleClipsFromAovs is deterministic across runs', async () => {
     const r2 = await styleClipsFromAovs([src], CAM, PIXEL, `${root}/two`);
     assertEquals(r1.paletteHex, r2.paletteHex);
     assertEquals(
-      await Deno.readFile(`${r1.styledDir}/a/d00_f000.png`),
-      await Deno.readFile(`${r2.styledDir}/a/d00_f000.png`),
+      new Uint8Array(await fs.readFile(`${r1.styledDir}/a/d00_f000.png`)),
+      new Uint8Array(await fs.readFile(`${r2.styledDir}/a/d00_f000.png`)),
     );
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });

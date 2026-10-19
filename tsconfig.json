@@ -24,6 +24,15 @@
     },
     {
       "path": "packages/rig"
+    },
+    {
+      "path": "packages/style"
+    },
+    {
+      "path": "packages/pack"
+    },
+    {
+      "path": "packages/export"
     }
   ]
 }

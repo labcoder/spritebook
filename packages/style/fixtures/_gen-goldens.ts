@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Generate the per-preset perceptual goldens (checked in). The style stage is
  * pure deterministic CPU over the committed AOVs, so these goldens are portable
@@ -8,8 +11,8 @@
  *     packages/style/fixtures/_gen-goldens.ts
  */
 import type { CameraPreset } from '@spritebook/schema';
-import { styleFromAovs } from '../pipeline.ts';
-import { PRESETS } from '../presets.ts';
+import { styleFromAovs } from '../dist/pipeline.js';
+import { PRESETS } from '../dist/presets.js';
 import { GOLDEN_FRAMES, goldenName } from './golden-config.ts';
 
 const here = new URL('.', import.meta.url);
@@ -30,16 +33,16 @@ const camera: CameraPreset = {
 };
 
 const goldensDir = win(new URL('goldens/', here));
-await Deno.mkdir(goldensDir, { recursive: true });
+await fs.mkdir(goldensDir, { recursive: true });
 
 for (const [id, preset] of Object.entries(PRESETS)) {
-  const out = await Deno.makeTempDir();
+  const out = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const r = await styleFromAovs(src, camera, preset, out);
   for (const [d, f] of GOLDEN_FRAMES) {
     const frameName = `d${String(d).padStart(2, '0')}_f${String(f).padStart(3, '0')}.png`;
-    await Deno.copyFile(`${r.styledDir}/${frameName}`, `${goldensDir}/${goldenName(id, d, f)}`);
+    await fs.copyFile(`${r.styledDir}/${frameName}`, `${goldensDir}/${goldenName(id, d, f)}`);
   }
-  await Deno.remove(out, { recursive: true });
+  await fs.rm(out, { recursive: true });
   console.log(`golden: ${id}`);
 }
 console.log('goldens written to packages/style/fixtures/goldens/');

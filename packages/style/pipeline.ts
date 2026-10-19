@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The NPR pipeline spine — the ORDER IS LAW (npr-sprite-stylization skill). Per
  * frame: composite the outline color into the Sx lit (display space) → quantize
@@ -12,7 +13,7 @@
  * styleFromAovs is pure CPU over committed AOV PNGs, so it is deterministic and
  * runs anywhere; the GPU-touching runStyleJob (mod.ts) renders the AOVs first.
  */
-import { encode as encodePng } from 'fast-png';
+import { encode as encodePng } from '@spritebook/render/png';
 import type { CameraPreset, QAFlag, StylePreset } from '@spritebook/schema';
 import type { AovImage, AovSource, Palette, StyleResult } from './contracts.ts';
 import { readAov } from './aovio.ts';
@@ -409,7 +410,7 @@ export async function styleClipsFromAovs(
   for (const src of srcs) {
     const aovs = perClip.get(src.clipId)!;
     const clipDir = `${styledDir}/${src.clipId}`;
-    await Deno.mkdir(clipDir, { recursive: true });
+    await fs.mkdir(clipDir, { recursive: true });
     for (let d = 0; d < src.directions; d++) {
       let prev: Int32Array | null = null;
       for (let f = 0; f < src.frames; f++) {
@@ -426,7 +427,7 @@ export async function styleClipsFromAovs(
           bestCov = { cov, ref: { clipId: src.clipId, direction: d, frame: f } };
         }
         if (src === srcs[0] && d === 0) flickerFrames.push(rgba.slice());
-        await Deno.writeFile(
+        await fs.writeFile(
           `${clipDir}/${tag(d, f)}.png`,
           encodePng({ width: w1, height: h1, data: rgba }),
         );
@@ -487,7 +488,7 @@ export async function styleFromAovs(
   const dither = ditherConfig(style);
 
   const styledDir = `${outDir}/styled`;
-  await Deno.mkdir(styledDir, { recursive: true });
+  await fs.mkdir(styledDir, { recursive: true });
 
   const idleFrames: Uint8Array[] = []; // direction 0's styled frames, for flicker
   const clipped: QAFlag['frameRefs'] = [];
@@ -509,7 +510,7 @@ export async function styleFromAovs(
         bestCov = { cov, ref: { clipId: 'idle', direction: d, frame: f } };
       }
       if (d === 0) idleFrames.push(rgba.slice());
-      await Deno.writeFile(
+      await fs.writeFile(
         `${styledDir}/${tag(d, f)}.png`,
         encodePng({ width: w1, height: h1, data: rgba }),
       );

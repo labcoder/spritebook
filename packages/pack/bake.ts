@@ -1,3 +1,7 @@
+import { resourcePath } from '@spritebook/core';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { projectPins } from '@spritebook/registry';
 /**
  * The bake orchestrator (P2-T3): canonical glb -> styled, packed, manifested
@@ -130,9 +134,7 @@ export interface ClipBindingSpec extends SampleSpec {
  * decodeURIComponent: URL.pathname percent-encodes (spaces, non-ASCII) — an
  * install under "C:\Users\First Last\..." must still resolve (review F3)
  */
-export const BUNDLED_PACK = decodeURIComponent(
-  new URL('../anim/packs/ual', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-);
+export const BUNDLED_PACK = resourcePath('anim', 'packs/ual');
 
 const CLIP_ID = 'idle';
 const AOV_PASSES = ['albedo', 'normal', 'depth', 'mask'] as const;
@@ -149,7 +151,7 @@ const AOV_PASSES = ['albedo', 'normal', 'depth', 'mask'] as const;
 const DEBUG_RAW_LIT_ENV = 'SPRITEBOOK_DEBUG_RAW_LIT';
 
 function debugRawLit(): boolean {
-  return (Deno.env.get(DEBUG_RAW_LIT_ENV) ?? '') !== '';
+  return (process.env[DEBUG_RAW_LIT_ENV] ?? '') !== '';
 }
 
 async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
@@ -197,7 +199,7 @@ export async function buildCacheInputs(
   renderSig: string,
   provenance: BakeProvenance = {},
 ): Promise<CacheKeyInputs> {
-  const modelBytes = await Deno.readFile(spec.modelPath);
+  const modelBytes = new Uint8Array(await fs.readFile(spec.modelPath));
   // clip CONTENT is a cache input (invariant 3): the binding spec alone would
   // serve stale pixels after an in-place pack upgrade while the preview GLB
   // regenerates from the new bytes — a silent D-006 parity break (review F1).
@@ -210,7 +212,7 @@ export async function buildCacheInputs(
       const clipPath = `${packDir}/clips/${c.clipId}.glb`;
       let bytes: Uint8Array;
       try {
-        bytes = await Deno.readFile(clipPath);
+        bytes = new Uint8Array(await fs.readFile(clipPath));
       } catch {
         throw new Error(`Cannot read clip "${c.clipId}" at "${clipPath}" - is the pack complete?`);
       }
@@ -479,16 +481,16 @@ async function recomputeClips(
   plan: MirrorPlan,
 ): Promise<BakedCells & { aovDirCleanup: () => Promise<void> }> {
   const s = spec.style.temporal.superSample;
-  const aovRoot = await Deno.makeTempDir();
+  const aovRoot = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const cleanup = async () => {
-    await Deno.remove(aovRoot, { recursive: true }).catch(() => {});
+    await fs.rm(aovRoot, { recursive: true }).catch(() => {});
   };
 
   try {
     const srcs: ClipAovSource[] = [];
     for (const { binding, sampled } of prepared) {
       const clipDir = `${aovRoot}/${binding.clipId}`;
-      await Deno.mkdir(clipDir, { recursive: true });
+      await fs.mkdir(clipDir, { recursive: true });
       const posesPath = `${clipDir}/${posesFileName(binding.clipId)}`;
       await writePoses(posesPath, binding.clipId, sampled);
       for await (
@@ -528,7 +530,7 @@ async function recomputeClips(
       });
     }
 
-    const styleOut = await Deno.makeTempDir();
+    const styleOut = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
     try {
       const styleResult = await styleClipsFromAovs(srcs, spec.camera, spec.style, styleOut);
       const cells = new Map<string, Map<string, Uint8Array>>(
@@ -542,7 +544,7 @@ async function recomputeClips(
         const f = String(id.frame).padStart(3, '0');
         cells.get('lit')!.set(
           fik,
-          await Deno.readFile(`${styleResult.styledDir}/${id.clipId}/d${d}_f${f}.png`),
+          new Uint8Array(await fs.readFile(`${styleResult.styledDir}/${id.clipId}/d${d}_f${f}.png`)),
         );
         const src = srcs.find((x) => x.clipId === id.clipId)!;
         const aov = await readAov(src.framesDir, id.direction, id.frame);
@@ -556,7 +558,7 @@ async function recomputeClips(
       fillMirroredCells(cells, grid, plan);
       return { cells, rawLit, styleResult, hits: new Set<string>(), aovDirCleanup: cleanup };
     } finally {
-      await Deno.remove(styleOut, { recursive: true }).catch(() => {});
+      await fs.rm(styleOut, { recursive: true }).catch(() => {});
     }
   } catch (err) {
     await cleanup();
@@ -571,9 +573,9 @@ async function recompute(
   plan: MirrorPlan,
 ): Promise<BakedCells & { aovDirCleanup: () => Promise<void> }> {
   const s = spec.style.temporal.superSample;
-  const aovDir = await Deno.makeTempDir();
+  const aovDir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const cleanup = async () => {
-    await Deno.remove(aovDir, { recursive: true }).catch(() => {});
+    await fs.rm(aovDir, { recursive: true }).catch(() => {});
   };
 
   for await (
@@ -608,7 +610,7 @@ async function recompute(
     height: spec.camera.cellPx.h * s,
   };
   // from here on, any throw must not leak the temp dirs (adversarial review m6)
-  const styleOut = await Deno.makeTempDir();
+  const styleOut = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const styleResult = await styleFromAovs(src, spec.camera, spec.style, styleOut);
 
@@ -621,7 +623,7 @@ async function recompute(
       const fik = frameIdKey(id);
       const d = String(id.direction).padStart(2, '0');
       const f = String(id.frame).padStart(3, '0');
-      cells.get('lit')!.set(fik, await Deno.readFile(`${styleResult.styledDir}/d${d}_f${f}.png`));
+      cells.get('lit')!.set(fik, new Uint8Array(await fs.readFile(`${styleResult.styledDir}/d${d}_f${f}.png`)));
       const aov = await readAov(src.framesDir, id.direction, id.frame);
       const one = aov1x(aov, s);
       cells.get('albedo')!.set(fik, encodePagePng(one.albedo, 'rgba8'));
@@ -636,7 +638,7 @@ async function recompute(
     await cleanup();
     throw err;
   } finally {
-    await Deno.remove(styleOut, { recursive: true }).catch(() => {});
+    await fs.rm(styleOut, { recursive: true }).catch(() => {});
   }
 }
 
@@ -663,7 +665,7 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     // model existence first (the friendlier error on every machine), THEN the
     // adapter-bound render signature — baking is a GPU operation either way
     try {
-      await Deno.stat(spec.modelPath);
+      await fs.stat(spec.modelPath);
     } catch {
       throw new Error(`Cannot read "${spec.modelPath}" - does the file exist?`);
     }
@@ -682,7 +684,7 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     const inputs = await buildCacheInputs(spec, await renderSignature(), spec.provenance);
     const bake = await bakeKey(inputs);
     const bakeDir = `${spec.outRoot}/bake-${bake.slice(0, 8)}`;
-    await Deno.mkdir(bakeDir, { recursive: true });
+    await fs.mkdir(bakeDir, { recursive: true });
     const grid = spec.clips?.length
       ? spec.clips.flatMap((c) => frameGrid(spec.camera.directions, c.frames, c.clipId))
       : frameGrid(spec.camera.directions, spec.frames, CLIP_ID);
@@ -774,7 +776,7 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       const source = pass === 'lit' ? litCells : decoded.get(pass)!;
       for (let i = 0; i < layout.pageCount; i++) {
         const page = composePage(layout, i, source, kind);
-        await Deno.writeFile(`${bakeDir}/${atlasPageName(pass, i)}`, encodePagePng(page, kind));
+        await fs.writeFile(`${bakeDir}/${atlasPageName(pass, i)}`, encodePagePng(page, kind));
       }
     }
 
@@ -785,7 +787,7 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
         [...baked.rawLit].map(([k, bytes]) => [k, decodeCell(bytes, 'rgba8')]),
       );
       for (let i = 0; i < layout.pageCount; i++) {
-        await Deno.writeFile(
+        await fs.writeFile(
           `${bakeDir}/atlas_litraw_${i}.png`,
           encodePagePng(composePage(layout, i, raw, 'rgba8'), 'rgba8'),
         );
@@ -794,7 +796,7 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
 
     // 3. artifacts: style-result, contact sheet, manifest
     yield { t: 'progress', jobId, at: at(), step: 'write', done: 3, total: 4 };
-    await Deno.writeTextFile(
+    await fs.writeFile(
       `${bakeDir}/style-result.json`,
       JSON.stringify(persistedStyleResult(baked.styleResult), null, 2) + '\n',
     );
@@ -811,7 +813,7 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
         cellH: spec.camera.cellPx.h,
         fps: DEFAULT_FPS,
       });
-      await Deno.writeFile(`${bakeDir}/contact-${c.clipId}.gif`, gif);
+      await fs.writeFile(`${bakeDir}/contact-${c.clipId}.gif`, gif);
     }
 
     const manifest = await assembleManifest({
@@ -825,7 +827,7 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       wallTimeS: (performance.now() - t0) / 1000,
       now: at,
     });
-    await Deno.writeTextFile(`${bakeDir}/manifest.json`, canonicalJson(manifest));
+    await fs.writeFile(`${bakeDir}/manifest.json`, canonicalJson(manifest));
     await cleanup?.();
 
     yield { t: 'progress', jobId, at: at(), step: 'manifest', done: 4, total: 4 };

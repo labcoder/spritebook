@@ -1,3 +1,8 @@
+import { runProcess } from '../../tools/testing/process.ts';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Tier-2 real-engine smoke (docs/export-validation.md): imports the exported
  * SpriteFrames into an actual Godot 4 and asserts the animations load. GATED —
@@ -13,48 +18,27 @@
  * and every character would still import mis-anchored. Godot reports
  * (16.0, 28.0); the model says (16, 28).
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
-import { exportGodot } from './godot.ts';
+import { exportGodot } from './dist/godot.js';
 
-const GODOT = Deno.env.get('GODOT4_BIN');
+const GODOT = process.env['GODOT4_BIN'];
 
-/**
- * `deno task test` runs with `--allow-run=nvidia-smi,uv`, so spawning Godot is
- * DENIED there no matter what GODOT4_BIN says — setting the variable turned a
- * skip into a hard failure of the whole suite, which is why nobody had ever
- * seen this lane run. Ask for the permission rather than assume it, and say
- * which task grants it.
- */
-async function canRunGodot(bin: string): Promise<boolean> {
-  const { state } = await Deno.permissions.query({ name: 'run', command: bin });
-  return state === 'granted';
-}
 const BAKE = new URL('./fixtures/bake-aabbccdd', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
   '$1',
 );
 
-Deno.test({
-  name: 'godot smoke: a real Godot 4 loads the exported SpriteFrames',
-  ignore: !GODOT,
-  fn: async () => {
-    if (!(await canRunGodot(GODOT!))) {
-      console.log(
-        `skip: GODOT4_BIN is set but this run cannot spawn it — asserted NOTHING. ` +
-          `Use \`deno task test:godot\`, which grants --allow-run.`,
-      );
-      return;
-    }
-    const project = await Deno.makeTempDir({ prefix: 'sb-godot-smoke-' });
+test('godot smoke: a real Godot 4 loads the exported SpriteFrames', { skip: !GODOT }, async () => {
+    const project = await fs.mkdtemp(join(tmpdir(), 'sb-godot-smoke-'));
     try {
       const manifest = parseWith(
         BakeManifestSchema,
-        JSON.parse(await Deno.readTextFile(`${BAKE}/manifest.json`)),
+        JSON.parse(await fs.readFile(`${BAKE}/manifest.json`, 'utf8')),
         'fixture BakeManifest',
       );
       await exportGodot(manifest, BAKE, project, { fps: 8 });
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${project}/project.godot`,
         '[application]\nconfig/name="sb-smoke"\nconfig/features=PackedStringArray("4.2")\n',
       );
@@ -67,7 +51,7 @@ Deno.test({
       // own exit code, so a failure is a fast non-zero with all of its reasons
       // printed at once. Verified by perturbing the expected box: 3s, and the
       // message says what Godot actually reported.
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${project}/smoke.gd`,
         [
           'extends SceneTree',
@@ -119,12 +103,7 @@ Deno.test({
       // hung child is a lane that reports nothing at all. A timeout turns that
       // into an ordinary failure with a name on it.
       const godot = async (args: string[], what: string) =>
-        await new Deno.Command(GODOT!, {
-          args: ['--headless', '--path', project, ...args],
-          stdout: 'piped',
-          stderr: 'piped',
-          signal: AbortSignal.timeout(90_000),
-        }).output().catch((err) => {
+        await runProcess(GODOT!, ['--headless', '--path', project, ...args], { signal: AbortSignal.timeout(90_000) }).catch((err) => {
           throw new Error(`godot ${what} did not finish within 90s: ${err}`);
         });
 
@@ -141,7 +120,6 @@ Deno.test({
       );
       assert(stdout.includes('SMOKE_OK'), `script did not reach SMOKE_OK:\n${stdout}`);
     } finally {
-      await Deno.remove(project, { recursive: true }).catch(() => {});
+      await fs.rm(project, { recursive: true }).catch(() => {});
     }
-  },
 });

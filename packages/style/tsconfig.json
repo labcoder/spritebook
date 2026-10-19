@@ -1,0 +1,29 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../render"
+    },
+    {
+      "path": "../schema"
+    }
+  ],
+  "include": [
+    "*.ts"
+  ],
+  "exclude": [
+    "*_test.ts",
+    "dist",
+    "bench.ts"
+  ]
+}

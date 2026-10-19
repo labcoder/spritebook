@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * THE TRACK A ACCEPTANCE (body-task close-out): the full roster path in one
  * test — canonical body, fitted, decaled on ONE forearm, baked in 8
@@ -30,16 +34,16 @@
  * because at 24 px/m a forearm is ~4 px wide; the 48/255 mask tolerance
  * keeps soft area-average edge blends out of the footprint.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { decode as decodePng } from 'fast-png';
 import type { BakeManifest, CameraPreset, JobEvent } from '@spritebook/schema';
 import { BakeManifestSchema, CanonicalBodySchema, parseWith } from '@spritebook/schema';
 import { PAINTERLY } from '@spritebook/style';
 import { encode as encodePng } from 'fast-png';
-import { compositeDecals } from '../gen/identity.ts';
-import { fitCanonicalBody } from '../rig/fit.ts';
-import { tryGetGpu } from '../render/gpu.ts';
-import { runBakeJob } from './mod.ts';
+import { compositeDecals } from '../gen/dist/identity.js';
+import { fitCanonicalBody } from '../rig/dist/fit.js';
+import { tryGetGpu } from '../render/dist/gpu.js';
+import { runBakeJob } from './dist/mod.js';
 
 const win = (u: URL) => decodeURIComponent(u.pathname.replace(/^\/([A-Za-z]:)/, '$1'));
 const BODY_DIR = win(new URL('../rig/bodies/ubc-male', import.meta.url));
@@ -77,7 +81,7 @@ async function bake(modelPath: string, outRoot: string, characterId: string) {
   }).path;
   const manifest = parseWith(
     BakeManifestSchema,
-    JSON.parse(await Deno.readTextFile(manifestPath)),
+    JSON.parse(await fs.readFile(manifestPath, 'utf8')),
     'BakeManifest',
   );
   return { manifest, bakeDir: manifestPath.slice(0, manifestPath.lastIndexOf('/')) };
@@ -137,8 +141,8 @@ async function decalFootprints(
   plain: { manifest: BakeManifest; bakeDir: string },
   marked: { manifest: BakeManifest; bakeDir: string },
 ) {
-  const pageP = decodePng(await Deno.readFile(`${plain.bakeDir}/atlas_albedo_0.png`));
-  const pageM = decodePng(await Deno.readFile(`${marked.bakeDir}/atlas_albedo_0.png`));
+  const pageP = decodePng(new Uint8Array(await fs.readFile(`${plain.bakeDir}/atlas_albedo_0.png`)));
+  const pageM = decodePng(new Uint8Array(await fs.readFile(`${marked.bakeDir}/atlas_albedo_0.png`)));
   const byDirP = new Map(plain.manifest.frames.map((f) => [f.direction, f.atlas]));
   const byDirM = new Map(marked.manifest.frames.map((f) => [f.direction, f.atlas]));
   const masks = new Map<number, { mask: Uint8Array; w: number; h: number }>();
@@ -157,9 +161,9 @@ async function decalFootprints(
   return masks;
 }
 
-Deno.test('ACCEPTANCE: fit -> decal -> bake, and the tattoo stays on its own arm', async (t) => {
-  if (!(await tryGetGpu())) return;
-  const root = await Deno.makeTempDir();
+test('ACCEPTANCE: fit -> decal -> bake, and the tattoo stays on its own arm', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     // 1. the real Track A front half: bundled body fitted to a fixture target
     const fitted = `${root}/fitted.glb`;
@@ -174,7 +178,7 @@ Deno.test('ACCEPTANCE: fit -> decal -> bake, and the tattoo stays on its own arm
     // 2. one loud decal on the LEFT forearm region, opt-in mirroring OFF
     const body = parseWith(
       CanonicalBodySchema,
-      JSON.parse(await Deno.readTextFile(`${BODY_DIR}/body.json`)),
+      JSON.parse(await fs.readFile(`${BODY_DIR}/body.json`, 'utf8')),
       'ubc-male body.json',
     );
     const region = body.regions.find((r) => r.side === 'left' && r.id.includes('arm'));
@@ -182,7 +186,7 @@ Deno.test('ACCEPTANCE: fit -> decal -> bake, and the tattoo stays on its own arm
     const decalPng = `${root}/tattoo.png`;
     const ink = new Uint8Array(16 * 16 * 4);
     for (let i = 0; i < 256; i++) ink.set([255, 0, 255, 255], i * 4);
-    await Deno.writeFile(decalPng, encodePng({ width: 16, height: 16, data: ink }));
+    await fs.writeFile(decalPng, encodePng({ width: 16, height: 16, data: ink }));
     const decaled = `${root}/decaled.glb`;
     const report = await compositeDecals({
       modelPath: fitted,
@@ -199,7 +203,7 @@ Deno.test('ACCEPTANCE: fit -> decal -> bake, and the tattoo stays on its own arm
     const masks = await decalFootprints(plain, marked);
     const px = (ds: number[]) => ds.reduce((s, d) => s + count(masks.get(d)!.mask), 0);
 
-    await t.step('the tattoo shows wherever the arm is on screen (>= 6 of 8 dirs)', () => {
+    await t.test('the tattoo shows wherever the arm is on screen (>= 6 of 8 dirs)', () => {
       const counts = [...masks.entries()].map(([d, m]) => [d, count(m.mask)] as const);
       const clear = counts.filter(([, n]) => n >= 5);
       assert(
@@ -212,7 +216,7 @@ Deno.test('ACCEPTANCE: fit -> decal -> bake, and the tattoo stays on its own arm
       assert(total >= 60, `the tattoo changed ${total} px across 8 directions - expected >= 60`);
     });
 
-    await t.step('and did NOT mirror onto the other arm (D-008)', () => {
+    await t.test('and did NOT mirror onto the other arm (D-008)', () => {
       for (const d of [1, 2, 3]) {
         const a = masks.get(d)!;
         const b = masks.get(8 - d)!;
@@ -226,10 +230,10 @@ Deno.test('ACCEPTANCE: fit -> decal -> bake, and the tattoo stays on its own arm
       }
     });
 
-    await t.step('and every direction was rendered, none mirrored (D-008 default)', () => {
+    await t.test('and every direction was rendered, none mirrored (D-008 default)', () => {
       for (const f of marked.manifest.frames) assertEquals(f.mirroredFrom, undefined);
     });
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });

@@ -1,6 +1,7 @@
-import { assert, assertEquals, assertNotStrictEquals, assertThrows } from 'jsr:@std/assert@1';
+import { test } from 'node:test';
+import { assert, assertEquals, assertNotStrictEquals, assertThrows } from '@std/assert';
 import type { AovImage } from '@spritebook/style';
-import { aov1x } from './aov1x.ts';
+import { aov1x } from './dist/aov1x.js';
 
 /** A zeroed AovImage of the given Sx size (tests fill the planes they assert on). */
 function makeAov(width: number, height: number): AovImage {
@@ -15,7 +16,7 @@ function makeAov(width: number, height: number): AovImage {
   };
 }
 
-Deno.test('aov1x: albedo colour is weighted by coverage; alpha is the area mean', () => {
+test('aov1x: albedo colour is weighted by coverage; alpha is the area mean', () => {
   // Half the subpixels are UNCOVERED (alpha 0). This previously expected
   // [8, 10, 1, 128] — the plain mean of r over all sixteen, including the eight
   // that were never drawn. That is the defect: transparent black dragged every
@@ -34,7 +35,7 @@ Deno.test('aov1x: albedo colour is weighted by coverage; alpha is the area mean'
   assertEquals([...out.albedo.rgba!], [12, 10, 1, 128]);
 });
 
-Deno.test('aov1x: a fully covered block is unchanged by the coverage weighting', () => {
+test('aov1x: a fully covered block is unchanged by the coverage weighting', () => {
   // The reason only silhouette edges move: when every alpha is 255 the weight
   // factors out of numerator and denominator exactly.
   const aov = makeAov(2, 2);
@@ -45,7 +46,7 @@ Deno.test('aov1x: a fully covered block is unchanged by the coverage weighting',
   assertEquals([...aov1x(aov, 2).albedo.rgba!], [25, 0, 0, 255]);
 });
 
-Deno.test("aov1x: albedo rounding is round-half-up, not banker's or truncation", () => {
+test("aov1x: albedo rounding is round-half-up, not banker's or truncation", () => {
   // Fully covered blocks, so this exercises rounding rather than coverage.
   // (It previously left alpha at 0, which now means "nothing was drawn here" —
   // the colour of an uncovered block is not a rounding question.)
@@ -65,7 +66,7 @@ Deno.test("aov1x: albedo rounding is round-half-up, not banker's or truncation",
   }
 });
 
-Deno.test('aov1x: normal/depth/mask center-tap picks the (2,2)-of-4 subpixel', () => {
+test('aov1x: normal/depth/mask center-tap picks the (2,2)-of-4 subpixel', () => {
   const aov = makeAov(4, 4);
   for (let i = 0; i < 16; i++) {
     aov.normal[i * 4] = 50 + i;
@@ -82,7 +83,7 @@ Deno.test('aov1x: normal/depth/mask center-tap picks the (2,2)-of-4 subpixel', (
   assertEquals(out.mask.gray16![0], 0xf000 + tap); // 16-bit value survives untouched
 });
 
-Deno.test('aov1x: center-tap lands per block, not per image (8x4, s=4 -> 2x1)', () => {
+test('aov1x: center-tap lands per block, not per image (8x4, s=4 -> 2x1)', () => {
   const aov = makeAov(8, 4);
   for (let i = 0; i < 32; i++) aov.depth[i] = i;
   for (let x = 0; x < 8; x++) {
@@ -98,7 +99,7 @@ Deno.test('aov1x: center-tap lands per block, not per image (8x4, s=4 -> 2x1)', 
   assertEquals([out.albedo.rgba![0], out.albedo.rgba![4]], [4, 8]);
 });
 
-Deno.test('aov1x: even s taps floor(s/2) — the lower-right of a 2x2 block', () => {
+test('aov1x: even s taps floor(s/2) — the lower-right of a 2x2 block', () => {
   const aov = makeAov(2, 2);
   aov.depth.set([5, 6, 7, 8]);
   aov.mask.set([50, 60, 70, 80]);
@@ -107,7 +108,7 @@ Deno.test('aov1x: even s taps floor(s/2) — the lower-right of a 2x2 block', ()
   assertEquals(out.mask.gray16![0], 80);
 });
 
-Deno.test('aov1x: s=1 is identity on fresh buffers', () => {
+test('aov1x: s=1 is identity on fresh buffers', () => {
   const aov = makeAov(2, 2);
   aov.albedo.set(Uint8Array.from({ length: 16 }, (_, i) => 30 + i));
   aov.normal.set(Uint8Array.from({ length: 16 }, (_, i) => 60 + i));
@@ -122,7 +123,7 @@ Deno.test('aov1x: s=1 is identity on fresh buffers', () => {
   assertNotStrictEquals(out.depth.gray16, aov.depth);
 });
 
-Deno.test('aov1x: output planes carry the right kinds and sizes', () => {
+test('aov1x: output planes carry the right kinds and sizes', () => {
   const out = aov1x(makeAov(8, 4), 4);
   for (const plane of [out.albedo, out.normal]) {
     assertEquals([plane.w, plane.h], [2, 1]);
@@ -136,7 +137,7 @@ Deno.test('aov1x: output planes carry the right kinds and sizes', () => {
   }
 });
 
-Deno.test('aov1x: indivisible dimensions and bad factors throw', () => {
+test('aov1x: indivisible dimensions and bad factors throw', () => {
   assertThrows(() => aov1x(makeAov(6, 4), 4), RangeError, 'divisible');
   assertThrows(() => aov1x(makeAov(4, 6), 4), RangeError, 'divisible');
   assertThrows(() => aov1x(makeAov(4, 4), 0), RangeError, 'positive integer');
@@ -144,7 +145,7 @@ Deno.test('aov1x: indivisible dimensions and bad factors throw', () => {
   assertThrows(() => aov1x(makeAov(4, 4), 2.5), RangeError, 'positive integer');
 });
 
-Deno.test('aov1x: a mis-sized plane throws before any work', () => {
+test('aov1x: a mis-sized plane throws before any work', () => {
   const aov = makeAov(4, 4);
   const broken = { ...aov, albedo: new Uint8Array(4) };
   assertThrows(() => aov1x(broken, 4), RangeError, 'albedo length');
@@ -153,7 +154,7 @@ Deno.test('aov1x: a mis-sized plane throws before any work', () => {
   assert(aov1x(aov, 4)); // the intact image still works
 });
 
-Deno.test('aov1x: the pre-style lit plane reduces exactly like albedo', () => {
+test('aov1x: the pre-style lit plane reduces exactly like albedo', () => {
   // The debug artifact only means anything if it is comparable to what ships.
   // Reducing lit by a DIFFERENT rule than albedo would make the two atlases
   // disagree for reasons that have nothing to do with the style stage - which
@@ -173,7 +174,7 @@ Deno.test('aov1x: the pre-style lit plane reduces exactly like albedo', () => {
   assertEquals([...out.lit.rgba!], [12, 10, 1, 128]);
 });
 
-Deno.test('aov1x: lit and albedo are independent planes, not one aliased twice', () => {
+test('aov1x: lit and albedo are independent planes, not one aliased twice', () => {
   // A copy-paste that reduced albedo into both slots would pass the test above
   // and make every debug atlas a duplicate of the shipped albedo page.
   const aov = makeAov(2, 2);

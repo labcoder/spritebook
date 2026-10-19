@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * P2-T3 acceptance, end-to-end on a real bake of the asymmetric fixture
  * (GPU-gated; SPRITEBOOK_REQUIRE_GPU forces it on the lavapipe lane):
@@ -10,15 +14,15 @@
  *  4. pivot anti-drift — pack's pivotFor matches the render framing solver's
  *     real render-summary.json.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { decode as decodePng } from 'fast-png';
 import type { BakeManifest, CameraPreset, JobEvent, StylePreset } from '@spritebook/schema';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
 import { PIXEL } from '@spritebook/style';
 import { renderSignature, runRenderJob } from '@spritebook/render';
-import { tryGetGpu } from '../render/gpu.ts';
+import { tryGetGpu } from '../render/dist/gpu.js';
 import { exportGodot, parseTres, runExportJob, validateTres } from '@spritebook/export';
-import { buildCacheInputs, frameGrid, pivotFor, predictInvalidation, runBakeJob } from './mod.ts';
+import { buildCacheInputs, frameGrid, pivotFor, predictInvalidation, runBakeJob } from './dist/mod.js';
 
 const GLB = new URL('../style/fixtures/asymmetric.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -63,21 +67,21 @@ async function bake(
   const bakeDir = manifestPath.slice(0, manifestPath.lastIndexOf('/'));
   const manifest = parseWith(
     BakeManifestSchema,
-    JSON.parse(await Deno.readTextFile(manifestPath)),
+    JSON.parse(await fs.readFile(manifestPath, 'utf8')),
     'BakeManifest',
   );
   return { manifest, bakeDir, events };
 }
 
-Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, exporters', async (t) => {
-  if (!(await tryGetGpu())) return;
-  const root = await Deno.makeTempDir();
+test('acceptance: bake -> rect identity, stability, invalidation, pivot, exporters', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const a = await bake(`${root}/a`);
 
-    await t.step(
+    await t.test(
       'rect identity: 5 passes x pages at one size; mask content inside rects',
-      async () => {
+      async (t) => {
         const byPass = new Map<string, number>();
         for (const p of a.manifest.atlases) {
           byPass.set(p.pass, (byPass.get(p.pass) ?? 0) + 1);
@@ -86,8 +90,8 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
         }
         assertEquals([...byPass.values()], [1, 1, 1, 1, 1], 'one page per pass for this bake');
 
-        const lit = decodePng(await Deno.readFile(`${a.bakeDir}/atlas_lit_0.png`));
-        const mask = decodePng(await Deno.readFile(`${a.bakeDir}/atlas_mask_0.png`));
+        const lit = decodePng(new Uint8Array(await fs.readFile(`${a.bakeDir}/atlas_lit_0.png`)));
+        const mask = decodePng(new Uint8Array(await fs.readFile(`${a.bakeDir}/atlas_mask_0.png`)));
         assertEquals([lit.width, lit.height], [mask.width, mask.height]);
         const litData = lit.data as Uint8Array;
         const maskData = mask.data as Uint16Array;
@@ -104,7 +108,7 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
       },
     );
 
-    await t.step('byte-stability: independent rebake agrees everywhere it must', async () => {
+    await t.test('byte-stability: independent rebake agrees everywhere it must', async () => {
       const b = await bake(`${root}/b`);
       assertEquals(a.manifest.bakeId, b.manifest.bakeId, 'same recipe -> same bakeId');
       // manifests equal after removing the volatile fields
@@ -116,14 +120,14 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
       assertEquals(strip(a.manifest), strip(b.manifest));
       for (const page of a.manifest.atlases) {
         assertEquals(
-          await Deno.readFile(`${a.bakeDir}/${page.png}`),
-          await Deno.readFile(`${b.bakeDir}/${page.png}`),
+          new Uint8Array(await fs.readFile(`${a.bakeDir}/${page.png}`)),
+          new Uint8Array(await fs.readFile(`${b.bakeDir}/${page.png}`)),
           `page differs: ${page.png}`,
         );
       }
       assertEquals(
-        await Deno.readTextFile(`${a.bakeDir}/style-result.json`),
-        await Deno.readTextFile(`${b.bakeDir}/style-result.json`),
+        await fs.readFile(`${a.bakeDir}/style-result.json`, 'utf8'),
+        await fs.readFile(`${b.bakeDir}/style-result.json`, 'utf8'),
       );
       // and the exporters project both bakes to byte-identical trees
       for (const target of ['godot', 'aseprite', 'texturepacker', 'strips'] as const) {
@@ -134,17 +138,17 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
         for await (
           const _ of runExportJob({ jobId: 'x', bakeDir: b.bakeDir, outDir: eb, targets: [target] })
         ) { /* drain */ }
-        for await (const f of Deno.readDir(`${ea}/${target}`)) {
+        for await (const f of await fs.readdir(`${ea}/${target}`, { withFileTypes: true })) {
           assertEquals(
-            await Deno.readFile(`${ea}/${target}/${f.name}`),
-            await Deno.readFile(`${eb}/${target}/${f.name}`),
+            new Uint8Array(await fs.readFile(`${ea}/${target}/${f.name}`)),
+            new Uint8Array(await fs.readFile(`${eb}/${target}/${f.name}`)),
             `${target}/${f.name} differs across bakes`,
           );
         }
       }
     });
 
-    await t.step(
+    await t.test(
       'invalidation: unchanged -> zero misses; outline change -> exactly all',
       async () => {
         const cacheDir = `${root}/cache`;
@@ -170,8 +174,8 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
         assert(warm.manifest.frames.every((f) => f.cacheHit), 'every frame served from cache');
         // the served bake reproduces the recomputed pages byte-for-byte
         assertEquals(
-          await Deno.readFile(`${cold.bakeDir}/atlas_lit_0.png`),
-          await Deno.readFile(`${warm.bakeDir}/atlas_lit_0.png`),
+          new Uint8Array(await fs.readFile(`${cold.bakeDir}/atlas_lit_0.png`)),
+          new Uint8Array(await fs.readFile(`${warm.bakeDir}/atlas_lit_0.png`)),
         );
 
         const wider: StylePreset = {
@@ -202,8 +206,8 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
       },
     );
 
-    await t.step('pivot anti-drift: pivotFor matches the render framing solver', async () => {
-      const renderOut = await Deno.makeTempDir();
+    await t.test('pivot anti-drift: pivotFor matches the render framing solver', async () => {
+      const renderOut = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
       try {
         for await (
           const e of runRenderJob({
@@ -218,22 +222,22 @@ Deno.test('acceptance: bake -> rect identity, stability, invalidation, pivot, ex
         ) {
           assert(e.t !== 'error', `render failed: ${JSON.stringify(e)}`);
         }
-        const summary = JSON.parse(await Deno.readTextFile(`${renderOut}/render-summary.json`));
+        const summary = JSON.parse(await fs.readFile(`${renderOut}/render-summary.json`, 'utf8'));
         assertEquals(pivotFor(CAM), summary.pivotPx, 'pack pivot == render pivot');
         assertEquals(a.manifest.frames[0].pivotPx, summary.pivotPx);
       } finally {
-        await Deno.remove(renderOut, { recursive: true });
+        await fs.rm(renderOut, { recursive: true });
       }
     });
 
-    await t.step('the real bake exports a valid, manifest-consistent .tres', async () => {
+    await t.test('the real bake exports a valid, manifest-consistent .tres', async () => {
       const out = `${root}/godot-real`;
       await exportGodot(a.manifest, a.bakeDir, out, { fps: 8 });
-      const parsed = parseTres(await Deno.readTextFile(`${out}/asym.tres`));
+      const parsed = parseTres(await fs.readFile(`${out}/asym.tres`, 'utf8'));
       validateTres(parsed, a.manifest); // throws on any inconsistency
       assertEquals(parsed.animations.length, CAM.directions);
     });
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });

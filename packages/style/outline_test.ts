@@ -1,6 +1,7 @@
-import { assertEquals } from 'jsr:@std/assert@1';
-import type { AovImage, OutlineParams } from './contracts.ts';
-import { creaseEdges, extractOutline, silhouetteEdges } from './outline.ts';
+import { test } from 'node:test';
+import { assertEquals } from '@std/assert';
+import type { AovImage, OutlineParams } from './dist/contracts.js';
+import { creaseEdges, extractOutline, silhouetteEdges } from './dist/outline.js';
 
 // --- synthetic AOV builders -------------------------------------------------
 
@@ -53,7 +54,7 @@ function flatOpaque(n: readonly [number, number, number], depth: number): AovIma
 
 // --- crease detection -------------------------------------------------------
 
-Deno.test('crease: two flat normal regions -> crease exactly on the seam', () => {
+test('crease: two flat normal regions -> crease exactly on the seam', () => {
   const aov = flatOpaque([0, 0, 1], 30000);
   // right region faces a perpendicular direction -> dot(A,B) = 0 < 0.5
   for (let y = 0; y < H; y++) {
@@ -69,7 +70,7 @@ Deno.test('crease: two flat normal regions -> crease exactly on the seam', () =>
   }
 });
 
-Deno.test('crease: a depth step is detected on the seam (normals flat)', () => {
+test('crease: a depth step is detected on the seam (normals flat)', () => {
   const aov = flatOpaque([0, 0, 1], 10000); // identical normals -> no normal crease
   for (let y = 0; y < H; y++) {
     for (let x = SEAM; x < W; x++) aov.depth[y * W + x] = 40000;
@@ -84,7 +85,7 @@ Deno.test('crease: a depth step is detected on the seam (normals flat)', () => {
   }
 });
 
-Deno.test('crease: a flat opaque frame has no interior edges', () => {
+test('crease: a flat opaque frame has no interior edges', () => {
   const aov = flatOpaque([0, 0, 1], 30000);
   const crease = creaseEdges(aov, params());
   assertEquals(crease.reduce((a, b) => a + b, 0), 0);
@@ -93,7 +94,7 @@ Deno.test('crease: a flat opaque frame has no interior edges', () => {
   assertEquals(sil.reduce((a, b) => a + b, 0), 0);
 });
 
-Deno.test('crease: depth threshold scales with depth (same step, near creases, far does not)', () => {
+test('crease: depth threshold scales with depth (same step, near creases, far does not)', () => {
   // Two single-seam frames with the SAME 2000-unit step, one near, one far. The scaled
   // threshold fires on the near seam and lets the identical far seam survive.
   const step = 2000;
@@ -133,7 +134,7 @@ function halfOpaque(): AovImage {
   return aov;
 }
 
-Deno.test('silhouette: mask boundary marks the opaque side only (1px, stroke 1)', () => {
+test('silhouette: mask boundary marks the opaque side only (1px, stroke 1)', () => {
   const aov = halfOpaque();
   const out = extractOutline(aov, params({ superSample: 1, widthPx: 1 }));
   for (let y = 0; y < H; y++) {
@@ -144,7 +145,7 @@ Deno.test('silhouette: mask boundary marks the opaque side only (1px, stroke 1)'
   }
 });
 
-Deno.test('silhouette: helper isolates the boundary; no crease in a flat object', () => {
+test('silhouette: helper isolates the boundary; no crease in a flat object', () => {
   const aov = halfOpaque();
   const sil = silhouetteEdges(aov);
   const crease = creaseEdges(aov, params());
@@ -158,7 +159,7 @@ Deno.test('silhouette: helper isolates the boundary; no crease in a flat object'
 
 // --- stroke width / dilation ------------------------------------------------
 
-Deno.test('stroke width: widthPx=1, S=4 -> exactly 4px thick, growing inward', () => {
+test('stroke width: widthPx=1, S=4 -> exactly 4px thick, growing inward', () => {
   const aov = halfOpaque();
   const out = extractOutline(aov, params({ superSample: 4, widthPx: 1 }));
   // stroke = round(1*4) = 4 -> columns 4,5,6,7 (inward from the boundary at 7)
@@ -170,7 +171,7 @@ Deno.test('stroke width: widthPx=1, S=4 -> exactly 4px thick, growing inward', (
   }
 });
 
-Deno.test('stroke width: stroke never lands on an empty (mask==0) texel', () => {
+test('stroke width: stroke never lands on an empty (mask==0) texel', () => {
   const aov = halfOpaque();
   for (const [S, wpx] of [[1, 1], [2, 1], [4, 1], [4, 2]] as const) {
     const out = extractOutline(aov, params({ superSample: S, widthPx: wpx }));
@@ -180,7 +181,7 @@ Deno.test('stroke width: stroke never lands on an empty (mask==0) texel', () => 
   }
 });
 
-Deno.test('stroke width: rounds up from the supersample factor (widthPx=2, S=3 -> 6px)', () => {
+test('stroke width: rounds up from the supersample factor (widthPx=2, S=3 -> 6px)', () => {
   const aov = halfOpaque();
   const out = extractOutline(aov, params({ superSample: 3, widthPx: 2 }));
   // stroke = round(2*3) = 6 -> columns 2..7
@@ -196,7 +197,7 @@ Deno.test('stroke width: rounds up from the supersample factor (widthPx=2, S=3 -
 
 // --- determinism ------------------------------------------------------------
 
-Deno.test('extractOutline is deterministic (byte-identical across calls)', () => {
+test('extractOutline is deterministic (byte-identical across calls)', () => {
   const aov = halfOpaque();
   for (let y = 0; y < H; y++) {
     for (let x = SEAM; x < W; x++) aov.mask[y * W + x] = 0; // keep the silhouette
@@ -236,7 +237,7 @@ function strokeShare(out: Uint8Array, aov: AovImage): number {
   return stroked / opaque;
 }
 
-Deno.test('outline: a fractional widthPx thins the stroke instead of rounding to 1', () => {
+test('outline: a fractional widthPx thins the stroke instead of rounding to 1', () => {
   // pixel-8 shipped widthPx as an INTEGER with a floor of 1, so a 64 px cell had
   // no thinner setting. On a slim character a 1 px inward stroke from both sides
   // of a 3 px limb IS the limb — measured at 67% of bulma's silhouette. The
@@ -253,7 +254,7 @@ Deno.test('outline: a fractional widthPx thins the stroke instead of rounding to
   assertEquals(Math.round(halfShare * 12), 4);
 });
 
-Deno.test('outline: minSpanPx drops the stroke on a limb too thin to survive it', () => {
+test('outline: minSpanPx drops the stroke on a limb too thin to survive it', () => {
   const thin = bar(8); // 2 px at 1x — an outline would leave no interior
   const thick = bar(40); // 10 px at 1x — plenty of inside
   const p = params({ superSample: 4, widthPx: 1, minSpanPx: 2 });
@@ -272,7 +273,7 @@ Deno.test('outline: minSpanPx drops the stroke on a limb too thin to survive it'
   );
 });
 
-Deno.test('outline: minSpanPx spares CREASES, which are the detail that still reads', () => {
+test('outline: minSpanPx spares CREASES, which are the detail that still reads', () => {
   // A thin limb loses its silhouette but must keep interior lines — otherwise
   // suppression trades a black limb for a featureless one.
   const aov = bar(8);

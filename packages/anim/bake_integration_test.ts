@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { assert, assertEquals } from '@std/assert';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
 import { PIXEL } from '@spritebook/style';
-import { tryGetGpu } from '../render/gpu.ts';
+import { tryGetGpu } from '../render/dist/gpu.js';
 import { runBakeJob } from '@spritebook/pack';
 import type { CameraPreset, JobEvent } from '@spritebook/schema';
 
@@ -32,8 +32,8 @@ const CAM: CameraPreset = {
   orthographic: true,
 };
 
-test('acceptance: multi-clip bake — exact counts, clip ids, previews', async () => {
-  if (!(await tryGetGpu())) return;
+test('acceptance: multi-clip bake — exact counts, clip ids, previews', async (t) => {
+  if (!(await tryGetGpu())) { t.skip('No WebGPU adapter'); return; }
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const events: JobEvent[] = [];

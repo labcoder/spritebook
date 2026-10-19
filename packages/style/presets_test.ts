@@ -1,4 +1,5 @@
-import { assert, assertEquals, assertStrictEquals, assertThrows } from 'jsr:@std/assert@1';
+import { test } from 'node:test';
+import { assert, assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
 import {
   canonicalStyleId,
   DEFAULT_STYLE_PRESET_ID,
@@ -8,20 +9,20 @@ import {
   resolveStyle,
   STYLE_ALIASES,
   styleAliasNote,
-} from './presets.ts';
+} from './dist/presets.js';
 
-Deno.test('every preset is keyed by its own id', () => {
+test('every preset is keyed by its own id', () => {
   for (const [key, preset] of Object.entries(PRESETS)) {
     assertEquals(preset.id, key, `PRESETS["${key}"] carries id "${preset.id}"`);
   }
 });
 
-Deno.test('resolveStyle with no arguments is the default preset', () => {
+test('resolveStyle with no arguments is the default preset', () => {
   assertStrictEquals(resolveStyle(), PIXEL);
   assertStrictEquals(resolveStyle(DEFAULT_STYLE_PRESET_ID, undefined), PIXEL);
 });
 
-Deno.test('an unknown style id names the ones that exist, and the retired ones', () => {
+test('an unknown style id names the ones that exist, and the retired ones', () => {
   const err = assertThrows(() => resolveStyle('pixel-24'), Error);
   assertEquals(
     err.message,
@@ -32,7 +33,7 @@ Deno.test('an unknown style id names the ones that exist, and the retired ones',
   assertThrows(() => resolveStyle('constructor'), Error, 'Unknown style');
 });
 
-Deno.test('a RETIRED id resolves to its replacement instead of throwing', () => {
+test('a RETIRED id resolves to its replacement instead of throwing', () => {
   // A style id is on disk: CharacterManifest.look.stylePresetId records it, so
   // every character baked before a rename carries the old string. Throwing made
   // that manifest unloadable - not hypothetical, `lineless-princess` has
@@ -49,7 +50,7 @@ Deno.test('a RETIRED id resolves to its replacement instead of throwing', () => 
   assertEquals(refined.quantize?.maxColors, 4);
 });
 
-Deno.test('a retired id earns a warning that names the replacement', () => {
+test('a retired id earns a warning that names the replacement', () => {
   const note = styleAliasNote('pixel-8');
   assert(note, 'a retired id has a note');
   assert(note.includes('"pixel-8"') && note.includes('"pixel"'), note);
@@ -66,7 +67,7 @@ Deno.test('a retired id earns a warning that names the replacement', () => {
   );
 });
 
-Deno.test('every alias points at a preset that actually exists', () => {
+test('every alias points at a preset that actually exists', () => {
   // an alias to a typo would turn a helpful redirect into a worse error
   for (const [from, to] of Object.entries(STYLE_ALIASES)) {
     assertEquals(Object.hasOwn(PRESETS, to), true, `${from} -> ${to}, which must be live`);
@@ -74,7 +75,7 @@ Deno.test('every alias points at a preset that actually exists', () => {
   }
 });
 
-Deno.test('overrides refine a preset and keep its id', () => {
+test('overrides refine a preset and keep its id', () => {
   const style = resolveStyle('painterly', {
     outline: { widthPx: 2, normalThreshold: 0.5, depthThresholdScaled: 0.15, colorFrom: '#101010' },
   });
@@ -84,11 +85,11 @@ Deno.test('overrides refine a preset and keep its id', () => {
   assertEquals(PAINTERLY.outline, undefined, 'the table itself is not mutated');
 });
 
-Deno.test('an explicit undefined override means "not overridden", not "unset"', () => {
+test('an explicit undefined override means "not overridden", not "unset"', () => {
   assertEquals(resolveStyle('cel-2', { outline: undefined, ramp: undefined }), PRESETS['cel-2']);
 });
 
-Deno.test("an override that leaves '1bit' alpha without a cutoff is refused", () => {
+test("an override that leaves '1bit' alpha without a cutoff is refused", () => {
   // The shallow-merge trap, and why the merged result is re-validated against
   // StylePresetSchema rather than the base object: painterly is 'soft', so this
   // override is the ONLY way the manifest can express 1-bit alpha, and it is
@@ -104,7 +105,7 @@ Deno.test("an override that leaves '1bit' alpha without a cutoff is refused", ()
   assertEquals(ok.alpha, { mode: '1bit', cutoff: 0.5, bleedPx: 2 });
 });
 
-Deno.test("an override that drops 'lit' from passes is refused", () => {
+test("an override that drops 'lit' from passes is refused", () => {
   // D-010: AOV pages share the lit layout, so a bake without it has no page
   // geometry to hang the others on
   assertThrows(
@@ -114,7 +115,7 @@ Deno.test("an override that drops 'lit' from passes is refused", () => {
   );
 });
 
-Deno.test('overrides cannot remove a field, only replace one', () => {
+test('overrides cannot remove a field, only replace one', () => {
   // The third cross-field rule — clusterVote without a palette paints a blank
   // sprite and reports flickerPct 0, a perfect stability score (pipeline_test
   // pins the refusal itself) — is unreachable through overrides, and this is
@@ -124,7 +125,7 @@ Deno.test('overrides cannot remove a field, only replace one', () => {
   assertEquals(stripped.quantize, PIXEL.quantize, 'quantize survives the attempt');
 });
 
-Deno.test('the error names the preset the overrides were applied to', () => {
+test('the error names the preset the overrides were applied to', () => {
   assertThrows(
     () => resolveStyle('cel-2', { passes: ['normal'] }),
     Error,

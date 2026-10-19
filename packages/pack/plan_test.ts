@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * The per-field staleness diff. Its contract is narrow and load-bearing:
  * every field of CacheKeyInputs must produce a reason (a field that moved
@@ -6,11 +7,11 @@
  * are the same question asked at different resolutions, and a disagreement
  * would mean the plan promised something the cache then contradicted.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { type CacheKeyInputs, CacheKeyInputsSchema, STALE_FIELDS } from '@spritebook/schema';
-import { diffCacheInputs } from './plan.ts';
-import { predictInvalidation } from './cache.ts';
-import type { FrameId } from './contracts.ts';
+import { diffCacheInputs } from './dist/plan.js';
+import { predictInvalidation } from './dist/cache.js';
+import type { FrameId } from './dist/contracts.js';
 
 const h = (c: string) => c.repeat(64);
 
@@ -31,7 +32,7 @@ const FRAMES: FrameId[] = [
   { clipId: 'idle-loop', direction: 1, frame: 0 },
 ];
 
-Deno.test('an unchanged recipe is stale in nothing', () => {
+test('an unchanged recipe is stale in nothing', () => {
   assertEquals(diffCacheInputs(BASE, { ...BASE }), []);
   // key ORDER is not a change: the diff reads fields by name, so a manifest
   // written by an older writer with a different key order is not "stale"
@@ -41,7 +42,7 @@ Deno.test('an unchanged recipe is stale in nothing', () => {
   assertEquals(diffCacheInputs(BASE, reordered), []);
 });
 
-Deno.test('EVERY field of the recipe can explain itself', () => {
+test('EVERY field of the recipe can explain itself', () => {
   // the guard that keeps this honest as CacheKeyInputs grows: a new field with
   // no reason would move the key while the plan said nothing changed
   const moved: Record<string, CacheKeyInputs> = {
@@ -69,7 +70,7 @@ Deno.test('EVERY field of the recipe can explain itself', () => {
   }
 });
 
-Deno.test('the backend is ONE reason, not three', () => {
+test('the backend is ONE reason, not three', () => {
   // modelId, version and paramsHash always move together (a re-generation);
   // reporting a paramsHash flip apart from the model that produced it would
   // read as two unrelated causes
@@ -84,7 +85,7 @@ Deno.test('the backend is ONE reason, not three', () => {
   assertEquals(reasons[0]!.to, 'pixal3d@2.1.0#22222222');
 });
 
-Deno.test('several changes report in intent order, not alphabetically', () => {
+test('several changes report in intent order, not alphabetically', () => {
   const next: CacheKeyInputs = {
     ...BASE,
     rendererVersion: 'r1#ffffffff',
@@ -98,7 +99,7 @@ Deno.test('several changes report in intent order, not alphabetically', () => {
   );
 });
 
-Deno.test('the diff and predictInvalidation never disagree', () => {
+test('the diff and predictInvalidation never disagree', () => {
   // the plan is the explanation of the cache's own verdict; if one said
   // "nothing changed" while the other invalidated every frame, the plan would
   // be committing the user to work it told them would not happen
@@ -124,7 +125,7 @@ function canonical(v: CacheKeyInputs): string {
   }`;
 }
 
-Deno.test('the rig reason promises a REAL skeleton change (D-031)', () => {
+test('the rig reason promises a REAL skeleton change (D-031)', () => {
   // Before D-031, `accepted` was hashed with the rest of the rig, so pressing
   // Accept invalidated every frame and this reason had to hedge. Now the hash
   // excludes it (packages/pack/cache.ts `rigForKey`), so the sentence can
@@ -136,7 +137,7 @@ Deno.test('the rig reason promises a REAL skeleton change (D-031)', () => {
     `the rig reason cites the decision that makes it honest: ${reasons[0]!.why}`,
   );
   assert(
-    !/accepting it/.test(reasons[0]!.why),
+    !/accepting it\b/.test(reasons[0]!.why),
     'and no longer blames an acceptance that cannot reach the key',
   );
 });

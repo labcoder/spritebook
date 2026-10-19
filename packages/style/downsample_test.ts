@@ -1,9 +1,10 @@
-import { assertEquals, assertThrows } from 'jsr:@std/assert@1';
-import { areaAverageDownsample, clusterVoteDownsample, downsampleCoverage } from './downsample.ts';
+import { test } from 'node:test';
+import { assertEquals, assertThrows } from '@std/assert';
+import { areaAverageDownsample, clusterVoteDownsample, downsampleCoverage } from './dist/downsample.js';
 
 // --- cluster-vote -----------------------------------------------------------
 
-Deno.test('clusterVote: 2x2 block, 3x label 2 + 1x label 5 -> majority 2', () => {
+test('clusterVote: 2x2 block, 3x label 2 + 1x label 5 -> majority 2', () => {
   //  row0: 2 2   row1: 2 5
   const labels = Int32Array.from([2, 2, 2, 5]);
   const out = clusterVoteDownsample(labels, 2, 2, 2);
@@ -11,7 +12,7 @@ Deno.test('clusterVote: 2x2 block, 3x label 2 + 1x label 5 -> majority 2', () =>
   assertEquals(out[0], 2);
 });
 
-Deno.test('clusterVote: 4x4 block with a clear 3/4 majority', () => {
+test('clusterVote: 4x4 block with a clear 3/4 majority', () => {
   const labels = new Int32Array(16).fill(2);
   labels[0] = 5;
   labels[1] = 5;
@@ -22,7 +23,7 @@ Deno.test('clusterVote: 4x4 block with a clear 3/4 majority', () => {
   assertEquals(out[0], 2);
 });
 
-Deno.test('clusterVote: a 2v2 tie breaks to the lower label index, order-independent', () => {
+test('clusterVote: a 2v2 tie breaks to the lower label index, order-independent', () => {
   assertEquals(clusterVoteDownsample(Int32Array.from([2, 2, 5, 5]), 2, 2, 2)[0], 2);
   assertEquals(clusterVoteDownsample(Int32Array.from([5, 5, 2, 2]), 2, 2, 2)[0], 2);
   assertEquals(clusterVoteDownsample(Int32Array.from([5, 2, 2, 5]), 2, 2, 2)[0], 2);
@@ -30,12 +31,12 @@ Deno.test('clusterVote: a 2v2 tie breaks to the lower label index, order-indepen
   assertEquals(clusterVoteDownsample(Int32Array.from([7, 4, 1, 4, 1, 7, 1, 4, 7]), 3, 3, 3)[0], 1);
 });
 
-Deno.test('clusterVote: an all-transparent block yields -1', () => {
+test('clusterVote: an all-transparent block yields -1', () => {
   const labels = Int32Array.from([-1, -1, -1, -1]);
   assertEquals(clusterVoteDownsample(labels, 2, 2, 2)[0], -1);
 });
 
-Deno.test('clusterVote: -1 voters are ignored unless the block is all -1', () => {
+test('clusterVote: -1 voters are ignored unless the block is all -1', () => {
   // wSx=4,hSx=2,s=2 -> two blocks. row0: [2 2 | -1 -1]  row1: [2 5 | -1 -1]
   // block(0): 2,2,2,5 -> 2.  block(1): all -1 -> -1.
   const labels = Int32Array.from([2, 2, -1, -1, 2, 5, -1, -1]);
@@ -43,19 +44,19 @@ Deno.test('clusterVote: -1 voters are ignored unless the block is all -1', () =>
   assertEquals(Array.from(out), [2, -1]);
 });
 
-Deno.test('clusterVote: partial transparency in a block does not sway the vote', () => {
+test('clusterVote: partial transparency in a block does not sway the vote', () => {
   // one real vote (label 3) among three transparent -> 3
   assertEquals(clusterVoteDownsample(Int32Array.from([3, -1, -1, -1]), 2, 2, 2)[0], 3);
 });
 
-Deno.test('clusterVote: throws when the Sx grid is indivisible or mis-sized', () => {
+test('clusterVote: throws when the Sx grid is indivisible or mis-sized', () => {
   assertThrows(() => clusterVoteDownsample(new Int32Array(9), 3, 3, 2), RangeError);
   assertThrows(() => clusterVoteDownsample(new Int32Array(3), 2, 2, 2), RangeError); // wrong length
 });
 
 // --- area average -----------------------------------------------------------
 
-Deno.test('areaAverage: colour is the ALPHA-WEIGHTED mean, alpha is the area mean', () => {
+test('areaAverage: colour is the ALPHA-WEIGHTED mean, alpha is the area mean', () => {
   // four texels p0..p3 with rising alpha (40, 80, 120, 160). This previously
   // expected [25, 50, 75, 100] — the plain unweighted mean — which is the
   // defect: a texel contributing 40/255 of a pixel's coverage was given the
@@ -68,7 +69,7 @@ Deno.test('areaAverage: colour is the ALPHA-WEIGHTED mean, alpha is the area mea
   assertEquals(Array.from(out), [30, 60, 90, 100]);
 });
 
-Deno.test('areaAverage: EMPTY texels do not darken the covered ones', () => {
+test('areaAverage: EMPTY texels do not darken the covered ones', () => {
   // Two texels at (0,0,0,0) and two opaque white. This previously expected
   // [128,128,128,128] under the name "half black + half white" — but those
   // texels are not black, they are EMPTY: alpha 0 means nothing was drawn
@@ -79,7 +80,7 @@ Deno.test('areaAverage: EMPTY texels do not darken the covered ones', () => {
   assertEquals(Array.from(out), [255, 255, 255, 128]);
 });
 
-Deno.test('areaAverage: independent blocks map to their own output texels', () => {
+test('areaAverage: independent blocks map to their own output texels', () => {
   // wSx=4,hSx=2,s=2 -> two output pixels; left block all 100, right block all 200.
   const rgba = new Uint8Array(4 * 2 * 4);
   for (let x = 0; x < 4; x++) {
@@ -92,34 +93,34 @@ Deno.test('areaAverage: independent blocks map to their own output texels', () =
   assertEquals(Array.from(out), [100, 100, 100, 100, 200, 200, 200, 200]);
 });
 
-Deno.test('areaAverage: throws on an indivisible or mis-sized grid', () => {
+test('areaAverage: throws on an indivisible or mis-sized grid', () => {
   assertThrows(() => areaAverageDownsample(new Uint8Array(4 * 4), 3, 3, 2), RangeError);
   assertThrows(() => areaAverageDownsample(new Uint8Array(4), 2, 2, 2), RangeError);
 });
 
 // --- coverage ---------------------------------------------------------------
 
-Deno.test('coverage: a half-opaque block -> 128', () => {
+test('coverage: a half-opaque block -> 128', () => {
   const alpha = Uint8Array.from([255, 0, 255, 0]);
   assertEquals(downsampleCoverage(alpha, 2, 2, 2)[0], 128);
 });
 
-Deno.test('coverage: fully opaque -> 255, fully empty -> 0', () => {
+test('coverage: fully opaque -> 255, fully empty -> 0', () => {
   assertEquals(downsampleCoverage(Uint8Array.from([255, 255, 255, 255]), 2, 2, 2)[0], 255);
   assertEquals(downsampleCoverage(Uint8Array.from([0, 0, 0, 0]), 2, 2, 2)[0], 0);
 });
 
-Deno.test('coverage: antialiased bytes average to mean coverage', () => {
+test('coverage: antialiased bytes average to mean coverage', () => {
   // (0 + 255 + 128 + 64) = 447; /4 = 111.75 -> 112 (round-half-up)
   assertEquals(downsampleCoverage(Uint8Array.from([0, 255, 128, 64]), 2, 2, 2)[0], 112);
 });
 
-Deno.test('coverage: 1/4 opaque -> 64, 3/4 opaque -> 191', () => {
+test('coverage: 1/4 opaque -> 64, 3/4 opaque -> 191', () => {
   assertEquals(downsampleCoverage(Uint8Array.from([255, 0, 0, 0]), 2, 2, 2)[0], 64);
   assertEquals(downsampleCoverage(Uint8Array.from([255, 255, 255, 0]), 2, 2, 2)[0], 191);
 });
 
-Deno.test('coverage: independent blocks (one full, one half)', () => {
+test('coverage: independent blocks (one full, one half)', () => {
   // wSx=4,hSx=2,s=2 -> two outputs. row0: [255 255 | 255 0]  row1: [255 255 | 0 255]
   // block(0): all 255 -> 255.  block(1): 255,0,0,255 -> 128.
   const alpha = Uint8Array.from([255, 255, 255, 0, 255, 255, 0, 255]);
@@ -127,12 +128,12 @@ Deno.test('coverage: independent blocks (one full, one half)', () => {
   assertEquals(Array.from(out), [255, 128]);
 });
 
-Deno.test('coverage: throws on an indivisible or mis-sized grid', () => {
+test('coverage: throws on an indivisible or mis-sized grid', () => {
   assertThrows(() => downsampleCoverage(new Uint8Array(9), 3, 3, 2), RangeError);
   assertThrows(() => downsampleCoverage(new Uint8Array(3), 2, 2, 2), RangeError);
 });
 
-Deno.test('areaAverage: colour is weighted by coverage, not diluted by empty texels', () => {
+test('areaAverage: colour is weighted by coverage, not diluted by empty texels', () => {
   // The defect: summing r,g,b over cleared (0,0,0,0) texels and dividing by the
   // full area mixes transparent black into every partial-coverage block. A 4x4
   // block half covered by rgb(200,0,0) came out rgb(100,0,0) - 2.00x too dark -
@@ -152,7 +153,7 @@ Deno.test('areaAverage: colour is weighted by coverage, not diluted by empty tex
   assertEquals(out[3], 128, 'alpha is still the AREA mean: 8/16 -> 128');
 });
 
-Deno.test('areaAverage: a fully opaque block is unchanged by the weighting', () => {
+test('areaAverage: a fully opaque block is unchanged by the weighting', () => {
   // Why the styled goldens move only along coverage boundaries: when every
   // alpha is 255 the weight factors out of numerator and denominator exactly.
   const s = 2;
@@ -178,13 +179,13 @@ Deno.test('areaAverage: a fully opaque block is unchanged by the weighting', () 
   assertEquals([out[0], out[1], out[2], out[3]], [25, 40, 55, 255]);
 });
 
-Deno.test('areaAverage: a fully transparent block reports nothing, not black', () => {
+test('areaAverage: a fully transparent block reports nothing, not black', () => {
   const s = 2;
   const out = areaAverageDownsample(new Uint8Array(s * s * 4), s, s, s);
   assertEquals([out[0], out[1], out[2], out[3]], [0, 0, 0, 0]);
 });
 
-Deno.test('areaAverage: partial coverage of two colours weights by their alphas', () => {
+test('areaAverage: partial coverage of two colours weights by their alphas', () => {
   // one texel fully opaque red, one half-alpha blue, two empty:
   // colour = (200*255 + 0*128)/(255+128) for r, (0*255 + 200*128)/383 for b
   const s = 2;

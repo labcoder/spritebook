@@ -1,7 +1,8 @@
-import { assertEquals } from 'jsr:@std/assert@1';
-import { cutAlpha1bit, dilateEdgeColors } from './alpha.ts';
+import { test } from 'node:test';
+import { assertEquals } from '@std/assert';
+import { cutAlpha1bit, dilateEdgeColors } from './dist/alpha.js';
 
-Deno.test('cutAlpha1bit thresholds alpha to 0 or 255', () => {
+test('cutAlpha1bit thresholds alpha to 0 or 255', () => {
   const rgba = new Uint8Array([1, 2, 3, 100, 4, 5, 6, 200]);
   cutAlpha1bit(rgba, 0.5); // cutoff 127.5
   assertEquals(rgba[3], 0, 'alpha 100 < cutoff -> 0');
@@ -10,7 +11,7 @@ Deno.test('cutAlpha1bit thresholds alpha to 0 or 255', () => {
   assertEquals([rgba[0], rgba[1], rgba[2]], [1, 2, 3]);
 });
 
-Deno.test('dilateEdgeColors bleeds color into transparent rings, alpha stays 0', () => {
+test('dilateEdgeColors bleeds color into transparent rings, alpha stays 0', () => {
   // 3x3, center opaque red, rest transparent black
   const w = 3, h = 3;
   const rgba = new Uint8Array(w * h * 4);
@@ -28,7 +29,7 @@ Deno.test('dilateEdgeColors bleeds color into transparent rings, alpha stays 0',
   assertEquals(rgba[(0 * w + 0) * 4], 0, 'corner untouched after 1 ring');
 });
 
-Deno.test('dilateEdgeColors extends bleedPx rings', () => {
+test('dilateEdgeColors extends bleedPx rings', () => {
   const w = 3, h = 3;
   const rgba = new Uint8Array(w * h * 4);
   const c = (1 * w + 1) * 4;

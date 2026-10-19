@@ -1,12 +1,17 @@
+import { rejects } from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * exportAseprite against the checked-in fixture bake (bake-aabbccdd: clip
  * 'idle', 2 directions x 2 frames, 16x16 cells on one 64x64 lit page, pivot
  * (8,14)) plus a synthesized two-page variant for the `_p<i>` naming rule.
  */
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
 import type { BakeManifest } from '@spritebook/schema';
-import { exportAseprite } from './aseprite.ts';
+import { exportAseprite } from './dist/aseprite.js';
 
 const BAKE = new URL('./fixtures/bake-aabbccdd', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
@@ -14,7 +19,7 @@ const BAKE = new URL('./fixtures/bake-aabbccdd', import.meta.url).pathname.repla
 );
 
 async function fixtureManifest(): Promise<BakeManifest> {
-  const raw = JSON.parse(await Deno.readTextFile(`${BAKE}/manifest.json`));
+  const raw = JSON.parse(await fs.readFile(`${BAKE}/manifest.json`, 'utf8'));
   return parseWith(BakeManifestSchema, raw, 'fixture BakeManifest');
 }
 
@@ -29,9 +34,9 @@ async function twoPageBake(base: BakeManifest): Promise<{ manifest: BakeManifest
     png: 'atlas_lit_1.png',
     layoutSharedWith: 'lit',
   });
-  const dir = await Deno.makeTempDir({ prefix: 'sb-ase-bake2p-' });
-  await Deno.copyFile(`${BAKE}/atlas_lit_0.png`, `${dir}/atlas_lit_0.png`);
-  await Deno.copyFile(`${BAKE}/atlas_lit_0.png`, `${dir}/atlas_lit_1.png`);
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-ase-bake2p-'));
+  await fs.copyFile(`${BAKE}/atlas_lit_0.png`, `${dir}/atlas_lit_0.png`);
+  await fs.copyFile(`${BAKE}/atlas_lit_0.png`, `${dir}/atlas_lit_1.png`);
   return { manifest: parseWith(BakeManifestSchema, plain, 'two-page fixture manifest'), dir };
 }
 
@@ -45,16 +50,16 @@ const expectedFrame = (filename: string, x: number, duration: number) => ({
   duration,
 });
 
-Deno.test('exportAseprite projects sorted frames, tags, and meta from the fixture', async () => {
+test('exportAseprite projects sorted frames, tags, and meta from the fixture', async () => {
   const manifest = await fixtureManifest();
-  const out = await Deno.makeTempDir({ prefix: 'sb-ase-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-ase-'));
   const written = await exportAseprite(manifest, BAKE, out, { fps: 8 });
 
   const jsonPath = `${out}/fixture-char.ase.json`;
   const pngPath = `${out}/atlas_lit_0.png`;
   assertEquals(written, [jsonPath, pngPath].toSorted(), 'returns the sorted written paths');
 
-  const raw = await Deno.readTextFile(jsonPath);
+  const raw = await fs.readFile(jsonPath, 'utf8');
   const doc = JSON.parse(raw);
   // 500 ms = 1000 / the fixture clip's own fps of 2, NOT 1000 / opts.fps (8)
   assertEquals(doc, {
@@ -79,8 +84,8 @@ Deno.test('exportAseprite projects sorted frames, tags, and meta from the fixtur
   });
   assertEquals(JSON.stringify(doc, null, 2) + '\n', raw, 'JSON.parse round-trips byte-identically');
   assertEquals(
-    await Deno.readFile(pngPath),
-    await Deno.readFile(`${BAKE}/atlas_lit_0.png`),
+    new Uint8Array(await fs.readFile(pngPath)),
+    new Uint8Array(await fs.readFile(`${BAKE}/atlas_lit_0.png`)),
     'lit page copied verbatim',
   );
   for (const needle of ['2026-07-15', 'createdAt', 'wallTimeS', 'cacheHitPct']) {
@@ -88,7 +93,7 @@ Deno.test('exportAseprite projects sorted frames, tags, and meta from the fixtur
   }
 });
 
-Deno.test('exportAseprite durations follow each clip own rate, not one --fps', async () => {
+test('exportAseprite durations follow each clip own rate, not one --fps', async () => {
   // Aseprite's format carries per-frame ms, so clips of different lengths must
   // not be flattened onto one rate the way `export --fps` used to do
   const plain = structuredClone(await fixtureManifest());
@@ -107,9 +112,9 @@ Deno.test('exportAseprite durations follow each clip own rate, not one --fps', a
     { clipId: 'idle', frames: 2, speed: 1, holdLast: false, loop: true, fps: 2 },
   ];
   const manifest = parseWith(BakeManifestSchema, plain, 'two-clip manifest');
-  const out = await Deno.makeTempDir({ prefix: 'sb-ase-fps-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-ase-fps-'));
   await exportAseprite(manifest, BAKE, out, { fps: 8 });
-  const doc = JSON.parse(await Deno.readTextFile(`${out}/fixture-char.ase.json`));
+  const doc = JSON.parse(await fs.readFile(`${out}/fixture-char.ase.json`, 'utf8'));
   assertEquals(
     doc.frames.map((f: { filename: string; duration: number }) => [f.filename, f.duration]),
     [
@@ -127,13 +132,13 @@ Deno.test('exportAseprite durations follow each clip own rate, not one --fps', a
   );
 });
 
-Deno.test('exportAseprite falls back to opts.fps when the bake recorded no clips', async () => {
+test('exportAseprite falls back to opts.fps when the bake recorded no clips', async () => {
   const plain = structuredClone(await fixtureManifest());
   delete plain.clips;
   const manifest = parseWith(BakeManifestSchema, plain, 'legacy idle manifest');
-  const out = await Deno.makeTempDir({ prefix: 'sb-ase-legacy-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-ase-legacy-'));
   await exportAseprite(manifest, BAKE, out, { fps: 24 });
-  const doc = JSON.parse(await Deno.readTextFile(`${out}/fixture-char.ase.json`));
+  const doc = JSON.parse(await fs.readFile(`${out}/fixture-char.ase.json`, 'utf8'));
   assertEquals(
     doc.frames.map((f: { duration: number }) => f.duration),
     [42, 42, 42, 42],
@@ -141,7 +146,7 @@ Deno.test('exportAseprite falls back to opts.fps when the bake recorded no clips
   );
 });
 
-Deno.test('exportAseprite double export is byte-identical (byte-stability doctrine)', async () => {
+test('exportAseprite double export is byte-identical (byte-stability doctrine)', async () => {
   const manifest = await fixtureManifest();
   // input frame order must be irrelevant: the second export sees reversed frames
   const reversed = parseWith(
@@ -149,24 +154,24 @@ Deno.test('exportAseprite double export is byte-identical (byte-stability doctri
     { ...manifest, frames: manifest.frames.toReversed() },
     'reversed fixture manifest',
   );
-  const a = await Deno.makeTempDir({ prefix: 'sb-ase-a-' });
-  const b = await Deno.makeTempDir({ prefix: 'sb-ase-b-' });
+  const a = await fs.mkdtemp(join(tmpdir(), 'sb-ase-a-'));
+  const b = await fs.mkdtemp(join(tmpdir(), 'sb-ase-b-'));
   const wroteA = await exportAseprite(manifest, BAKE, a, { fps: 8 });
   const wroteB = await exportAseprite(reversed, BAKE, b, { fps: 8 });
 
   assertEquals(wroteA.map((p) => p.slice(a.length)), wroteB.map((p) => p.slice(b.length)));
   for (let i = 0; i < wroteA.length; i++) {
     assertEquals(
-      await Deno.readFile(wroteA[i]),
-      await Deno.readFile(wroteB[i]),
+      new Uint8Array(await fs.readFile(wroteA[i])),
+      new Uint8Array(await fs.readFile(wroteB[i])),
       `${wroteA[i].slice(a.length)} is byte-identical across exports`,
     );
   }
 });
 
-Deno.test('exportAseprite emits one JSON per lit page with page-local tags', async () => {
+test('exportAseprite emits one JSON per lit page with page-local tags', async () => {
   const { manifest, dir } = await twoPageBake(await fixtureManifest());
-  const out = await Deno.makeTempDir({ prefix: 'sb-ase-2p-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-ase-2p-'));
   const written = await exportAseprite(manifest, dir, out, { fps: 8 });
 
   assertEquals(
@@ -179,8 +184,8 @@ Deno.test('exportAseprite emits one JSON per lit page with page-local tags', asy
     ].toSorted(),
     'page-suffixed JSON per lit page plus both page PNGs',
   );
-  const p0 = JSON.parse(await Deno.readTextFile(`${out}/fixture-char_p0.ase.json`));
-  const p1 = JSON.parse(await Deno.readTextFile(`${out}/fixture-char_p1.ase.json`));
+  const p0 = JSON.parse(await fs.readFile(`${out}/fixture-char_p0.ase.json`, 'utf8'));
+  const p1 = JSON.parse(await fs.readFile(`${out}/fixture-char_p1.ase.json`, 'utf8'));
   const names = (doc: { frames: { filename: string }[] }) => doc.frames.map((f) => f.filename);
   assertEquals(names(p0), ['idle_d00_f000', 'idle_d00_f001']);
   assertEquals(names(p1), ['idle_d01_f000', 'idle_d01_f001']);
@@ -191,11 +196,11 @@ Deno.test('exportAseprite emits one JSON per lit page with page-local tags', asy
   assertEquals(p1.meta.frameTags, [{ name: 'idle_d01', from: 0, to: 1, direction: 'forward' }]);
 });
 
-Deno.test('exportAseprite refuses an empty manifest instead of writing an empty dir', async () => {
+test('exportAseprite refuses an empty manifest instead of writing an empty dir', async () => {
   // godot.ts and strips.ts throw here; aseprite used to iterate zero lit pages,
   // mkdir the target and return [] — an export that "succeeded" with no output
   const base = await fixtureManifest();
-  const parent = await Deno.makeTempDir({ prefix: 'sb-ase-empty-' });
+  const parent = await fs.mkdtemp(join(tmpdir(), 'sb-ase-empty-'));
   try {
     const cases: Array<{ name: string; patch: (m: BakeManifest) => void; msg: string }> = [
       { name: 'no-pages', patch: (m) => void (m.atlases = []), msg: 'no lit atlas pages' },
@@ -207,19 +212,17 @@ Deno.test('exportAseprite refuses an empty manifest instead of writing an empty 
       const manifest = parseWith(BakeManifestSchema, plain, `${c.name} manifest`);
       const out = `${parent}/${c.name}`;
       await assertRejects(() => exportAseprite(manifest, BAKE, out, { fps: 8 }), Error, c.msg);
-      await assertRejects(
-        () => Deno.stat(out),
-        Deno.errors.NotFound,
-        undefined,
+      await rejects(
+        () => fs.stat(out), { code: 'ENOENT' },
         `${c.name}: a refusal must not leave an output directory behind`,
       );
     }
   } finally {
-    await Deno.remove(parent, { recursive: true });
+    await fs.rm(parent, { recursive: true });
   }
 });
 
-Deno.test('exportAseprite refuses an animation split across pages (M1 guard)', async () => {
+test('exportAseprite refuses an animation split across pages (M1 guard)', async () => {
   // move ONLY idle/d01/f001 to page 1: group idle_d01 now spans pages 0 and 1,
   // so any per-page JSON would truncate the animation - must throw, not lie
   const base = await fixtureManifest();
@@ -235,7 +238,7 @@ Deno.test('exportAseprite refuses an animation split across pages (M1 guard)', a
     layoutSharedWith: 'lit',
   });
   const manifest = parseWith(BakeManifestSchema, plain, 'split-group manifest');
-  const out = await Deno.makeTempDir({ prefix: 'sb-ase-split-' });
+  const out = await fs.mkdtemp(join(tmpdir(), 'sb-ase-split-'));
   try {
     let threw = false;
     try {
@@ -247,6 +250,6 @@ Deno.test('exportAseprite refuses an animation split across pages (M1 guard)', a
     }
     assert(threw, 'split animation must throw');
   } finally {
-    await Deno.remove(out, { recursive: true });
+    await fs.rm(out, { recursive: true });
   }
 });

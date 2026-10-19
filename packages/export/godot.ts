@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Godot 4 SpriteFrames exporter — a PURE PROJECTION of BakeManifest (D-010).
  *
@@ -25,7 +26,7 @@
  * without it falls back to opts.fps and an endless loop.
  */
 import type { FrameRecord } from '@spritebook/schema';
-import { atlasPageName, type Exporter, frameIdKey } from '../pack/contracts.ts';
+import { atlasPageName, type Exporter, frameIdKey } from '@spritebook/pack/contracts';
 
 /** The schema leaves clipId free-form; resource names and file names must not. */
 const SAFE_CLIP_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -162,13 +163,13 @@ export const exportGodot: Exporter = async (manifest, bakeDir, outDir, opts) => 
     lines.push(gi < groups.length - 1 ? '}, {' : '}]');
   }
 
-  await Deno.mkdir(outDir, { recursive: true });
+  await fs.mkdir(outDir, { recursive: true });
   const tresPath = `${outDir}/${manifest.characterId}.tres`;
-  await Deno.writeTextFile(tresPath, lines.join('\n') + '\n');
+  await fs.writeFile(tresPath, lines.join('\n') + '\n');
   const written = [tresPath];
   for (const page of litPages) {
     const dest = `${outDir}/${atlasPageName('lit', page.pageIndex)}`;
-    await Deno.copyFile(`${bakeDir}/${page.png}`, dest);
+    await fs.copyFile(`${bakeDir}/${page.png}`, dest);
     written.push(dest);
   }
   return written.sort();

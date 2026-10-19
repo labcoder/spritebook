@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * @spritebook/export - Godot / Aseprite / TexturePacker / strips, pure
  * projections of the BakeManifest (D-010). The seam: an ExportJobSpec (plain
@@ -7,7 +8,7 @@
  */
 import type { BakeManifest, ExportTargetId, JobEvent } from '@spritebook/schema';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
-import { DEFAULT_FPS, type Exporter } from '../pack/contracts.ts';
+import { DEFAULT_FPS, type Exporter } from '@spritebook/pack/contracts';
 import { exportGodot } from './godot.ts';
 import { exportStrips } from './strips.ts';
 import { exportAseprite } from './aseprite.ts';
@@ -52,7 +53,7 @@ export async function* runExportJob(spec: ExportJobSpec): AsyncIterable<JobEvent
     }
     const manifest: BakeManifest = parseWith(
       BakeManifestSchema,
-      JSON.parse(await Deno.readTextFile(`${spec.bakeDir}/manifest.json`)),
+      JSON.parse(await fs.readFile(`${spec.bakeDir}/manifest.json`, 'utf8')),
       'BakeManifest',
     );
     const targets = [...new Set(spec.targets)];

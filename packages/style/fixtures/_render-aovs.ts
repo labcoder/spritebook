@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Render the asymmetric fixture to Sx AOV PNGs, checked in as the style test
  * fixtures. Run ONCE on a GPU (this box: DENO_WEBGPU_BACKEND=vulkan); the style
@@ -48,6 +49,6 @@ for await (
   }
 }
 // throughput.json is machine-specific; keep only the AOV frames + summary
-await Deno.remove(`${outDir}/throughput.json`).catch(() => {});
-if (failed) Deno.exit(1);
+await fs.rm(`${outDir}/throughput.json`).catch(() => {});
+if (failed) process.exit(1);
 console.log('AOV fixtures rendered to packages/style/fixtures/aov/frames/');

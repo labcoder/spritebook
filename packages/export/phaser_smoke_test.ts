@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Phaser smoke: REAL Phaser 3 (the studio's devDependency copy) parses the
  * exported TexturePacker JSON in a REAL browser — the running desktop app's
@@ -11,22 +15,18 @@
  * the honest-skip pattern. The page is cleaned after: the Game is destroyed
  * and window.Phaser deleted.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { encodeBase64 } from 'jsr:@std/encoding@1/base64';
+import { assert, assertEquals } from '@std/assert';
+import { createRequire } from 'node:module';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
-import { exportTexturePacker } from './texturepacker.ts';
+import { exportTexturePacker } from './dist/texturepacker.js';
 
-const PORT = Deno.env.get('SPRITEBOOK_CDP_PORT');
+const PORT = process.env['SPRITEBOOK_CDP_PORT'];
 
 const BAKE = new URL('./fixtures/bake-aabbccdd', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
   '$1',
 );
-const PHASER_JS = new URL(
-  '../../apps/studio/node_modules/phaser/dist/phaser.min.js',
-  import.meta.url,
-)
-  .pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const PHASER_JS = createRequire(import.meta.url).resolve('phaser/dist/phaser.min.js');
 
 /** Minimal CDP evaluate client — self-contained so the lane owns its seam. */
 async function cdpEval(port: number, expression: string): Promise<unknown> {
@@ -63,31 +63,25 @@ async function cdpEval(port: number, expression: string): Promise<unknown> {
   }
 }
 
-Deno.test({
-  name: 'phaser smoke: real Phaser parses the exported atlas in a real browser',
-  ignore: !PORT,
-  fn: async () => {
-    const phaserSrc = await Deno.readTextFile(PHASER_JS).catch(() => null);
+test('phaser smoke: real Phaser parses the exported atlas in a real browser', { skip: !PORT }, async (t) => {
+    const phaserSrc = await fs.readFile(PHASER_JS, 'utf8').catch(() => null);
     if (phaserSrc === null) {
-      console.log(
-        'skip: phaser is not installed in apps/studio/node_modules - asserted NOTHING. ' +
-          'Run `npm i -D phaser` in apps/studio first.',
-      );
+      t.skip('Phaser package unavailable');
       return;
     }
-    const out = await Deno.makeTempDir({ prefix: 'sb-phaser-smoke-' });
+    const out = await fs.mkdtemp(join(tmpdir(), 'sb-phaser-smoke-'));
     try {
       const manifest = parseWith(
         BakeManifestSchema,
-        JSON.parse(await Deno.readTextFile(`${BAKE}/manifest.json`)),
+        JSON.parse(await fs.readFile(`${BAKE}/manifest.json`, 'utf8')),
         'fixture BakeManifest',
       );
       await exportTexturePacker(manifest, BAKE, out, { fps: 8 });
       const json = JSON.parse(
-        await Deno.readTextFile(`${out}/${manifest.characterId}.tp.json`),
+        await fs.readFile(`${out}/${manifest.characterId}.tp.json`, 'utf8'),
       ) as { frames: Record<string, { frame: { w: number; h: number } }>; meta: { image: string } };
       const expected = Object.keys(json.frames).sort();
-      const pngB64 = encodeBase64(await Deno.readFile(`${out}/${json.meta.image}`));
+      const pngB64 = (await fs.readFile(`${out}/${json.meta.image}`)).toString('base64');
 
       const got = await cdpEval(
         Number(PORT),
@@ -126,7 +120,6 @@ Deno.test({
       assert(expected.length > 0, 'the fixture has frames to parse');
       console.log(`phaser smoke: ${expected.length} frames parsed by real Phaser`);
     } finally {
-      await Deno.remove(out, { recursive: true }).catch(() => {});
+      await fs.rm(out, { recursive: true }).catch(() => {});
     }
-  },
 });

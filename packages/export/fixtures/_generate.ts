@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Exporter fixture generator (deterministic; run once, files are checked in):
  * a hand-authored, schema-validated mini BakeManifest + synthetic atlas pages,
@@ -18,7 +19,7 @@ import { BakeManifestSchema, canonicalJson, parseWith, SCHEMA_VERSION } from '@s
 const here = new URL('.', import.meta.url);
 const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const outDir = win(new URL('bake-aabbccdd/', here));
-await Deno.mkdir(outDir, { recursive: true });
+await fs.mkdir(outDir, { recursive: true });
 
 const PAGE = 64;
 const CELL = 16;
@@ -92,7 +93,7 @@ const pages: Array<[string, Uint8Array]> = [
     encodePng({ width: PAGE, height: PAGE, data: gray16Page(1, 0), channels: 1, depth: 16 }),
   ],
 ];
-for (const [name, bytes] of pages) await Deno.writeFile(`${outDir}/${name}`, bytes);
+for (const [name, bytes] of pages) await fs.writeFile(`${outDir}/${name}`, bytes);
 
 const manifest = parseWith(BakeManifestSchema, {
   schemaVersion: SCHEMA_VERSION,
@@ -133,5 +134,5 @@ const manifest = parseWith(BakeManifestSchema, {
   createdAt: '2026-07-15T00:00:00.000Z',
 }, 'fixture BakeManifest');
 
-await Deno.writeTextFile(`${outDir}/manifest.json`, canonicalJson(manifest));
+await fs.writeFile(`${outDir}/manifest.json`, canonicalJson(manifest));
 console.log(`exporter fixture written: ${outDir}`);

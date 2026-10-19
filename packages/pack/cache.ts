@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 /**
  * Per-frame pixel cache for the bake stage (D-011: hash inputs, never pixels).
  *
@@ -87,7 +89,7 @@ export class BlobCache {
 
   constructor(dir: string) {
     this.#dir = dir;
-    Deno.mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true });
   }
 
   #path(key: string): string {
@@ -98,7 +100,7 @@ export class BlobCache {
   async has(key: string): Promise<boolean> {
     const path = this.#path(key);
     try {
-      await Deno.stat(path);
+      await fs.stat(path);
       return true;
     } catch {
       return false;
@@ -108,7 +110,7 @@ export class BlobCache {
   async get(key: string): Promise<Uint8Array | undefined> {
     const path = this.#path(key);
     try {
-      return await Deno.readFile(path);
+      return new Uint8Array(await fs.readFile(path));
     } catch {
       return undefined;
     }
@@ -123,7 +125,7 @@ export class BlobCache {
   async put(key: string, bytes: Uint8Array): Promise<void> {
     const path = this.#path(key);
     const tmp = `${path}.tmp-${crypto.randomUUID()}`;
-    await Deno.writeFile(tmp, bytes);
-    await Deno.rename(tmp, path);
+    await fs.writeFile(tmp, bytes);
+    await fs.rename(tmp, path);
   }
 }

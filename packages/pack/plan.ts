@@ -57,7 +57,7 @@ const REASONS: Record<StaleField, (from: string, to: string) => string> = {
     'the light rig changed — key direction or ambient floor. Two bakes can share a camera exactly ' +
     'and differ in every pixel, which is why this is its own input',
   rendererVersion: (from, to) =>
-    `the renderer or the GPU adapter changed (${from} → ${to}) — a different card, a Deno ` +
+    `the renderer or the GPU adapter changed (${from} → ${to}) — a different card, a runtime ` +
     'upgrade, or a change to the render pipeline itself',
   backend: () => 'a different generation backend, version, or parameter set produced this mesh',
 };
