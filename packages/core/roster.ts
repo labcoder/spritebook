@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { readdirSync, type Dirent, type Stats } from 'node:fs';
 import { readCurrentBake } from './queries.ts';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 /**
@@ -105,13 +107,13 @@ export async function cloneCharacter(
   if (inside(resolve(sourceWorkspace), resolve(destWorkspace))) {
     throw new Error('Clone destination must be outside the source workspace');
   }
-  await Deno.mkdir(destWorkspace, { recursive: true });
-  const source = await Deno.realPath(sourceWorkspace), dest = await Deno.realPath(destWorkspace);
+  await fs.mkdir(destWorkspace, { recursive: true });
+  const source = await fs.realpath(sourceWorkspace), dest = await fs.realpath(destWorkspace);
   if (inside(source, dest)) {
     throw new Error('Clone destination must be outside the source workspace');
   }
   const paths = [workspacePaths(source).manifest, workspacePaths(dest).manifest]
-    .map((path) => Deno.build.os === 'windows' ? path.toLowerCase() : path).sort();
+    .map((path) => process.platform === 'win32' ? path.toLowerCase() : path).sort();
   return await withManifestWrite(
     paths[0],
     () =>
@@ -167,7 +169,7 @@ async function cloneUnlocked(
   delete (cloned as { lastBakeId?: string }).lastBakeId;
   const validated = parseWith(CharacterManifestSchema, cloned, 'cloned CharacterManifest');
 
-  await Deno.mkdir(destWorkspace, { recursive: true });
+  await fs.mkdir(destWorkspace, { recursive: true });
 
   // A fresh history whose first line says where this character came from — and
   // whose first line is TRUE. It used to journal `replace /displayName` to the
@@ -196,7 +198,7 @@ async function cloneUnlocked(
 
 async function exists(path: string): Promise<boolean> {
   try {
-    await Deno.stat(path);
+    await fs.stat(path);
     return true;
   } catch {
     return false;
@@ -205,15 +207,15 @@ async function exists(path: string): Promise<boolean> {
 
 /** Recursive copy, skipping the manifest/journal files the caller rewrites. */
 async function copyTree(from: string, to: string, skipTop: Set<string>): Promise<void> {
-  await Deno.mkdir(to, { recursive: true });
-  for await (const entry of Deno.readDir(from)) {
+  await fs.mkdir(to, { recursive: true });
+  for await (const entry of await fs.readdir(from, { withFileTypes: true })) {
     if (skipTop.has(entry.name)) continue;
     const src = `${from}/${entry.name}`;
     const dst = `${to}/${entry.name}`;
-    if (entry.isDirectory) {
+    if (entry.isDirectory()) {
       await copyTree(src, dst, new Set());
-    } else if (entry.isFile) {
-      await Deno.copyFile(src, dst);
+    } else if (entry.isFile()) {
+      await fs.copyFile(src, dst);
     }
     // symlinks are deliberately not followed: a character that references
     // files outside its own workspace is not self-contained, and silently
@@ -254,9 +256,9 @@ export async function scanRoster(
   const characters: RosterEntry[] = [];
   const unreadable: { dir: string; error: string }[] = [];
 
-  let entries: Deno.DirEntry[];
+  let entries: Dirent[];
   try {
-    entries = [...Deno.readDirSync(base)];
+    entries = [...readdirSync(base, { withFileTypes: true })];
   } catch (err) {
     throw new Error(
       `Cannot read the roster root "${base}": ${err instanceof Error ? err.message : String(err)}`,
@@ -264,12 +266,12 @@ export async function scanRoster(
   }
 
   for (const entry of entries) {
-    if (!entry.isDirectory) continue;
+    if (!entry.isDirectory()) continue;
     const dir = `${base}/${entry.name}`;
     const paths = workspacePaths(dir);
-    let stat: Deno.FileInfo;
+    let stat: Stats;
     try {
-      stat = await Deno.stat(paths.manifest);
+      stat = await fs.stat(paths.manifest);
     } catch {
       continue; // not a workspace — roots hold other directories too, and that
       // is not an error the way an unparseable manifest is
@@ -291,7 +293,7 @@ export async function scanRoster(
         let ready = manifest.canonicalMesh !== undefined;
         if (ready) {
           try {
-            await Deno.stat(paths.canonicalModel);
+            await fs.stat(paths.canonicalModel);
           } catch {
             ready = false;
           }

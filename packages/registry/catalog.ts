@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Catalog layer (D-009): the committed catalog JSON is the single source of
  * model truth — ids, versions, licenses, territories, platform lists, VRAM
@@ -14,7 +15,7 @@ const BUNDLED_CATALOG = decodeURIComponent(
 
 /** Read + schema-validate a model catalog; defaults to the bundled file. */
 export async function loadCatalog(path = BUNDLED_CATALOG): Promise<ModelCatalog> {
-  const text = await Deno.readTextFile(path).catch((err) => {
+  const text = await fs.readFile(path, 'utf8').catch((err) => {
     throw new Error(`cannot read model catalog ${path}: ${message(err)}`);
   });
   let raw: unknown;

@@ -1,3 +1,4 @@
+import { openSync, writeSync, closeSync } from 'node:fs';
 /**
  * The NDJSON emitter — one JobEvent per line, matching @spritebook/schema
  * EXACTLY (every emitted event is validated; every line is canonical JSON).
@@ -25,18 +26,22 @@ export interface EventSink {
 
 /** Append-only NDJSON file sink (the optional session log file, audit 11). */
 export class FileSink implements EventSink {
-  #file: Deno.FsFile;
+  #file: number | undefined;
 
   constructor(path: string | URL) {
-    this.#file = Deno.openSync(path, { create: true, append: true });
+    this.#file = openSync(path, 'a');
   }
 
   write(line: string): void {
-    this.#file.writeSync(new TextEncoder().encode(line));
+    if (this.#file === undefined) throw new Error('Event sink is closed.');
+    writeSync(this.#file, line);
   }
 
   close(): void {
-    this.#file.close();
+    if (this.#file !== undefined) {
+      closeSync(this.#file);
+      this.#file = undefined;
+    }
   }
 }
 

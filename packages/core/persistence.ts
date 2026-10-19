@@ -1,3 +1,5 @@
+import { acquireFileLock } from './lock.ts';
+import { promises as fs } from 'node:fs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { dirname, resolve } from 'node:path';
 import type { CharacterManifest, JobEvent, JsonPatchOp, ManifestPatch } from '@spritebook/schema';
@@ -24,25 +26,19 @@ interface State {
 async function acquireLock(path: string) {
   let realDir: string;
   try {
-    realDir = await Deno.realPath(dirname(resolve(path)));
+    realDir = await fs.realpath(dirname(resolve(path)));
   } catch (e) {
-    if (!(e instanceof Deno.errors.NotFound)) throw e;
+    if (!((e as NodeJS.ErrnoException)?.code === 'ENOENT')) throw e;
     throw new Error(
       `No character manifest at "${path}" - that directory is not a SpriteBook workspace.`,
     );
   }
   const key = resolve(realDir, path.replaceAll('\\', '/').split('/').at(-1)!);
-  const id = Deno.build.os === 'windows' ? key.toLowerCase() : key;
+  const id = process.platform === 'win32' ? key.toLowerCase() : key;
   const keys = new Set([...(held.getStore() ?? []), id]);
   if (held.getStore()?.has(id)) return { keys };
-  const file = await Deno.open(`${key}.lock`, { create: true, read: true, write: true });
-  try {
-    await file.lock(true);
-    return { keys, file };
-  } catch (e) {
-    file.close();
-    throw e;
-  }
+  const file = await acquireFileLock(`${key}.lock`);
+  return { keys, file };
 }
 
 export async function withManifestLock<T>(path: string, run: () => Promise<T>): Promise<T> {
@@ -50,7 +46,7 @@ export async function withManifestLock<T>(path: string, run: () => Promise<T>): 
   try {
     return await held.run(lock.keys, run);
   } finally {
-    lock.file?.close();
+    await lock.file?.close();
   }
 }
 
@@ -68,7 +64,7 @@ export async function* workspaceJob(
     yield* run();
     return;
   }
-  await Deno.mkdir(workspace, { recursive: true });
+  await fs.mkdir(workspace, { recursive: true });
   const lock = await acquireLock(`${workspacePaths(workspace).manifest}.job`);
   const iterator = run()[Symbol.asyncIterator]();
   try {
@@ -83,7 +79,7 @@ export async function* workspaceJob(
         await iterator.return?.();
       });
     } finally {
-      lock.file?.close();
+      await lock.file?.close();
     }
   }
 }
@@ -92,26 +88,26 @@ export async function* workspaceJob(
 export async function writeAtomic(path: string, text: string | Uint8Array): Promise<void> {
   const tmp = `${path}.${crypto.randomUUID()}.tmp`;
   try {
-    await Deno.writeFile(tmp, typeof text === 'string' ? new TextEncoder().encode(text) : text, {
-      createNew: true,
+    await fs.writeFile(tmp, typeof text === 'string' ? new TextEncoder().encode(text) : text, {
+      flag: 'wx',
     });
     {
-      using file = await Deno.open(tmp, { write: true });
+      await using file = await fs.open(tmp, 'r+');
       await file.sync();
     }
-    await Deno.rename(tmp, path);
+    await fs.rename(tmp, path);
   } finally {
-    await Deno.remove(tmp).catch((e) => {
-      if (!(e instanceof Deno.errors.NotFound)) throw e;
+    await fs.rm(tmp).catch((e) => {
+      if (!((e as NodeJS.ErrnoException)?.code === 'ENOENT')) throw e;
     });
   }
 }
 
 async function optionalText(path: string, fallback: string): Promise<string> {
   try {
-    return await Deno.readTextFile(path);
+    return await fs.readFile(path, 'utf8');
   } catch (e) {
-    if (e instanceof Deno.errors.NotFound) return fallback;
+    if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return fallback;
     throw e;
   }
 }
@@ -139,10 +135,10 @@ function revisionPath(path: string, hash: string) {
 
 async function fileExists(path: string) {
   try {
-    await Deno.stat(path);
+    await fs.stat(path);
     return true;
   } catch (e) {
-    if (e instanceof Deno.errors.NotFound) return false;
+    if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return false;
     throw e;
   }
 }
@@ -153,12 +149,12 @@ async function retain(path: string, hash: string, bytes: Uint8Array): Promise<vo
   }
   const revision = revisionPath(path, hash);
   if (await fileExists(revision)) {
-    if (await sha256Bytes(await Deno.readFile(revision)) !== hash) {
+    if (await sha256Bytes(new Uint8Array(await fs.readFile(revision))) !== hash) {
       throw new Error(`Corrupt asset revision "${revision}"`);
     }
     return;
   }
-  await Deno.mkdir(dirname(revision), { recursive: true });
+  await fs.mkdir(dirname(revision), { recursive: true });
   await writeAtomic(revision, bytes);
 }
 
@@ -172,16 +168,16 @@ async function prepareAssets(
   const current = before.canonicalMesh?.gltfSha256;
   let managed = source !== undefined;
   if (current && await fileExists(canonical)) {
-    await retain(path, current, await Deno.readFile(canonical));
+    await retain(path, current, new Uint8Array(await fs.readFile(canonical)));
     managed = true;
   }
   const next = after.doc.canonicalMesh?.gltfSha256;
   if (source) {
     if (!next) throw new Error('A canonical asset requires its manifest hash.');
-    await retain(path, next, await Deno.readFile(source));
+    await retain(path, next, new Uint8Array(await fs.readFile(source)));
   }
   if (next && await fileExists(revisionPath(path, next))) {
-    await retain(path, next, await Deno.readFile(revisionPath(path, next)));
+    await retain(path, next, new Uint8Array(await fs.readFile(revisionPath(path, next))));
     managed = true;
   }
   if (!managed) return;
@@ -194,7 +190,7 @@ async function prepareAssets(
         `Historical canonical revision ${next} is unavailable; nothing was committed.`,
       );
     }
-    await retain(path, next, await Deno.readFile(original));
+    await retain(path, next, new Uint8Array(await fs.readFile(original)));
   }
   after.assetHash = next ?? null;
 }
@@ -202,9 +198,9 @@ async function prepareAssets(
 async function stateOf(path: string): Promise<State> {
   let text: string;
   try {
-    text = await Deno.readTextFile(path);
+    text = await fs.readFile(path, 'utf8');
   } catch (e) {
-    if (!(e instanceof Deno.errors.NotFound)) throw e;
+    if (!((e as NodeJS.ErrnoException)?.code === 'ENOENT')) throw e;
     throw new Error(
       `No character manifest at "${path}" - that directory is not a SpriteBook workspace.`,
     );
@@ -221,13 +217,13 @@ async function stateOf(path: string): Promise<State> {
 async function materialize(path: string, state: State): Promise<void> {
   const canonical = workspacePaths(dirname(path)).canonicalModel;
   if (state.assetHash) {
-    const bytes = await Deno.readFile(revisionPath(path, state.assetHash));
+    const bytes = new Uint8Array(await fs.readFile(revisionPath(path, state.assetHash)));
     if (await sha256Bytes(bytes) !== state.assetHash) {
       throw new Error('Corrupt canonical revision; recovery refused.');
     }
     await writeAtomic(canonical, bytes);
   } else if (state.assetHash === null && await fileExists(canonical)) {
-    await Deno.remove(canonical);
+    await fs.rm(canonical);
   }
   await writeAtomic(`${path}.journal.ndjson`, state.patches.map(canonicalJson).join(''));
   await writeAtomic(`${path}.journal.cursor`, String(state.cursor));
@@ -241,7 +237,7 @@ async function recover(path: string): Promise<void> {
   if (raw.version !== 1) throw new Error(`Unsupported pending transaction at "${path}"`);
   const state = validateState(raw, path);
   await materialize(path, state);
-  await Deno.remove(`${path}.pending.json`);
+  await fs.rm(`${path}.pending.json`);
 }
 
 async function persist(path: string, state: State): Promise<void> {

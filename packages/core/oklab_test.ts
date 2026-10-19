@@ -1,4 +1,5 @@
-import { assert, assertAlmostEquals, assertEquals } from 'jsr:@std/assert@1';
+import { test } from 'node:test';
+import { assert, assertAlmostEquals, assertEquals } from '@std/assert';
 import {
   labToHex,
   linearToOklab,
@@ -7,9 +8,9 @@ import {
   srgbToHex,
   srgbToLab,
   srgbToLinear,
-} from './oklab.ts';
+} from './dist/oklab.js';
 
-Deno.test('srgbToLinear: EOTF anchors and monotonicity', () => {
+test('srgbToLinear: EOTF anchors and monotonicity', () => {
   assertEquals(srgbToLinear(0), 0);
   assertEquals(srgbToLinear(255), 1);
   // Low codes take the linear (/12.92) branch.
@@ -22,7 +23,7 @@ Deno.test('srgbToLinear: EOTF anchors and monotonicity', () => {
   }
 });
 
-Deno.test('linearToSrgb: inverse EOTF anchors, clamping, exact code round-trip', () => {
+test('linearToSrgb: inverse EOTF anchors, clamping, exact code round-trip', () => {
   assertEquals(linearToSrgb(0), 0);
   assertEquals(linearToSrgb(1), 255);
   // Out-of-range linear values clamp, and never produce NaN on negatives.
@@ -34,7 +35,7 @@ Deno.test('linearToSrgb: inverse EOTF anchors, clamping, exact code round-trip',
   }
 });
 
-Deno.test('srgbToLab: known OKLab anchors (white, black, mid-grey)', () => {
+test('srgbToLab: known OKLab anchors (white, black, mid-grey)', () => {
   const white = srgbToLab(255, 255, 255);
   assertAlmostEquals(white[0], 1, 1e-6); // L ~= 1
   assertAlmostEquals(white[1], 0, 1e-6); // a ~= 0
@@ -51,13 +52,13 @@ Deno.test('srgbToLab: known OKLab anchors (white, black, mid-grey)', () => {
   assertAlmostEquals(grey[2], 0, 1e-6); // achromatic -> b ~= 0
 });
 
-Deno.test('linearToOklab: matches srgbToLab composed with the EOTF', () => {
+test('linearToOklab: matches srgbToLab composed with the EOTF', () => {
   const viaLinear = linearToOklab(srgbToLinear(64), srgbToLinear(160), srgbToLinear(200));
   const viaBytes = srgbToLab(64, 160, 200);
   for (let i = 0; i < 3; i++) assertAlmostEquals(viaLinear[i], viaBytes[i], 1e-12);
 });
 
-Deno.test('srgbToLab: L is strictly monotonic across the grey ramp', () => {
+test('srgbToLab: L is strictly monotonic across the grey ramp', () => {
   let prev = -1;
   for (let c = 0; c <= 255; c++) {
     const L = srgbToLab(c, c, c)[0];
@@ -66,7 +67,7 @@ Deno.test('srgbToLab: L is strictly monotonic across the grey ramp', () => {
   }
 });
 
-Deno.test('round-trip: srgbToLab -> oklabToSrgb within +/-1 over a full sweep', () => {
+test('round-trip: srgbToLab -> oklabToSrgb within +/-1 over a full sweep', () => {
   let maxErr = 0;
   for (let r = 0; r <= 255; r += 17) {
     for (let g = 0; g <= 255; g += 17) {
@@ -84,14 +85,14 @@ Deno.test('round-trip: srgbToLab -> oklabToSrgb within +/-1 over a full sweep', 
   assertEquals(maxErr, 0);
 });
 
-Deno.test('oklabToSrgb: clamps out-of-gamut OKLab into valid bytes', () => {
+test('oklabToSrgb: clamps out-of-gamut OKLab into valid bytes', () => {
   const [r, g, b] = oklabToSrgb([1, 0.5, -0.3]); // heavily out of the sRGB gamut
   for (const v of [r, g, b]) {
     assert(Number.isInteger(v) && v >= 0 && v <= 255, `channel ${v} not a valid byte`);
   }
 });
 
-Deno.test('srgbToHex / labToHex: formatting and round-trip', () => {
+test('srgbToHex / labToHex: formatting and round-trip', () => {
   assertEquals(srgbToHex(255, 0, 0), '#ff0000');
   assertEquals(srgbToHex(0, 128, 255), '#0080ff');
   assertEquals(srgbToHex(18, 52, 86), '#123456');

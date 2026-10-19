@@ -1,10 +1,14 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Installed layer: root resolution (env-injected, per-OS), the deterministic
  * numeric-aware version order, and the receipt-is-the-installed-marker law —
  * receiptless dirs and staging leftovers are invisible, corrupt receipts are
  * loud.
  */
-import { assertEquals, assertRejects, assertThrows } from 'jsr:@std/assert@1';
+import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 import { canonicalJson } from '@spritebook/schema';
 import {
   compareVersions,
@@ -13,10 +17,10 @@ import {
   listInstalled,
   RECEIPT_FILE,
   resolveInstalled,
-} from './installed.ts';
+} from './dist/installed.js';
 import { plantReceipt } from './_testutil.ts';
 
-Deno.test('defaultModelsRoot: env override wins; per-OS data dirs; honest when unset', () => {
+test('defaultModelsRoot: env override wins; per-OS data dirs; honest when unset', () => {
   const env = (vars: Record<string, string>) => (key: string) => vars[key];
   assertEquals(
     defaultModelsRoot(env({ SPRITEBOOK_MODELS_DIR: 'D:/models' }), 'windows'),
@@ -42,7 +46,7 @@ Deno.test('defaultModelsRoot: env override wins; per-OS data dirs; honest when u
   assertThrows(() => defaultModelsRoot(env({}), 'linux'), Error, 'HOME');
 });
 
-Deno.test('compareVersions: numeric-aware, deterministic, antisymmetric', () => {
+test('compareVersions: numeric-aware, deterministic, antisymmetric', () => {
   const cases: [string, string, number][] = [
     ['1.2', '1.10', -1], // numeric, not lexicographic
     ['1.9', '2.0', -1],
@@ -57,8 +61,8 @@ Deno.test('compareVersions: numeric-aware, deterministic, antisymmetric', () => 
   }
 });
 
-Deno.test('listInstalled/resolveInstalled: receipted versions only, highest wins', async () => {
-  const tmp = await Deno.makeTempDir();
+test('listInstalled/resolveInstalled: receipted versions only, highest wins', async () => {
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const root = `${tmp}/models`;
   try {
     assertEquals(await listInstalled(root), [], 'missing root = nothing installed');
@@ -66,10 +70,10 @@ Deno.test('listInstalled/resolveInstalled: receipted versions only, highest wins
     await plantReceipt(root, 'toy-rig', '1.10');
     await plantReceipt(root, 'a-model', '0.1');
     // crash-window remnant: weights without a receipt are NOT installed
-    await Deno.mkdir(`${root}/toy-rig/9.9`, { recursive: true });
-    await Deno.writeTextFile(`${root}/toy-rig/9.9/model.ckpt`, 'x');
+    await fs.mkdir(`${root}/toy-rig/9.9`, { recursive: true });
+    await fs.writeFile(`${root}/toy-rig/9.9/model.ckpt`, 'x');
     // a crashed staging dir must not break or pollute the listing
-    await Deno.mkdir(`${root}/.staging-toy-rig-1.0-dead`, { recursive: true });
+    await fs.mkdir(`${root}/.staging-toy-rig-1.0-dead`, { recursive: true });
 
     const got = await listInstalled(root);
     assertEquals(
@@ -81,22 +85,22 @@ Deno.test('listInstalled/resolveInstalled: receipted versions only, highest wins
     assertEquals(await resolveInstalled(root, 'toy-rig', '9.9'), null, 'receiptless = absent');
     assertEquals(await resolveInstalled(root, 'ghost'), null);
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });
 
-Deno.test('getReceipt: corrupt receipts are loud, never a silent not-installed', async () => {
-  const tmp = await Deno.makeTempDir();
+test('getReceipt: corrupt receipts are loud, never a silent not-installed', async () => {
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const root = `${tmp}/models`;
   try {
     assertEquals(await getReceipt(root, 'toy-rig', '1.0'), null, 'missing -> null');
     const dir = `${root}/toy-rig/1.0`;
-    await Deno.mkdir(dir, { recursive: true });
-    await Deno.writeTextFile(`${dir}/${RECEIPT_FILE}`, '{broken');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(`${dir}/${RECEIPT_FILE}`, '{broken');
     await assertRejects(() => getReceipt(root, 'toy-rig', '1.0'), Error, 'invalid JSON');
-    await Deno.writeTextFile(`${dir}/${RECEIPT_FILE}`, canonicalJson({ schemaVersion: 2 }));
+    await fs.writeFile(`${dir}/${RECEIPT_FILE}`, canonicalJson({ schemaVersion: 2 }));
     await assertRejects(() => getReceipt(root, 'toy-rig', '1.0'), Error, 'InstallReceipt');
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });

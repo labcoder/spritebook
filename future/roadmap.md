@@ -196,6 +196,10 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       transactions and subprocess ownership; no permanent global Deno shim. Preserve canonical
       glTF/FBX behavior, retarget-once, palettes/temporal ordering, deterministic packing and CLI
       twins.
+      **Progress:** core and registry compile on Node; 192 checks cover their first package group,
+      including the real process-crash/concurrency and VRAM lease fixtures. Kernel workspace locks
+      use a small Rust helper; policy stays in TypeScript. Two tests that also call the CLI remain
+      queued with that package's port, rather than counted as passing here.
 - [ ] **F4-T3 · Promote the qualified renderer.** Integrate the F2 path through the existing render
       seam. Assign a fresh renderer signature/cache namespace, including build/backend/adapter and
       available driver identity. Never reuse old cached frames as evidence of Node rendering. Keep

@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import type { Dirent, Stats } from 'node:fs';
 /**
  * A machine-wide VRAM lease, coordinated through the filesystem (P4-T3).
  *
@@ -6,7 +8,7 @@
  * `JobQueue`'s budget admits jobs inside ONE process. That is the wrong
  * boundary for the thing it is protecting: the Studio spawns every job as its
  * own `spritebook` subprocess (`run_cli` in the Tauri shell), and a user with
- * two characters generating has two Deno processes, each with its own queue,
+ * two characters generating has two Node processes, each with its own queue,
  * each certain it has the whole card. The GPU is a machine resource, so the
  * budget has to live where every process can see it — a directory.
  *
@@ -28,15 +30,9 @@
  * The task called for PID-liveness reaping. A recorded pid is here and is what
  * the wait message names, but the REAPER is a heartbeat (each participant
  * touches its own file's mtime; a file not touched within `staleMs` is
- * removed by whoever notices). The reason is not preference:
- *
- *  - `Deno.kill(pid, 0)`-style probing does not exist. `Deno.kill` needs
- *    `--allow-run`, which the CLI does not otherwise require and which the
- *    test lane grants only for `nvidia-smi` and `uv`; on Windows there is no
- *    non-destructive signal at all.
- *  - Deno's file locks (`FsFile.lock`) BLOCK and have no `tryLock`, so they
- *    cannot answer "is that holder still there?" without hanging on the
- *    answer. Verified, not assumed.
+ * removed by whoever notices). The Node port preserves this protocol: PID-only
+ * probes cannot distinguish a recycled pid, and a kernel lock only establishes
+ * exclusion rather than the age or health of a VRAM claim.
  *
  * The heartbeat is also strictly stronger where it overlaps: it reclaims from
  * a process that is alive but wedged, and it cannot be fooled by a recycled
@@ -101,7 +97,7 @@ const LOCK = '.lock';
 const LOCK_STALE_MS = 5_000;
 
 export function defaultLeaseDir(): string {
-  const tmp = Deno.env.get('TMPDIR') ?? Deno.env.get('TEMP') ?? Deno.env.get('TMP') ?? '/tmp';
+  const tmp = process.env['TMPDIR'] ?? process.env['TEMP'] ?? process.env['TMP'] ?? '/tmp';
   return `${tmp.replace(/[\\/]+$/, '')}/spritebook-vram`;
 }
 
@@ -116,28 +112,28 @@ async function readClaims(
   now: number,
 ): Promise<Map<string, Claim>> {
   const out = new Map<string, Claim>();
-  let entries: AsyncIterable<Deno.DirEntry>;
+  let entries: Dirent[];
   try {
-    entries = Deno.readDir(dir);
+    entries = await fs.readdir(dir, { withFileTypes: true });
   } catch {
     return out; // swept away underneath us; see withLock's note
   }
   for await (const entry of entries) {
-    if (!entry.isFile || !entry.name.endsWith('.json')) continue;
+    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
     const path = `${dir}/${entry.name}`;
-    let stat: Deno.FileInfo;
+    let stat: Stats;
     try {
-      stat = await Deno.stat(path);
+      stat = await fs.stat(path);
     } catch {
       continue; // reaped by someone else between readDir and here
     }
     // the heartbeat IS the liveness signal; see the module note
     if (now - (stat.mtime?.getTime() ?? 0) > staleMs) {
-      await Deno.remove(path).catch(() => {});
+      await fs.rm(path).catch(() => {});
       continue;
     }
     try {
-      const claim = JSON.parse(await Deno.readTextFile(path)) as Claim;
+      const claim = JSON.parse(await fs.readFile(path, 'utf8')) as Claim;
       if (claim && (claim.state === 'waiting' || claim.state === 'held')) {
         out.set(entry.name, claim);
       }
@@ -155,7 +151,7 @@ async function withLock<T>(dir: string, now: () => number, fn: () => Promise<T>)
   const lock = `${dir}/${LOCK}`;
   for (;;) {
     try {
-      await Deno.mkdir(lock);
+      await fs.mkdir(lock);
       break;
     } catch (err) {
       // The lease directory lives in machine temp, which OS cleaners do sweep.
@@ -163,16 +159,16 @@ async function withLock<T>(dir: string, now: () => number, fn: () => Promise<T>)
       // job down for a housekeeping task, so it is rebuilt instead. The cost is
       // stated rather than hidden: any live claims that were swept are gone
       // with it, and the machine's accounting restarts from empty.
-      if (err instanceof Deno.errors.NotFound) {
-        await Deno.mkdir(dir, { recursive: true });
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        await fs.mkdir(dir, { recursive: true });
         continue;
       }
-      if (!(err instanceof Deno.errors.AlreadyExists)) throw err;
-      const stat = await Deno.stat(lock).catch(() => null);
+      if (!((err as NodeJS.ErrnoException)?.code === 'EEXIST')) throw err;
+      const stat = await fs.stat(lock).catch(() => null);
       // held for longer than any critical section here can take: the holder
       // died between mkdir and remove, and without this everyone stalls
       if (stat && now() - (stat.mtime?.getTime() ?? 0) > LOCK_STALE_MS) {
-        await Deno.remove(lock, { recursive: true }).catch(() => {});
+        await fs.rm(lock, { recursive: true }).catch(() => {});
         continue;
       }
       await sleep(15 + Math.floor(Math.random() * 20));
@@ -181,7 +177,7 @@ async function withLock<T>(dir: string, now: () => number, fn: () => Promise<T>)
   try {
     return await fn();
   } finally {
-    await Deno.remove(lock, { recursive: true }).catch(() => {});
+    await fs.rm(lock, { recursive: true }).catch(() => {});
   }
 }
 
@@ -212,20 +208,20 @@ export async function acquireVramLease(opts: VramLeaseOptions): Promise<VramLeas
   const staleMs = opts.staleMs ?? 10_000;
   const heartbeatMs = opts.heartbeatMs ?? Math.max(500, Math.floor(staleMs / 4));
   const pollMs = opts.pollMs ?? 400;
-  await Deno.mkdir(dir, { recursive: true });
+  await fs.mkdir(dir, { recursive: true });
 
-  const name = `${now()}-${Deno.pid}-${crypto.randomUUID()}.json`;
+  const name = `${now()}-${process.pid}-${crypto.randomUUID()}.json`;
   const path = `${dir}/${name}`;
-  const claim: Claim = { state: 'waiting', gb, at: now(), pid: Deno.pid, jobId: opts.jobId };
-  await Deno.writeTextFile(path, canonicalJson(claim), { createNew: true });
+  const claim: Claim = { state: 'waiting', gb, at: now(), pid: process.pid, jobId: opts.jobId };
+  await fs.writeFile(path, canonicalJson(claim), { flag: 'wx' });
 
   // The heartbeat says "still here" for the whole life of the claim, waiting
   // AND held. Unref'd so a lease can never keep the process alive on its own.
   const beat = setInterval(() => {
     const t = new Date(now());
-    Deno.utime(path, t, t).catch(() => {});
+    fs.utimes(path, t, t).catch(() => {});
   }, heartbeatMs);
-  Deno.unrefTimer(beat);
+  beat.unref();
 
   const started = now();
   let told = false;
@@ -234,12 +230,12 @@ export async function acquireVramLease(opts: VramLeaseOptions): Promise<VramLeas
     path,
     release: async () => {
       clearInterval(beat);
-      await Deno.remove(path).catch(() => {});
+      await fs.rm(path).catch(() => {});
     },
   });
   const abandon = async (message: string): Promise<never> => {
     clearInterval(beat);
-    await Deno.remove(path).catch(() => {});
+    await fs.rm(path).catch(() => {});
     throw new Error(message);
   };
 
@@ -265,7 +261,7 @@ export async function acquireVramLease(opts: VramLeaseOptions): Promise<VramLeas
         .sort(([a, ca], [b, cb]) => ca.at - cb.at || (a < b ? -1 : a > b ? 1 : 0));
       const head = waiting[0];
       if (head !== undefined && head[0] === name && gb <= free) {
-        await Deno.writeTextFile(path, canonicalJson({ ...mine, state: 'held' }));
+        await fs.writeFile(path, canonicalJson({ ...mine, state: 'held' }));
         return 'granted' as const;
       }
       // Name WHO, not just how many. "1 other job(s) holding 20 GiB" tells a

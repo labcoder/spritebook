@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { licenseFingerprint } from './hash.ts';
 import { dirname, resolve } from 'node:path';
 import {
@@ -31,9 +32,9 @@ export async function projectPins(context: ExecutionContext): Promise<ProjectPin
   if (!path) return;
   if (!context.pinsPath) {
     try {
-      await Deno.stat(path);
+      await fs.stat(path);
     } catch (e) {
-      if (e instanceof Deno.errors.NotFound) return;
+      if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return;
       throw e;
     }
   }

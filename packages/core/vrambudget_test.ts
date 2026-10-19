@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * The queue's VRAM budget (P4-T3).
  *
@@ -12,10 +13,10 @@
  *
  * plus the one that is merely rude: holding work with no way to see why.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import type { JobEvent, JobSpec } from '@spritebook/schema';
-import { EventBus } from './events.ts';
-import { JobQueue } from './queue.ts';
+import { EventBus } from './dist/events.js';
+import { JobQueue } from './dist/queue.js';
 
 const at = '2026-08-01T00:00:00Z';
 const spec = (id: string): JobSpec =>
@@ -48,7 +49,7 @@ function held(started: string[], g: { opened: Promise<void> }) {
 
 const tick = () => new Promise((r) => setTimeout(r, 10));
 
-Deno.test('the budget admits what fits and holds what does not', async () => {
+test('the budget admits what fits and holds what does not', async () => {
   const bus = new EventBus();
   // concurrency alone would run all three; the card would not
   const queue = new JobQueue({ bus, concurrency: 4, vramBudgetGb: 24 });
@@ -72,7 +73,7 @@ Deno.test('the budget admits what fits and holds what does not', async () => {
   assertEquals(queue.vramCommittedGb, 0, 'every claim was given back');
 });
 
-Deno.test('a big job is NOT starved by a stream of small ones', async () => {
+test('a big job is NOT starved by a stream of small ones', async () => {
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 8, vramBudgetGb: 24 });
   const started: string[] = [];
@@ -101,7 +102,7 @@ Deno.test('a big job is NOT starved by a stream of small ones', async () => {
   assertEquals(queue.vramCommittedGb, 0);
 });
 
-Deno.test('waiting on VRAM is SAID, once, on the bus', async () => {
+test('waiting on VRAM is SAID, once, on the bus', async () => {
   // a queue deliberately holding work looks exactly like a hung one
   const bus = new EventBus();
   const warns: Extract<JobEvent, { t: 'warn' }>[] = [];
@@ -131,7 +132,7 @@ Deno.test('waiting on VRAM is SAID, once, on the bus', async () => {
   assertEquals(queue.blockedReason(), null, 'and stops saying it once it is not true');
 });
 
-Deno.test('a claim bigger than the whole budget is refused, not queued', async () => {
+test('a claim bigger than the whole budget is refused, not queued', async () => {
   // queuing it would hang forever AND block everything behind it under FIFO
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 2, vramBudgetGb: 12 });
@@ -154,7 +155,7 @@ Deno.test('a claim bigger than the whole budget is refused, not queued', async (
   assertEquals((await fine.done).kind, 'done');
 });
 
-Deno.test('a failed, thrown, or cancelled job gives its VRAM back', async () => {
+test('a failed, thrown, or cancelled job gives its VRAM back', async () => {
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 1, vramBudgetGb: 24, maxRetries: 0 });
 
@@ -196,7 +197,7 @@ Deno.test('a failed, thrown, or cancelled job gives its VRAM back', async () => 
   await last.done;
 });
 
-Deno.test('no budget means no budgeting — a claim is just ignored', async () => {
+test('no budget means no budgeting — a claim is just ignored', async () => {
   // the honest default when detection returned null: an invented budget would
   // refuse work the card can actually do
   const bus = new EventBus();
@@ -213,7 +214,7 @@ Deno.test('no budget means no budgeting — a claim is just ignored', async () =
   await Promise.all(handles.map((h) => h.done));
 });
 
-Deno.test('a job with no claim is gated by concurrency alone', async () => {
+test('a job with no claim is gated by concurrency alone', async () => {
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 2, vramBudgetGb: 8 });
   const started: string[] = [];
@@ -231,7 +232,7 @@ Deno.test('a job with no claim is gated by concurrency alone', async () => {
   await Promise.all(handles.map((h) => h.done));
 });
 
-Deno.test('fractional GiB do not drift the budget below zero', async () => {
+test('fractional GiB do not drift the budget below zero', async () => {
   // nvidia-smi reports one decimal, and repeated float subtraction is how a
   // budget silently becomes 23.999999999999996 and then refuses a 24 GiB job
   const bus = new EventBus();

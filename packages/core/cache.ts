@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+import { promises as fs } from 'node:fs';
 /**
  * Input-hash cache (D-011): keys are sha256 over canonical CacheKeyInputs —
  * inputs, never pixels; bound to the immutable characterId. Renaming a
@@ -76,7 +78,7 @@ export class DiskCacheStore implements CacheStore {
 
   constructor(dir: string) {
     this.#dir = dir;
-    Deno.mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true });
   }
 
   #path(key: string): string {
@@ -87,7 +89,7 @@ export class DiskCacheStore implements CacheStore {
   async has(key: string): Promise<boolean> {
     const path = this.#path(key); // invalid keys throw, they are not misses
     try {
-      await Deno.stat(path);
+      await fs.stat(path);
       return true;
     } catch {
       return false;
@@ -96,7 +98,7 @@ export class DiskCacheStore implements CacheStore {
   async get(key: string): Promise<string | undefined> {
     const path = this.#path(key); // invalid keys throw, they are not misses
     try {
-      return await Deno.readTextFile(path);
+      return await fs.readFile(path, 'utf8');
     } catch {
       return undefined;
     }
@@ -110,17 +112,17 @@ export class DiskCacheStore implements CacheStore {
     const final = this.#path(key);
     const tmp = `${final}.${crypto.randomUUID()}.tmp`;
     try {
-      await Deno.writeTextFile(tmp, value);
-      await Deno.rename(tmp, final);
+      await fs.writeFile(tmp, value);
+      await fs.rename(tmp, final);
     } catch (err) {
-      await Deno.remove(tmp).catch(() => {});
+      await fs.rm(tmp).catch(() => {});
       throw err;
     }
   }
   async keys(): Promise<string[]> {
     const out: string[] = [];
-    for await (const e of Deno.readDir(this.#dir)) {
-      if (e.isFile && e.name.endsWith('.json')) out.push(e.name.slice(0, -5));
+    for await (const e of await fs.readdir(this.#dir, { withFileTypes: true })) {
+      if (e.isFile() && e.name.endsWith('.json')) out.push(e.name.slice(0, -5));
     }
     return out.sort();
   }

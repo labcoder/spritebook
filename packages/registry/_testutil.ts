@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Shared fixtures for the registry suite: schema-honest toy catalog builders,
  * a network-free fetcher rig, and a JobEvent collector that validates every
@@ -86,12 +89,12 @@ export async function installRig(
   entryOver: Partial<ModelEntry> = {},
   versionOver: Partial<ModelVersion> = {},
 ): Promise<InstallRig> {
-  const tmp = await Deno.makeTempDir({ prefix: 'sb-registry-' });
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'sb-registry-'));
   const root = `${tmp}/models`;
   const src = `${tmp}/src`;
-  await Deno.mkdir(src, { recursive: true });
-  await Deno.writeFile(`${src}/model.ckpt`, TOY_A);
-  await Deno.writeFile(`${src}/config.yaml`, TOY_B);
+  await fs.mkdir(src, { recursive: true });
+  await fs.writeFile(`${src}/model.ckpt`, TOY_A);
+  await fs.writeFile(`${src}/config.yaml`, TOY_B);
   const files = [
     { path: 'model.ckpt', url: URL_A, sha256: await sha256Hex(TOY_A), bytes: TOY_A.byteLength },
     {
@@ -106,7 +109,7 @@ export async function installRig(
   );
   const fetcher: Fetcher = async (url, dest) => {
     const name = url.split('/').at(-1)!;
-    await Deno.copyFile(`${src}/${name}`, dest); // fixture bytes only — never the network
+    await fs.copyFile(`${src}/${name}`, dest); // fixture bytes only — never the network
   };
   return { tmp, root, catalog, fetcher };
 }
@@ -114,7 +117,7 @@ export async function installRig(
 /** Plant a minimal valid receipt directly on disk (installed-layer tests). */
 export async function plantReceipt(root: string, id: string, version: string): Promise<void> {
   const dir = `${root}/${id}/${version}`;
-  await Deno.mkdir(dir, { recursive: true });
+  await fs.mkdir(dir, { recursive: true });
   const receipt = parseWith(
     InstallReceiptSchema,
     {
@@ -129,5 +132,5 @@ export async function plantReceipt(root: string, id: string, version: string): P
     },
     `planted receipt (${id}@${version})`,
   );
-  await Deno.writeTextFile(`${dir}/receipt.json`, canonicalJson(receipt));
+  await fs.writeFile(`${dir}/receipt.json`, canonicalJson(receipt));
 }

@@ -3,6 +3,12 @@
   "references": [
     {
       "path": "packages/schema"
+    },
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/registry"
     }
   ]
 }

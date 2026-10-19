@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { Buffer } from 'node:buffer';
 import { isAbsolute, resolve } from 'node:path';
 import { BakeManifestSchema, type CharacterManifest, parseWith } from '@spritebook/schema';
@@ -14,17 +15,17 @@ export interface WorkspaceSnapshot {
 export async function listWorkspaces(root: string): Promise<WorkspaceSnapshot[]> {
   const base = resolve(root);
   const out: WorkspaceSnapshot[] = [];
-  for await (const entry of Deno.readDir(base)) {
-    if (!entry.isDirectory) continue;
+  for await (const entry of await fs.readdir(base, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
     const dir = resolve(base, entry.name);
     const { manifest } = workspacePaths(dir);
     let exists = false;
     for (const path of [manifest, `${manifest}.pending.json`]) {
       try {
-        await Deno.stat(path);
+        await fs.stat(path);
         exists = true;
       } catch (e) {
-        if (!(e instanceof Deno.errors.NotFound)) throw e;
+        if (!((e as NodeJS.ErrnoException)?.code === 'ENOENT')) throw e;
       }
     }
     if (!exists) continue;
@@ -57,7 +58,7 @@ export async function readCurrentBake(workspace: string) {
     );
     const manifest = parseWith(
       BakeManifestSchema,
-      JSON.parse(await Deno.readTextFile(`${dir}/manifest.json`)),
+      JSON.parse(await fs.readFile(`${dir}/manifest.json`, 'utf8')),
       `BakeManifest at ${dir}`,
     );
     if (manifest.bakeId !== character.lastBakeId || manifest.characterId !== character.id) {
@@ -75,16 +76,16 @@ export async function readBakeArtifact(workspace: string, kind: 'thumb' | 'atlas
     if (kind === 'atlas') {
       const atlas = bake.manifest.atlases.find((a) => a.pass === pass);
       if (!atlas) return null;
-      const bytes = await Deno.readFile(artifactPath(bake.dir, atlas.png));
+      const bytes = new Uint8Array(await fs.readFile(artifactPath(bake.dir, atlas.png)));
       return { manifest: bake.manifest, png: Buffer.from(bytes).toString('base64') };
     }
     const clips = [...new Set(bake.manifest.frames.map((f) => f.clipId))];
     for (const clip of clips) {
       try {
-        return Buffer.from(await Deno.readFile(artifactPath(bake.dir, `contact-${clip}.gif`)))
+        return Buffer.from(new Uint8Array(await fs.readFile(artifactPath(bake.dir, `contact-${clip}.gif`))))
           .toString('base64');
       } catch (e) {
-        if (!(e instanceof Deno.errors.NotFound)) throw e;
+        if (!((e as NodeJS.ErrnoException)?.code === 'ENOENT')) throw e;
       }
     }
     return null;

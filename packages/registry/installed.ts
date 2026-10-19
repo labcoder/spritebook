@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import type { Dirent } from 'node:fs';
 /**
  * Installed layer (D-009): `<root>/<modelId>/<version>/` holds the weight
  * files at their catalog-declared relative paths plus `receipt.json`. The
@@ -26,8 +28,8 @@ export function versionDir(root: string, id: string, version: string): string {
  * (or `~/.local/share/...`) on Linux. Env and os are injectable for tests.
  */
 export function defaultModelsRoot(
-  getEnv: (key: string) => string | undefined = (key) => Deno.env.get(key),
-  os: typeof Deno.build.os = Deno.build.os,
+  getEnv: (key: string) => string | undefined = (key) => process.env[key],
+  os: NodeJS.Platform | 'windows' = (process.platform === 'win32' ? 'windows' : process.platform),
 ): string {
   const override = getEnv('SPRITEBOOK_MODELS_DIR');
   if (override) return override;
@@ -91,9 +93,9 @@ export async function getReceipt(
   const path = `${versionDir(root, id, version)}/${RECEIPT_FILE}`;
   let text: string;
   try {
-    text = await Deno.readTextFile(path);
+    text = await fs.readFile(path, 'utf8');
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return null;
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
     throw err;
   }
   let raw: unknown;
@@ -124,18 +126,18 @@ export interface InstalledVersion {
  * receipt that fails validation throws via getReceipt.
  */
 export async function listInstalled(root: string): Promise<InstalledVersion[]> {
-  let modelDirs: Deno.DirEntry[];
+  let modelDirs: Dirent[];
   try {
-    modelDirs = await Array.fromAsync(Deno.readDir(root));
+    modelDirs = await fs.readdir(root, { withFileTypes: true });
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return []; // no root yet = nothing installed
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return []; // no root yet = nothing installed
     throw err;
   }
   const out: InstalledVersion[] = [];
   for (const m of modelDirs) {
-    if (!m.isDirectory || m.name.startsWith('.')) continue;
-    for (const v of await Array.fromAsync(Deno.readDir(`${root}/${m.name}`))) {
-      if (!v.isDirectory) continue;
+    if (!m.isDirectory() || m.name.startsWith('.')) continue;
+    for (const v of await fs.readdir(`${root}/${m.name}`, { withFileTypes: true })) {
+      if (!v.isDirectory()) continue;
       const receipt = await getReceipt(root, m.name, v.name);
       if (receipt) out.push({ id: m.name, version: v.name, receipt });
     }

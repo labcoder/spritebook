@@ -1,3 +1,6 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
 /**
  * Install gates (D-009), pure functions so the CLI/event layer stays thin.
  * Every failure message is a complete sentence a stranger can act on. The
@@ -127,27 +130,22 @@ export type CommandRunner = (cmd: string[]) => Promise<{ ok: boolean; stdout: st
 /** Default runner: any spawn failure (missing binary, no permission) is a clean "no". */
 export const runCommand: CommandRunner = async (cmd) => {
   try {
-    const out = await new Deno.Command(cmd[0], {
-      args: cmd.slice(1),
-      stdout: 'piped',
-      stderr: 'null',
-      stdin: 'null',
-    }).output();
-    return { ok: out.success, stdout: new TextDecoder().decode(out.stdout) };
+    const out = await promisify(execFile)(cmd[0], cmd.slice(1), { windowsHide: true });
+    return { ok: true, stdout: out.stdout };
   } catch {
     return { ok: false, stdout: '' };
   }
 };
 
 /**
- * OS from Deno.build + accelerator probe. `nvidia-smi -L` listing at least
+ * OS from Node + accelerator probe. `nvidia-smi -L` listing at least
  * one GPU means cuda; darwin is assumed Apple Silicon and reports
  * macos-metal without probing (fine for every Mac we target); anything that
  * is neither windows nor darwin rides the linux entries.
  */
 export async function detectPlatform(
   run: CommandRunner = runCommand,
-  os: typeof Deno.build.os = Deno.build.os,
+  os: NodeJS.Platform | 'windows' = (process.platform === 'win32' ? 'windows' : process.platform),
 ): Promise<Platform> {
   if (os === 'darwin') return 'macos-metal';
   const family = os === 'windows' ? 'windows' : 'linux';

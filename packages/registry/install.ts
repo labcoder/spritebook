@@ -1,3 +1,7 @@
+import { createWriteStream } from 'node:fs';
+import { Writable } from 'node:stream';
+import { promises as fs } from 'node:fs';
+import type { Stats } from 'node:fs';
 /**
  * Install / verify / rm jobs (D-009), speaking the runBakeJob event
  * discipline: queued -> started -> per-file progress -> artifact -> done,
@@ -64,7 +68,6 @@ export const fetchToFile: Fetcher = async (url, destPath, onBytes) => {
   if (!resp.ok || resp.body === null) {
     throw new Error(`GET ${url} -> HTTP ${resp.status}`);
   }
-  const file = await Deno.open(destPath, { write: true, create: true, truncate: true });
   let seen = 0;
   const counter = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
@@ -73,7 +76,7 @@ export const fetchToFile: Fetcher = async (url, destPath, onBytes) => {
       controller.enqueue(chunk);
     },
   });
-  await resp.body.pipeThrough(counter).pipeTo(file.writable);
+  await resp.body.pipeThrough(counter).pipeTo(Writable.toWeb(createWriteStream(destPath)));
 };
 
 /**
@@ -90,7 +93,7 @@ export function fetchFromDir(sourceDir: string, files: { path: string; url: stri
     if (rel === undefined) throw new Error(`no local file mapped for ${url}`);
     const src = `${sourceDir}/${rel}`;
     try {
-      await Deno.copyFile(src, destPath);
+      await fs.copyFile(src, destPath);
     } catch {
       throw new Error(
         `cannot read "${src}" - --from expects the files laid out at their declared paths`,
@@ -198,14 +201,14 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
 
     // download ALL files to staging; each must verify before finalize
     staging = `${opts.root}/.staging-${entry.id}-${version.version}-${randomHex(4)}`;
-    await Deno.mkdir(staging, { recursive: true });
+    await fs.mkdir(staging, { recursive: true });
     const fetcher = opts.fetcher ?? fetchToFile;
     const total = version.files.length;
     const verified: InstallReceipt['files'] = [];
     for (const [i, f] of version.files.entries()) {
       const dest = `${staging}/${f.path}`;
       const parent = dest.slice(0, dest.lastIndexOf('/'));
-      await Deno.mkdir(parent, { recursive: true });
+      await fs.mkdir(parent, { recursive: true });
       try {
         await fetcher(f.url, dest);
       } catch (err) {
@@ -216,7 +219,7 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
           true,
         );
       }
-      const size = (await Deno.stat(dest)).size;
+      const size = (await fs.stat(dest)).size;
       if (size !== f.bytes) {
         throw new JobFail(
           'hash-mismatch',
@@ -251,7 +254,7 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
     // receipt write leaves weights WITHOUT a receipt — verify reports
     // no-receipt, listInstalled/resolveInstalled treat it as not-installed,
     // and `models rm` (or the remnant sweep below) cleans it up.
-    await Deno.mkdir(`${opts.root}/${entry.id}`, { recursive: true });
+    await fs.mkdir(`${opts.root}/${entry.id}`, { recursive: true });
     if (await dirExists(finalDir)) {
       // The sweep is for a receiptless remnant from exactly that crash window
       // (the receipt check above returned null). Before deleting anything,
@@ -260,9 +263,9 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
       // receipt sits on disk, and the sweep would silently delete a healthy
       // multi-GB install. Refuse loudly instead - the refusal is correct on
       // ANY divergence, whatever its next cause turns out to be.
-      let receiptStat: Deno.FileInfo | null = null;
+      let receiptStat: Stats | null = null;
       try {
-        receiptStat = await Deno.stat(`${finalDir}/${RECEIPT_FILE}`);
+        receiptStat = await fs.stat(`${finalDir}/${RECEIPT_FILE}`);
       } catch { /* truly absent - the remnant case */ }
       if (receiptStat !== null) {
         throw new JobFail(
@@ -278,9 +281,9 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
         );
       }
       // receiptless remnant confirmed - unverified bytes, safe and honest to sweep
-      await Deno.remove(finalDir, { recursive: true });
+      await fs.rm(finalDir, { recursive: true });
     }
-    await Deno.rename(staging, finalDir);
+    await fs.rename(staging, finalDir);
     staging = undefined;
 
     const receipt = parseWith(
@@ -310,12 +313,12 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
       `InstallReceipt (${entry.id}@${version.version})`,
     );
     const receiptPath = `${finalDir}/${RECEIPT_FILE}`;
-    await Deno.writeTextFile(receiptPath, canonicalJson(receipt));
+    await fs.writeFile(receiptPath, canonicalJson(receipt));
 
     yield { t: 'artifact', jobId, at: at(), kind: 'install-receipt', path: receiptPath };
     yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
   } catch (err) {
-    if (staging) await Deno.remove(staging, { recursive: true }).catch(() => {});
+    if (staging) await fs.rm(staging, { recursive: true }).catch(() => {});
     const fail = err instanceof JobFail ? err : new JobFail('install-failed', message(err));
     yield {
       t: 'error',
@@ -379,8 +382,8 @@ export async function* runVerifyJob(opts: VerifyJobOpts): AsyncIterable<JobEvent
     const total = receipt.files.length;
     for (const [i, f] of receipt.files.entries()) {
       const path = `${dir}/${f.path}`;
-      const stat = await Deno.stat(path).catch(() => null);
-      if (!stat?.isFile) {
+      const stat = await fs.stat(path).catch(() => null);
+      if (!stat?.isFile()) {
         throw new JobFail('verify-failed', `File "${f.path}" is missing from ${dir}.`);
       }
       if (stat.size !== f.bytes) {
@@ -469,13 +472,13 @@ export async function* runRmJob(opts: RmJobOpts): AsyncIterable<JobEvent> {
           `what is installed.`,
       );
     }
-    await Deno.remove(target, { recursive: true });
+    await fs.rm(target, { recursive: true });
     if (opts.version !== undefined) {
       // sweep the model dir when the last version is gone — an empty dir is
       // not "installed" and must not linger in listings or on disk
       const parent = `${opts.root}/${opts.modelId}`;
-      const left = await Array.fromAsync(Deno.readDir(parent)).catch(() => null);
-      if (left !== null && left.length === 0) await Deno.remove(parent);
+      const left = await fs.readdir(parent, { withFileTypes: true }).catch(() => null);
+      if (left !== null && left.length === 0) await fs.rmdir(parent);
     }
     yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
   } catch (err) {
@@ -591,8 +594,8 @@ function findVersion(entry: ModelEntry, version?: string): ModelVersion {
 }
 
 async function dirExists(path: string): Promise<boolean> {
-  const stat = await Deno.stat(path).catch(() => null);
-  return stat?.isDirectory ?? false;
+  const stat = await fs.stat(path).catch(() => null);
+  return stat?.isDirectory() ?? false;
 }
 
 function randomHex(bytes: number): string {

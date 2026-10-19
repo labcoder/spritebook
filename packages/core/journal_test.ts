@@ -1,16 +1,18 @@
-import { assert, assertEquals, assertThrows } from 'jsr:@std/assert@1';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 import { canonicalJson, ManifestPatchSchema, parseWith } from '@spritebook/schema';
-import { ManifestJournal } from './journal.ts';
+import { ManifestJournal } from './dist/journal.js';
 
 const now = () => '2026-07-12T00:00:00Z';
 const target = { kind: 'character', id: 'brave-knight' } as const;
 
 async function loadFixtureDoc(): Promise<Record<string, unknown>> {
   const url = new URL('../schema/fixtures/valid/character-manifest.json', import.meta.url);
-  return JSON.parse(await Deno.readTextFile(url));
+  return JSON.parse(await fs.readFile(url, 'utf8'));
 }
 
-Deno.test('acceptance: undo of a 5-patch chain restores the manifest byte-for-byte', async () => {
+test('acceptance: undo of a 5-patch chain restores the manifest byte-for-byte', async () => {
   const original = await loadFixtureDoc();
   const originalBytes = canonicalJson(original);
   const journal = new ManifestJournal(original, { now });
@@ -53,7 +55,7 @@ Deno.test('acceptance: undo of a 5-patch chain restores the manifest byte-for-by
   assertEquals(journal.redoDepth, 5);
 });
 
-Deno.test('redo replays forward; undo/redo interleave correctly', async () => {
+test('redo replays forward; undo/redo interleave correctly', async () => {
   const journal = new ManifestJournal(await loadFixtureDoc(), { now });
   journal.commit({
     target,
@@ -84,7 +86,7 @@ Deno.test('redo replays forward; undo/redo interleave correctly', async () => {
   assertEquals(journal.redo(), undefined);
 });
 
-Deno.test('commits produce valid ManifestPatch objects with precomputed inverses', async () => {
+test('commits produce valid ManifestPatch objects with precomputed inverses', async () => {
   const journal = new ManifestJournal(await loadFixtureDoc(), { now });
   const patch = journal.commit({
     target,
@@ -101,7 +103,7 @@ Deno.test('commits produce valid ManifestPatch objects with precomputed inverses
   assert(restore && restore.path === '/detailLayers/0');
 });
 
-Deno.test('failing op leaves the document untouched (all-or-nothing)', async () => {
+test('failing op leaves the document untouched (all-or-nothing)', async () => {
   const journal = new ManifestJournal(await loadFixtureDoc(), { now });
   const before = journal.canonicalBytes;
   assertThrows(() =>
@@ -123,7 +125,7 @@ Deno.test('failing op leaves the document untouched (all-or-nothing)', async () 
 // OVERWRITE, so "inverse of add is remove" is only true when the member was
 // absent. These four cases pin all of it.
 
-Deno.test('add over an EXISTING object member inverts to replace, not remove', async () => {
+test('add over an EXISTING object member inverts to replace, not remove', async () => {
   const original = await loadFixtureDoc();
   const originalBytes = canonicalJson(original);
   const journal = new ManifestJournal(original, { now });
@@ -141,7 +143,7 @@ Deno.test('add over an EXISTING object member inverts to replace, not remove', a
   assertEquals(journal.canonicalBytes, originalBytes, 'byte-for-byte restoration');
 });
 
-Deno.test('add over an existing OBJECT value restores the whole old subtree', async () => {
+test('add over an existing OBJECT value restores the whole old subtree', async () => {
   const original = await loadFixtureDoc();
   const originalBytes = canonicalJson(original);
   const journal = new ManifestJournal(original, { now });
@@ -163,7 +165,7 @@ Deno.test('add over an existing OBJECT value restores the whole old subtree', as
   assertEquals(journal.canonicalBytes, originalBytes, 'the old overrides came back intact');
 });
 
-Deno.test('add of an ABSENT object member still inverts to remove', async () => {
+test('add of an ABSENT object member still inverts to remove', async () => {
   const original = await loadFixtureDoc();
   const originalBytes = canonicalJson(original);
   const journal = new ManifestJournal(original, { now });
@@ -179,7 +181,7 @@ Deno.test('add of an ABSENT object member still inverts to remove', async () => 
   assertEquals(journal.canonicalBytes, originalBytes);
 });
 
-Deno.test('array add stays an insert: both /- and an index invert to remove', async () => {
+test('array add stays an insert: both /- and an index invert to remove', async () => {
   const original = await loadFixtureDoc();
   const originalBytes = canonicalJson(original);
   const journal = new ManifestJournal(original, { now });
@@ -204,7 +206,7 @@ Deno.test('array add stays an insert: both /- and an index invert to remove', as
   assertEquals(journal.canonicalBytes, originalBytes, 'neither insert destroyed a sibling');
 });
 
-Deno.test('add of a prototype-chain key is an addition, not an overwrite', () => {
+test('add of a prototype-chain key is an addition, not an overwrite', () => {
   // `'toString' in parent` is true for every plain object, so reading presence
   // that way would call structuredClone on an inherited function and throw
   const journal = new ManifestJournal({ keep: 1 }, { now });
@@ -221,7 +223,7 @@ Deno.test('add of a prototype-chain key is an addition, not an overwrite', () =>
   assertEquals(journal.doc, { keep: 1 });
 });
 
-Deno.test('JSON Pointer escapes (~0 ~1) resolve correctly', () => {
+test('JSON Pointer escapes (~0 ~1) resolve correctly', () => {
   const journal = new ManifestJournal({ 'a/b': { 'c~d': 1 } }, { now });
   journal.commit({
     target,

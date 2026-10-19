@@ -1,32 +1,26 @@
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
-import { appendGenerationResult, pickResult, setIdentity, setRigState } from './receipts.ts';
-import { sha256Bytes } from './cache.ts';
-import { createWorkspace, readWorkspace, workspacePaths } from './workspace.ts';
-import { moveManifestCursor, workspaceJob } from './persistence.ts';
+import { fileURLToPath } from 'node:url';
+import { runProcess } from '../../tools/testing/process.ts';
+import { append } from './fixtures/state.ts';
+import { rejects } from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assert, assertEquals, assertRejects } from '@std/assert';
+import { pickResult, setIdentity, setRigState } from './dist/receipts.js';
+import { sha256Bytes } from './dist/cache.js';
+import { createWorkspace, readWorkspace, workspacePaths } from './dist/workspace.js';
+import { moveManifestCursor, workspaceJob } from './dist/persistence.js';
 
-async function append(workspace: string, id: string, hash = 'a'.repeat(64)) {
-  await appendGenerationResult(workspace, {
-    id,
-    backend: { modelId: 'fixture-gen', version: '1' },
-    params: {},
-    seed: 7,
-    startedAt: '2026-10-19T00:00:00Z',
-    wallTimeS: 0,
-    output: { gltfSha256: hash, tris: 1, kind: 'mesh' },
-    discarded: false,
-  });
-}
 
 function child(workspace: string, mode: string) {
-  return new Deno.Command('deno', {
-    args: ['run', '--allow-read', '--allow-write', import.meta.filename!, workspace, mode],
-    stdout: 'piped',
-    stderr: 'piped',
-  }).output();
+  return runProcess(process.execPath, [
+    fileURLToPath(new URL('./fixtures/persistence-worker.ts', import.meta.url)), workspace, mode,
+  ]);
 }
 
 async function fixture() {
-  const workspace = await Deno.makeTempDir({ prefix: 'sb-state-' });
+  const workspace = await fs.mkdtemp(join(tmpdir(), 'sb-state-'));
   await createWorkspace({
     workspace,
     characterId: 'state',
@@ -39,8 +33,8 @@ async function fixture() {
 const A = new Uint8Array([1, 2, 3, 4]), B = new Uint8Array([5, 6, 7, 8]);
 async function assetFixture() {
   const workspace = await fixture();
-  await Deno.writeFile(`${workspace}/a.glb`, A);
-  await Deno.writeFile(`${workspace}/b.glb`, B);
+  await fs.writeFile(`${workspace}/a.glb`, A);
+  await fs.writeFile(`${workspace}/b.glb`, B);
   await append(workspace, 'r1', await sha256Bytes(A));
   await append(workspace, 'r2', await sha256Bytes(B));
   await pickResult(workspace, 'r1', {
@@ -51,13 +45,13 @@ async function assetFixture() {
   return workspace;
 }
 
-Deno.test('undo/redo restores selected and transformed mesh bytes, including the first pick', async () => {
+test('undo/redo restores selected and transformed mesh bytes, including the first pick', async () => {
   const workspace = await assetFixture();
   try {
     const paths = workspacePaths(workspace);
     await pickResult(workspace, 'r2', { canonicalSource: `${workspace}/b.glb` });
     const C = new Uint8Array([9, 10, 11, 12]), D = new Uint8Array([13, 14, 15, 16]);
-    await Deno.writeFile(`${workspace}/rig.glb`, C);
+    await fs.writeFile(`${workspace}/rig.glb`, C);
     await setRigState(workspace, {
       track: 'A',
       skeletonProfile: 'ual-humanoid',
@@ -69,14 +63,14 @@ Deno.test('undo/redo restores selected and transformed mesh bytes, including the
       canonicalMesh: { gltfSha256: await sha256Bytes(C) },
       canonicalSource: `${workspace}/rig.glb`,
     });
-    await Deno.writeFile(`${workspace}/identity.glb`, D);
+    await fs.writeFile(`${workspace}/identity.glb`, D);
     await setIdentity(workspace, {
       detailLayers: [{ id: 'ink', uvDecalPng: 'ink.png' }],
       canonicalMesh: { gltfSha256: await sha256Bytes(D) },
     }, { canonicalSource: `${workspace}/identity.glb` });
     for (const bytes of [C, B, A]) {
       await moveManifestCursor(paths.manifest, 'undo');
-      assertEquals(await Deno.readFile(paths.canonicalModel), bytes);
+      assertEquals(new Uint8Array(await fs.readFile(paths.canonicalModel)), bytes);
       assertEquals(
         (await readWorkspace(workspace)).canonicalMesh?.gltfSha256,
         await sha256Bytes(bytes),
@@ -84,29 +78,27 @@ Deno.test('undo/redo restores selected and transformed mesh bytes, including the
     }
     await moveManifestCursor(paths.manifest, 'undo');
     assertEquals((await readWorkspace(workspace)).canonicalMesh, undefined);
-    await assertRejects(() => Deno.stat(paths.canonicalModel), Deno.errors.NotFound);
+    await rejects(() => fs.stat(paths.canonicalModel), { code: 'ENOENT' });
     for (const bytes of [A, B, C, D]) {
       await moveManifestCursor(paths.manifest, 'redo');
-      assertEquals(await Deno.readFile(paths.canonicalModel), bytes);
+      assertEquals(new Uint8Array(await fs.readFile(paths.canonicalModel)), bytes);
     }
-    const manifest = await Deno.readTextFile(paths.manifest);
-    await assertRejects(
-      () => pickResult(workspace, 'r1', { canonicalSource: `${workspace}/b.glb` }),
+    const manifest = await fs.readFile(paths.manifest, 'utf8');
+    await assertRejects(() => pickResult(workspace, 'r1', { canonicalSource: `${workspace}/b.glb` }),
       Error,
-      'hash mismatch',
-    );
+      'hash mismatch',);
     assertEquals(
-      await Deno.readTextFile(paths.manifest),
+      await fs.readFile(paths.manifest, 'utf8'),
       manifest,
       'failed promotion cannot replace the accepted asset',
     );
-    assertEquals(await Deno.readFile(paths.canonicalModel), D);
+    assertEquals(new Uint8Array(await fs.readFile(paths.canonicalModel)), D);
   } finally {
-    await Deno.remove(workspace, { recursive: true });
+    await fs.rm(workspace, { recursive: true });
   }
 });
 
-Deno.test('process death during asset publication recovers matching bytes and history', async (t) => {
+test('process death during asset publication recovers matching bytes and history', async (t) => {
   for (
     const boundary of [
       'before-intent',
@@ -117,7 +109,7 @@ Deno.test('process death during asset publication recovers matching bytes and hi
       'character.json',
     ]
   ) {
-    await t.step(boundary, async () => {
+    await t.test(boundary, async () => {
       const workspace = await assetFixture();
       try {
         const result = await child(workspace, `asset:${boundary}`);
@@ -126,21 +118,21 @@ Deno.test('process death during asset publication recovers matching bytes and hi
         const state = await readWorkspace(workspace);
         const expected = boundary === 'before-intent' ? A : B;
         assertEquals(state.canonicalMesh?.gltfSha256, await sha256Bytes(expected));
-        assertEquals(await Deno.readFile(paths.canonicalModel), expected);
+        assertEquals(new Uint8Array(await fs.readFile(paths.canonicalModel)), expected);
         if (boundary !== 'before-intent') {
           await moveManifestCursor(paths.manifest, 'undo');
-          assertEquals(await Deno.readFile(paths.canonicalModel), A);
+          assertEquals(new Uint8Array(await fs.readFile(paths.canonicalModel)), A);
           await moveManifestCursor(paths.manifest, 'redo');
-          assertEquals(await Deno.readFile(paths.canonicalModel), B);
+          assertEquals(new Uint8Array(await fs.readFile(paths.canonicalModel)), B);
         }
       } finally {
-        await Deno.remove(workspace, { recursive: true });
+        await fs.rm(workspace, { recursive: true });
       }
     });
   }
 });
 
-Deno.test('independent writers keep both acknowledged histories, including their inverses', async () => {
+test('independent writers keep both acknowledged histories, including their inverses', async () => {
   const workspace = await fixture();
   try {
     const results = await Promise.all([child(workspace, 'writer-a'), child(workspace, 'writer-b')]);
@@ -156,11 +148,11 @@ Deno.test('independent writers keep both acknowledged histories, including their
     for (let i = 0; i < 10; i++) await moveManifestCursor(manifest, 'redo');
     assertEquals((await readWorkspace(workspace)).generation.results.map((r) => r.id), ids);
   } finally {
-    await Deno.remove(workspace, { recursive: true });
+    await fs.rm(workspace, { recursive: true });
   }
 });
 
-Deno.test('job ownership spans computation, permits reads, and releases on early return', async () => {
+test('job ownership spans computation, permits reads, and releases on early return', async () => {
   const workspace = await fixture();
   try {
     const work = async function* () {
@@ -198,11 +190,11 @@ Deno.test('job ownership spans computation, permits reads, and releases on early
       'after-cancel',
     ]);
   } finally {
-    await Deno.remove(workspace, { recursive: true });
+    await fs.rm(workspace, { recursive: true });
   }
 });
 
-Deno.test('process death at each persistence boundary recovers one coherent state', async (t) => {
+test('process death at each persistence boundary recovers one coherent state', async (t) => {
   for (
     const boundary of [
       'before-intent',
@@ -212,7 +204,7 @@ Deno.test('process death at each persistence boundary recovers one coherent stat
       'character.json',
     ]
   ) {
-    await t.step(boundary, async () => {
+    await t.test(boundary, async () => {
       const workspace = await fixture();
       try {
         const result = await child(workspace, boundary);
@@ -221,7 +213,7 @@ Deno.test('process death at each persistence boundary recovers one coherent stat
         const state = await readWorkspace(workspace); // also proves the dead process released its lock
         if (boundary === 'before-intent') {
           assertEquals(state.generation.results, []);
-          assertEquals(await Deno.readTextFile(`${manifest}.journal.cursor`), '0');
+          assertEquals(await fs.readFile(`${manifest}.journal.cursor`, 'utf8'), '0');
         } else {
           assertEquals(state.generation.results.map((r) => r.id), ['new']);
           await moveManifestCursor(manifest, 'undo');
@@ -232,31 +224,13 @@ Deno.test('process death at each persistence boundary recovers one coherent stat
           ]);
         }
         assert(
-          !(await Array.fromAsync(Deno.readDir(workspace))).some((e) =>
+          !(await fs.readdir(workspace, { withFileTypes: true })).some((e) =>
             e.name.endsWith('.pending.json')
           ),
         );
       } finally {
-        await Deno.remove(workspace, { recursive: true });
+        await fs.rm(workspace, { recursive: true });
       }
     });
   }
 });
-
-if (import.meta.main) {
-  const [workspace, mode] = Deno.args;
-  if (mode.startsWith('writer-')) {
-    for (let i = 0; i < 5; i++) await append(workspace, `${mode}-${i}`);
-  } else {
-    const boundary = mode.replace('asset:', '');
-    const rename = Deno.rename;
-    Deno.rename = async (from, to) => {
-      if (boundary === 'before-intent' && String(to).endsWith('.pending.json')) Deno.exit(91);
-      await rename(from, to);
-      if (String(to).endsWith(boundary)) Deno.exit(91);
-    };
-    if (mode.startsWith('asset:')) {
-      await pickResult(workspace, 'r2', { canonicalSource: `${workspace}/b.glb` });
-    } else await append(workspace, 'new');
-  }
-}

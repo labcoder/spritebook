@@ -1,15 +1,19 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The registry seam speaks JobEvents only, including on failure — a broken
  * input yields a schema-valid error event, never a throw across the seam.
  * Going through loadCatalog() also exercises the bundled default-path
  * resolution (the percent-encoding trap from P3-T1 review F3 lives there).
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { loadCatalog, runInstallJob } from './mod.ts';
+import { assert, assertEquals } from '@std/assert';
+import { loadCatalog, runInstallJob } from './dist/mod.js';
 import { collect } from './_testutil.ts';
 
-Deno.test('registry seam: an unknown model becomes an error EVENT, not a throw', async () => {
-  const tmp = await Deno.makeTempDir();
+test('registry seam: an unknown model becomes an error EVENT, not a throw', async () => {
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const catalog = await loadCatalog(); // the bundled catalog (empty until integration)
     const events = await collect(runInstallJob({
@@ -24,6 +28,6 @@ Deno.test('registry seam: an unknown model becomes an error EVENT, not a throw',
     assert(err.t === 'error' && err.code === 'unknown-model', 'terminal error event');
     assert(!events.some((e) => e.t === 'done'), 'no done after failure');
   } finally {
-    await Deno.remove(tmp, { recursive: true });
+    await fs.rm(tmp, { recursive: true });
   }
 });

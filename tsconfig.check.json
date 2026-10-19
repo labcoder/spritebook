@@ -3,6 +3,10 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["packages/schema/**/*.ts"],
-  "exclude": ["**/dist/**"]
+  "include": [
+    "packages/schema/**/*.ts"
+  ],
+  "exclude": [
+    "**/dist/**"
+  ]
 }

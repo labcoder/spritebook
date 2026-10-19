@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Project pins (D-009): thin IO over ProjectPinsSchema. The pins document
  * maps model/pack ids to exact versions and carries rendererVersion for the
@@ -8,7 +9,7 @@ import { canonicalJson, parseWith, type ProjectPins, ProjectPinsSchema } from '@
 
 /** Read + schema-validate a pins file. Missing or broken files throw actionably. */
 export async function readPins(path: string): Promise<ProjectPins> {
-  const text = await Deno.readTextFile(path).catch((err) => {
+  const text = await fs.readFile(path, 'utf8').catch((err) => {
     throw new Error(`cannot read pins file ${path}: ${message(err)}`);
   });
   let raw: unknown;
@@ -23,7 +24,7 @@ export async function readPins(path: string): Promise<ProjectPins> {
 /** Validate, then write canonically — a pins file on disk is always schema-true bytes. */
 export async function writePins(path: string, pins: ProjectPins): Promise<void> {
   const valid = parseWith(ProjectPinsSchema, pins, 'ProjectPins (writePins)');
-  await Deno.writeTextFile(path, canonicalJson(valid));
+  await fs.writeFile(path, canonicalJson(valid));
 }
 
 function message(err: unknown): string {

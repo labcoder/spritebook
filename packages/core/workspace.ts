@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The character workspace (P3-T2): the on-disk home of one character — its
  * manifest, its journal, the source image, and every generation result. The
@@ -162,9 +163,9 @@ export async function createWorkspace(opts: CreateWorkspaceOptions): Promise<Cha
     mirroring: { enabled: false },
   }, `initial CharacterManifest for "${opts.characterId}"`);
 
-  await Deno.mkdir(paths.sourceDir, { recursive: true });
-  await Deno.mkdir(paths.resultsDir, { recursive: true });
-  await Deno.mkdir(paths.canonicalDir, { recursive: true });
+  await fs.mkdir(paths.sourceDir, { recursive: true });
+  await fs.mkdir(paths.resultsDir, { recursive: true });
+  await fs.mkdir(paths.canonicalDir, { recursive: true });
   await initializeManifest(paths.manifest, manifest);
   return manifest;
 }
@@ -195,7 +196,7 @@ export async function storeSourceImage(
 ): Promise<StoredSource> {
   let bytes: Uint8Array;
   try {
-    bytes = await Deno.readFile(imagePath);
+    bytes = new Uint8Array(await fs.readFile(imagePath));
   } catch {
     throw new Error(`Cannot read the source image at "${imagePath}" - does that file exist?`);
   }
@@ -203,8 +204,8 @@ export async function storeSourceImage(
   const originalFilename = baseName(imagePath);
   const { sourceDir } = workspacePaths(workspace);
   const storedPath = `${sourceDir}/${sha256}${extName(originalFilename)}`;
-  await Deno.mkdir(sourceDir, { recursive: true });
-  if (!(await pathExists(storedPath))) await Deno.writeFile(storedPath, bytes);
+  await fs.mkdir(sourceDir, { recursive: true });
+  if (!(await pathExists(storedPath))) await fs.writeFile(storedPath, bytes);
   return { sha256, storedPath, originalFilename };
 }
 
@@ -253,10 +254,10 @@ export function sourceImagePath(workspace: string, manifest: CharacterManifest):
 
 async function pathExists(path: string): Promise<boolean> {
   try {
-    await Deno.stat(path);
+    await fs.stat(path);
     return true;
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return false;
     throw err;
   }
 }

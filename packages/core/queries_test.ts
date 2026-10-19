@@ -1,12 +1,17 @@
-import { assertEquals, assertRejects } from 'jsr:@std/assert@1';
+import { rejects } from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assertEquals } from '@std/assert';
 import { SCHEMA_VERSION } from '@spritebook/schema';
-import { createWorkspace, readWorkspace, workspacePaths } from './workspace.ts';
-import { commitManifest, moveManifestCursor } from './persistence.ts';
-import { listWorkspaces, readBakeArtifact, readCurrentBake } from './queries.ts';
+import { createWorkspace, readWorkspace, workspacePaths } from './dist/workspace.js';
+import { commitManifest, moveManifestCursor } from './dist/persistence.js';
+import { listWorkspaces, readBakeArtifact, readCurrentBake } from './dist/queries.js';
 import { runCli } from '../cli/mod.ts';
 
-Deno.test('core, CLI and artifacts follow the selected bake through undo, never directory age', async () => {
-  const root = await Deno.makeTempDir();
+test('core, CLI and artifacts follow the selected bake through undo, never directory age', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const workspace = `${root}/hero`;
   try {
     await createWorkspace({
@@ -17,18 +22,16 @@ Deno.test('core, CLI and artifacts follow the selected bake through undo, never 
     });
     const manifestPath = workspacePaths(workspace).manifest;
     const bake = JSON.parse(
-      await Deno.readTextFile(
-        new URL('../schema/fixtures/valid/bake-manifest.json', import.meta.url),
-      ),
+      await fs.readFile(new URL('../schema/fixtures/valid/bake-manifest.json', import.meta.url), 'utf8'),
     );
     Object.assign(bake, { schemaVersion: SCHEMA_VERSION, characterId: 'hero' });
     bake.inputs.characterId = 'hero';
     for (const [id, byte] of [['e41c', 1], ['f00d', 2]] as const) {
       const dir = `${workspace}/bakes/bake-${id}`;
-      await Deno.mkdir(dir, { recursive: true });
-      await Deno.writeTextFile(`${dir}/manifest.json`, JSON.stringify({ ...bake, bakeId: id }));
-      await Deno.writeFile(`${dir}/atlas-0-lit.png`, new Uint8Array([byte]));
-      await Deno.writeFile(`${dir}/contact-walk_relaxed.gif`, new Uint8Array([byte]));
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(`${dir}/manifest.json`, JSON.stringify({ ...bake, bakeId: id }));
+      await fs.writeFile(`${dir}/atlas-0-lit.png`, new Uint8Array([byte]));
+      await fs.writeFile(`${dir}/contact-walk_relaxed.gif`, new Uint8Array([byte]));
       await commitManifest(manifestPath, () => ({
         op: [{ op: 'add', path: '/lastBakeId', value: id }],
         label: `Select ${id}`,
@@ -51,8 +54,8 @@ Deno.test('core, CLI and artifacts follow the selected bake through undo, never 
     );
     assertEquals(lines.length, 1, 'query is one document, not a job stream');
     assertEquals(JSON.parse(lines[0]).manifest.bakeId, 'e41c');
-    await Deno.mkdir(`${root}/broken`);
-    await Deno.writeTextFile(`${root}/broken/character.json`, 'broken JSON');
+    await fs.mkdir(`${root}/broken`);
+    await fs.writeFile(`${root}/broken/character.json`, 'broken JSON');
     const list = await listWorkspaces(root);
     assertEquals(list.length, 2);
     assertEquals(
@@ -60,8 +63,8 @@ Deno.test('core, CLI and artifacts follow the selected bake through undo, never 
       await readWorkspace(workspace),
     );
     assertEquals(list.find((w) => w.dir.endsWith('broken'))?.manifest, null);
-    await Deno.remove(`${workspace}/bakes/bake-e41c/manifest.json`);
-    await assertRejects(() => readCurrentBake(workspace), Deno.errors.NotFound);
+    await fs.rm(`${workspace}/bakes/bake-e41c/manifest.json`);
+    await rejects(() => readCurrentBake(workspace), { code: 'ENOENT' });
     await moveManifestCursor(manifestPath, 'undo');
     assertEquals(
       await readBakeArtifact(workspace, 'thumb'),
@@ -69,6 +72,6 @@ Deno.test('core, CLI and artifacts follow the selected bake through undo, never 
       'no selection cannot choose another existing bake',
     );
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });

@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * The params gate's MESSAGES, and the one coercion that keeps a knob reachable.
  *
@@ -8,8 +9,8 @@
  * failed with "params must NOT have additional properties" and left the user
  * with no way to learn which of the three was wrong.
  */
-import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1';
-import { coerceParams, propertyNames, validateParams } from './params.ts';
+import { assert, assertEquals, assertStringIncludes } from '@std/assert';
+import { coerceParams, propertyNames, validateParams } from './dist/params.js';
 
 const SCHEMA = {
   type: 'object',
@@ -22,7 +23,7 @@ const SCHEMA = {
   },
 };
 
-Deno.test('an unknown param is named, with the roster it could have come from', () => {
+test('an unknown param is named, with the roster it could have come from', () => {
   const check = validateParams(SCHEMA, { steps: 25, resolution: 1024 });
   assert(!check.ok);
   assertEquals(check.errors, [
@@ -30,14 +31,14 @@ Deno.test('an unknown param is named, with the roster it could have come from', 
   ]);
 });
 
-Deno.test('several unknown params arrive as ONE sentence, sorted', () => {
+test('several unknown params arrive as ONE sentence, sorted', () => {
   const check = validateParams(SCHEMA, { quality: 'high', resolution: 1024 });
   assert(!check.ok);
   assertEquals(check.errors.length, 1);
   assertStringIncludes(check.errors[0], 'unknown param(s) quality, resolution;');
 });
 
-Deno.test('the wording matches the sidecar validator, the other lock on this door', () => {
+test('the wording matches the sidecar validator, the other lock on this door', () => {
   // sidecar/spritebook_sidecar/adapters/__init__.py:
   //   f"unknown param(s) {', '.join(unknown)}; allowed: {', '.join(sorted(props))}"
   const check = validateParams(SCHEMA, { resolution: 1024 });
@@ -48,7 +49,7 @@ Deno.test('the wording matches the sidecar validator, the other lock on this doo
   );
 });
 
-Deno.test('an enum failure lists the values it would have taken', () => {
+test('an enum failure lists the values it would have taken', () => {
   const check = validateParams(SCHEMA, { pipelineType: '2048' });
   assert(!check.ok);
   assertEquals(check.errors, [
@@ -56,13 +57,13 @@ Deno.test('an enum failure lists the values it would have taken', () => {
   ]);
 });
 
-Deno.test("range failures keep ajv's own wording, which was already actionable", () => {
+test("range failures keep ajv's own wording, which was already actionable", () => {
   const check = validateParams(SCHEMA, { steps: 500 });
   assert(!check.ok);
   assertStringIncludes(check.errors[0], 'params/steps must be <= 50');
 });
 
-Deno.test('unknown keys and bad values are reported together, not one per run', () => {
+test('unknown keys and bad values are reported together, not one per run', () => {
   const check = validateParams(SCHEMA, { resolution: 1024, steps: 500 });
   assert(!check.ok);
   assertEquals(check.errors.length, 2);
@@ -70,7 +71,7 @@ Deno.test('unknown keys and bad values are reported together, not one per run', 
   assertStringIncludes(check.errors[1], 'params/steps');
 });
 
-Deno.test('a digit-string enum is reachable from --adjust, which JSON-parses', () => {
+test('a digit-string enum is reachable from --adjust, which JSON-parses', () => {
   // `--adjust pipelineType=1024` hands core the NUMBER 1024
   const raw = { pipelineType: 1024 };
   assert(!validateParams(SCHEMA, raw).ok, 'the number is what used to be refused');
@@ -79,20 +80,20 @@ Deno.test('a digit-string enum is reachable from --adjust, which JSON-parses', (
   assert(validateParams(SCHEMA, coerced).ok);
 });
 
-Deno.test('coercion is one-way: nothing is parsed INTO a number', () => {
+test('coercion is one-way: nothing is parsed INTO a number', () => {
   // a typo must still fail loudly rather than be repaired into a wrong value
   const coerced = coerceParams(SCHEMA, { steps: '25', lowVram: 'yes' });
   assertEquals(coerced, { steps: '25', lowVram: 'yes' });
   assert(!validateParams(SCHEMA, coerced).ok);
 });
 
-Deno.test('coercion leaves undescribed keys alone, so the error can still name them', () => {
+test('coercion leaves undescribed keys alone, so the error can still name them', () => {
   const coerced = coerceParams(SCHEMA, { resolution: 1024 });
   assertEquals(coerced, { resolution: 1024 });
   assertStringIncludes(validateParams(SCHEMA, coerced).ok ? '' : 'unknown', 'unknown');
 });
 
-Deno.test('propertyNames is the roster, sorted and stable', () => {
+test('propertyNames is the roster, sorted and stable', () => {
   assertEquals(propertyNames(SCHEMA), [
     'decimationTarget',
     'lowVram',

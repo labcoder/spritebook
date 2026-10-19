@@ -11,14 +11,15 @@
     "apps/studio"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "npm run build:host && tsc -b && node tools/copy-assets.mjs",
     "check": "tsc -p tsconfig.check.json",
     "test": "node --test --test-concurrency=1 packages/schema/*_test.ts",
     "test:schema": "node --test packages/schema/*_test.ts",
     "lint": "biome lint .",
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
-    "hooks:install": "git config core.hooksPath .githooks"
+    "hooks:install": "git config core.hooksPath .githooks",
+    "build:host": "node tools/build-host.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

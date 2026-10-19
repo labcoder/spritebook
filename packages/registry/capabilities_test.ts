@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * Capabilities: what a backend can be ASKED to do, and with which defaults.
  *
@@ -7,7 +8,7 @@
  * halves that promise makes: resolution by capability, and defaults that differ
  * per operation on ONE model.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import {
   type Capability,
   defaultsFor,
@@ -19,7 +20,7 @@ import {
   versionCapabilities,
 } from '@spritebook/schema';
 import { validateParams } from '@spritebook/core';
-import { loadCatalog } from './mod.ts';
+import { loadCatalog } from './dist/mod.js';
 import { toyEntry, toyVersion } from './_testutil.ts';
 
 /** Exactly what the verb will do: ask the catalog, not a hardcoded id. */
@@ -27,7 +28,7 @@ function backendsFor(models: ModelEntry[], op: Capability): string[] {
   return models.filter((m) => m.versions.some((v) => versionCan(m.kind, v, op))).map((m) => m.id);
 }
 
-Deno.test('a verb resolves its backend by capability, not by name', async () => {
+test('a verb resolves its backend by capability, not by name', async () => {
   const cat = await loadCatalog();
   // the real backend and the weightless stand-in that makes the path testable
   assertEquals(backendsFor(cat.models, 'retexture'), ['trellis2-4b', 'fixture-gen']);
@@ -41,7 +42,7 @@ Deno.test('a verb resolves its backend by capability, not by name', async () => 
   assertEquals([...versionCapabilities(unirig.kind, unirig.versions[0])], ['rig']);
 });
 
-Deno.test('trellis2 retextures with a bigger seed ladder than it generates with', async () => {
+test('trellis2 retextures with a bigger seed ladder than it generates with', async () => {
   const cat = await loadCatalog();
   const t = cat.models.find((m) => m.id === 'trellis2-4b')!;
   const v = t.versions[0];
@@ -73,7 +74,7 @@ Deno.test('trellis2 retextures with a bigger seed ladder than it generates with'
   assertEquals(defaultsFor(v, 'retexture').textureGuidanceRescale, 0.2);
 });
 
-Deno.test('every entry can actually RUN every operation it declares', async () => {
+test('every entry can actually RUN every operation it declares', async () => {
   // The test that was missing, and the break it missed: `trellis2-4b` declared
   // retexture, carried `resolution` and `textureRetries` as operation defaults,
   // and had a `paramsSchema` with `additionalProperties: false` that listed
@@ -98,7 +99,7 @@ Deno.test('every entry can actually RUN every operation it declares', async () =
   }
 });
 
-Deno.test('one schema, two operations: each sees only the knobs it accepts', async () => {
+test('one schema, two operations: each sees only the knobs it accepts', async () => {
   // The field report: `gen --adjust resolution=1024` was refused with "params
   // must NOT have additional properties", because trellis2's union schema
   // carries the retexture sampler's knob and nothing said whose it was.
@@ -123,12 +124,13 @@ Deno.test('one schema, two operations: each sees only the knobs it accepts', asy
   );
 });
 
-Deno.test('the narrowed schema is stable by identity, so core caches it once', async () => {
+test('the narrowed schema is stable by identity, so core caches it once', async () => {
   // core compiles ajv validators keyed by schema IDENTITY (packages/core/params.ts) —
   // a fresh object per call would recompile the same schema on every job
   const cat = await loadCatalog();
   const t = cat.models.find((m) => m.id === 'trellis2-4b')!.versions[0];
-  assert(paramsSchemaFor(t, 'gen3d') === paramsSchemaFor(t, 'gen3d'));
+  const generation = paramsSchemaFor(t, 'gen3d');
+  assert(paramsSchemaFor(t, 'gen3d') === generation);
   assert(paramsSchemaFor(t, 'gen3d') !== paramsSchemaFor(t, 'retexture'));
   // a single-capability backend declares no sets and pays nothing: same object
   const unirig = cat.models.find((m) => m.id === 'unirig')!.versions[0];
@@ -136,7 +138,7 @@ Deno.test('the narrowed schema is stable by identity, so core caches it once', a
   assertEquals(operationsAccepting(unirig, 'anything'), []);
 });
 
-Deno.test('a knob set that names an undescribed property is refused', () => {
+test('a knob set that names an undescribed property is refused', () => {
   // the typo that would otherwise DELETE a parameter: the narrowed schema drops
   // what it does not find, so a misspelling silently removes the real knob
   const withSet = (keys: string[]) =>
@@ -158,7 +160,7 @@ Deno.test('a knob set that names an undescribed property is refused', () => {
   assert(withSet(['seed']).success, 'a described knob is admitted');
 });
 
-Deno.test('defaults for an operation the version cannot do are refused', () => {
+test('defaults for an operation the version cannot do are refused', () => {
   const withOp = (capabilities?: Capability[]) =>
     ModelCatalogSchema.safeParse({
       schemaVersion: 2,

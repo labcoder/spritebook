@@ -1,3 +1,10 @@
+import { runProcess } from '../../tools/testing/process.ts';
+import { fileURLToPath } from 'node:url';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The machine-wide VRAM lease.
  *
@@ -5,23 +12,22 @@
  * directory exercise exactly the code two PROCESSES exercise — the algorithm
  * has no notion of a process beyond the pid it writes down. What that does not
  * cover is OS-level interleaving of the directory mutex, so there is a real
- * two-process test at the bottom, gated the way the other spawn-based lanes
- * are (`deno task test` grants `--allow-run` for nvidia-smi and uv only).
+ * two-process test at the bottom, enabled with SPRITEBOOK_LEASE_ITEST=1.
  *
  * A killed holder is simulated the way a killed holder actually looks: a claim
  * file on disk whose heartbeat stopped. There is no way to leave a more
  * authentic corpse than that.
  */
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
-import { acquireVramLease, defaultLeaseDir, vramCommittedGb } from './vramlease.ts';
+import { assert, assertEquals, assertRejects } from '@std/assert';
+import { acquireVramLease, defaultLeaseDir, vramCommittedGb } from './dist/vramlease.js';
 
 const FAST = { pollMs: 20, heartbeatMs: 40, staleMs: 160 } as const;
 
 async function tmp(): Promise<string> {
-  return await Deno.makeTempDir();
+  return await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
 }
 
-Deno.test('with no budget there is no lease, and no directory', async () => {
+test('with no budget there is no lease, and no directory', async () => {
   // detection returning null must not invent a ceiling that refuses work the
   // card can actually do
   const dir = await tmp();
@@ -35,13 +41,13 @@ Deno.test('with no budget there is no lease, and no directory', async () => {
     const none = await acquireVramLease({ gb: 0, jobId: 'prep', budgetGb: 24, dir, ...FAST });
     assertEquals(none.path, null);
     await none.release();
-    assertEquals([...Deno.readDirSync(dir)].length, 0, 'no files at all');
+    assertEquals([...readdirSync(dir, { withFileTypes: true })].length, 0, 'no files at all');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('a claim bigger than the machine is refused, not waited on', async () => {
+test('a claim bigger than the machine is refused, not waited on', async () => {
   const dir = await tmp();
   try {
     await assertRejects(
@@ -49,13 +55,13 @@ Deno.test('a claim bigger than the machine is refused, not waited on', async () 
       Error,
       'could never start',
     );
-    assertEquals([...Deno.readDirSync(dir)].filter((e) => e.isFile).length, 0, 'and left nothing');
+    assertEquals([...readdirSync(dir, { withFileTypes: true })].filter((e) => e.isFile()).length, 0, 'and left nothing');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('two claims that fit both hold; a third waits for a release', async () => {
+test('two claims that fit both hold; a third waits for a release', async () => {
   const dir = await tmp();
   try {
     const a = await acquireVramLease({ gb: 8, jobId: 'a', budgetGb: 24, dir, ...FAST });
@@ -84,11 +90,11 @@ Deno.test('two claims that fit both hold; a third waits for a release', async ()
     await c.release();
     assertEquals(await vramCommittedGb(dir, FAST.staleMs), 0);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('the OLDEST waiter goes first, even when a later one would fit', async () => {
+test('the OLDEST waiter goes first, even when a later one would fit', async () => {
   // the cross-process form of the queue's FIFO rule: without it a 20 GiB job
   // waits behind every 1 GiB job anyone starts, forever
   const dir = await tmp();
@@ -119,36 +125,36 @@ Deno.test('the OLDEST waiter goes first, even when a later one would fit', async
     for (const l of leases) await l.release();
     assertEquals(await vramCommittedGb(dir, FAST.staleMs), 0);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('a KILLED holder gives its VRAM back when its heartbeat lapses', async () => {
+test('a KILLED holder gives its VRAM back when its heartbeat lapses', async () => {
   // what a killed process actually leaves behind: a held claim whose mtime
   // stops moving. Nothing else about it is distinguishable from a live one.
   const dir = await tmp();
   try {
     const corpse = `${dir}/1000-4242-dead.json`;
-    await Deno.writeTextFile(
+    await fs.writeFile(
       corpse,
       JSON.stringify({ state: 'held', gb: 20, at: 1000, pid: 4242, jobId: 'killed' }),
     );
     const old = new Date(Date.now() - 60_000);
-    await Deno.utime(corpse, old, old);
+    await fs.utimes(corpse, old, old);
 
     assertEquals(await vramCommittedGb(dir, FAST.staleMs), 0, 'a stale claim commits nothing');
     // and the reaper actually removed the file rather than only ignoring it
-    assertEquals(await Deno.stat(corpse).catch(() => null), null, 'the corpse was buried');
+    assertEquals(await fs.stat(corpse).catch(() => null), null, 'the corpse was buried');
 
     const lease = await acquireVramLease({ gb: 24, jobId: 'next', budgetGb: 24, dir, ...FAST });
     assertEquals(await vramCommittedGb(dir, FAST.staleMs), 24, 'the whole budget came back');
     await lease.release();
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('a LIVE holder is not reaped while it heartbeats', async () => {
+test('a LIVE holder is not reaped while it heartbeats', async () => {
   // the other half of the same rule: a long generate must not have its budget
   // taken away underneath it just for taking a while
   const dir = await tmp();
@@ -160,28 +166,28 @@ Deno.test('a LIVE holder is not reaped while it heartbeats', async () => {
     await lease.release();
     assertEquals(await vramCommittedGb(dir, FAST.staleMs), 0);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('a stale directory mutex does not wedge the machine', async () => {
+test('a stale directory mutex does not wedge the machine', async () => {
   // the lock holder dying between mkdir and remove is the one failure that
   // would stop every SpriteBook process on the box
   const dir = await tmp();
   try {
-    await Deno.mkdir(`${dir}/.lock`, { recursive: true });
+    await fs.mkdir(`${dir}/.lock`, { recursive: true });
     const old = new Date(Date.now() - 60_000);
-    await Deno.utime(`${dir}/.lock`, old, old);
+    await fs.utimes(`${dir}/.lock`, old, old);
 
     const lease = await acquireVramLease({ gb: 8, jobId: 'after', budgetGb: 24, dir, ...FAST });
     assertEquals(await vramCommittedGb(dir, FAST.staleMs), 8);
     await lease.release();
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('cancelling while waiting leaves no claim behind', async () => {
+test('cancelling while waiting leaves no claim behind', async () => {
   const dir = await tmp();
   try {
     const holder = await acquireVramLease({ gb: 20, jobId: 'holder', budgetGb: 24, dir, ...FAST });
@@ -198,15 +204,15 @@ Deno.test('cancelling while waiting leaves no claim behind', async () => {
     ac.abort();
     await assertRejects(() => pending, Error, 'Cancelled while waiting');
     // the abandoned claim is gone immediately, not after a stale window
-    const files = [...Deno.readDirSync(dir)].filter((e) => e.isFile);
+    const files = [...readdirSync(dir, { withFileTypes: true })].filter((e) => e.isFile());
     assertEquals(files.length, 1, `only the holder remains: ${files.map((f) => f.name)}`);
     await holder.release();
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('a timeout gives up and says what it was waiting for', async () => {
+test('a timeout gives up and says what it was waiting for', async () => {
   const dir = await tmp();
   try {
     const holder = await acquireVramLease({ gb: 20, jobId: 'holder', budgetGb: 24, dir, ...FAST });
@@ -225,11 +231,11 @@ Deno.test('a timeout gives up and says what it was waiting for', async () => {
     );
     await holder.release();
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('the default directory is machine-wide, not per-workspace', () => {
+test('the default directory is machine-wide, not per-workspace', () => {
   // two Studio-spawned processes in different workspaces must land in the same
   // place or the whole exercise is decorative
   const d = defaultLeaseDir();
@@ -237,32 +243,22 @@ Deno.test('the default directory is machine-wide, not per-workspace', () => {
   assert(!d.includes('character'), 'nothing workspace-shaped is in the path');
 });
 
-Deno.test('ACCEPTANCE: two real PROCESSES contend for one budget', async () => {
-  // Everything above proves the protocol; only this proves the OS agrees —
-  // that two `deno` processes racing the directory mutex do not both take the
-  // card. Gated because `deno task test` grants --allow-run for nvidia-smi and
-  // uv only; run it with:
-  //
-  //   SPRITEBOOK_LEASE_ITEST=1 deno test --allow-all packages/core/vramlease_test.ts
-  if (Deno.env.get('SPRITEBOOK_LEASE_ITEST') !== '1') {
+test('ACCEPTANCE: two real PROCESSES contend for one budget', async () => {
+  // Separate processes must share the same admission budget.
+  if (process.env['SPRITEBOOK_LEASE_ITEST'] !== '1') {
     console.log('skip: set SPRITEBOOK_LEASE_ITEST=1 to run the two-process lease test');
     return;
   }
   const dir = await tmp();
-  const holder = new URL('./fixtures/leaseholder.ts', import.meta.url).pathname
-    .replace(/^\/([A-Za-z]:)/, '$1');
+  const holder = fileURLToPath(new URL('./fixtures/leaseholder.ts', import.meta.url));
   try {
     // 16 + 16 does not fit in 24: exactly one may hold at a time
     const run = (jobId: string, holdMs: number) =>
-      new Deno.Command(Deno.execPath(), {
-        args: ['run', '--allow-all', holder, dir, '16', jobId, String(holdMs)],
-        stdout: 'piped',
-        stderr: 'piped',
-      }).output();
+      runProcess(process.execPath, [holder, dir, '16', jobId, String(holdMs)]);
 
     const [a, b] = await Promise.all([run('proc-a', 700), run('proc-b', 700)]);
-    const out = (r: Deno.CommandOutput) => new TextDecoder().decode(r.stdout);
-    const err = (r: Deno.CommandOutput) => new TextDecoder().decode(r.stderr);
+    const out = (r: Awaited<ReturnType<typeof runProcess>>) => new TextDecoder().decode(r.stdout);
+    const err = (r: Awaited<ReturnType<typeof runProcess>>) => new TextDecoder().decode(r.stderr);
     assertEquals(a.code, 0, err(a));
     assertEquals(b.code, 0, err(b));
 
@@ -281,6 +277,6 @@ Deno.test('ACCEPTANCE: two real PROCESSES contend for one budget', async () => {
     assert(waiter.includes('16 GiB'), waiter);
     assertEquals(await vramCommittedGb(dir, 240), 0, 'and both gave it back');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });

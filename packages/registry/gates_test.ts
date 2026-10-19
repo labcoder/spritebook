@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * Gate laws: license acceptance and territory declarations are enforced with
  * exact codes and actionable sentences; platform satisfiability follows the
@@ -5,7 +6,7 @@
  * are exercised through injected runners — no nvidia-smi, no GPU — plus one
  * skip-graceful smoke of the real default path.
  */
-import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertStringIncludes } from '@std/assert';
 import { PlatformSchema } from '@spritebook/schema';
 import {
   type CommandRunner,
@@ -15,7 +16,7 @@ import {
   gatePlatform,
   gateTerritory,
   gateVram,
-} from './gates.ts';
+} from './dist/gates.js';
 import { toyEntry, toyVersion } from './_testutil.ts';
 
 const RAIL = toyEntry({
@@ -35,7 +36,7 @@ const EXCLUDING = toyEntry({
   },
 });
 
-Deno.test('gateLicense: acceptance-required licenses block until --accept-license', () => {
+test('gateLicense: acceptance-required licenses block until --accept-license', () => {
   const blocked = gateLicense(RAIL, { acceptLicense: false });
   assert(!blocked.ok);
   assertEquals(blocked.code, 'license-acceptance-required');
@@ -48,7 +49,7 @@ Deno.test('gateLicense: acceptance-required licenses block until --accept-licens
   assertEquals(gateLicense(toyEntry(), { acceptLicense: false }), { ok: true });
 });
 
-Deno.test('gateTerritory: the full declaration matrix (D-027)', () => {
+test('gateTerritory: the full declaration matrix (D-027)', () => {
   // no exclusions: fine with or without a declaration
   assertEquals(gateTerritory(toyEntry(), {}), { ok: true });
   assertEquals(gateTerritory(toyEntry(), { territory: 'US' }), { ok: true });
@@ -81,7 +82,7 @@ Deno.test('gateTerritory: the full declaration matrix (D-027)', () => {
   assertEquals(lower.code, 'territory-invalid', 'format precedes membership');
 });
 
-Deno.test('gatePlatform: cpu entries run anywhere with that OS; accelerator entries do not', () => {
+test('gatePlatform: cpu entries run anywhere with that OS; accelerator entries do not', () => {
   // cpu entry on a cuda machine of the same OS: satisfiable
   assertEquals(
     gatePlatform(toyVersion({ platforms: ['windows-cpu'] }), 'windows-cuda'),
@@ -109,7 +110,7 @@ Deno.test('gatePlatform: cpu entries run anywhere with that OS; accelerator entr
   assertStringIncludes(mac.message, 'macos-cpu');
 });
 
-Deno.test('gateVram: advisory statuses, never a block', () => {
+test('gateVram: advisory statuses, never a block', () => {
   assertEquals(gateVram(toyVersion(), 4), { status: 'not-required' });
   assertEquals(gateVram(toyVersion(), null), { status: 'not-required' });
 
@@ -133,7 +134,7 @@ function fakeRun(res: { ok: boolean; stdout: string }, calls: string[][] = []): 
   };
 }
 
-Deno.test('detectPlatform: os + probe matrix through injected runners', async () => {
+test('detectPlatform: os + probe matrix through injected runners', async () => {
   const gpuList = { ok: true, stdout: 'GPU 0: NVIDIA GeForce RTX 3090 (UUID: GPU-x)\n' };
   const calls: string[][] = [];
   assertEquals(await detectPlatform(fakeRun(gpuList, calls), 'windows'), 'windows-cuda');
@@ -147,7 +148,7 @@ Deno.test('detectPlatform: os + probe matrix through injected runners', async ()
   assertEquals(darwinCalls, []);
 });
 
-Deno.test('detectVramGb: MiB -> GiB (1 decimal), first GPU, failures -> null', async () => {
+test('detectVramGb: MiB -> GiB (1 decimal), first GPU, failures -> null', async () => {
   assertEquals(await detectVramGb(fakeRun({ ok: true, stdout: '24576\n' })), 24);
   assertEquals(await detectVramGb(fakeRun({ ok: true, stdout: '11178\n' })), 10.9);
   assertEquals(await detectVramGb(fakeRun({ ok: true, stdout: '24576\n12288\n' })), 24);
@@ -157,7 +158,7 @@ Deno.test('detectVramGb: MiB -> GiB (1 decimal), first GPU, failures -> null', a
   assertEquals(await detectVramGb(fakeRun({ ok: true, stdout: '-5\n' })), null);
 });
 
-Deno.test('default detectors: skip-graceful smoke (no GPU required, no GPU asserted)', async () => {
+test('default detectors: skip-graceful smoke (no GPU required, no GPU asserted)', async () => {
   // the default runner treats ANY spawn failure as "probe says no", so this
   // passes identically on dev boxes with a 3090 and on GPU-less CI
   PlatformSchema.parse(await detectPlatform());

@@ -1,10 +1,11 @@
+
 /**
  * A real second process for the lease test: takes a claim, prints one line so
  * the parent knows it is held, sits, releases. Args: <dir> <gb> <jobId> <holdMs>
  */
-import { acquireVramLease } from '../vramlease.ts';
+import { acquireVramLease } from '../dist/vramlease.js';
 
-const [dir, gb, jobId, holdMs] = Deno.args;
+const [dir, gb, jobId, holdMs] = process.argv.slice(2);
 const lease = await acquireVramLease({
   dir,
   gb: Number(gb),

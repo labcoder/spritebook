@@ -10,6 +10,12 @@ patch/inverse construction and publication. Closing the handle or killing its pr
 ownership. Lock files are never unlinked or stolen based on elapsed time. Nested core operations
 reuse ownership in their asynchronous call context; separate jobs do not share it.
 
+F4's Node implementation acquires the same kernel lock through the app-owned `spritebook-lock`
+helper (`LockFileEx` on Windows, `flock` on Unix). A dedicated stdin pipe holds its lifetime;
+normal release or Node process death closes the pipe and drops the native handle. Acquisition
+order, reentrancy, transactions and recovery remain in TypeScript. The compiled helper ships with
+core; development builds compile it with Rust. The persistent lock file is still never deleted.
+
 A mutation validates the next state, writes a uniquely staged and file-synced version-1
 `<manifest>.pending.json`, then atomically renames it into place. That intent is the commit point.
 It contains the next manifest, complete retained journal and cursor. Materialization atomically
@@ -39,7 +45,7 @@ bytes remain readable. Never test migration on the sealed F0 controls or origina
 
 Validation uses independent child processes: concurrent appenders retain both histories and their
 inverses; abrupt exit before intent and after each rename boundary recovers a coherent old/new
-state. The normal test/coverage tasks grant Deno subprocess permission for these checks. No image
+state. The Node checks run the actual child-process fixtures against emitted core modules. No image
 goldens or retry loops are involved. Fresh execution so far is native Windows x64; other platforms
 remain qualification work.
 

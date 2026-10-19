@@ -41,8 +41,9 @@ phases). Requires [Deno](https://deno.com) 2.9.x.
 
 The [Node migration](future/roadmap.md#f4--migrate-the-existing-typescript-core-and-tauri-bridge) is
 active. Its npm workspace uses the version in `.node-version`: `npm ci --ignore-scripts`,
-`npm run build`, `npm run check` and `npm run test:schema` currently build and verify the compiled
-schema package. The remaining production core and desktop commands below still use Deno while
+`npm run build`, `npm run check` and `npm run test:schema` build the ported packages and verify the
+compiled schema contract. Building core's file-lock helper requires Rust/Cargo during development;
+installed artifacts include the binary. The remaining production CLI and desktop commands below still use Deno while
 their package groups are ported.
 
 ```sh

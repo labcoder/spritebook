@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * P3-T3 acceptance: "jointEdits are journaled patches — undo works on them."
  *
@@ -6,12 +10,12 @@
  * walks and land back on byte-identical bytes. A repair the user cannot take
  * back is a repair they will be afraid to try.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import type { CharacterId, RigState } from '@spritebook/schema';
 import { ManifestPatchSchema, parseWith } from '@spritebook/schema';
-import { applyPatchOps } from './journal.ts';
-import { createWorkspace, workspacePaths } from './workspace.ts';
-import { setRigState } from './receipts.ts';
+import { applyPatchOps } from './dist/journal.js';
+import { createWorkspace, workspacePaths } from './dist/workspace.js';
+import { setRigState } from './dist/receipts.js';
 
 const NOW = () => '2026-07-19T00:00:00Z';
 
@@ -29,7 +33,7 @@ function rig(over: Partial<RigState> = {}): RigState {
 }
 
 async function workspace(): Promise<string> {
-  const dir = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   await createWorkspace({
     workspace: dir,
     characterId: 'knight' as CharacterId,
@@ -43,26 +47,26 @@ async function workspace(): Promise<string> {
 /** Replay the LAST journal patch's inverse, exactly as `spritebook undo` does. */
 async function undoOnce(ws: string): Promise<void> {
   const paths = workspacePaths(ws);
-  const patches = (await Deno.readTextFile(paths.journal))
+  const patches = (await fs.readFile(paths.journal, 'utf8'))
     .split('\n')
     .filter((l) => l.length > 0)
     .map((l, i) => parseWith(ManifestPatchSchema, JSON.parse(l), `journal line ${i + 1}`));
-  const cursor = Number((await Deno.readTextFile(paths.cursor)).trim());
+  const cursor = Number((await fs.readFile(paths.cursor, 'utf8')).trim());
   assert(cursor > 0, 'nothing to undo');
-  const doc = JSON.parse(await Deno.readTextFile(paths.manifest));
+  const doc = JSON.parse(await fs.readFile(paths.manifest, 'utf8'));
   const undone = applyPatchOps(doc, patches[cursor - 1].inverse);
-  await Deno.writeTextFile(paths.manifest, JSON.stringify(undone, null, 2));
-  await Deno.writeTextFile(paths.cursor, String(cursor - 1));
+  await fs.writeFile(paths.manifest, JSON.stringify(undone, null, 2));
+  await fs.writeFile(paths.cursor, String(cursor - 1));
 }
 
-Deno.test('ACCEPTANCE: a joint edit is a journaled patch, and undo takes it back', async () => {
+test('ACCEPTANCE: a joint edit is a journaled patch, and undo takes it back', async () => {
   const ws = await workspace();
   try {
     const paths = workspacePaths(ws);
 
     // 1. the rig lands
     await setRigState(ws, rig(), { now: NOW });
-    const afterRig = await Deno.readTextFile(paths.manifest);
+    const afterRig = await fs.readFile(paths.manifest, 'utf8');
     const rigged = JSON.parse(afterRig);
     assertEquals(rigged.rig.jointCount, 52);
     assertEquals(rigged.rig.jointEdits, [], 'no repairs yet');
@@ -75,12 +79,12 @@ Deno.test('ACCEPTANCE: a joint edit is a journaled patch, and undo takes it back
       }),
       { now: NOW },
     );
-    const edited = JSON.parse(await Deno.readTextFile(paths.manifest));
+    const edited = JSON.parse(await fs.readFile(paths.manifest, 'utf8'));
     assertEquals(edited.rig.jointEdits.length, 1);
     assertEquals(edited.rig.jointEdits[0].joint, 'clavicle_l');
 
     // the journal grew by exactly one replayable patch, with an inverse
-    const lines = (await Deno.readTextFile(paths.journal)).split('\n').filter((l) => l);
+    const lines = (await fs.readFile(paths.journal, 'utf8')).split('\n').filter((l) => l);
     assertEquals(lines.length, 2, 'one patch per mutation');
     const last = JSON.parse(lines[1]);
     assert(Array.isArray(last.inverse) && last.inverse.length > 0, 'the patch carries its inverse');
@@ -91,7 +95,7 @@ Deno.test('ACCEPTANCE: a joint edit is a journaled patch, and undo takes it back
 
     // 3. THE POINT: undo takes the nudge back, byte for byte
     await undoOnce(ws);
-    const undone = JSON.parse(await Deno.readTextFile(paths.manifest));
+    const undone = JSON.parse(await fs.readFile(paths.manifest, 'utf8'));
     assertEquals(undone.rig.jointEdits, [], 'the nudge is gone');
     assertEquals(undone.rig.jointCount, 52, 'the rig itself survives');
     assertEquals(
@@ -102,25 +106,25 @@ Deno.test('ACCEPTANCE: a joint edit is a journaled patch, and undo takes it back
 
     // 4. and undoing again takes the whole rig back
     await undoOnce(ws);
-    const bare = JSON.parse(await Deno.readTextFile(paths.manifest));
+    const bare = JSON.parse(await fs.readFile(paths.manifest, 'utf8'));
     assertEquals(bare.rig, undefined, 'a character with no rig at all, as it began');
   } finally {
-    await Deno.remove(ws, { recursive: true });
+    await fs.rm(ws, { recursive: true });
   }
 });
 
-Deno.test('orientation fixes are recorded for provenance too', async () => {
+test('orientation fixes are recorded for provenance too', async () => {
   const ws = await workspace();
   try {
     await setRigState(ws, rig({ orientationFixes: ['rotate-180', 'feet-ground'] }), { now: NOW });
-    const m = JSON.parse(await Deno.readTextFile(workspacePaths(ws).manifest));
+    const m = JSON.parse(await fs.readFile(workspacePaths(ws).manifest, 'utf8'));
     assertEquals(m.rig.orientationFixes, ['rotate-180', 'feet-ground']);
   } finally {
-    await Deno.remove(ws, { recursive: true });
+    await fs.rm(ws, { recursive: true });
   }
 });
 
-Deno.test('re-recording the identical rig is refused, so the journal has no no-ops', async () => {
+test('re-recording the identical rig is refused, so the journal has no no-ops', async () => {
   const ws = await workspace();
   try {
     await setRigState(ws, rig(), { now: NOW });
@@ -133,7 +137,7 @@ Deno.test('re-recording the identical rig is refused, so the journal has no no-o
     }
     assert(threw, 'an undo stack full of no-ops is an undo stack nobody trusts');
   } finally {
-    await Deno.remove(ws, { recursive: true });
+    await fs.rm(ws, { recursive: true });
   }
 });
 
@@ -147,7 +151,7 @@ function canonical(v: unknown): string {
   });
 }
 
-Deno.test('setIdentity: one journaled patch for the whole identity change', async () => {
+test('setIdentity: one journaled patch for the whole identity change', async () => {
   const ws = await workspace();
   try {
     const { setIdentity } = await import('./receipts.ts');
@@ -157,24 +161,24 @@ Deno.test('setIdentity: one journaled patch for the whole identity change', asyn
       attachments: [{ id: 'sword', socketId: 'hand-r', meshSha256: 'b'.repeat(64) }],
     }, { now: NOW });
     const paths = workspacePaths(ws);
-    const m = JSON.parse(await Deno.readTextFile(paths.manifest));
+    const m = JSON.parse(await fs.readFile(paths.manifest, 'utf8'));
     assertEquals(m.detailLayers[0].id, 'tattoo');
     assertEquals(m.attachments[0].id, 'sword');
-    const lines = (await Deno.readTextFile(paths.journal)).split('\n').filter((l) => l);
+    const lines = (await fs.readFile(paths.journal, 'utf8')).split('\n').filter((l) => l);
     assertEquals(lines.length, 1, 'decals AND attachments are ONE undo step');
     assert(String(JSON.parse(lines[0]).label).includes('1 decal'), 'label reads like history');
 
     // undo takes the whole identity change back in one step
     await undoOnce(ws);
-    const undone = JSON.parse(await Deno.readTextFile(paths.manifest));
+    const undone = JSON.parse(await fs.readFile(paths.manifest, 'utf8'));
     assertEquals(undone.detailLayers, undefined);
     assertEquals(undone.attachments, undefined);
   } finally {
-    await Deno.remove(ws, { recursive: true });
+    await fs.rm(ws, { recursive: true });
   }
 });
 
-Deno.test('setIdentity: a bone mask without a rig is refused, naming the fix', async () => {
+test('setIdentity: a bone mask without a rig is refused, naming the fix', async () => {
   const ws = await workspace();
   try {
     const { setIdentity } = await import('./receipts.ts');
@@ -190,9 +194,9 @@ Deno.test('setIdentity: a bone mask without a rig is refused, naming the fix', a
     // with a rig, it patches INTO rig.boneMask
     await setRigState(ws, rig(), { now: NOW });
     await setIdentity(ws, { boneMask: { head: 'custom-head.glb' } }, { now: NOW });
-    const m = JSON.parse(await Deno.readTextFile(workspacePaths(ws).manifest));
+    const m = JSON.parse(await fs.readFile(workspacePaths(ws).manifest, 'utf8'));
     assertEquals(m.rig.boneMask, { head: 'custom-head.glb' });
   } finally {
-    await Deno.remove(ws, { recursive: true });
+    await fs.rm(ws, { recursive: true });
   }
 });

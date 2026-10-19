@@ -1,14 +1,16 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * Install/verify/rm end-to-end against fixture bytes: no network (the fetcher
  * copies from a temp source dir), no GPU (detection injected), temp dirs
  * everywhere. collect() validates every event against JobEventSchema as it
  * streams, so a malformed event fails the suite wherever it appears.
  */
-import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertStringIncludes } from '@std/assert';
 import type { Platform } from '@spritebook/schema';
 import { canonicalJson, InstallReceiptSchema, parseWith } from '@spritebook/schema';
-import { listInstalled, resolveInstalled } from './installed.ts';
-import { hashFile } from './hash.ts';
+import { listInstalled, resolveInstalled } from './dist/installed.js';
+import { hashFile } from './dist/hash.js';
 import {
   type Fetcher,
   type InstallJobOpts,
@@ -16,7 +18,7 @@ import {
   runListQuery,
   runRmJob,
   runVerifyJob,
-} from './install.ts';
+} from './dist/install.js';
 import {
   collect,
   type InstallRig,
@@ -50,7 +52,7 @@ function install(rig: InstallRig, over: Partial<InstallJobOpts> = {}) {
   });
 }
 
-Deno.test('install: happy path - verified files land, canonical receipt, events in order', async () => {
+test('install: happy path - verified files land, canonical receipt, events in order', async () => {
   const rig = await installRig();
   try {
     const events = await collect(install(rig));
@@ -68,7 +70,7 @@ Deno.test('install: happy path - verified files land, canonical receipt, events 
     assertEquals(art.path, `${rig.root}/toy-rig/1.0/receipt.json`);
 
     // files land at their declared relative paths, byte-identical to fixtures
-    assertEquals(await Deno.readFile(`${rig.root}/toy-rig/1.0/model.ckpt`), TOY_A);
+    assertEquals(new Uint8Array(await fs.readFile(`${rig.root}/toy-rig/1.0/model.ckpt`)), TOY_A);
     assertEquals(
       await hashFile(`${rig.root}/toy-rig/1.0/cfg/config.yaml`),
       await sha256Hex(TOY_B),
@@ -76,7 +78,7 @@ Deno.test('install: happy path - verified files land, canonical receipt, events 
     );
 
     // the receipt is schema-valid canonical bytes recording what the gates saw
-    const text = await Deno.readTextFile(art.path);
+    const text = await fs.readFile(art.path, 'utf8');
     const receipt = parseWith(InstallReceiptSchema, JSON.parse(text), 'installed receipt');
     assertEquals(text, canonicalJson(receipt), 'receipt bytes are canonicalJson');
     assertEquals(receipt.modelId, 'toy-rig');
@@ -102,19 +104,19 @@ Deno.test('install: happy path - verified files land, canonical receipt, events 
       defaults: {},
     }]);
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('install: a tampered download is refused - staging swept, nothing lands', async () => {
+test('install: a tampered download is refused - staging swept, nothing lands', async () => {
   const rig = await installRig();
   try {
     const tampered: Fetcher = async (url, dest) => {
       await rig.fetcher(url, dest);
       if (url === URL_A) {
-        const bytes = await Deno.readFile(dest);
+        const bytes = new Uint8Array(await fs.readFile(dest));
         bytes[0] ^= 0xff; // same length, different content
-        await Deno.writeFile(dest, bytes);
+        await fs.writeFile(dest, bytes);
       }
     };
     const events = await collect(install(rig, { fetcher: tampered }));
@@ -127,13 +129,13 @@ Deno.test('install: a tampered download is refused - staging swept, nothing land
     assertStringIncludes(err.message, 'refusing to install');
     assert(!events.some((e) => e.t === 'done'), 'no done after refusal');
 
-    assertEquals(await Array.fromAsync(Deno.readDir(rig.root)), [], 'staging gone, no model dir');
+    assertEquals(await fs.readdir(rig.root, { withFileTypes: true }), [], 'staging gone, no model dir');
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('install: a byte-count mismatch is refused the same way', async () => {
+test('install: a byte-count mismatch is refused the same way', async () => {
   const rig = await installRig();
   try {
     const entry = rig.catalog.models[0];
@@ -150,13 +152,13 @@ Deno.test('install: a byte-count mismatch is refused the same way', async () => 
     assert(err.t === 'error');
     assertEquals(err.code, 'hash-mismatch');
     assertStringIncludes(err.message, 'bytes');
-    assertEquals(await Array.fromAsync(Deno.readDir(rig.root)), []);
+    assertEquals(await fs.readdir(rig.root, { withFileTypes: true }), []);
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('install: no silent overwrite - a second install errors toward models rm', async () => {
+test('install: no silent overwrite - a second install errors toward models rm', async () => {
   const rig = await installRig();
   try {
     assertEquals((await collect(install(rig))).at(-1)!.t, 'done');
@@ -166,11 +168,11 @@ Deno.test('install: no silent overwrite - a second install errors toward models 
     assertEquals(err.code, 'already-installed');
     assertStringIncludes(err.message, 'models rm');
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('install: unknown model and unknown version list what IS available', async () => {
+test('install: unknown model and unknown version list what IS available', async () => {
   const rig = await installRig();
   try {
     let events = await collect(install(rig, { modelId: 'ghost' }));
@@ -185,11 +187,11 @@ Deno.test('install: unknown model and unknown version list what IS available', a
     assertEquals(err.code, 'unknown-version');
     assertStringIncludes(err.message, '1.0', 'lists available versions');
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('install: license gate blocks BEFORE any disk writes; acceptance is recorded', async () => {
+test('install: license gate blocks BEFORE any disk writes; acceptance is recorded', async () => {
   const rig = await installRig({
     license: {
       name: 'Toy RAIL',
@@ -203,18 +205,18 @@ Deno.test('install: license gate blocks BEFORE any disk writes; acceptance is re
     assert(err.t === 'error');
     assertEquals(err.code, 'license-acceptance-required');
     assertStringIncludes(err.message, '--accept-license');
-    assertEquals(await Deno.stat(rig.root).catch(() => null), null, 'gates precede disk writes');
+    assertEquals(await fs.stat(rig.root).catch(() => null), null, 'gates precede disk writes');
 
     assertEquals((await collect(install(rig, { acceptLicense: true }))).at(-1)!.t, 'done');
     const { receipt } = (await resolveInstalled(rig.root, 'toy-rig'))!;
     assertEquals(receipt.licenseAccepted?.name, 'Toy RAIL');
     assertEquals(receipt.licenseAccepted?.spdx, 'Toy-RAIL-1.0');
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('install: territory gate end-to-end (declaration required, excluded, recorded)', async () => {
+test('install: territory gate end-to-end (declaration required, excluded, recorded)', async () => {
   const rig = await installRig({
     license: {
       name: 'Toy Restricted License',
@@ -238,11 +240,11 @@ Deno.test('install: territory gate end-to-end (declaration required, excluded, r
     const { receipt } = (await resolveInstalled(rig.root, 'toy-rig'))!;
     assertEquals(receipt.territoryDeclared, 'US', 'self-declaration recorded (D-027)');
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('install: platform gate refuses a cuda-only entry on a cpu machine, naming both', async () => {
+test('install: platform gate refuses a cuda-only entry on a cpu machine, naming both', async () => {
   const rig = await installRig({}, { platforms: ['windows-cuda', 'linux-cuda'] });
   try {
     const events = await collect(
@@ -254,11 +256,11 @@ Deno.test('install: platform gate refuses a cuda-only entry on a cpu machine, na
     assertStringIncludes(err.message, 'windows-cuda or linux-cuda');
     assertStringIncludes(err.message, 'macos-cpu');
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('install: VRAM warns (below-min and unknown) but NEVER blocks', async () => {
+test('install: VRAM warns (below-min and unknown) but NEVER blocks', async () => {
   const below = await installRig({}, { minVramGb: 10 });
   try {
     const events = await collect(
@@ -272,7 +274,7 @@ Deno.test('install: VRAM warns (below-min and unknown) but NEVER blocks', async 
     const { receipt } = (await resolveInstalled(below.root, 'toy-rig'))!;
     assertEquals(receipt.vram, { minGb: 10, detectedGb: 8, status: 'below-min' });
   } finally {
-    await Deno.remove(below.tmp, { recursive: true });
+    await fs.rm(below.tmp, { recursive: true });
   }
 
   const unknown = await installRig({}, { minVramGb: 10 });
@@ -285,11 +287,11 @@ Deno.test('install: VRAM warns (below-min and unknown) but NEVER blocks', async 
     const { receipt } = (await resolveInstalled(unknown.root, 'toy-rig'))!;
     assertEquals(receipt.vram, { minGb: 10, status: 'unknown' }, 'no detectedGb when unknown');
   } finally {
-    await Deno.remove(unknown.tmp, { recursive: true });
+    await fs.rm(unknown.tmp, { recursive: true });
   }
 });
 
-Deno.test('install: omitted version resolves to the HIGHEST catalog version (numeric-aware)', async () => {
+test('install: omitted version resolves to the HIGHEST catalog version (numeric-aware)', async () => {
   const rig = await installRig();
   try {
     const entry = rig.catalog.models[0];
@@ -306,11 +308,11 @@ Deno.test('install: omitted version resolves to the HIGHEST catalog version (num
       '1.10 beats 1.2 numerically',
     );
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('verify: intact passes; corruption, catalog drift, and no-receipt fail loud', async () => {
+test('verify: intact passes; corruption, catalog drift, and no-receipt fail loud', async () => {
   const rig = await installRig();
   try {
     await collect(install(rig));
@@ -330,9 +332,9 @@ Deno.test('verify: intact passes; corruption, catalog drift, and no-receipt fail
 
     // flip one byte post-install -> named file, both hashes
     const target = `${rig.root}/toy-rig/1.0/model.ckpt`;
-    const bytes = await Deno.readFile(target);
+    const bytes = new Uint8Array(await fs.readFile(target));
     bytes[3] ^= 0x01;
-    await Deno.writeFile(target, bytes);
+    await fs.writeFile(target, bytes);
     events = await collect(runVerifyJob(opts));
     let err = events.at(-1)!;
     assert(err.t === 'error');
@@ -343,7 +345,7 @@ Deno.test('verify: intact passes; corruption, catalog drift, and no-receipt fail
     // restore the bytes, then drift the CATALOG pin: disk matches the receipt
     // but no longer matches what the catalog ships -> still a loud failure
     bytes[3] ^= 0x01;
-    await Deno.writeFile(target, bytes);
+    await fs.writeFile(target, bytes);
     const entry = rig.catalog.models[0];
     const v = entry.versions[0];
     const drifted = toyCatalog({
@@ -360,18 +362,18 @@ Deno.test('verify: intact passes; corruption, catalog drift, and no-receipt fail
     assertStringIncludes(err.message, 'catalog');
 
     // no receipt -> the crash-window verdict
-    await Deno.remove(`${rig.root}/toy-rig/1.0/receipt.json`);
+    await fs.rm(`${rig.root}/toy-rig/1.0/receipt.json`);
     events = await collect(runVerifyJob(opts));
     err = events.at(-1)!;
     assert(err.t === 'error');
     assertEquals(err.code, 'no-receipt');
     assertStringIncludes(err.message, 'models rm');
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('rm: removes a version (sweeping the empty model dir) or the whole model', async () => {
+test('rm: removes a version (sweeping the empty model dir) or the whole model', async () => {
   const rig = await installRig();
   try {
     await collect(install(rig));
@@ -380,7 +382,7 @@ Deno.test('rm: removes a version (sweeping the empty model dir) or the whole mod
     );
     assertEquals(events.map((e) => e.t), ['queued', 'started', 'done'], 'artifact-free');
     assertEquals(
-      await Deno.stat(`${rig.root}/toy-rig`).catch(() => null),
+      await fs.stat(`${rig.root}/toy-rig`).catch(() => null),
       null,
       'empty model dir swept with its last version',
     );
@@ -395,8 +397,8 @@ Deno.test('rm: removes a version (sweeping the empty model dir) or the whole mod
     await collect(install(rig));
     events = await collect(runRmJob({ jobId: 'job-rm3', root: rig.root, modelId: 'toy-rig' }));
     assertEquals(events.at(-1)!.t, 'done');
-    assertEquals(await Deno.stat(`${rig.root}/toy-rig`).catch(() => null), null);
+    assertEquals(await fs.stat(`${rig.root}/toy-rig`).catch(() => null), null);
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });

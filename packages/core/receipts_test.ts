@@ -1,4 +1,8 @@
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import type { GenerationResult, ManifestPatch } from '@spritebook/schema';
 import {
   canonicalJson,
@@ -6,21 +10,21 @@ import {
   ManifestPatchSchema,
   parseWith,
 } from '@spritebook/schema';
-import { moveManifestCursor } from './persistence.ts';
-import { createWorkspace, readWorkspace, workspacePaths } from './workspace.ts';
+import { moveManifestCursor } from './dist/persistence.js';
+import { createWorkspace, readWorkspace, workspacePaths } from './dist/workspace.js';
 import {
   appendGenerationResult,
   discardResult,
   pickResult,
   recordBake,
   setCanonicalMesh,
-} from './receipts.ts';
+} from './dist/receipts.js';
 
 const NOW = () => '2026-07-12T00:00:00Z';
 const sha = (c: string) => c.repeat(64);
 
 async function withCharacter(fn: (dir: string) => Promise<void>): Promise<void> {
-  const raw = await Deno.makeTempDir({ prefix: 'spritebook-receipts-' });
+  const raw = await fs.mkdtemp(join(tmpdir(), 'spritebook-receipts-'));
   const dir = raw.replaceAll('\\', '/');
   try {
     await createWorkspace({
@@ -32,7 +36,7 @@ async function withCharacter(fn: (dir: string) => Promise<void>): Promise<void> 
     });
     await fn(dir);
   } finally {
-    await Deno.remove(raw, { recursive: true });
+    await fs.rm(raw, { recursive: true });
   }
 }
 
@@ -50,7 +54,7 @@ function makeResult(id: string, gltfSha256 = sha('b')): GenerationResult {
 }
 
 async function journalLines(dir: string): Promise<ManifestPatch[]> {
-  const text = await Deno.readTextFile(workspacePaths(dir).journal);
+  const text = await fs.readFile(workspacePaths(dir).journal, 'utf8');
   return text
     .split('\n')
     .filter((l) => l.length > 0)
@@ -58,14 +62,14 @@ async function journalLines(dir: string): Promise<ManifestPatch[]> {
 }
 
 const cursorOf = async (dir: string) =>
-  Number((await Deno.readTextFile(workspacePaths(dir).cursor)).trim());
-const manifestBytes = (dir: string) => Deno.readTextFile(workspacePaths(dir).manifest);
+  Number((await fs.readFile(workspacePaths(dir).cursor, 'utf8')).trim());
+const manifestBytes = (dir: string) => fs.readFile(workspacePaths(dir).manifest, 'utf8');
 
 async function cliUndo(dir: string): Promise<ManifestPatch> {
   return await moveManifestCursor(workspacePaths(dir).manifest, 'undo');
 }
 
-Deno.test('appendGenerationResult journals one patch and advances the cursor', async () => {
+test('appendGenerationResult journals one patch and advances the cursor', async () => {
   await withCharacter(async (dir) => {
     const manifest = await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     assertEquals(manifest.generation.results.length, 1);
@@ -94,7 +98,7 @@ Deno.test('appendGenerationResult journals one patch and advances the cursor', a
   });
 });
 
-Deno.test('appendGenerationResult refuses a result id that is already recorded', async () => {
+test('appendGenerationResult refuses a result id that is already recorded', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     const err = await assertRejects(
@@ -107,7 +111,7 @@ Deno.test('appendGenerationResult refuses a result id that is already recorded',
   });
 });
 
-Deno.test('acceptance: `undo` after a second generate restores the previous bytes', async () => {
+test('acceptance: `undo` after a second generate restores the previous bytes', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     const afterFirst = await manifestBytes(dir);
@@ -128,7 +132,7 @@ Deno.test('acceptance: `undo` after a second generate restores the previous byte
   });
 });
 
-Deno.test('a commit after an undo drops the redo tail', async () => {
+test('a commit after an undo drops the redo tail', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     await appendGenerationResult(dir, makeResult('r2'), { now: NOW });
@@ -148,7 +152,7 @@ Deno.test('a commit after an undo drops the redo tail', async () => {
   });
 });
 
-Deno.test('pickResult sets pickedResultId and writes canonicalMesh', async () => {
+test('pickResult sets pickedResultId and writes canonicalMesh', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     await appendGenerationResult(dir, makeResult('r2', sha('c')), { now: NOW });
@@ -193,7 +197,7 @@ Deno.test('pickResult sets pickedResultId and writes canonicalMesh', async () =>
   });
 });
 
-Deno.test('pickResult carries a MEASURED canonicalMesh in the SAME patch', async () => {
+test('pickResult carries a MEASURED canonicalMesh in the SAME patch', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     const before = await manifestBytes(dir);
@@ -228,7 +232,7 @@ Deno.test('pickResult carries a MEASURED canonicalMesh in the SAME patch', async
   });
 });
 
-Deno.test('pickResult refuses an unknown id and lists what is available', async () => {
+test('pickResult refuses an unknown id and lists what is available', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     await appendGenerationResult(dir, makeResult('r2'), { now: NOW });
@@ -242,7 +246,7 @@ Deno.test('pickResult refuses an unknown id and lists what is available', async 
   });
 });
 
-Deno.test('pickResult refuses a discarded result', async () => {
+test('pickResult refuses a discarded result', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     await appendGenerationResult(dir, makeResult('r2'), { now: NOW });
@@ -257,7 +261,7 @@ Deno.test('pickResult refuses a discarded result', async () => {
   });
 });
 
-Deno.test('pickResult refuses a first pick with no height or texture provenance', async () => {
+test('pickResult refuses a first pick with no height or texture provenance', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
 
@@ -273,7 +277,7 @@ Deno.test('pickResult refuses a first pick with no height or texture provenance'
   });
 });
 
-Deno.test('discardResult marks the receipt and keeps its id', async () => {
+test('discardResult marks the receipt and keeps its id', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     await appendGenerationResult(dir, makeResult('r2'), { now: NOW });
@@ -301,7 +305,7 @@ Deno.test('discardResult marks the receipt and keeps its id', async () => {
   });
 });
 
-Deno.test('discardResult refuses to discard the picked result', async () => {
+test('discardResult refuses to discard the picked result', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     await appendGenerationResult(dir, makeResult('r2'), { now: NOW });
@@ -318,7 +322,7 @@ Deno.test('discardResult refuses to discard the picked result', async () => {
   });
 });
 
-Deno.test('setCanonicalMesh flips reprojected and repins the hash', async () => {
+test('setCanonicalMesh flips reprojected and repins the hash', async () => {
   await withCharacter(async (dir) => {
     await appendGenerationResult(dir, makeResult('r1'), { now: NOW });
     await pickResult(dir, 'r1', { heightM: 1.81, texturedBy: 'backend', now: NOW });
@@ -349,7 +353,7 @@ Deno.test('setCanonicalMesh flips reprojected and repins the hash', async () => 
   });
 });
 
-Deno.test('setCanonicalMesh refuses before there is a canonical mesh, or with nothing to do', async () => {
+test('setCanonicalMesh refuses before there is a canonical mesh, or with nothing to do', async () => {
   await withCharacter(async (dir) => {
     const none = await assertRejects(
       () => setCanonicalMesh(dir, { reprojected: true }, { now: NOW }),
@@ -376,7 +380,7 @@ const CLIPS = [
   { clipId: 'walk-loop', packId: 'ual', enabled: true, frames: 6, speed: 1.5, holdLast: false },
 ];
 
-Deno.test('recordBake writes look, clips and lastBakeId as ONE patch', async () => {
+test('recordBake writes look, clips and lastBakeId as ONE patch', async () => {
   await withCharacter(async (dir) => {
     const manifest = await recordBake(dir, {
       look: LOOK,
@@ -401,7 +405,7 @@ Deno.test('recordBake writes look, clips and lastBakeId as ONE patch', async () 
   });
 });
 
-Deno.test('one undo takes the whole bake back, not part of it', async () => {
+test('one undo takes the whole bake back, not part of it', async () => {
   // The reason these three fields share a patch: `lastBakeId` names a bake dir
   // whose atlases were rendered from THIS look. Split across two patches, a
   // single undo would roll back the look and leave lastBakeId pointing at
@@ -424,7 +428,7 @@ Deno.test('one undo takes the whole bake back, not part of it', async () => {
   });
 });
 
-Deno.test('re-running an unchanged bake journals nothing at all', async () => {
+test('re-running an unchanged bake journals nothing at all', async () => {
   // An undo stack with empty steps in it is an undo stack a user stops
   // trusting: the verb reports done and the document is visibly identical.
   await withCharacter(async (dir) => {
@@ -451,7 +455,7 @@ Deno.test('re-running an unchanged bake journals nothing at all', async () => {
   });
 });
 
-Deno.test('a second bake patches only what actually moved', async () => {
+test('a second bake patches only what actually moved', async () => {
   await withCharacter(async (dir) => {
     await recordBake(dir, {
       look: LOOK,
@@ -480,7 +484,7 @@ Deno.test('a second bake patches only what actually moved', async () => {
   });
 });
 
-Deno.test('mirroring rides the same patch, and always as a replace', async () => {
+test('mirroring rides the same patch, and always as a replace', async () => {
   await withCharacter(async (dir) => {
     const on = await recordBake(dir, {
       look: LOOK,
@@ -504,7 +508,7 @@ Deno.test('mirroring rides the same patch, and always as a replace', async () =>
   });
 });
 
-Deno.test('one undo cannot leave a manifest claiming symmetry for flipped atlases', async () => {
+test('one undo cannot leave a manifest claiming symmetry for flipped atlases', async () => {
   // The sharpest case for the single patch. Split across two, an undo could
   // roll mirroring back to false while lastBakeId still names a bake whose
   // back half is literally flipped copies of its front.
@@ -517,7 +521,7 @@ Deno.test('one undo cannot leave a manifest claiming symmetry for flipped atlase
   });
 });
 
-Deno.test('an absent animationSet leaves the stored bindings alone', async () => {
+test('an absent animationSet leaves the stored bindings alone', async () => {
   // An idle-stub bake ran no clips, which is not the same statement as "this
   // character has none" - clearing them on the way past would delete a choice
   // the bake was never asked about.

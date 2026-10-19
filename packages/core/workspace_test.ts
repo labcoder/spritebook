@@ -1,4 +1,8 @@
-import { assert, assertEquals, assertNotEquals, assertRejects } from 'jsr:@std/assert@1';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assert, assertEquals, assertNotEquals, assertRejects } from '@std/assert';
 import type { CharacterManifest } from '@spritebook/schema';
 import {
   CANONICAL_MODEL,
@@ -18,17 +22,17 @@ import {
   sourceImagePath,
   storeSourceImage,
   workspacePaths,
-} from './workspace.ts';
+} from './dist/workspace.js';
 
 const NOW = () => '2026-07-12T00:00:00Z';
 const SHA_A = 'a'.repeat(64);
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
-  const dir = await Deno.makeTempDir({ prefix: 'spritebook-workspace-' });
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-workspace-'));
   try {
     await fn(dir.replaceAll('\\', '/'));
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 }
 
@@ -68,7 +72,7 @@ function manifestWith(
   }, 'test CharacterManifest');
 }
 
-Deno.test('workspacePaths and resultPaths spell the frozen layout', () => {
+test('workspacePaths and resultPaths spell the frozen layout', () => {
   const p = workspacePaths('/tmp/ws', 'brave-knight');
   assertEquals(p.manifest, `/tmp/ws/${MANIFEST_FILE}`);
   assertEquals(p.journal, `/tmp/ws/${MANIFEST_FILE}.journal.ndjson`);
@@ -87,7 +91,7 @@ Deno.test('workspacePaths and resultPaths spell the frozen layout', () => {
   assertEquals(r.preflight, `/tmp/ws/results/r2/${RESULT_PREFLIGHT}`);
 });
 
-Deno.test('workspacePaths and resultPaths refuse ids the schemas reject', () => {
+test('workspacePaths and resultPaths refuse ids the schemas reject', () => {
   let threw = false;
   try {
     workspacePaths('/tmp/ws', 'Brave Knight!');
@@ -104,7 +108,7 @@ Deno.test('workspacePaths and resultPaths refuse ids the schemas reject', () => 
   assert(threw, 'r0 is not a legal result id');
 });
 
-Deno.test('createWorkspace writes a valid manifest, canonical bytes, empty journal, cursor 0', async () => {
+test('createWorkspace writes a valid manifest, canonical bytes, empty journal, cursor 0', async () => {
   await withTempDir(async (dir) => {
     const manifest = await newCharacter(dir);
     const p = workspacePaths(dir);
@@ -115,21 +119,21 @@ Deno.test('createWorkspace writes a valid manifest, canonical bytes, empty journ
     assertEquals(manifest.canonicalMesh, undefined, 'nothing is canonical yet');
     assertEquals(manifest.mirroring.enabled, false, 'D-008: mirroring is opt-in');
 
-    const bytes = await Deno.readTextFile(p.manifest);
+    const bytes = await fs.readFile(p.manifest, 'utf8');
     assertEquals(bytes, canonicalJson(JSON.parse(bytes)), 'manifest is canonical bytes');
     assertEquals(bytes, canonicalJson(manifest));
     parseWith(CharacterManifestSchema, JSON.parse(bytes), 'manifest on disk');
 
-    assertEquals(await Deno.readTextFile(p.journal), '', 'journal starts empty');
-    assertEquals(await Deno.readTextFile(p.cursor), '0', 'cursor starts at 0');
+    assertEquals(await fs.readFile(p.journal, 'utf8'), '', 'journal starts empty');
+    assertEquals(await fs.readFile(p.cursor, 'utf8'), '0', 'cursor starts at 0');
     for (const d of [p.sourceDir, p.resultsDir, p.canonicalDir]) {
-      assert((await Deno.stat(d)).isDirectory, `${d} exists`);
+      assert((await fs.stat(d)).isDirectory(), `${d} exists`);
     }
     assertEquals((await readWorkspace(dir)).displayName, 'Brave Knight');
   });
 });
 
-Deno.test('createWorkspace refuses to overwrite an existing character', async () => {
+test('createWorkspace refuses to overwrite an existing character', async () => {
   await withTempDir(async (dir) => {
     await newCharacter(dir);
     const err = await assertRejects(() => newCharacter(dir), Error);
@@ -138,7 +142,7 @@ Deno.test('createWorkspace refuses to overwrite an existing character', async ()
   });
 });
 
-Deno.test('readWorkspace names the path when there is no workspace there', async () => {
+test('readWorkspace names the path when there is no workspace there', async () => {
   await withTempDir(async (dir) => {
     const err = await assertRejects(() => readWorkspace(`${dir}/nope`), Error);
     assert(err.message.includes(`${dir}/nope/${MANIFEST_FILE}`), err.message);
@@ -148,8 +152,8 @@ Deno.test('readWorkspace names the path when there is no workspace there', async
 /** A v2 workspace on disk: what a build before D-029 left behind. */
 async function writeV2Workspace(dir: string): Promise<void> {
   const paths = workspacePaths(dir);
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
     paths.manifest,
     JSON.stringify({
       schemaVersion: 2,
@@ -165,11 +169,11 @@ async function writeV2Workspace(dir: string): Promise<void> {
       mirroring: { enabled: false },
     }),
   );
-  await Deno.writeTextFile(paths.journal, '');
-  await Deno.writeTextFile(paths.cursor, '0');
+  await fs.writeFile(paths.journal, '');
+  await fs.writeFile(paths.cursor, '0');
 }
 
-Deno.test('readWorkspace upgrades an older manifest instead of refusing it', async () => {
+test('readWorkspace upgrades an older manifest instead of refusing it', async () => {
   // The gate this closes: `schemaVersion: z.literal(3)` rejects a v2 document
   // outright, so before the loaders migrated, bumping the version turned every
   // existing workspace into "that directory is not a SpriteBook workspace".
@@ -183,67 +187,67 @@ Deno.test('readWorkspace upgrades an older manifest instead of refusing it', asy
   });
 });
 
-Deno.test('reading an old workspace does not rewrite it; the first WRITE does', async () => {
+test('reading an old workspace does not rewrite it; the first WRITE does', async () => {
   // Upgrade-on-write. A read that silently rewrote the file would mutate a
   // workspace the user only looked at - and would do it outside the journal,
   // which is the one thing law 7 forbids.
   await withTempDir(async (dir) => {
     await writeV2Workspace(dir);
-    const before = await Deno.readTextFile(workspacePaths(dir).manifest);
+    const before = await fs.readFile(workspacePaths(dir).manifest, 'utf8');
     await readWorkspace(dir);
-    assertEquals(await Deno.readTextFile(workspacePaths(dir).manifest), before, 'untouched');
+    assertEquals(await fs.readFile(workspacePaths(dir).manifest, 'utf8'), before, 'untouched');
 
     const { renameCharacter } = await import('./roster.ts');
     await renameCharacter(dir, 'Sir Bravery', { now: NOW });
-    const after = JSON.parse(await Deno.readTextFile(workspacePaths(dir).manifest));
+    const after = JSON.parse(await fs.readFile(workspacePaths(dir).manifest, 'utf8'));
     assertEquals(after.schemaVersion, CHARACTER_SCHEMA_VERSION, 'persisted at the new version');
     assertEquals(after.preflight, undefined);
     assertEquals(after.displayName, 'Sir Bravery');
   });
 });
 
-Deno.test('storeSourceImage is content-addressed and idempotent', async () => {
+test('storeSourceImage is content-addressed and idempotent', async () => {
   await withTempDir(async (dir) => {
     await newCharacter(dir);
     const imagePath = `${dir}/knight.png`;
-    await Deno.writeFile(imagePath, new Uint8Array([1, 2, 3, 4]));
+    await fs.writeFile(imagePath, new Uint8Array([1, 2, 3, 4]));
 
     const first = await storeSourceImage(dir, imagePath);
     assertEquals(first.originalFilename, 'knight.png');
     assertEquals(first.storedPath, `${dir}/source/${first.sha256}.png`, 'named by content');
-    assertEquals(await Deno.readFile(first.storedPath), new Uint8Array([1, 2, 3, 4]));
-    const stamp = (await Deno.stat(first.storedPath)).mtime?.getTime();
+    assertEquals(new Uint8Array(await fs.readFile(first.storedPath)), new Uint8Array([1, 2, 3, 4]));
+    const stamp = (await fs.stat(first.storedPath)).mtime?.getTime();
 
     // same bytes -> same path, and the file is left alone rather than rewritten
     const again = await storeSourceImage(dir, imagePath);
     assertEquals(again.storedPath, first.storedPath);
     assertEquals(again.sha256, first.sha256);
-    assertEquals((await Deno.stat(first.storedPath)).mtime?.getTime(), stamp, 'not rewritten');
+    assertEquals((await fs.stat(first.storedPath)).mtime?.getTime(), stamp, 'not rewritten');
 
     // a copy under a different name is still the same content, same path
     const copyPath = `${dir}/renamed.png`;
-    await Deno.writeFile(copyPath, new Uint8Array([1, 2, 3, 4]));
+    await fs.writeFile(copyPath, new Uint8Array([1, 2, 3, 4]));
     const copy = await storeSourceImage(dir, copyPath);
     assertEquals(copy.storedPath, first.storedPath);
     assertEquals(copy.originalFilename, 'renamed.png', 'the chosen name is still reported');
   });
 });
 
-Deno.test('storeSourceImage gives two different images two paths', async () => {
+test('storeSourceImage gives two different images two paths', async () => {
   await withTempDir(async (dir) => {
     await newCharacter(dir);
-    await Deno.writeFile(`${dir}/a.png`, new Uint8Array([1, 2, 3]));
-    await Deno.writeFile(`${dir}/b.png`, new Uint8Array([9, 9, 9]));
+    await fs.writeFile(`${dir}/a.png`, new Uint8Array([1, 2, 3]));
+    await fs.writeFile(`${dir}/b.png`, new Uint8Array([9, 9, 9]));
     const a = await storeSourceImage(dir, `${dir}/a.png`);
     const b = await storeSourceImage(dir, `${dir}/b.png`);
     assertNotEquals(a.sha256, b.sha256);
     assertNotEquals(a.storedPath, b.storedPath);
-    assert((await Deno.stat(a.storedPath)).isFile);
-    assert((await Deno.stat(b.storedPath)).isFile);
+    assert((await fs.stat(a.storedPath)).isFile());
+    assert((await fs.stat(b.storedPath)).isFile());
   });
 });
 
-Deno.test('storeSourceImage names the file it could not read', async () => {
+test('storeSourceImage names the file it could not read', async () => {
   await withTempDir(async (dir) => {
     await newCharacter(dir);
     const err = await assertRejects(() => storeSourceImage(dir, `${dir}/missing.png`), Error);
@@ -251,7 +255,7 @@ Deno.test('storeSourceImage names the file it could not read', async () => {
   });
 });
 
-Deno.test('nextResultId counts up and never reuses a discarded id', () => {
+test('nextResultId counts up and never reuses a discarded id', () => {
   assertEquals(nextResultId(manifestWith([])), 'r1');
   assertEquals(nextResultId(manifestWith([{ id: 'r1' }])), 'r2');
   assertEquals(nextResultId(manifestWith([{ id: 'r1' }, { id: 'r2' }])), 'r3');
@@ -272,8 +276,8 @@ Deno.test('nextResultId counts up and never reuses a discarded id', () => {
   assertEquals(nextResultId(allGone), 'r3');
 });
 
-Deno.test('sourceImagePath: one derivation, correct for extension-less names', async () => {
-  const dir = await Deno.makeTempDir();
+test('sourceImagePath: one derivation, correct for extension-less names', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     // storeSourceImage is the writer; sourceImagePath must agree with it for
     // EVERY filename shape, including ones with no extension and dotfiles —
@@ -281,9 +285,9 @@ Deno.test('sourceImagePath: one derivation, correct for extension-less names', a
     for (const [i, name] of ['cutout.png', 'cutout', '.hidden', 'a.b.c.png'].entries()) {
       const ws = `${dir}/ws-${i}`;
       const srcDir = `${dir}/src-${i}`;
-      await Deno.mkdir(srcDir, { recursive: true });
+      await fs.mkdir(srcDir, { recursive: true });
       const src = `${srcDir}/${name}`;
-      await Deno.writeFile(src, new Uint8Array([1, 2, 3, 4]));
+      await fs.writeFile(src, new Uint8Array([1, 2, 3, 4]));
       const stored = await storeSourceImage(ws, src);
       const manifest = await createWorkspace({
         workspace: ws,
@@ -296,9 +300,9 @@ Deno.test('sourceImagePath: one derivation, correct for extension-less names', a
         stored.storedPath,
         `derivation matches the writer for "${name}"`,
       );
-      await Deno.stat(sourceImagePath(ws, manifest)); // the file is really there
+      await fs.stat(sourceImagePath(ws, manifest)); // the file is really there
     }
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });

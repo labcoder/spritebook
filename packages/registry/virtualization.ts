@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import type { Dirent } from 'node:fs';
 /**
  * MSIX AppData virtualization detection (D-039). A Windows process with
  * package identity — including every child a packaged app spawns — gets a
@@ -33,17 +35,17 @@ export async function findMarkerBacking(
   localAppData: string,
   marker: string,
 ): Promise<{ pkg: string; backing: string } | null> {
-  let pkgs: Deno.DirEntry[];
+  let pkgs: Dirent[];
   try {
-    pkgs = await Array.fromAsync(Deno.readDir(`${localAppData}/Packages`));
+    pkgs = await fs.readdir(`${localAppData}/Packages`, { withFileTypes: true });
   } catch {
     return null; // no Packages dir - nothing packaged has ever run
   }
   for (const p of pkgs) {
-    if (!p.isDirectory) continue;
+    if (!p.isDirectory()) continue;
     const backing = `${localAppData}/Packages/${p.name}/LocalCache/Local/${marker}`;
     try {
-      await Deno.stat(backing);
+      await fs.stat(backing);
       return { pkg: p.name, backing };
     } catch {
       // not this package
@@ -57,15 +59,15 @@ export async function findMarkerBacking(
  * Never throws — a diagnostic that fails reads as "not virtualized".
  */
 export async function detectAppDataVirtualization(
-  getEnv: (key: string) => string | undefined = (key) => Deno.env.get(key),
-  os: typeof Deno.build.os = Deno.build.os,
+  getEnv: (key: string) => string | undefined = (key) => process.env[key],
+  os: NodeJS.Platform | 'windows' = (process.platform === 'win32' ? 'windows' : process.platform),
 ): Promise<VirtualizationReport> {
   if (os !== 'windows') return { virtualized: false };
   const local = getEnv('LOCALAPPDATA');
   if (!local) return { virtualized: false };
   const marker = `.sb-vfs-probe-${crypto.randomUUID()}`;
   try {
-    await Deno.writeTextFile(`${local}/${marker}`, 'spritebook virtualization probe (D-039)');
+    await fs.writeFile(`${local}/${marker}`, 'spritebook virtualization probe (D-039)');
   } catch {
     return { virtualized: false };
   }
@@ -75,7 +77,7 @@ export async function detectAppDataVirtualization(
   } finally {
     // where contained this removes the overlay copy (the real dir never had
     // it), where not it removes the real file - no tombstone risk either way
-    await Deno.remove(`${local}/${marker}`).catch(() => {});
+    await fs.rm(`${local}/${marker}`).catch(() => {});
   }
 }
 
@@ -85,8 +87,8 @@ export async function detectAppDataVirtualization(
  * only — the probe costs one write plus one stat per installed package.
  */
 export async function virtualizationNote(
-  getEnv: (key: string) => string | undefined = (key) => Deno.env.get(key),
-  os: typeof Deno.build.os = Deno.build.os,
+  getEnv: (key: string) => string | undefined = (key) => process.env[key],
+  os: NodeJS.Platform | 'windows' = (process.platform === 'win32' ? 'windows' : process.platform),
 ): Promise<string> {
   const v = await detectAppDataVirtualization(getEnv, os);
   if (!v.virtualized) return '';
@@ -99,7 +101,7 @@ export async function virtualizationNote(
 /** Case- and separator-insensitive "is this root inside %LOCALAPPDATA%?". */
 export function rootUnderLocalAppData(
   root: string,
-  getEnv: (key: string) => string | undefined = (key) => Deno.env.get(key),
+  getEnv: (key: string) => string | undefined = (key) => process.env[key],
 ): boolean {
   const local = getEnv('LOCALAPPDATA');
   if (!local) return false;

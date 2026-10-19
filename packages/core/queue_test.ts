@@ -1,7 +1,8 @@
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { test } from 'node:test';
+import { assert, assertEquals } from '@std/assert';
 import type { JobEvent, JobSpec } from '@spritebook/schema';
-import { EventBus } from './events.ts';
-import { JobQueue } from './queue.ts';
+import { EventBus } from './dist/events.js';
+import { JobQueue } from './dist/queue.js';
 
 const at = '2026-07-12T00:00:00Z';
 const spec = (n: number): JobSpec =>
@@ -13,7 +14,7 @@ function gate() {
   return { open, opened };
 }
 
-Deno.test('queue enforces the concurrency limit', async () => {
+test('queue enforces the concurrency limit', async () => {
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 2 });
   const g = gate();
@@ -38,7 +39,7 @@ Deno.test('queue enforces the concurrency limit', async () => {
   assertEquals(peak, 2);
 });
 
-Deno.test('retry-on-retryable is bounded; non-retryable never retries', async () => {
+test('retry-on-retryable is bounded; non-retryable never retries', async () => {
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 1, maxRetries: 2 });
 
@@ -64,7 +65,7 @@ Deno.test('retry-on-retryable is bounded; non-retryable never retries', async ()
   assertEquals(fatalAttempts, 1);
 });
 
-Deno.test('cancel before start emits a terminal cancelled error', async () => {
+test('cancel before start emits a terminal cancelled error', async () => {
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 1 });
   const g = gate();
@@ -87,7 +88,7 @@ Deno.test('cancel before start emits a terminal cancelled error', async () => {
   assertEquals(types, ['queued', 'error']);
 });
 
-Deno.test('cancel during run aborts the executor', async () => {
+test('cancel during run aborts the executor', async () => {
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 1 });
   const g = gate();
@@ -117,10 +118,10 @@ Deno.test('cancel during run aborts the executor', async () => {
   assertEquals(o.attempts, 1);
 });
 
-Deno.test('executor throw becomes a non-retryable error event', async () => {
+test('executor throw becomes a non-retryable error event', async () => {
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 1 });
-  // deno-lint-ignore require-yield
+  // biome-ignore lint/correctness/useYield: this executor must throw before yielding
   async function* boom(s: JobSpec): AsyncIterable<JobEvent> {
     throw new Error(`kaboom in ${s.jobId}`);
   }

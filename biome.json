@@ -37,7 +37,12 @@
         "noAssignInExpressions": "off"
       },
       "style": {
-        "useTemplate": "off"
+        "useTemplate": "off",
+        "noNonNullAssertion": "off"
+      },
+      "complexity": {
+        "useLiteralKeys": "off",
+        "useOptionalChain": "off"
       }
     }
   }

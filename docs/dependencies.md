@@ -41,6 +41,12 @@ The shell also directly uses lock-pinned `windows-sys` 0.61.2 (MIT/Apache-2.0) f
 objects and `libc` 0.2 (MIT/Apache-2.0) for Unix process groups. Both already belonged to the Tauri
 dependency graph; F1-T3 uses them to cancel owned CLI descendants and clean up on close.
 
+F4's small `spritebook-lock` helper reuses **windows-sys 0.61.2** and **libc 0.2.189**
+(MIT/Apache-2.0). It preserves kernel file locks across Node process death using `LockFileEx` or
+`flock`, without moving workspace policy into Rust. Its Cargo lock is committed; development
+builds need Rust, while installed applications include the compiled helper. No FFI package or
+timeout-based replacement for F1's workspace locks is added.
+
 F2's isolated renderer experiment (`tools/qualification`, not the production runtime) pins `webgpu`
 **0.6.2**. Its npm metadata says MIT, but its actual `LICENSE.md` is **BSD-3-Clause** (Dawn/Tint);
 retain the shipped text. The addon is evaluated with an app-owned **Node 24.22.0** (MIT plus Node's

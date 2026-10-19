@@ -1,3 +1,7 @@
+import { spawn, type ChildProcessByStdio } from 'node:child_process';
+import { once } from 'node:events';
+import { Readable } from 'node:stream';
+
 /**
  * Sidecar client + supervisor (P3-T2) — the core side of the wire contract
  * frozen in @spritebook/schema sidecar.ts. Everything the sidecar sends is
@@ -8,7 +12,7 @@
  * `retryable: true`, and the next run() respawns.
  *
  * Layering: the pure-HTTP client functions take `{port, token, adapters}` so
- * the protocol is testable against a mock server in Deno; `startSidecar` /
+ * the protocol is testable against a mock server in Node; `startSidecar` /
  * `SidecarSession` add the real process (uv-run) on top.
  */
 import {
@@ -196,9 +200,9 @@ export interface SidecarConfig {
 export interface SidecarHandle extends SidecarEndpoint {
   pid: number;
   handshake: SidecarHandshake;
-  proc: Deno.ChildProcess;
+  proc: ChildProcessByStdio<null, Readable, Readable>;
   /** resolves when the process exits (for death detection) */
-  exited: Promise<Deno.CommandStatus>;
+  exited: Promise<{ code: number; success: boolean; signal: NodeJS.Signals | null }>;
   stderrTail: () => string;
 }
 
@@ -248,27 +252,27 @@ async function readListeningLine(
 /** Spawn the sidecar, learn its port, handshake, enforce the contract. */
 export async function startSidecar(cfg: SidecarConfig): Promise<SidecarHandle> {
   const token = mintToken();
-  const cmd = new Deno.Command(cfg.uvBin ?? 'uv', {
-    args: [
+  const proc = spawn(cfg.uvBin ?? 'uv', [
       'run',
       '--project',
       cfg.sidecarDir,
       'spritebook-sidecar',
       '--port',
       String(cfg.port ?? 0),
-    ],
-    env: { [SIDECAR_TOKEN_ENV]: token },
-    stdout: 'piped',
-    stderr: 'piped',
-    stdin: 'null',
-  });
-  const proc = cmd.spawn();
+    ], {
+      env: { ...process.env, [SIDECAR_TOKEN_ENV]: token },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+  const exited = once(proc, 'close').then(([code, signal]) => ({ code: code ?? -1, signal, success: code === 0 }));
+  void exited.catch(() => {});
+  await once(proc, 'spawn');
 
   // stderr → bounded ring buffer; surfaced in every death/startup error
   const stderrLines: string[] = [];
   const stderrTail = () => stderrLines.join('\n');
   (async () => {
-    const reader = proc.stderr.pipeThrough(new TextDecoderStream()).getReader();
+    const reader = (Readable.toWeb(proc.stderr) as ReadableStream<Uint8Array<ArrayBuffer>>).pipeThrough(new TextDecoderStream()).getReader();
     let carry = '';
     try {
       while (true) {
@@ -287,10 +291,9 @@ export async function startSidecar(cfg: SidecarConfig): Promise<SidecarHandle> {
     }
   })();
 
-  const exited = proc.status;
   try {
     const { line, rest } = await readListeningLine(
-      proc.stdout,
+      Readable.toWeb(proc.stdout) as ReadableStream<Uint8Array>,
       cfg.startTimeoutMs ?? 120_000,
       stderrTail,
     );
@@ -372,7 +375,7 @@ export class SidecarSession {
       // honest retryability (review P2-3): a missing uv binary or a sidecar
       // that exits at boot is a CONFIG error a retry loop can never heal; a
       // startup timeout may just be the first-run uv sync being slow
-      const permanent = e instanceof Deno.errors.NotFound ||
+      const permanent = (e as NodeJS.ErrnoException)?.code === 'ENOENT' ||
         message.includes('exited before announcing its port');
       yield errEvent(req.jobId, 'sidecar-start-failed', message, !permanent);
       return;
@@ -407,7 +410,7 @@ export class SidecarSession {
       // the announced pid is the PYTHON process; proc is the uv wrapper —
       // kill both, or a stubborn python could orphan behind a dead wrapper
       try {
-        Deno.kill(handle.pid);
+        process.kill(handle.pid);
       } catch {
         // already gone
       }

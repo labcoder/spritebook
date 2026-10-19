@@ -23,6 +23,7 @@ tests/failures/
 # Retired experiments stay local; their history remains in Git.
 /spikes/
 apps/studio/src-tauri/target/
+packages/core/native/target/
 apps/studio/src-tauri/gen/
 sidecar/wheels/*.whl
 sidecar/.deps/

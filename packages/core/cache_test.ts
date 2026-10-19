@@ -1,13 +1,17 @@
-import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert@1';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import type { CacheKeyInputs } from '@spritebook/schema';
-import { computeCacheKey, DiskCacheStore, InputHashCache } from './cache.ts';
+import { computeCacheKey, DiskCacheStore, InputHashCache } from './dist/cache.js';
 
 async function fixtureInputs(): Promise<CacheKeyInputs> {
   const url = new URL('../schema/fixtures/valid/cache-key-inputs.json', import.meta.url);
-  return JSON.parse(await Deno.readTextFile(url));
+  return JSON.parse(await fs.readFile(url, 'utf8'));
 }
 
-Deno.test('acceptance: same inputs hit; ANY single input change misses', async () => {
+test('acceptance: same inputs hit; ANY single input change misses', async () => {
   const cache = new InputHashCache();
   const inputs = await fixtureInputs();
   await cache.put(inputs, 'bake-e41c');
@@ -40,7 +44,7 @@ Deno.test('acceptance: same inputs hit; ANY single input change misses', async (
   }
 });
 
-Deno.test('computeCacheKey is key-order independent and validates inputs', async () => {
+test('computeCacheKey is key-order independent and validates inputs', async () => {
   const inputs = await fixtureInputs();
   // same data, reversed insertion order (canonicalJson must neutralize it)
   const shuffled = Object.fromEntries(
@@ -49,8 +53,8 @@ Deno.test('computeCacheKey is key-order independent and validates inputs', async
   assertEquals(await computeCacheKey(shuffled), await computeCacheKey(inputs));
 });
 
-Deno.test('DiskCacheStore round-trips and lists keys', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'sb-cache-' });
+test('DiskCacheStore round-trips and lists keys', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-cache-'));
   const store = new DiskCacheStore(dir);
   const cache = new InputHashCache(store);
   const inputs = await fixtureInputs();
@@ -77,21 +81,21 @@ Deno.test('DiskCacheStore round-trips and lists keys', async () => {
   assert(guarded, 'non-hash keys are rejected');
 });
 
-Deno.test('DiskCacheStore.put is atomic: no torn value is ever served as a hit', async () => {
+test('DiskCacheStore.put is atomic: no torn value is ever served as a hit', async () => {
   // A plain writeTextFile can be interrupted, and nothing downstream detects a
   // truncated entry: has() -> true, get() -> a prefix, and the caller reports a
   // cache HIT and parses garbage.
-  const dir = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const store = new DiskCacheStore(dir);
     const key = 'a'.repeat(64); // keys are sha256 hex
     await store.put(key, JSON.stringify({ pixels: 'complete' }));
     // no stray temp files survive a successful write
     const leftovers: string[] = [];
-    for await (const e of Deno.readDir(dir)) if (e.name.includes('.tmp')) leftovers.push(e.name);
+    for await (const e of await fs.readdir(dir, { withFileTypes: true })) if (e.name.includes('.tmp')) leftovers.push(e.name);
     assertEquals(leftovers, [], 'the temp file is renamed, not left behind');
     assertEquals(await store.get(key), JSON.stringify({ pixels: 'complete' }));
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });

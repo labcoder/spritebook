@@ -1,17 +1,21 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { runCli } from '../cli/mod.ts';
-import { assertEquals, assertRejects, assertThrows } from 'jsr:@std/assert@1';
+import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 import { fileURLToPath } from 'node:url';
 import { CharacterIdSchema, type ModelCatalog, type ProjectPins } from '@spritebook/schema';
-import { loadCatalog } from './catalog.ts';
-import { runInstallJob } from './install.ts';
-import { resolveInstalled } from './installed.ts';
-import { writePins } from './pins.ts';
+import { loadCatalog } from './dist/catalog.js';
+import { runInstallJob } from './dist/install.js';
+import { resolveInstalled } from './dist/installed.js';
+import { writePins } from './dist/pins.js';
 import {
   executionVram,
   resolvePinnedInstalled,
   verifyExecutionModel,
   verifyPackPin,
-} from './execution.ts';
+} from './dist/execution.js';
 import { collect, installRig } from './_testutil.ts';
 import { runGenJob } from '../gen/gen.ts';
 import { readWorkspace } from '../core/workspace.ts';
@@ -22,8 +26,8 @@ const pins: ProjectPins = {
   rendererVersion: 'legacy',
 };
 
-Deno.test('project pins select the exact installed recipe and corrupt weights refuse before sidecar work', async () => {
-  const root = await Deno.makeTempDir();
+test('project pins select the exact installed recipe and corrupt weights refuse before sidecar work', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const catalog = await loadCatalog();
     const entry = catalog.models.find((m) => m.id === 'fixture-gen')!;
@@ -41,7 +45,7 @@ Deno.test('project pins select the exact installed recipe and corrupt weights re
     const small: ModelCatalog = { ...catalog, models: [entry] };
     const models = `${root}/models`, workspace = `${root}/hero`;
     const catalogPath = `${root}/catalog.json`;
-    await Deno.writeTextFile(catalogPath, JSON.stringify(small));
+    await fs.writeFile(catalogPath, JSON.stringify(small));
     for (const version of ['1.0.0', '2.0.0']) {
       const events = await collect(
         runInstallJob({
@@ -52,7 +56,7 @@ Deno.test('project pins select the exact installed recipe and corrupt weights re
           version,
           detected: { platform: 'windows-cpu', vramGb: null },
           fetcher: async (_url, path) => {
-            await Deno.writeFile(path, bytes);
+            await fs.writeFile(path, bytes);
           },
         }),
       );
@@ -88,7 +92,7 @@ Deno.test('project pins select the exact installed recipe and corrupt weights re
       '1.0.0',
       'actual output receipt uses the pin, not newest',
     );
-    await Deno.remove(`${root}/pins.json`);
+    await fs.rm(`${root}/pins.json`);
     const replay: string[] = [];
     assertEquals(
       await runCli([
@@ -130,7 +134,7 @@ Deno.test('project pins select the exact installed recipe and corrupt weights re
         pipelineType: { type: 'string' },
       },
     };
-    await Deno.writeTextFile(catalogPath, JSON.stringify(memoryCatalog));
+    await fs.writeFile(catalogPath, JSON.stringify(memoryCatalog));
     const memory = (await collect(
       runGenJob({
         ...opts,
@@ -144,8 +148,8 @@ Deno.test('project pins select the exact installed recipe and corrupt weights re
       'vram-insufficient',
       'resident config must not borrow the low-memory claim',
     );
-    await Deno.writeTextFile(catalogPath, JSON.stringify(small));
-    await Deno.writeFile(`${models}/fixture-gen/1.0.0/weight.bin`, new Uint8Array([3, 2, 1]));
+    await fs.writeFile(catalogPath, JSON.stringify(small));
+    await fs.writeFile(`${models}/fixture-gen/1.0.0/weight.bin`, new Uint8Array([3, 2, 1]));
     const failed = await collect(runGenJob({ ...opts, sidecarDir: `${root}/no-sidecar` }));
     const terminal = failed.at(-1)!;
     assertEquals(terminal.t === 'error' && terminal.code, 'verify-failed');
@@ -154,7 +158,7 @@ Deno.test('project pins select the exact installed recipe and corrupt weights re
       accepted,
       'failed policy cannot append an accepted result',
     );
-    await Deno.remove(`${models}/fixture-gen/1.0.0/receipt.json`);
+    await fs.rm(`${models}/fixture-gen/1.0.0/receipt.json`);
     assertEquals(
       await resolvePinnedInstalled(models, entry.id, undefined, { workspace }),
       null,
@@ -165,18 +169,18 @@ Deno.test('project pins select the exact installed recipe and corrupt weights re
       Error,
       'Project pins require',
     );
-    await Deno.writeTextFile(`${root}/pins.json`, 'invalid');
+    await fs.writeFile(`${root}/pins.json`, 'invalid');
     await assertRejects(
       () => resolvePinnedInstalled(models, entry.id, undefined, { workspace }),
       Error,
       'Cannot use project pins',
     );
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });
 
-Deno.test('job-time consent fingerprints, territory and current platform are rechecked', async () => {
+test('job-time consent fingerprints, territory and current platform are rechecked', async () => {
   const rig = await installRig({
     license: {
       name: 'Toy license',
@@ -236,11 +240,11 @@ Deno.test('job-time consent fingerprints, territory and current platform are rec
       'this machine is windows-cpu',
     );
   } finally {
-    await Deno.remove(rig.tmp, { recursive: true });
+    await fs.rm(rig.tmp, { recursive: true });
   }
 });
 
-Deno.test('VRAM claims follow the measured configuration; unmeasured paths refuse', async () => {
+test('VRAM claims follow the measured configuration; unmeasured paths refuse', async () => {
   const catalog = await loadCatalog();
   const version = catalog.models.find((m) => m.id === 'trellis2-4b')!.versions[0];
   assertEquals(executionVram(version, 'gen3d', { lowVram: true, pipelineType: '512' }), 4);
