@@ -5,13 +5,13 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1 state-safety work and the Windows x64 F2 proof are complete. F4-T1/T2 are complete;
-F4-T3/T4 are active.** The [conformance/platform matrix](baseline.md) records fresh Windows
-evidence, known defects and unverified targets. Closing baseline capture does not close platform,
-installed-app, model or release qualification gates. A task closes on evidence, not on a compiled
-binary or an optimistic support claim. Exact dependency pins and schema changes follow the existing
-BOM/decision process; Node/Dawn has measured Windows candidate evidence; new models remain
-unqualified.
+2026-10-19; F1 state-safety work and the Windows x64 F2 proof are complete. F4-T1/T2/T3/T5 are
+complete; F4-T4 remains open for real model setup.** The [conformance/platform matrix](baseline.md)
+records fresh Windows evidence, known defects and unverified targets. Closing baseline capture does
+not close platform, installed-app, model or release qualification gates. A task closes on evidence,
+not on a compiled binary or an optimistic support claim. Exact dependency pins and schema changes
+follow the existing BOM/decision process; Node/Dawn has measured Windows candidate evidence; new
+models remain unqualified.
 
 ## The route
 
@@ -198,12 +198,13 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       transactions and subprocess ownership; no permanent global Deno shim. Preserve canonical
       glTF/FBX behavior, retarget-once, palettes/temporal ordering, deterministic packing and CLI
       twins. **Recorded package exit:** all 13 packages compile to JavaScript and declarations, with
-      a separate source/test type check. The Windows Vulkan suite passes **885 checks**, with **6
-      explicit skips** for real-engine, real-model and weight-gated lanes. This includes the GUI
-      logic/parity suite, crash/concurrent-writer recovery, asset undo, independent-process VRAM
-      admission, synthetic sidecar inference and sidecar death/retry. The Node resource guard
-      rejects referenced-handle leaks; explicit descriptor/process regressions cover the boundaries
-      Node's resource inventory cannot see. Installed delivery and real-model checks remain below.
+      a separate source/test type check. The Windows Vulkan suite passes **892 of 899 checks**, with
+      **7 explicit skips** for real-engine, real-model, weight-gated and desktop lanes. This
+      includes the GUI logic/parity suite, crash/concurrent-writer recovery, asset undo,
+      independent-process VRAM admission, synthetic sidecar inference and sidecar death/retry. The
+      Node resource guard rejects referenced-handle leaks; explicit descriptor/process regressions
+      cover the boundaries Node's resource inventory cannot see. Installed delivery and real-model
+      checks remain below.
 - [x] **F4-T3 · Promote the qualified renderer.** Integrate the F2 path through the existing render
       seam. Assign a fresh renderer signature/cache namespace, including build/backend/adapter and
       available driver identity. Never reuse old cached frames as evidence of Node rendering. Keep
@@ -216,7 +217,7 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       padded readback, materials, attachments and independent 8/16-bit PNG/CRC checks. Renderer
       0.6.0 hashes Node/Dawn, codec, backend and adapter/available driver information into a fresh
       cache identity. The [paired production replay](runtime-cutover.md) passes 40/40 pixel-exact
-      atlas pages and 15/15 F0 comparisons, with cold medians 12?15% faster. Old bakes remain
+      atlas pages and 15/15 F0 comparisons, with cold medians 12-15% faster. Old bakes remain
       readable and the original control stays sealed.
 - [~] **F4-T4 · Switch application, tooling and release execution.** Make Tauri invoke bundled
   runtime/core entry points rather than `deno run -A` against a checkout. Switch web build hooks,
@@ -230,12 +231,16 @@ Avoid dependency upgrades that are unrelated to the runtime move.
   from a fresh install. Minimum provisioning fixes needed by existing models belong here; they
   cannot be deferred merely because F3 includes broader model-management improvements. **Progress:**
   the owned runtime/uv/package tree, Tauri bridge/hooks, portable body ID, Vite optimizer/watch fix,
-  frozen writable base environment, Hub auth and Node CI/candidate workflows are implemented.
-  Outside-checkout Unicode/empty-PATH GPU and exporter checks, live native
-  projections/cancellation/retry and real U?-Net prep pass. Final NSIS/failure checks follow.
-  **Open:** current TRELLIS.2/UniRig source/env provisioning and the undeclared gated conditioner;
-  existing stack license gaps are explicit. See [cutover evidence](runtime-cutover.md).
-- [ ] **F4-T5 · Prove conversion, rollback and legacy retirement.** Validate a preserved workspace
+  frozen writable base environment, Hub auth and Node CI/candidate workflows are implemented. The
+  final 6,130-file Windows NSIS payload passes outside-checkout Unicode/empty-PATH import, synthetic
+  generation, Track A rigging, core preview, styled/AOV bake and all four exporters. Fresh Python
+  3.11.16/base setup, native Tauri projections/health, cancellation/retry and real U2-Net prep pass.
+  Installed Python uses normal wheels to avoid the editable Unicode-path bug. **Open:** pinned
+  TRELLIS.2/UniRig source/env provisioning and verified local decoder/conditioner resolution; stack
+  license/provenance gaps are explicit. The [model gate](model-provisioning-gate.md) records exact
+  requirements, primary license evidence and the order of work. See also
+  [cutover evidence](runtime-cutover.md).
+- [x] **F4-T5 · Prove conversion, rollback and legacy retirement.** Validate a preserved workspace
       copy before changing it. Preserve IDs, source/assets/history and readable exports; reject
       future schemas honestly. Test interrupted installs, corrupt receipts, disk-full commits,
       spaces/Unicode paths, model-root relocation and Windows AppData virtualization. Reopen the
@@ -244,14 +249,19 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       conversion/reference, not normal use. **Progress:** preserved-copy conversion, asset/export
       preservation, future-schema refusal and reopening original/converted copies in the archived F1
       release pass. ENOSPC and interrupted builder publication recover coherently. Deno configs, F2
-      shims and importer-less release tooling are retired; final installed failure checks are being
-      recorded.
+      shims and importer-less release tooling are retired. The installed payload passes corrupt
+      receipt, missing addon/loader, model-root relocation and owner-death/retry checks; prior bakes
+      remain unchanged. The native app reports an unvirtualized model root and the existing
+      virtualization guards pass. Private NSIS install/uninstall both exit 0. Full installer
+      upgrades, signing and clean-machine qualification stay in F7.
 
 **Acceptance:** the installed CLI and Tauri app use one TypeScript core on Node, import a mesh,
 retarget clips, bake styled/AOV atlases and export every existing target. Existing real generation
 and rigging workflows pass their applicable hardware/terms gates without undeclared downloads.
 Source, tests, hooks, CI and release execution no longer require Deno. Historical proof transcripts
 may still contain Deno commands when clearly labeled historical; executable support paths may not.
+The maintainer confirmed on 2026-10-19 that the existing model provisioning/licensing gate stays in
+F4. **F4 remains open at F4-T4** until that gate and the real workflow proof pass.
 
 ## F7 · Release the migrated application
 
@@ -341,8 +351,9 @@ successfully is not evidence that the complete character workflow is ready.
    reads and execution policy are recorded in [state safety](state-safety.md).
 3. **Completed — F2:** the Windows Node/Dawn slice and installed proof pass. Additional native
    targets are deferred to F7, as confirmed above.
-4. **Next — F4:** execute the package groups and application/tooling cutover, then F7's release
-   gates. Put unrelated model, editor, dependency and performance work in the later tasks above.
+4. **In progress — F4:** package, renderer, application/tooling and Windows installed proofs pass.
+   Resolve F4-T4's existing model provisioning/licensing gate, then run F7's release gates. Put
+   unrelated model, editor, dependency and performance work in the later tasks above.
 
 Use these task IDs in implementation changes, include the relevant original P-task IDs where
 behavior is carried forward, and update the progress log with actual measurements and remaining

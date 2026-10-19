@@ -404,13 +404,88 @@
   },
   "rawEvidence": ".render-bench/f4/paired-2",
   "initialPortableEvidence": ".render-bench/f4/portable-check-1",
-  "conversionEvidence": ".render-bench/f4/conversion-3",
+  "conversionEvidence": ".render-bench/f4/conversion-4",
   "freshSidecarEvidence": ".render-bench/f4/fresh-sidecar.json",
   "limits": [
     "Same Windows machine, OS/driver caches not flushed",
     "GPU memory samples include the desktop",
     "No remote CI or additional native targets executed",
     "Full TRELLIS.2/UniRig provisioning and commercial-stack gates remain open",
-    "Installer/signing/native-notice and clean-machine qualification tracked separately"
-  ]
+    "Signed release, native notices and clean-machine prerequisites remain F7 gates"
+  ],
+  "tests": {
+    "total": 899,
+    "passed": 892,
+    "failed": 0,
+    "explicitSkips": 7,
+    "lineCoveragePct": 91.75,
+    "branchCoveragePct": 86.71,
+    "functionCoveragePct": 91.83,
+    "realU2NetIntegration": {
+      "passed": 4,
+      "skipped": 0,
+      "evidence": ".render-bench/f4/rembg-check.log"
+    },
+    "installedWheelRegression": {
+      "passed": 12,
+      "skipped": 1,
+      "evidence": ".render-bench/f4/noneditable-checks.log"
+    },
+    "rawEvidence": ".render-bench/f4/final-node-suite.log"
+  },
+  "installed": {
+    "sourceCommit": "c178933ca37591a939ef7b22502c6fbade25a18b",
+    "sourceDirty": false,
+    "runtimeReceiptSha256": "5e3f597d684824ce2a57a2140209bafd7ac91f8b1b3e0b49913105e60f35dc22",
+    "sealedFiles": 6130,
+    "productionPackages": 98,
+    "installer": {
+      "bytes": 64208560,
+      "sha256": "af0a849cf30c3d55c18349814690c067e147ddf5610e825878ae6e907cb9fe88",
+      "installExit": 0,
+      "privateUninstallExit": 0
+    },
+    "checks": [
+      "all sealed files",
+      "empty PATH",
+      "Unicode path",
+      "version",
+      "catalog",
+      "doctor",
+      "OBJ importer/CJS assets",
+      "fresh owned Python/base environment",
+      "relocated model root",
+      "synthetic gen/pick/Track A rig",
+      "core-retargeted preview clip",
+      "cold/warm styled AOVs",
+      "all four exporters",
+      "corrupt receipt refusal",
+      "missing native assets",
+      "prior bake unchanged",
+      "owner death after rendered frame",
+      "retry"
+    ],
+    "native": {
+      "node": "24.22.0",
+      "python": "3.11.16",
+      "contractVersion": 1,
+      "adapters": 9,
+      "vramGb": 24,
+      "virtualization": {
+        "virtualized": false
+      },
+      "workspaces": 1,
+      "thumbBytes": 12478,
+      "meshBytes": 2286684,
+      "atlasKeys": [
+        "manifest",
+        "png"
+      ]
+    },
+    "rawEvidence": ".render-bench/f4/installed-final-2",
+    "nativeEvidence": ".render-bench/f4/desktop-installed-final-proof",
+    "installerBuildEvidence": ".render-bench/f4/desktop-release-build.log",
+    "installerRebundleEvidence": ".render-bench/f4/desktop-rebundle.log",
+    "environment": "Outside checkout, Unicode path, empty PATH/NODE_PATH/NODE_OPTIONS, fresh managed Python and uv/user-data directories; same Windows developer machine"
+  }
 }

@@ -3,7 +3,7 @@
 F4 migrates this repository in place. The TypeScript core/CLI, Tauri/React editor, manifest formats,
 WGSL and feature boundaries are retained. Main now builds and runs on Node **24.22.0**, with pinned
 Dawn **0.6.2**. No supported development, test, CI or application entrypoint requires Deno. F4's
-real-model setup exit gate remains open pending the explicit roadmap decision below.
+real-model provisioning/licensing exit gate remains open, as confirmed by the maintainer.
 
 ## Implemented path
 
@@ -28,6 +28,10 @@ real-model setup exit gate remains open pending the explicit roadmap decision be
 - CI uses Node on the existing OS/software-Vulkan lanes. Release execution builds candidates with
   owned runtimes and Windows NSIS packaging; publication waits for F7 qualification.
 
+The full Windows Node suite passes **892/899 checks**, with zero failures and seven explicit skips;
+line coverage is **91.75%**. Real U2-Net integration and native desktop checks also pass separately.
+The final installed-wheel fix passes the focused sidecar checks and the full installed workflow.
+
 ## Renderer evidence
 
 The [machine-readable receipt](qualification/node-cutover-windows-x64.json) records 46 fresh paired
@@ -38,9 +42,9 @@ width 100, non-square cells, mirroring and all four styles.
 
 | Supersample | Deno cold median | Node cold median | Cold change | Node warm median |
 | ----------- | ---------------: | ---------------: | ----------: | ---------------: |
-| 1?          |          4.325 s |          3.789 s |     ?12.39% |          2.075 s |
-| 2?          |          5.906 s |          5.018 s |     ?15.04% |          2.116 s |
-| 4?          |         11.127 s |          9.599 s |     ?13.74% |          2.087 s |
+| 1x          |          4.325 s |          3.789 s |     -12.39% |          2.075 s |
+| 2x          |          5.906 s |          5.018 s |     -15.04% |          2.116 s |
+| 4x          |         11.127 s |          9.599 s |     -13.74% |          2.087 s |
 
 All **40/40** atlas pages match decoded pixels exactly; all **15/15** comparisons to sealed F0 pages
 match. Frame layout, pivots, mirroring and AOV declarations match exactly. PNG bytes differ because
@@ -61,27 +65,40 @@ is counted as a successful Node render.
 - Existing crash/concurrent-writer tests and an added ENOSPC boundary check recover a coherent prior
   or durable pending state. The runtime builder recovers interrupted directory replacement; this is
   separate from an operating-system installer upgrade guarantee.
-- The initial 6,129-file copied payload passes version/catalog/doctor, OBJ import in its intact CJS
-  layout, styled/AOV baking and all four exporters outside the checkout under a Unicode path with an
-  empty PATH. Final installer/failure evidence is added after its dedicated run.
-- A fresh user profile and uv cache initialize the base sidecar in **10.3 s** with an empty PATH,
-  announce the v1 handshake and shut down cleanly. The machine's managed Python 3.11.15 is reused;
-  this is not a whole clean-machine claim. Real, registry-installed U?-Net prep passes, as do
-  sidecar death/retry and doctor handshake checks.
+- The final **64,208,560-byte** NSIS candidate installs outside the checkout under a Unicode path.
+  All **6,130** sealed runtime files verify. With an empty PATH and fresh user/Python/cache
+  directories, the copied installed payload imports OBJ in its intact CJS layout, runs synthetic
+  gen/pick, Track A rigging, core preview, 48-frame cold/warm baking (0/100% hits), styled/AOV
+  asymmetric rendering and all four exporters. Model-root relocation, corrupt receipt refusal,
+  missing Dawn/loader failures, owner termination after a rendered frame and retry pass. Prior
+  accepted bake hashes remain unchanged.
+- The actual installed Tauri app reports owned Node **24.22.0**, managed Python **3.11.16**,
+  contract v1 and nine adapters, and reads the preserved roster/thumbnail/mesh/atlas through core.
+  Its health action reports render/sidecar OK; screenshots were inspected. NSIS install and private
+  uninstall both exit 0. No Vite server or checkout executable is used by the installed bridge.
+- An initial fresh-profile base setup took **10.3 s**, reusing managed Python 3.11.15. Final Unicode
+  runs download Python 3.11.16 into isolated directories and use normal wheel installation; this
+  fixes Python 3.11's locale-decoded editable `.pth` import failure. Real, registry-installed U2-Net
+  prep and sidecar death/retry also pass. These are fresh-profile checks on this developer machine,
+  not a clean-machine prerequisite/signing claim.
 
 ## Remaining gate
 
 The existing real TRELLIS.2 and UniRig environments/source are absent on this machine. Their old
 preparation relied on retired, untracked spike directories. TRELLIS.2 still has an undeclared,
-manually gated DINOv3 conditioner and evaluation-only/unlicensed CUDA components documented in the
+manually gated DINOv3 conditioner and CUDA artifact license/provenance gaps documented in the
 [BOM](../docs/dependencies.md) and [sidecar setup](../sidecar/README.md). Current auth access is
 available; access alone does not solve reproducible provisioning or stack clearance. No model
-substitution, license exception or silent cloud fallback was introduced.
+substitution, license exception or silent cloud fallback was introduced. The
+[model gate investigation](model-provisioning-gate.md) separates implementation work from
+permission: pin sources/environments, declare and load local dependencies, resolve exact wheel
+provenance/terms, and run the real installed workflow without hidden downloads. Its DINOv3 license
+was retrieved at the exact authorized snapshot; the NVIDIA artifact restrictions remain.
 
-The current roadmap explicitly keeps minimum existing-model provisioning in **F4-T4**. Until the
-maintainer changes that scope or the gate is resolved, F4 is **open**, even though the Node package,
-renderer, CLI and desktop cutover is implemented. This is distinct from F7's already agreed native
-Mac/ARM/Linux, signing, notices, clean-machine prerequisites, engine, accessibility and soak gates.
+The maintainer explicitly retained minimum existing-model provisioning/licensing in **F4-T4**. Until
+the gate is resolved, F4 is **open**, even though the Node package, renderer, CLI and desktop
+cutover is implemented. This is distinct from F7's already agreed native Mac/ARM/Linux, signing,
+notices, clean-machine prerequisites, engine, accessibility and soak gates.
 
 ## Reproduction and preserved controls
 
@@ -102,7 +119,9 @@ historical reproduction. F1's pinned source archive is **b201f85**. Local eviden
   `eb51889ff4e3df1ea109b28dce2de4e7b420d2922aca259abef42492a941b785`.
 - Pinned Deno 2.9.2 reference: `.render-bench/f4/legacy-runtime/deno.exe`, SHA-256
   `a5270c2bb75a2ec12fef53185730327267d9e9fe6be6a962c5d1d5a050f93c88`.
-- Paired measurements/images: `.render-bench/f4/paired-2/`; conversion: `conversion-3/`; native
-  desktop: `desktop-dev-proof/`, `desktop-ownership.log`; real prep: `rembg-check.log`.
+- Paired measurements/images: `.render-bench/f4/paired-2/`; conversion: `conversion-4/`; native
+  desktop: `desktop-dev-proof/`, `desktop-ownership.log`, `desktop-installed-final-proof/`;
+  installed workflow: `installed-final-2/`; real prep: `rembg-check.log`; suite:
+  `final-node-suite.log`.
 
 Nothing was pushed or published, and hosted CI was not dispatched.

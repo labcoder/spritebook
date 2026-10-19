@@ -16,7 +16,10 @@ complete; [the evidence and preservation matrix](baseline.md) records the curren
 known failures and unverified targets. [F1 safety repairs are complete](state-safety.md).
 [F2's Windows renderer and installer proof is complete](renderer-qualification.md), with the
 additional native platforms deferred to F7 and release notice/prerequisite/signing gates explicit.
-**Next: F4-T1**, the production TypeScript core/CLI/toolchain port. Production still runs Deno.
+**F4 runtime cutover is implemented:** main now runs the compiled TypeScript core/CLI on Node
+24.22.0. [Windows parity and installed proofs pass](runtime-cutover.md). F4 remains open at F4-T4
+for the [existing model provisioning/licensing gate](model-provisioning-gate.md), as confirmed by
+the maintainer. F7 retains release and deferred native-platform qualification.
 
 ## Recommendation in one paragraph
 
@@ -43,6 +46,8 @@ migration problems either.
 | [F0 preservation and control](baseline.md)               | Which contracts and platform targets must survive, what ran, and how do we replay the legacy control safely?                 |
 | [F1 state-safety completion](state-safety.md)            | What changed in state, process ownership, queries and execution policy; what passed and what remains unqualified?            |
 | [F2 renderer qualification](renderer-qualification.md)   | Does the actual Node/Dawn pipeline preserve pixels and performance, and which installed/platform gates remain open?          |
+| [F4 Node cutover](runtime-cutover.md)                    | What migrated, what passed in the installed Windows app, and what remains open?                                              |
+| [F4 model setup gate](model-provisioning-gate.md)        | Which source, environment, auxiliary-model and permission gaps prevent closing F4?                                           |
 
 ## Findings that change the decision
 
@@ -72,9 +77,10 @@ historical repo performance/proof logs were read, not rerun. No model download, 
 Mac/ARM run, native toolkit build, desktop installation, or live screen-reader audit was performed.
 Upstream branches and terms are moving targets; pin/review them again when implementing.
 
-F0 subsequently ran the current Windows suite/control and source build checks; its
+F0 subsequently ran the Windows suite/control and source build checks; its
 [baseline report](baseline.md) distinguishes passes, setup-dependent failures, diagnostic failures
-and unverified platforms. The next implementation task is the shared writer/recovery fix in
-**F1-T2**. Follow the [roadmap's ordered changes](roadmap.md#first-implementation-changes).
+and unverified platforms. F1, Windows F2 and the Node cutover now have separate execution receipts.
+The next implementation work is **F4-T4's model setup gate**. Follow the
+[roadmap's ordered changes](roadmap.md#first-implementation-changes).
 [D-041 and D-042](../docs/internal/decisions.md) record the stack and repository decisions. Model
 selection and hardware support remain qualification work, not newly certified by this plan.
