@@ -1,3 +1,4 @@
+import { useJobBridge } from './jobscope';
 /**
  * The editor frame for one open character: stage rail (hue chips, lock
  * states), canvas well (core-produced pixels at integer zoom, dark checker
@@ -38,10 +39,12 @@ function stageLabel(k: StageKey): string {
   }
 }
 
-function StageRail({ stages, active, onSelect }: {
+function StageRail({ stages, active, onSelect, busy, onCancel }: {
   stages: Stage[];
   active: StageKey;
   onSelect: (k: StageKey) => void;
+  busy: boolean;
+  onCancel: () => void;
 }) {
   return (
     <nav className='rail' aria-label={t('Pipeline stages')}>
@@ -68,6 +71,16 @@ function StageRail({ stages, active, onSelect }: {
           {s.state === 'locked' && <span className='sr-only'>{t('locked')} — {s.note}</span>}
         </button>
       ))}
+      {busy && (
+        <button
+          type='button'
+          className='btn'
+          onClick={onCancel}
+          title='CLI: Ctrl+C'
+        >
+          {t('Cancel job')} <kbd>Ctrl+C</kbd>
+        </button>
+      )}
       <div className='railnote'>
         {stages.some((s) => s.state === 'locked')
           ? t('stages unlock when a canonical mesh is saved')
@@ -194,7 +207,8 @@ function sliceFor(stage: StageKey, manifest: unknown): Record<string, unknown> {
       const set = Array.isArray(m.animationSet) ? m.animationSet : [];
       return {
         bindings: set.length,
-        enabled: (set as { enabled?: boolean }[]).filter((b) => b.enabled === true).length,
+        enabled: (set as { enabled?: boolean }[]).filter((b) => b.enabled === true)
+          .length,
       };
     }
     case 'look':
@@ -218,7 +232,9 @@ function Inspector({ stage, stages, manifest, dir }: {
       <div className='isec'>
         <div className='isechead'>
           <span className='hud'>{stageLabel(stage)}</span>
-          <span className='ieyebrow mono'>{`${s.n}// ${stage.toUpperCase()}`}</span>
+          <span className='ieyebrow mono'>
+            {`${s.n}// ${stage.toUpperCase()}`}
+          </span>
         </div>
         <div className='inote'>{s.note}</div>
         <Rows obj={sliceFor(stage, manifest)} />
@@ -292,16 +308,18 @@ function Grip(
 
 /* ---------------- the frame ---------------- */
 
-export function Editor({ bridge, card, manifest, onChanged, onOpenModels, catalogEpoch }: {
-  bridge: StudioBridge;
-  card: CharacterCard;
-  manifest: unknown;
-  /** a verb changed the manifest — the projections must re-read */
-  onChanged: () => void;
-  /** the Generate-more panel and failure banners open Manage models from here */
-  onOpenModels: () => void;
-  catalogEpoch?: number;
-}) {
+export function Editor(
+  { bridge: baseBridge, card, manifest, onChanged, onOpenModels, catalogEpoch }: {
+    bridge: StudioBridge;
+    card: CharacterCard;
+    manifest: unknown;
+    /** a verb changed the manifest — the projections must re-read */
+    onChanged: () => void;
+    /** the Generate-more panel and failure banners open Manage models from here */
+    onOpenModels: () => void;
+    catalogEpoch?: number;
+  },
+) {
   const stages = stageStates(manifest);
   // 'gen', not 'look': the old default sat masked behind the locked-stage
   // fallback and TELEPORTED the user two stages ahead the instant a pick
@@ -311,18 +329,26 @@ export function Editor({ bridge, card, manifest, onChanged, onOpenModels, catalo
   // an active stage can become locked when switching characters — fall back
   const activeStage = stages.find((s) => s.key === active);
   const effective = activeStage && activeStage.state !== 'locked' ? active : 'gen';
+  const { bridge, busy, cancel } = useJobBridge(
+    baseBridge,
+    `${card.dir}|${effective}|${JSON.stringify(manifest)}`,
+  );
 
   // picking a canonical advances the rail to the NEXT stage in order - the
   // journey continues at Rig, not wherever a default happened to point. On
   // EVERY pick, not just the first: a re-picked canonical needs a re-rig,
   // so Rig is the next stage either way.
   const canonicalSha = String(
-    ((manifest ?? {}) as { canonicalMesh?: { gltfSha256?: string } }).canonicalMesh
+    ((manifest ?? {}) as { canonicalMesh?: { gltfSha256?: string } })
+      .canonicalMesh
       ?.gltfSha256 ?? '',
   );
   const prevSha = useRef(canonicalSha);
   useEffect(() => {
-    if (prevSha.current !== canonicalSha && canonicalSha !== '' && active === 'gen') {
+    if (
+      prevSha.current !== canonicalSha && canonicalSha !== '' &&
+      active === 'gen'
+    ) {
       setActive('rig');
     }
     prevSha.current = canonicalSha;
@@ -338,7 +364,9 @@ export function Editor({ bridge, card, manifest, onChanged, onOpenModels, catalo
     if (prevEffective.current === effective) return;
     prevEffective.current = effective;
     const raf = requestAnimationFrame(() => {
-      if (document.activeElement && document.activeElement !== document.body) return;
+      if (document.activeElement && document.activeElement !== document.body) {
+        return;
+      }
       const panel = document.querySelector<HTMLElement>('.center');
       if (panel) {
         panel.tabIndex = -1;
@@ -350,7 +378,13 @@ export function Editor({ bridge, card, manifest, onChanged, onOpenModels, catalo
 
   return (
     <div className='editor'>
-      <StageRail stages={stages} active={effective} onSelect={setActive} />
+      <StageRail
+        stages={stages}
+        active={effective}
+        onSelect={setActive}
+        busy={busy}
+        onCancel={cancel}
+      />
       {effective === 'gen'
         ? (
           <div className='center genstage'>

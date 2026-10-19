@@ -1,3 +1,4 @@
+import { useJobBridge } from './jobscope';
 /**
  * Manage models (⌘M): the registry projected, with its gates VISIBLE —
  * license (SPDX + acceptance requirement), territory exclusions, VRAM floor,
@@ -163,7 +164,9 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
           <span className='mv-bar' aria-hidden='true'>
             <span
               className='mv-barfill'
-              style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+              style={{
+                width: `${Math.round((progress.done / progress.total) * 100)}%`,
+              }}
             />
           </span>
           <span className='mono dimtext'>
@@ -207,11 +210,15 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
   );
 }
 
-export function ManageModels({ bridge, open, onClose }: {
+export function ManageModels({ bridge: baseBridge, open, onClose }: {
   bridge: StudioBridge;
   open: boolean;
   onClose: () => void;
 }) {
+  const { bridge, busy: jobBusy, cancel } = useJobBridge(
+    baseBridge,
+    String(open),
+  );
   const [rows, setRows] = useState<ModelRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -254,6 +261,16 @@ export function ManageModels({ bridge, open, onClose }: {
       className='mdl'
     >
       <div className='mdl-head'>
+        {jobBusy && (
+          <button
+            type='button'
+            className='btn'
+            onClick={cancel}
+            title='CLI: Ctrl+C'
+          >
+            {t('Cancel job')} <kbd>Ctrl+C</kbd>
+          </button>
+        )}
         <span className='hud'>{t('Manage models')}</span>
         <span className='mono dimtext'>
           {t('installed')}: {gb(installedBytes)} GB

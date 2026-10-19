@@ -6,6 +6,7 @@
  * purpose — they match the CLI the GUI mirrors.
  */
 export const es: Record<string, string> = {
+  'Cancel job': 'Cancelar tarea',
   // gallery
   'no bake yet': 'sin bake todavía',
   'Open': 'Abrir',

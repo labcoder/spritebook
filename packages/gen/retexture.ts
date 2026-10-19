@@ -1,3 +1,4 @@
+import { workspaceJob } from '@spritebook/core';
 /**
  * `spritebook retexture` — keep the mesh, reroll the paint.
  *
@@ -128,7 +129,7 @@ export function retextureBackends(
  * backend-unavailable, backend-failed, no-mesh, border-failed, and
  * retexture-failed for anything unclassified.
  */
-export async function* runRetextureJob(
+async function* executeRetextureJob(
   opts: RetextureJobOptions,
 ): AsyncIterable<JobEvent> {
   const at = () => new Date().toISOString();
@@ -432,4 +433,8 @@ export async function* runRetextureJob(
   } finally {
     await session?.dispose();
   }
+}
+
+export function runRetextureJob(opts: RetextureJobOptions): AsyncIterable<JobEvent> {
+  return workspaceJob(opts.workspace, () => executeRetextureJob(opts));
 }

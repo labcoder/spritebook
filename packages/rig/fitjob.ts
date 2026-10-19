@@ -1,3 +1,4 @@
+import { workspaceJob } from '@spritebook/core';
 /**
  * The Track A `fit` job (P3-T4): fit the ONE canonical rigged body onto a
  * generated mesh, as a JobEvent stream like every other verb. job.ts (the
@@ -61,7 +62,7 @@ class FitFail extends Error {
  * fit-stray-joints, fit-unprojected, fit-not-recorded (warns — a torn fit is
  * reported, never fatal).
  */
-export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
+async function* executeFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
   const at = () => new Date().toISOString();
   const jobId = opts.jobId as JobEvent['jobId'];
   const t0 = performance.now();
@@ -187,18 +188,21 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
       const promotion = await prepareCanonicalPromotion(opts.workspace, fittedPath, report.heightM);
       const promoted = promotion.ready;
       const meshRepin = promotion.ready ? promotion.meshRepin : undefined;
+      if (!promotion.ready && promotion.reason === 'io') {
+        throw new FitFail(
+          'fit-not-promoted',
+          `Output was retained but could not be accepted: ${promotion.error.message}`,
+        );
+      }
       if (!promotion.ready) {
         yield {
           t: 'warn',
           jobId,
           at: at(),
           code: 'fit-not-promoted',
-          message: promotion.reason === 'no-canonical-mesh'
-            ? 'This workspace has no picked canonical mesh, so the fitted body was left in ' +
-              `${fittedPath} instead of becoming canonical/model.glb. Run \`spritebook pick\` ` +
-              'first if you meant this fit to become the character.'
-            : `The fit is on disk at ${fittedPath} but could not become the workspace's ` +
-              `canonical mesh: ${promotion.error.message}`,
+          message: 'This workspace has no picked canonical mesh, so the fitted body was left in ' +
+            `${fittedPath} instead of becoming canonical/model.glb. Run \`spritebook pick\` ` +
+            'first if you meant this fit to become the character.',
         };
       }
 
@@ -241,17 +245,12 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
           path: `${opts.workspace}/${MANIFEST_FILE}`,
         };
       } catch (err) {
-        // the fit itself succeeded and its files are on disk; failing the job
-        // now would throw away real work over bookkeeping (job.ts discipline)
-        yield {
-          t: 'warn',
-          jobId,
-          at: at(),
-          code: 'fit-not-recorded',
-          message: `The fit is on disk but could not be recorded in the character: ${
+        throw new FitFail(
+          'fit-not-recorded',
+          `Output files were retained, but the character was not updated: ${
             err instanceof Error ? err.message : String(err)
           }`,
-        };
+        );
       }
     }
 
@@ -274,4 +273,8 @@ export async function* runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
       retryable: fail.retryable,
     };
   }
+}
+
+export function runFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
+  return workspaceJob(opts.workspace, () => executeFitJob(opts));
 }

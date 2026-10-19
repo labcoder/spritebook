@@ -42,3 +42,24 @@ inverses; abrupt exit before intent and after each rename boundary recovers a co
 state. The normal test/coverage tasks grant Deno subprocess permission for these checks. No image
 goldens or retry loops are involved. Fresh execution so far is native Windows x64; other platforms
 remain qualification work.
+
+## Job ownership (F1-T3)
+
+Writers first acquire `<manifest>.job.lock` for the complete read/compute/commit operation, then
+`<manifest>.lock` for the short recoverable transaction. Core job generators retain their lease
+until completion or iterator cleanup. The CLI also encloses workspace argument resolution in that
+lease. Readers take only the short lock and can show the previous accepted revision during
+inference. The OS releases both locks when the owning process dies; never delete lock files as a
+reset.
+
+The editor keys drafts to a character, scopes jobs to its stage and manifest snapshot, and cancels
+on scope disposal. Old callbacks cannot report success into a newer scope. The Tauri shell owns CLI
+descendants with a Windows job object (kill on handle close) or a Unix process group. A stdin
+startup gate prevents workers from starting before ownership is assigned. Explicit cancellation,
+window destruction and normal job cleanup kill the owned tree. Windows descendant cancellation is
+exercised by a real parent/grandchild test; macOS/Linux execution remains a platform qualification
+gate. Abrupt Unix shell death is not claimed to have Windows kernel job-object cleanup semantics.
+
+Stdout remains the CLI's original query document or NDJSON stream. Stderr has a distinct per-job
+channel and diagnostic file; the log drawer displays its lines verbatim with error severity. Failed
+rig/fit acceptance is a terminal error even when intermediate output files were retained.

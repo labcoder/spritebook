@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { dirname, resolve } from 'node:path';
-import type { CharacterManifest, JsonPatchOp, ManifestPatch } from '@spritebook/schema';
+import type { CharacterManifest, JobEvent, JsonPatchOp, ManifestPatch } from '@spritebook/schema';
 import {
   canonicalJson,
   CharacterManifestSchema,
@@ -21,7 +21,7 @@ interface State {
 }
 
 /** OS locks release on process death. Never unlink the lock file (inode races). */
-export async function withManifestLock<T>(path: string, run: () => Promise<T>): Promise<T> {
+async function acquireLock(path: string) {
   let realDir: string;
   try {
     realDir = await Deno.realPath(dirname(resolve(path)));
@@ -33,10 +33,59 @@ export async function withManifestLock<T>(path: string, run: () => Promise<T>): 
   }
   const key = resolve(realDir, path.replaceAll('\\', '/').split('/').at(-1)!);
   const id = Deno.build.os === 'windows' ? key.toLowerCase() : key;
-  if (held.getStore()?.has(id)) return await run();
-  using file = await Deno.open(`${key}.lock`, { create: true, read: true, write: true });
-  await file.lock(true);
-  return await held.run(new Set([...(held.getStore() ?? []), id]), run);
+  const keys = new Set([...(held.getStore() ?? []), id]);
+  if (held.getStore()?.has(id)) return { keys };
+  const file = await Deno.open(`${key}.lock`, { create: true, read: true, write: true });
+  try {
+    await file.lock(true);
+    return { keys, file };
+  } catch (e) {
+    file.close();
+    throw e;
+  }
+}
+
+export async function withManifestLock<T>(path: string, run: () => Promise<T>): Promise<T> {
+  const lock = await acquireLock(path);
+  try {
+    return await held.run(lock.keys, run);
+  } finally {
+    lock.file?.close();
+  }
+}
+
+/** Lock order: the long job lease, then the short recoverable state transaction. */
+export async function withManifestWrite<T>(path: string, run: () => Promise<T>): Promise<T> {
+  return await withManifestLock(`${path}.job`, run);
+}
+
+/** Keep generator work inside its lease, including cleanup after an early return. */
+export async function* workspaceJob(
+  workspace: string | undefined,
+  run: () => AsyncIterable<JobEvent>,
+): AsyncIterable<JobEvent> {
+  if (!workspace) {
+    yield* run();
+    return;
+  }
+  await Deno.mkdir(workspace, { recursive: true });
+  const lock = await acquireLock(`${workspacePaths(workspace).manifest}.job`);
+  const iterator = run()[Symbol.asyncIterator]();
+  try {
+    while (true) {
+      const next = await held.run(lock.keys, () => iterator.next());
+      if (next.done) return;
+      yield next.value;
+    }
+  } finally {
+    try {
+      await held.run(lock.keys, async () => {
+        await iterator.return?.();
+      });
+    } finally {
+      lock.file?.close();
+    }
+  }
 }
 
 /** Unique staging plus file sync; directory-entry durability is not promised on power loss. */
@@ -213,13 +262,14 @@ export async function initializeManifest(
   doc: CharacterManifest,
   patches: ManifestPatch[] = [],
 ): Promise<void> {
-  await withManifestLock(path, async () => {
-    await recover(path);
-    if (await optionalText(path, '')) {
-      throw new Error(`A character already exists at "${path}" - refusing to overwrite it.`);
-    }
-    await persist(path, validateState({ doc, patches, cursor: patches.length }, path));
-  });
+  await withManifestWrite(path, () =>
+    withManifestLock(path, async () => {
+      await recover(path);
+      if (await optionalText(path, '')) {
+        throw new Error(`A character already exists at "${path}" - refusing to overwrite it.`);
+      }
+      await persist(path, validateState({ doc, patches, cursor: patches.length }, path));
+    }));
 }
 
 export async function commitManifest(
@@ -228,57 +278,59 @@ export async function commitManifest(
   now?: () => string,
   canonicalSource?: string,
 ): Promise<CharacterManifest> {
-  return await withManifestLock(path, async () => {
-    await recover(path);
-    const state = await stateOf(path);
-    const { op, label } = build(state.doc);
-    if (!op.length) return state.doc;
-    const kept = state.patches.slice(0, state.cursor);
-    const journal = new ManifestJournal(state.doc, { now });
-    const built = journal.commit({ target: { kind: 'character', id: state.doc.id }, op, label });
-    const patch = { ...built, seq: kept.length ? kept.at(-1)!.seq + 1 : 0 };
-    const next = validateState({
-      doc: journal.doc as CharacterManifest,
-      patches: [...kept, patch],
-      cursor: kept.length + 1,
-    }, path);
-    await prepareAssets(path, state.doc, next, canonicalSource);
-    await persist(path, next);
-    return next.doc;
-  });
+  return await withManifestWrite(path, () =>
+    withManifestLock(path, async () => {
+      await recover(path);
+      const state = await stateOf(path);
+      const { op, label } = build(state.doc);
+      if (!op.length) return state.doc;
+      const kept = state.patches.slice(0, state.cursor);
+      const journal = new ManifestJournal(state.doc, { now });
+      const built = journal.commit({ target: { kind: 'character', id: state.doc.id }, op, label });
+      const patch = { ...built, seq: kept.length ? kept.at(-1)!.seq + 1 : 0 };
+      const next = validateState({
+        doc: journal.doc as CharacterManifest,
+        patches: [...kept, patch],
+        cursor: kept.length + 1,
+      }, path);
+      await prepareAssets(path, state.doc, next, canonicalSource);
+      await persist(path, next);
+      return next.doc;
+    }));
 }
 
 export async function moveManifestCursor(path: string, direction: 'undo' | 'redo') {
-  return await withManifestLock(path, async () => {
-    await recover(path);
-    const state = await stateOf(path);
-    const index = direction === 'undo' ? state.cursor - 1 : state.cursor;
-    if (index < 0 || index >= state.patches.length) {
-      throw Object.assign(new Error(`Nothing to ${direction}`), {
-        code: `nothing-to-${direction}`,
-      });
-    }
-    const patch = state.patches[index];
-    const doc = applyPatchOps(state.doc, direction === 'undo' ? patch.inverse : patch.op);
-    let next: State;
-    try {
-      next = validateState({
-        ...state,
-        doc: doc as CharacterManifest,
-        cursor: state.cursor + (direction === 'undo' ? -1 : 1),
-      }, path);
-    } catch (e) {
-      throw Object.assign(
-        new Error(
-          `Cannot ${direction} "${patch.label}" at "${path}": ${
-            e instanceof Error ? e.message : e
-          }`,
-        ),
-        { code: 'invalid-manifest' },
-      );
-    }
-    await prepareAssets(path, state.doc, next);
-    await persist(path, next);
-    return patch;
-  });
+  return await withManifestWrite(path, () =>
+    withManifestLock(path, async () => {
+      await recover(path);
+      const state = await stateOf(path);
+      const index = direction === 'undo' ? state.cursor - 1 : state.cursor;
+      if (index < 0 || index >= state.patches.length) {
+        throw Object.assign(new Error(`Nothing to ${direction}`), {
+          code: `nothing-to-${direction}`,
+        });
+      }
+      const patch = state.patches[index];
+      const doc = applyPatchOps(state.doc, direction === 'undo' ? patch.inverse : patch.op);
+      let next: State;
+      try {
+        next = validateState({
+          ...state,
+          doc: doc as CharacterManifest,
+          cursor: state.cursor + (direction === 'undo' ? -1 : 1),
+        }, path);
+      } catch (e) {
+        throw Object.assign(
+          new Error(
+            `Cannot ${direction} "${patch.label}" at "${path}": ${
+              e instanceof Error ? e.message : e
+            }`,
+          ),
+          { code: 'invalid-manifest' },
+        );
+      }
+      await prepareAssets(path, state.doc, next);
+      await persist(path, next);
+      return patch;
+    }));
 }

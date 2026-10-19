@@ -15,6 +15,7 @@ export interface LogLine {
   jobId: string;
   line: string;
   severity: Severity;
+  stream: 'stdout' | 'stderr';
   at: number;
 }
 
@@ -49,12 +50,18 @@ export class LogStore {
     unseenErrors: 0,
   };
 
-  append(jobId: string, line: string, now: number = Date.now()): LogLine {
+  append(
+    jobId: string,
+    line: string,
+    now: number = Date.now(),
+    stream: 'stdout' | 'stderr' = 'stdout',
+  ): LogLine {
     const entry: LogLine = {
       seq: ++this.#seq,
       jobId,
       line,
-      severity: severityOf(line),
+      severity: stream === 'stderr' ? 'error' : severityOf(line),
+      stream,
       at: now,
     };
     this.#lines.push(entry);

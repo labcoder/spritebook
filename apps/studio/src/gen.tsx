@@ -1,3 +1,4 @@
+import { useJobBridge } from './jobscope';
 /**
  * Stage 01, both halves (P4-T2):
  *
@@ -341,7 +342,7 @@ export function CliTwin({ args }: { args: string[] }) {
 /* ---------------- GenerateNew (the + tab) ---------------- */
 
 export function GenerateNew(
-  { bridge, projectsRoot, onCreated, onOpenModels, catalogEpoch, vramGb }: {
+  { bridge: baseBridge, projectsRoot, onCreated, onOpenModels, catalogEpoch, vramGb }: {
     bridge: StudioBridge;
     projectsRoot: string;
     /** called with the new CHARACTER ID after gen exits 0 - the App re-reads
@@ -354,6 +355,7 @@ export function GenerateNew(
     vramGb?: number | null;
   },
 ) {
+  const { bridge, busy: jobBusy, cancel } = useJobBridge(baseBridge, projectsRoot);
   const [name, setName] = useState('');
   const [imagePath, setImagePath] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
@@ -691,6 +693,11 @@ export function GenerateNew(
         >
           {run?.running ? t('Generating…') : t('Generate model')}
         </button>
+        {jobBusy && (
+          <button type='button' className='btn' onClick={cancel} title='CLI: Ctrl+C'>
+            {t('Cancel job')} <kbd>Ctrl+C</kbd>
+          </button>
+        )}
         {!ready && blocker !== null && <span className='blocker mono' role='status'>{blocker}
         </span>}
         {run?.running && (

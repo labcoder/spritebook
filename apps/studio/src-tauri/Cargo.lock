@@ -2774,10 +2774,12 @@ name = "spritebook-studio"
 version = "0.9.0"
 dependencies = [
  "base64 0.22.1",
+ "libc",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

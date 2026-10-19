@@ -1,3 +1,4 @@
+import { workspaceJob } from '@spritebook/core';
 /**
  * `spritebook pick` — promote one generation result to THE canonical mesh,
  * optionally repainting its texture from the source image first (P3-T2).
@@ -89,7 +90,7 @@ export async function heightOf(bytes: Uint8Array): Promise<number> {
  * Promote a result. Event codes: unknown-result, discarded-result,
  * missing-model, no-source, reproject-failed, picked-multi-body (warn).
  */
-export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
+async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
   const at = () => new Date().toISOString();
   const jobId = opts.jobId as JobEvent['jobId'];
   const t0 = performance.now();
@@ -410,4 +411,8 @@ export async function* runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent>
       }
     }
   }
+}
+
+export function runPickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
+  return workspaceJob(opts.workspace, () => executePickJob(opts));
 }

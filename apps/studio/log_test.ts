@@ -50,3 +50,15 @@ Deno.test('subscribers fire per append and the snapshot is stable between them',
   s.append('a', 'y');
   assertEquals(fired, 1, 'unsubscribed');
 });
+
+Deno.test('stderr stays verbatim, separate from stdout, and contributes to the error badge', () => {
+  const s = new LogStore();
+  const raw = 'Traceback: worker process crashed';
+  s.append('job', '{"t":"progress"}', 1);
+  s.append('job', raw, 2, 'stderr');
+  assertEquals(s.snapshot().lines.map((l) => [l.stream, l.line]), [
+    ['stdout', '{"t":"progress"}'],
+    ['stderr', raw],
+  ]);
+  assertEquals(s.snapshot().unseenErrors, 1);
+});

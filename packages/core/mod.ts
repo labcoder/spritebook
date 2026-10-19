@@ -20,4 +20,10 @@ export * from './sidecar.ts';
 export * from './params.ts';
 export * from './oklab.ts';
 
-export { commitManifest, moveManifestCursor, withManifestLock } from './persistence.ts';
+export {
+  commitManifest,
+  moveManifestCursor,
+  withManifestLock,
+  withManifestWrite,
+  workspaceJob,
+} from './persistence.ts';

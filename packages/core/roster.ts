@@ -1,3 +1,4 @@
+import { relative, resolve } from 'node:path';
 /**
  * Roster operations: `clone` and `rename` (P3-T4).
  *
@@ -38,7 +39,7 @@ import { ManifestJournal } from './journal.ts';
 import {
   commitManifest,
   initializeManifest,
-  withManifestLock,
+  withManifestWrite,
   writeAtomic,
 } from './persistence.ts';
 import { readWorkspace, workspacePaths } from './workspace.ts';
@@ -96,12 +97,18 @@ export async function cloneCharacter(
   destWorkspace: string,
   opts: CloneOptions,
 ) {
+  const nested = relative(resolve(sourceWorkspace), resolve(destWorkspace));
+  if (!nested || (!nested.startsWith('..') && !nested.includes(':'))) {
+    throw new Error('Clone destination must be outside the source workspace');
+  }
   await Deno.mkdir(destWorkspace, { recursive: true });
-  return await withManifestLock(
-    workspacePaths(sourceWorkspace).manifest,
+  const paths = [workspacePaths(sourceWorkspace).manifest, workspacePaths(destWorkspace).manifest]
+    .sort();
+  return await withManifestWrite(
+    paths[0],
     () =>
-      withManifestLock(
-        workspacePaths(destWorkspace).manifest,
+      withManifestWrite(
+        paths[1],
         () => cloneUnlocked(sourceWorkspace, destWorkspace, opts),
       ),
   );
@@ -136,6 +143,7 @@ async function cloneUnlocked(
       `${MANIFEST_FILE}.journal.ndjson`,
       `${MANIFEST_FILE}.journal.cursor`,
       `${MANIFEST_FILE}.lock`,
+      `${MANIFEST_FILE}.job.lock`,
       `${MANIFEST_FILE}.pending.json`,
     ]),
   );

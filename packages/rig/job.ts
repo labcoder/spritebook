@@ -1,3 +1,4 @@
+import { workspaceJob } from '@spritebook/core';
 /**
  * The `rig` job (P3-T3): predict a skeleton, apply it, check it deforms, and
  * record what happened — as a JobEvent stream like every other verb.
@@ -106,7 +107,7 @@ class RigFail extends Error {
  * rig-invalid-output, rig-apply-failed, deform-flagged (warn),
  * unknown-joint (warn).
  */
-export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
+async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
   const at = () => new Date().toISOString();
   const jobId = opts.jobId as JobEvent['jobId'];
   const t0 = performance.now();
@@ -432,18 +433,21 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
       // was given and does not change how tall the character stands, so
       // carrying the pick's height forward is the truthful move
       const promotion = await prepareCanonicalPromotion(opts.workspace, riggedPath);
+      if (!promotion.ready && promotion.reason === 'io') {
+        throw new RigFail(
+          'rig-not-promoted',
+          `Output was retained but could not be accepted: ${promotion.error.message}`,
+        );
+      }
       if (!promotion.ready) {
         yield {
           t: 'warn',
           jobId,
           at: at(),
           code: 'rig-not-promoted',
-          message: promotion.reason === 'no-canonical-mesh'
-            ? 'This workspace has no picked canonical mesh, so the rigged model was left at ' +
-              `${riggedPath} instead of becoming canonical/model.glb. Run \`spritebook pick\` ` +
-              'first if you meant this rig to become the character.'
-            : `The rig is on disk at ${riggedPath} but could not become the workspace's ` +
-              `canonical mesh: ${promotion.error.message}`,
+          message: 'This workspace has no picked canonical mesh, so the rigged model was left at ' +
+            `${riggedPath} instead of becoming canonical/model.glb. Run \`spritebook pick\` ` +
+            'first if you meant this rig to become the character.',
         };
       }
 
@@ -472,17 +476,12 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
           path: `${opts.workspace}/${MANIFEST_FILE}`,
         };
       } catch (err) {
-        // the rig itself succeeded and its files are on disk; failing the job
-        // now would throw away real work over bookkeeping
-        yield {
-          t: 'warn',
-          jobId,
-          at: at(),
-          code: 'rig-not-recorded',
-          message: `The rig is on disk but could not be recorded in the character: ${
+        throw new RigFail(
+          'rig-not-recorded',
+          `Output files were retained, but the character was not updated: ${
             err instanceof Error ? err.message : String(err)
           }`,
-        };
+        );
       }
     }
 
@@ -510,4 +509,8 @@ export async function* runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
     // outlives its job shrinks the machine's budget until its heartbeat lapses
     await lease?.release();
   }
+}
+
+export function runRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
+  return workspaceJob(opts.workspace, () => executeRigJob(opts));
 }

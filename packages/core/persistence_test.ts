@@ -2,7 +2,7 @@ import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import { appendGenerationResult, pickResult, setIdentity, setRigState } from './receipts.ts';
 import { sha256Bytes } from './cache.ts';
 import { createWorkspace, readWorkspace, workspacePaths } from './workspace.ts';
-import { moveManifestCursor } from './persistence.ts';
+import { moveManifestCursor, workspaceJob } from './persistence.ts';
 
 async function append(workspace: string, id: string, hash = 'a'.repeat(64)) {
   await appendGenerationResult(workspace, {
@@ -155,6 +155,48 @@ Deno.test('independent writers keep both acknowledged histories, including their
     assertEquals((await readWorkspace(workspace)).generation.results, []);
     for (let i = 0; i < 10; i++) await moveManifestCursor(manifest, 'redo');
     assertEquals((await readWorkspace(workspace)).generation.results.map((r) => r.id), ids);
+  } finally {
+    await Deno.remove(workspace, { recursive: true });
+  }
+});
+
+Deno.test('job ownership spans computation, permits reads, and releases on early return', async () => {
+  const workspace = await fixture();
+  try {
+    const work = async function* () {
+      const before = await readWorkspace(workspace);
+      yield {
+        t: 'started' as const,
+        jobId: 'owner' as import('@spritebook/schema').JobId,
+        at: '2026-10-19T00:00:00Z',
+      };
+      await append(workspace, `r${before.generation.results.length + 1}`);
+    };
+    const first = workspaceJob(workspace, work)[Symbol.asyncIterator]();
+    await first.next();
+    assertEquals(
+      (await readWorkspace(workspace)).generation.results.length,
+      0,
+      'reads stay available while a job computes',
+    );
+    const second = (async () => {
+      for await (const _ of workspaceJob(workspace, work)) { /* drain */ }
+    })();
+    await first.next();
+    await second;
+    assertEquals((await readWorkspace(workspace)).generation.results.map((r) => r.id), [
+      'r1',
+      'r2',
+    ]);
+    const canceled = workspaceJob(workspace, work)[Symbol.asyncIterator]();
+    await canceled.next();
+    await canceled.return?.();
+    await append(workspace, 'after-cancel');
+    assertEquals((await readWorkspace(workspace)).generation.results.map((r) => r.id), [
+      'r1',
+      'r2',
+      'after-cancel',
+    ]);
   } finally {
     await Deno.remove(workspace, { recursive: true });
   }

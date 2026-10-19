@@ -1,3 +1,4 @@
+import { workspaceJob } from '@spritebook/core';
 /**
  * The `identity` job (P3-T4, Track A): decals, attachments and bone masks
  * applied to a character's PICKED canonical mesh, as a JobEvent stream like
@@ -68,7 +69,7 @@ class IdentityFail extends Error {
  * identity-failed (errors). Stages emit progress steps `bone-mask`,
  * `attachments`, `decals` (whichever were requested), then `record`.
  */
-export async function* runIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobEvent> {
+async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobEvent> {
   const at = () => new Date().toISOString();
   const jobId = opts.jobId as JobEvent['jobId'];
   const t0 = performance.now();
@@ -344,4 +345,8 @@ async function heightOf(bytes: Uint8Array): Promise<number> {
     }
   }
   return Number.isFinite(min) && Number.isFinite(max) ? Number((max - min).toFixed(6)) : 0;
+}
+
+export function runIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobEvent> {
+  return workspaceJob(opts.workspace, () => executeIdentityJob(opts));
 }

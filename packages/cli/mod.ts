@@ -48,6 +48,7 @@ import {
   readWorkspace,
   recordBake,
   resolveCamera,
+  withManifestWrite,
   workspacePaths,
 } from '@spritebook/core';
 import {
@@ -1122,7 +1123,11 @@ async function runBakeAll(args: string[], io: CliIo, b: BatchIo): Promise<number
   return 0;
 }
 
-export async function runCli(args: string[], io: CliIo): Promise<number> {
+export function runCli(args: string[], io: CliIo): Promise<number> {
+  return dispatchCli(args, io, false);
+}
+
+async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<number> {
   const now = io.now ?? (() => new Date().toISOString());
   const json = args.includes('--json');
   const verb = args[0];
@@ -1181,6 +1186,27 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
         unknown.join(', ')
       }${hint} - accepted: ${accepted}`,
     );
+  }
+
+  const workspace = flag(args, 'workspace') ??
+    (['gen', 'pick', 'retexture'].includes(verb) ? flag(args, 'out') : undefined);
+  if (
+    !owned && workspace && !(verb === 'bake' && args.includes('--all')) &&
+    ['gen', 'pick', 'retexture', 'rig', 'identity', 'bake', 'anim', 'look', 'rename'].includes(verb)
+  ) {
+    try {
+      await Deno.mkdir(workspace, { recursive: true });
+      return await withManifestWrite(
+        workspacePaths(workspace).manifest,
+        () => dispatchCli(args, io, true),
+      );
+    } catch (e) {
+      return fail(
+        verb as JobEvent['jobId'],
+        'workspace-failed',
+        e instanceof Error ? e.message : String(e),
+      );
+    }
   }
 
   if (verb === '--version' || verb === '-v') {
@@ -2575,7 +2601,13 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
 }
 
 if (import.meta.main) {
-  const code = await runCli(Deno.args, {
+  const args = [...Deno.args];
+  // The shell assigns this process to its owned tree before releasing the gate.
+  if (args[0] === '--owned-start') {
+    args.shift();
+    if (await new Response(Deno.stdin.readable).text() !== 'start\n') Deno.exit(130);
+  }
+  const code = await runCli(args, {
     stdout: (l) => console.log(l),
     stderr: (l) => console.error(l),
   });

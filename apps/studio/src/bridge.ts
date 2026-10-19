@@ -35,7 +35,11 @@ export interface CliRun {
 export interface StudioBridge {
   name: 'tauri' | 'browser-demo';
   /** Any core verb, streamed line-by-line; every line also lands in the log. */
-  runCli(args: string[], onLine?: (line: string) => void): Promise<CliRun>;
+  runCli(
+    args: string[],
+    onLine?: (line: string) => void,
+    signal?: AbortSignal,
+  ): Promise<CliRun>;
   /** `spritebook doctor [--sidecar] --json` through the shell. */
   runDoctor(
     opts: { sidecar: boolean },
@@ -83,7 +87,9 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
   const runCli = async (
     args: string[],
     onLine?: (line: string) => void,
+    signal?: AbortSignal,
   ): Promise<CliRun> => {
+    if (signal?.aborted) return { exitCode: 130, lines: [] };
     const jobId = `${args[0] ?? 'cli'}-${Date.now()}-${++seq}`;
     const lines: string[] = [];
     const unlisten = await t.event.listen(`cli:${jobId}`, (e) => {
@@ -92,12 +98,34 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
       log.append(jobId, line);
       onLine?.(line);
     });
+    const unlistenStderr = await t.event.listen(`cli-stderr:${jobId}`, (e) => {
+      log.append(jobId, String(e.payload), Date.now(), 'stderr');
+    }).catch((e) => {
+      unlisten();
+      throw e;
+    });
+    let started = false;
+    const cancel = () => {
+      if (started) {
+        void t.core.invoke('cancel_cli', { jobId }).catch((e) => {
+          log.append(jobId, `Could not cancel: ${e}`, Date.now(), 'stderr');
+        });
+      }
+    };
+    signal?.addEventListener('abort', cancel, { once: true });
     try {
+      if (signal?.aborted) return { exitCode: 130, lines: [] };
+      started = true;
       const exitCode = (await t.core.invoke('run_cli', { jobId, args })) as
         | number
         | null;
-      return { exitCode, lines };
+      return { exitCode: signal?.aborted ? 130 : exitCode, lines };
+    } catch (e) {
+      log.append(jobId, String(e), Date.now(), 'stderr');
+      return { exitCode: signal?.aborted ? 130 : 1, lines };
     } finally {
+      signal?.removeEventListener('abort', cancel);
+      unlistenStderr();
       unlisten();
     }
   };
@@ -128,17 +156,25 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
       return b64 ? `data:image/gif;base64,${b64}` : null;
     },
     async readImage(path) {
-      const r = (await t.core.invoke('read_image', { path })) as [string, string] | null;
+      const r = (await t.core.invoke('read_image', { path })) as [
+        string,
+        string,
+      ] | null;
       return r ? `data:${r[0]};base64,${r[1]}` : null;
     },
     async prevSession(maxLines) {
-      return (await t.core.invoke('read_prev_session', { maxLines })) as string[] | null;
+      return (await t.core.invoke('read_prev_session', { maxLines })) as
+        | string[]
+        | null;
     },
     async readRigReport(dir) {
       return await t.core.invoke('read_rig_report', { dir });
     },
     async readBakeAtlas(dir, pass) {
-      return (await t.core.invoke('read_bake_atlas', { dir, pass: pass ?? 'lit' })) as
+      return (await t.core.invoke('read_bake_atlas', {
+        dir,
+        pass: pass ?? 'lit',
+      })) as
         | { manifest: unknown; png: string }
         | null;
     },
@@ -259,7 +295,10 @@ const DEMO_CATALOG = {
           properties: {
             steps: { type: 'integer', minimum: 1, maximum: 100 },
             guidanceStrength: { type: 'number', minimum: 0 },
-            pipelineType: { type: 'string', enum: ['512', '1024', '1024_cascade'] },
+            pipelineType: {
+              type: 'string',
+              enum: ['512', '1024', '1024_cascade'],
+            },
             lowVram: { type: 'boolean' },
             candidates: { type: 'integer', minimum: 1, maximum: 8 },
           },
@@ -351,7 +390,13 @@ const DEMO_LOOK_PRESETS = {
       superSample: 4,
       alphaMode: '1bit',
     },
-    { id: 'painterly', mode: 'painterly', maxColors: 32, superSample: 4, alphaMode: 'soft' },
+    {
+      id: 'painterly',
+      mode: 'painterly',
+      maxColors: 32,
+      superSample: 4,
+      alphaMode: 'soft',
+    },
   ],
 };
 
@@ -467,7 +512,10 @@ function browserBridge(): StudioBridge {
             id: 'clay',
             displayName: 'clay',
             canonicalMesh: { heightM: 1.7 },
-            generation: { pickedResultId: 'r1', results: [{ id: 'r1', seed: 3 }] },
+            generation: {
+              pickedResultId: 'r1',
+              results: [{ id: 'r1', seed: 3 }],
+            },
             look: { stylePresetId: 'clean', cameraPresetId: 'standard-30' },
             source: { kind: 'image' },
           },
@@ -537,7 +585,12 @@ function browserBridge(): StudioBridge {
       return Promise.resolve({
         manifest: {
           bakeId: 'demo0000',
-          metrics: { cacheHitPct: 0, flickerPct: 0.3, framesTotal: 6, wallTimeS: 3.2 },
+          metrics: {
+            cacheHitPct: 0,
+            flickerPct: 0.3,
+            framesTotal: 6,
+            wallTimeS: 3.2,
+          },
           flags: [{
             code: 'silhouette-clipped',
             severity: 'warn',
@@ -545,7 +598,12 @@ function browserBridge(): StudioBridge {
             message:
               'the silhouette reaches the cell edge on 2 frames (bottom). Lower pixelsPerMeter or raise cellPx.',
           }],
-          atlases: [{ pass: 'lit', png: 'atlas_lit_0.png', pageIndex: 0, sizePx: 96 }],
+          atlases: [{
+            pass: 'lit',
+            png: 'atlas_lit_0.png',
+            pageIndex: 0,
+            sizePx: 96,
+          }],
           frames: [
             {
               clipId: 'idle',
@@ -595,15 +653,25 @@ function browserBridge(): StudioBridge {
     readMesh(path) {
       // a fixed rigged humanoid so the viewport and bone overlay drive in a
       // browser; anything that is not a canonical/result mesh still says no
-      return Promise.resolve(/\.(glb|gltf)$/i.test(path) ? DEMO_MESH_B64 : null);
+      return Promise.resolve(
+        /\.(glb|gltf)$/i.test(path) ? DEMO_MESH_B64 : null,
+      );
     },
     writeRigEdits() {
       return Promise.reject(new Error('writing edits needs the desktop shell'));
     },
     prevSession() {
       return Promise.resolve([
-        JSON.stringify({ t: 'queued', jobId: 'demo-prev', at: '2026-07-31T00:00:00.000Z' }),
-        JSON.stringify({ t: 'done', jobId: 'demo-prev', at: '2026-07-31T00:00:01.000Z' }),
+        JSON.stringify({
+          t: 'queued',
+          jobId: 'demo-prev',
+          at: '2026-07-31T00:00:00.000Z',
+        }),
+        JSON.stringify({
+          t: 'done',
+          jobId: 'demo-prev',
+          at: '2026-07-31T00:00:01.000Z',
+        }),
       ]);
     },
   };

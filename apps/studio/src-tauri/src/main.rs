@@ -13,10 +13,14 @@
 // binary takes SPRITEBOOK_REPO until the packaging task pins a real story.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::io::BufRead;
+mod jobs;
+
+use jobs::Jobs;
+use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use tauri::Emitter;
+use std::sync::Arc;
+use tauri::{Emitter, Manager};
 
 fn repo_root() -> PathBuf {
     if let Ok(p) = std::env::var("SPRITEBOOK_REPO") {
@@ -65,40 +69,77 @@ fn session_path() -> &'static PathBuf {
 }
 
 #[tauri::command]
-async fn run_cli(app: tauri::AppHandle, job_id: String, args: Vec<String>) -> Result<i32, String> {
-    // per-job channel, so two concurrent jobs can never interleave lines
-    let channel = format!("cli:{job_id}");
+async fn run_cli(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, Arc<Jobs>>,
+    job_id: String,
+    args: Vec<String>,
+) -> Result<i32, String> {
+    let jobs = jobs.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let root = repo_root();
         let mut cmd = Command::new("deno");
         cmd.arg("run")
             .arg("-A")
             .arg(root.join("packages/cli/mod.ts"))
+            .arg("--owned-start")
             .args(&args)
-            // the core-side sink: every JobEvent of every run lands in THIS
-            // app run's session file, which the next run's drawer can replay
             .arg("--log-append")
             .arg(session_path())
             .current_dir(&root)
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .stdin(Stdio::null());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-        }
-        let mut child = cmd.spawn().map_err(|e| format!("spawn deno: {e}"))?;
-        let stdout = child.stdout.take().ok_or("no stdout")?;
+            .stderr(Stdio::piped())
+            .stdin(Stdio::piped());
+        let mut job = match jobs.start(job_id.clone(), &mut cmd) {
+            Ok(job) => job,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => return Ok(130),
+            Err(e) => return Err(format!("start owned CLI: {e}")),
+        };
+        job.child
+            .stdin
+            .take()
+            .ok_or("no stdin")?
+            .write_all(b"start\n")
+            .map_err(|e| e.to_string())?;
+        let stdout = job.child.stdout.take().ok_or("no stdout")?;
+        let stderr = job.child.stderr.take().ok_or("no stderr")?;
+        let diagnostics_app = app.clone();
+        let diagnostic_id = job_id.clone();
+        let diagnostics = std::thread::spawn(move || -> Result<(), String> {
+            let safe_id: String = diagnostic_id
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+                .collect();
+            let path = session_path().with_extension(format!("{safe_id}.stderr.log"));
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .ok();
+            for line in std::io::BufReader::new(stderr).lines() {
+                let line = line.map_err(|e| e.to_string())?;
+                let _ = diagnostics_app.emit(&format!("cli-stderr:{diagnostic_id}"), &line);
+                if let Some(file) = file.as_mut() {
+                    let _ = writeln!(file, "{line}");
+                }
+            }
+            Ok(())
+        });
         for line in std::io::BufReader::new(stdout).lines() {
             let line = line.map_err(|e| e.to_string())?;
-            let _ = app.emit(&channel, &line);
+            let _ = app.emit(&format!("cli:{job_id}"), &line);
         }
-        let status = child.wait().map_err(|e| e.to_string())?;
+        let status = job.child.wait().map_err(|e| e.to_string())?;
+        diagnostics.join().map_err(|_| "stderr reader failed")??;
         Ok(status.code().unwrap_or(-1))
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn cancel_cli(jobs: tauri::State<'_, Arc<Jobs>>, job_id: String) {
+    jobs.cancel(job_id);
 }
 
 #[derive(serde::Serialize)]
@@ -111,10 +152,14 @@ struct RawWorkspace {
 fn list_workspaces(root: String) -> Result<Vec<RawWorkspace>, String> {
     let base = {
         let p = PathBuf::from(&root);
-        if p.is_absolute() { p } else { repo_root().join(p) }
+        if p.is_absolute() {
+            p
+        } else {
+            repo_root().join(p)
+        }
     };
-    let entries = std::fs::read_dir(&base)
-        .map_err(|e| format!("cannot read {}: {e}", base.display()))?;
+    let entries =
+        std::fs::read_dir(&base).map_err(|e| format!("cannot read {}: {e}", base.display()))?;
     let mut out = Vec::new();
     for entry in entries.flatten() {
         let manifest_path = entry.path().join("character.json");
@@ -123,8 +168,7 @@ fn list_workspaces(root: String) -> Result<Vec<RawWorkspace>, String> {
         };
         // verbatim passthrough: a malformed manifest still yields a card that
         // SAYS it is malformed, instead of silently vanishing from the gallery
-        let manifest = serde_json::from_slice(&bytes)
-            .unwrap_or(serde_json::Value::Null);
+        let manifest = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
         out.push(RawWorkspace {
             dir: display_path(&entry.path()),
             manifest,
@@ -157,7 +201,9 @@ fn read_thumb(dir: String) -> Result<Option<String>, String> {
     match candidates.first() {
         Some((_, gif)) => {
             let bytes = std::fs::read(gif).map_err(|e| e.to_string())?;
-            Ok(Some(base64::engine::general_purpose::STANDARD.encode(bytes)))
+            Ok(Some(
+                base64::engine::general_purpose::STANDARD.encode(bytes),
+            ))
         }
         None => Ok(None),
     }
@@ -226,16 +272,20 @@ fn read_bake_atlas(dir: String, pass: Option<String>) -> Result<Option<serde_jso
     let Some((_, bake_dir)) = candidates.first() else {
         return Ok(None);
     };
-    let manifest: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(bake_dir.join("manifest.json")).map_err(|e| e.to_string())?)
-            .map_err(|e| format!("bake manifest is not JSON: {e}"))?;
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(bake_dir.join("manifest.json")).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| format!("bake manifest is not JSON: {e}"))?;
     // the lit page is the one the sheet ships; AOV pages are RECT-IDENTICAL
     // (D-010), so the same frame rects address every pass
     let want = pass.unwrap_or_else(|| "lit".to_string());
     let png_name = manifest
         .get("atlases")
         .and_then(|a| a.as_array())
-        .and_then(|a| a.iter().find(|x| x.get("pass").and_then(|p| p.as_str()) == Some(&want)))
+        .and_then(|a| {
+            a.iter()
+                .find(|x| x.get("pass").and_then(|p| p.as_str()) == Some(&want))
+        })
         .and_then(|x| x.get("png"))
         .and_then(|p| p.as_str())
         .unwrap_or("atlas_lit_0.png")
@@ -286,7 +336,12 @@ fn read_mesh(path: String) -> Result<Option<String>, String> {
     use base64::Engine;
     const MAX_BYTES: u64 = 128 * 1024 * 1024;
     let p = PathBuf::from(&path);
-    match p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
+    match p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
         Some("glb") | Some("gltf") => {}
         _ => return Ok(None),
     }
@@ -302,7 +357,9 @@ fn read_mesh(path: String) -> Result<Option<String>, String> {
         ));
     }
     match std::fs::read(&p) {
-        Ok(bytes) => Ok(Some(base64::engine::general_purpose::STANDARD.encode(bytes))),
+        Ok(bytes) => Ok(Some(
+            base64::engine::general_purpose::STANDARD.encode(bytes),
+        )),
         Err(e) => Err(format!("could not read {path}: {e}")),
     }
 }
@@ -347,13 +404,22 @@ fn open_folder(path: String) -> Result<(), String> {
         c
     };
     // explorer.exe returns 1 even on success; spawning is the whole contract
-    cmd.spawn().map(|_| ()).map_err(|e| format!("could not open {path}: {e}"))
+    cmd.spawn()
+        .map(|_| ())
+        .map_err(|e| format!("could not open {path}: {e}"))
 }
 
 fn main() {
     tauri::Builder::default()
+        .manage(Arc::new(Jobs::default()))
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                window.state::<Arc<Jobs>>().cancel_all();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             run_cli,
+            cancel_cli,
             list_workspaces,
             read_thumb,
             read_prev_session,

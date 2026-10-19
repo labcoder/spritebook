@@ -20,6 +20,10 @@ are unchanged.
 | Tauri 2.x (pin minor)    | app shell — **chosen by P0-T3 (D-005)**; `deno desktop` revisit trigger noted in D-005; in use since P4-T1 (`apps/studio/src-tauri`, pinned 2.11/2.6 + serde, serde_json, base64 crates — all MIT+Apache-2.0) | MIT+Apache-2.0      | std              |
 | wgpu (under Deno WebGPU) | GPU backend                                                                                                                                                                                                   | MIT/Apache-2.0 dual | std              |
 
+The shell also directly uses lock-pinned `windows-sys` 0.61.2 (MIT/Apache-2.0) for Windows job
+objects and `libc` 0.2 (MIT/Apache-2.0) for Unix process groups. Both already belonged to the Tauri
+dependency graph; F1-T3 uses them to cancel owned CLI descendants and clean up on close.
+
 ## Core render, style, pack
 
 | Dependency        | Role                                                            | License     | Status       |

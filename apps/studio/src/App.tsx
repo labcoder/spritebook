@@ -3,7 +3,7 @@
  * construction: the only core verb this window can run is `doctor`; every
  * panel is a projection of character manifests.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLingui } from '@lingui/react';
 import { makeBridge, type RawWorkspace } from './bridge';
 import { type CharacterCard, toCard } from './manifest';
@@ -77,15 +77,32 @@ export default function App() {
     prefs.setLocale(locale);
   }, [locale]);
 
+  const currentRoot = useRef(root);
+  currentRoot.current = root;
+  const loadEpoch = useRef(0);
+  const activeOwner = useRef(activeTab);
+  activeOwner.current = activeTab;
+
   const load = useCallback(async (): Promise<Workspace[] | null> => {
+    if (currentRoot.current !== root) return null;
+    const epoch = ++loadEpoch.current;
     setLoadError(null);
     try {
       const ws = await bridge.listWorkspaces(root);
-      const next = ws.map((raw) => ({ raw, card: toCard(raw.dir, raw.manifest) }));
+      if (currentRoot.current !== root || epoch !== loadEpoch.current) {
+        return null;
+      }
+      const next = ws.map((raw) => ({
+        raw,
+        card: toCard(raw.dir, raw.manifest),
+      }));
       setWorkspaces(next);
       prefs.setProjectsRoot(root);
       return next;
     } catch (err) {
+      if (currentRoot.current !== root || epoch !== loadEpoch.current) {
+        return null;
+      }
       setWorkspaces(null);
       setLoadError(err instanceof Error ? err.message : String(err));
       return null;
@@ -126,12 +143,15 @@ export default function App() {
   const onCreated = useCallback(async (characterId: string) => {
     setNewOpen(false);
     const list = await load();
+    if (!list) return;
     const created = list?.find((w) => w.card.id === characterId);
     if (!created) {
       setActiveTab('gallery');
       return;
     }
-    setOpenDirs((cur) => (cur.includes(created.raw.dir) ? cur : [...cur, created.raw.dir]));
+    setOpenDirs((
+      cur,
+    ) => (cur.includes(created.raw.dir) ? cur : [...cur, created.raw.dir]));
     setActiveTab(created.raw.dir);
     // the Generate form the user was focused in unmounts on this navigation;
     // land keyboard focus on the new character's tab so the journey continues
@@ -153,6 +173,7 @@ export default function App() {
   const runJournal = useCallback(async (verb: 'undo' | 'redo') => {
     if (activeTab === 'gallery') return;
     const r = await bridge.runCli([...journalArgs(activeTab, verb), '--json']);
+    if (activeOwner.current !== activeTab) return;
     if (r.exitCode === 0) await load();
     if (!drawerOpen && r.exitCode !== 0) setDrawerOpen(true);
   }, [activeTab, load, drawerOpen]);
@@ -190,7 +211,8 @@ export default function App() {
     { id: 'gallery', label: t('Gallery') },
     ...openDirs.map((dir) => ({
       id: dir,
-      label: byDir.get(dir)?.card.displayName ?? dir.split(/[\\/]/).pop() ?? dir,
+      label: byDir.get(dir)?.card.displayName ?? dir.split(/[\\/]/).pop() ??
+        dir,
     })),
     ...(newOpen ? [{ id: '__new__', label: t('New character') }] : []),
   ];
@@ -361,6 +383,7 @@ export default function App() {
           : activeTab === '__new__'
           ? (
             <GenerateNew
+              key={root}
               bridge={bridge}
               projectsRoot={root}
               onCreated={onCreated}
@@ -372,6 +395,7 @@ export default function App() {
           : activeWs
           ? (
             <Editor
+              key={activeWs.card.dir}
               onOpenModels={() => setModelsOpen(true)}
               catalogEpoch={catalogEpoch}
               bridge={bridge}

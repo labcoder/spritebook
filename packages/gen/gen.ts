@@ -1,3 +1,4 @@
+import { workspaceJob } from '@spritebook/core';
 /**
  * `spritebook gen` — one image in, one canonical textured glb out, with a
  * receipt that can reproduce it (P3-T2).
@@ -116,7 +117,7 @@ export async function describeMesh(
  * platform-unsupported, vram-insufficient, invalid-params, backend-failed
  * (retryable mirrors the sidecar's verdict), no-mesh, border-failed.
  */
-export async function* runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
+async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
   const at = () => new Date().toISOString();
   const jobId = opts.jobId as JobEvent['jobId'];
   const t0 = performance.now();
@@ -518,3 +519,7 @@ export async function readEffectiveSeed(
  * record the effective seed per candidate and win.
  */
 export const SEED_STRIDE = 1000;
+
+export function runGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
+  return workspaceJob(opts.workspace, () => executeGenJob(opts));
+}
