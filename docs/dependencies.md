@@ -24,6 +24,21 @@ The shell also directly uses lock-pinned `windows-sys` 0.61.2 (MIT/Apache-2.0) f
 objects and `libc` 0.2 (MIT/Apache-2.0) for Unix process groups. Both already belonged to the Tauri
 dependency graph; F1-T3 uses them to cancel owned CLI descendants and clean up on close.
 
+F2's isolated renderer experiment (`tools/qualification`, not the production runtime) pins `webgpu`
+**0.6.2**. Its npm metadata says MIT, but its actual `LICENSE.md` is **BSD-3-Clause** (Dawn/Tint);
+retain the shipped text. The addon is evaluated with an app-owned **Node 24.22.0** (MIT plus Node's
+bundled third-party notices). Build-only npm transitives are `debug` (MIT), `ms` (MIT) and
+`@webgpu/types` (BSD-3-Clause); the deployed loader imports none of them. Windows shader DLLs and
+native transitive notices require an explicit artifact audit before a shipping claim; do not copy
+the entire npm distribution on the strength of its metadata label.
+
+The Windows Vulkan proof bundles the **LunarG Vulkan Runtime 1.4.341.0** x64 loader (MIT/Apache-2.0,
+with its complete `VulkanRT-License.txt`). Its official Components archive is SHA-256 pinned in the
+proof builder. Dawn needs this loader beside the addon: its current Windows search path fails to
+load the system copy by basename. The Vulkan payload excludes FXC, DXC and their DLLs; Direct3D 12
+experiments with DXC are separate from that artifact. PE imports also require the Microsoft VC++
+runtime on the machine; it is not silently copied from Visual Studio.
+
 ## Core render, style, pack
 
 | Dependency        | Role                                                            | License     | Status       |

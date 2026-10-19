@@ -507,7 +507,12 @@ async function recomputeClips(
           outDir: clipDir,
         })
       ) {
-        if (e.t === 'error') throw new Error(`render ${binding.clipId} failed: ${e.message}`);
+        if (e.t === 'error') {
+          throw Object.assign(new Error(`render ${binding.clipId} failed: ${e.message}`), {
+            code: e.code,
+            retryable: e.retryable,
+          });
+        }
       }
       srcs.push({
         clipId: binding.clipId,
@@ -587,7 +592,10 @@ async function recompute(
   ) {
     if (e.t === 'error') {
       await cleanup();
-      throw new Error(`render failed [${e.code}]: ${e.message}`);
+      throw Object.assign(new Error(`render failed [${e.code}]: ${e.message}`), {
+        code: e.code,
+        retryable: e.retryable,
+      });
     }
   }
 
@@ -835,13 +843,14 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
   } catch (err) {
     await cleanup?.().catch(() => {});
+    const code = (err as { code?: unknown })?.code;
     yield {
       t: 'error',
       jobId,
       at: at(),
-      code: (err as { code?: string }).code ?? 'bake-failed',
+      code: typeof code === 'string' ? code : 'bake-failed',
       message: err instanceof Error ? err.message : String(err),
-      retryable: false,
+      retryable: (err as { retryable?: unknown })?.retryable === true,
     };
   }
 }
