@@ -141,9 +141,24 @@ The builder deliberately rejects unqualified host targets. It uses Deno **at bui
 the installed Node runtime. F4 replaces this temporary compiler/tooling path. Benchmark failure is
 terminal and its artifacts remain; image suites are never automatically retried.
 
-F2 remains open for native Windows ARM64, macOS ARM64/x64, Linux Vulkan/lavapipe, clean-machine
-installation/prerequisites and complete native notice clearance. No additional hardware/runner has
-been available in this session. A generic upstream build matrix is not evidence for these targets.
-Do not mark the whole milestone or a production renderer promotion complete from the Windows result.
-Preserve the Tauri/TypeScript/in-place decision while collecting the remaining evidence; a
-whole-core rewrite would not solve these gates.
+## Deferred platform checks
+
+The maintainer confirmed **Windows x64 only for F2 on 2026-10-19**. Native Windows ARM64, macOS
+ARM64/Intel and Linux execution move to **F7-T1/T2**, before support is advertised for those
+artifacts. Clean-machine prerequisites and complete native notice clearance also remain release
+gates. Production renderer promotion is F4 work.
+
+GitHub Actions can build and run non-GPU checks on its
+[standard OS runners](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners).
+The repository already declares those source-test lanes and a Linux Mesa lavapipe lane; F4-T4 must
+port them to Node. This session has not dispatched remote CI or qualified the Node addon there.
+Lavapipe can provide Linux software-rendering smoke/structural evidence, with its backend recorded;
+it cannot establish hardware performance or desktop behavior.
+
+Actual hardware checks need a suitable adapter, rather than a personally owned machine specifically.
+[GitHub's larger runners](https://docs.github.com/en/actions/reference/runners/larger-runners)
+include GPU options and an Apple Silicon option with GPU acceleration; availability, billing and the
+application's adapter must be verified before use. A configured GPU runner or a supplied native
+machine can run the same workload. Mac/Windows ARM64/Linux installed paths, hardware pixels,
+performance and desktop behavior stay unverified until those runs happen. No paid runner or new CI
+infrastructure is provisioned in F2.

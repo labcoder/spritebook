@@ -10,7 +10,7 @@ This is the execution plan for that approved direction. **F0 baseline capture is
 unverified targets. Closing baseline capture does not close platform, installed-app, model or
 release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
 support claim. Exact dependency pins and schema changes follow the existing BOM/decision process;
-Node/Dawn and new models remain unqualified.
+Node/Dawn has measured Windows candidate evidence; new models remain unqualified.
 
 ## The route
 
@@ -28,7 +28,7 @@ into another core-language or desktop-toolkit selection.
 | ----- | ------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | 1     | **F0 · Lock the baseline**                  | Approved strategy                                  | Recorded contracts, feature/platform matrix, representative fixtures and current measurements                                         |
 | 2     | **F1 · Make state safe**                    | F0 baseline                                        | Recoverable writes and actual asset undo; isolated character/job state; consistent core reads and model resolution                    |
-| 3     | **F2 · Prove Node rendering and packaging** | F0 fixtures; F1 before mutating real workspaces    | Actual TypeScript renderer works through Node/Dawn in installed target artifacts, with image/structure/performance evidence           |
+| 3     | **F2 · Prove Node rendering and packaging** | F0 fixtures; F1 before mutating real workspaces    | Actual TypeScript renderer works through Node/Dawn in a Windows x64 installer, with image/structure/performance evidence              |
 | 4     | **F4 · Migrate core, CLI and toolchain**    | F1 and F2                                          | One TypeScript core on Node; complete CLI and Tauri integration; tests/tooling/release flows no longer execute Deno                   |
 | 5     | **F7 · Release the migrated application**   | F4; required regression and platform gates         | Clean-machine mesh and existing model workflows, preserved workspace conversion/rollback, signed supported artifacts and current docs |
 | Later | **F3 · Qualify better model runtimes**      | Migrated baseline                                  | One audited, measured default recipe per claimed hardware tier, complete provisioning and offline inference                           |
@@ -127,6 +127,14 @@ installed-artifact, real-model, power-loss and soak limits remain explicit in th
 
 ## F2 · Qualify the Node GPU path and installed layout
 
+**Scope confirmed 2026-10-19:** finish this proof on the available Windows x64 machine. Defer native
+Windows ARM64, macOS ARM64/Intel and Linux qualification to **F7-T1/T2**; they remain product
+targets with open release gates. F4-T4 carries the Node build and non-GPU checks into the existing
+GitHub Actions OS matrix. Linux lavapipe can exercise software rendering there. Hardware image,
+performance and installed-app checks require a functioning native adapter and desktop environment; a
+green build alone does not qualify them. See
+[the runner plan](renderer-qualification.md#deferred-platform-checks).
+
 - [~] **F2-T1 · Run the real renderer on Node/Dawn.** Use a bounded adapter/environment experiment
   in this repository; keep existing production modules as the control. Exercise MRT AOVs, WGSL,
   upload/skinning/attachments, alpha, padded readback, styling and atlas output. Carry the exact
@@ -141,7 +149,9 @@ installed-artifact, real-model, power-loss and soak limits remain explicit in th
   library and required shader/decoder assets. Launch through Tauri resource paths without source,
   development node_modules, Deno/Node on PATH, compilers or an untracked shared cache. A runtime
   directory is acceptable; do not require a single-file executable. Audit native notices/required
-  shared libraries and execute the installed artifact on each claimed OS/CPU target.
+  shared libraries and execute the Windows x64 installer. Record unresolved prerequisites and
+  redistribution blockers for F7; this proof does not authorize distribution or additional support
+  claims.
 
 **Acceptance:** a written pass/fail report, artifact paths and reproducible runs. A source build,
 triangle demo, generic addon CI matrix or cache hit is not a qualified SpriteBook renderer. Device
@@ -219,7 +229,11 @@ integration or UI feature first. F3/F5/F6 improvements follow it.
       sidecar generation/ rigging where supported, adaptive and fixed-palette styles, AOV layout,
       warm-cache hits and a representative roster rebake. Run actual engine imports for supported
       claims; unresolved lanes such as Unity must stay explicitly unverified rather than silently
-      passing.
+      passing. Run the deferred F2 workload and installed-failure checks natively on Windows ARM64,
+      macOS ARM64/Intel and Linux, recording adapter/backend, image comparisons, memory and
+      cold/warm timings separately. Use Linux lavapipe for software checks and hardware runners for
+      GPU/performance claims. Complete native notice clearance and runtime prerequisite provisioning
+      before any artifact is distributed.
 - [ ] **F7-T2 · Exercise installed-app recovery.** Test signing/notarization, upgrade/uninstall,
       application-owned executable discovery, model/log storage, cancellation, workspace conversion,
       preserved-copy rollback and cache invalidation. Repeat keyboard/focus/IME and existing locale
@@ -287,16 +301,14 @@ successfully is not evidence that the complete character workflow is ready.
 
 1. **Completed — F0:** current control, conformance fixtures, feature/platform checklist and
    preserved local workspace/export backup are recorded in [the baseline](baseline.md).
-2. **F1-T2:** add the failing crash/concurrent-writer regressions and consolidate the
-   writer/recovery path; do not combine this with the runtime move.
-3. **F1-T1:** prove and repair actual mesh/texture undo through that writer, including bake after
-   undo.
-4. **F1-T3:** isolate character state and fix job diagnostic/cancel ownership.
-5. **F2-T1/F2-T3:** qualify the Node/Dawn rendering slice and installed layout before a bulk port.
-6. Finish F1-T4/T5 and execute F4's package groups, then F7's release gates. Put unrelated new
-   model, editor, dependency and performance work in the later tasks above.
+2. **Completed — F1:** recoverable writes, byte-correct asset undo, job/editor isolation, consistent
+   reads and execution policy are recorded in [state safety](state-safety.md).
+3. **F2-T1/F2-T3:** finish the Windows Node/Dawn rendering slice and installed proof before a bulk
+   port. Additional native targets are deferred to F7, as confirmed above.
+4. **Next — F4:** execute the package groups and application/tooling cutover, then F7's release
+   gates. Put unrelated model, editor, dependency and performance work in the later tasks above.
 
 Use these task IDs in implementation changes, include the relevant original P-task IDs where
 behavior is carried forward, and update the progress log with actual measurements and remaining
-gates. F0 records the legacy implementation; the runtime migration and F1 safety repairs have not
-started.
+gates. F0 records the legacy implementation; F1 is complete and production still runs Deno while F2
+qualifies its replacement.
