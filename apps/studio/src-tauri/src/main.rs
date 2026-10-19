@@ -14,6 +14,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod jobs;
+#[cfg(feature = "renderer-qualification")]
+mod qualification;
 
 use jobs::Jobs;
 use std::io::{BufRead, Write};
@@ -361,6 +363,12 @@ fn open_folder(path: String) -> Result<(), String> {
         .map_err(|e| format!("could not open {path}: {e}"))
 }
 
+#[cfg(feature = "renderer-qualification")]
+fn main() {
+    qualification::run();
+}
+
+#[cfg(not(feature = "renderer-qualification"))]
 fn main() {
     tauri::Builder::default()
         .manage(Arc::new(Jobs::default()))

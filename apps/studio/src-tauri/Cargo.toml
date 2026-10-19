@@ -3,6 +3,9 @@ name = "spritebook-studio"
 version = "0.9.0"
 edition = "2021"
 
+[features]
+renderer-qualification = []
+
 [build-dependencies]
 # D-005 rider: pin the Tauri minor
 tauri-build = { version = "2.6", features = [] }
