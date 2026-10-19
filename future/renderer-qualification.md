@@ -10,6 +10,11 @@ x64 Vulkan passes the measured image and performance gates. The evidence does no
 render worker. Other hardware, clean-machine delivery and complete redistribution clearance remain
 gates; this report does not grant a support claim or a license-policy exception.
 
+The checked-in [measurement and artifact receipt](qualification/windows-x64.json) contains exact
+pins, hashes, timings, memory observations and installed results. The
+[review image](qualification/windows-x64-review.png) retains the visual comparison. Large runtime,
+installer and bake artifacts stay under the ignored `.render-bench/f2/` tree.
+
 ## Candidate and control
 
 The candidate pins **Node 24.22.0**, **`webgpu` 0.6.2** and the **LunarG Vulkan Runtime 1.4.341.0**
@@ -46,9 +51,9 @@ measurements do not replace F0's separately measured full CLI journey.
 
 | Supersampling | Deno cold | Node cold | Node change | Deno warm | Node warm |
 | ------------- | --------: | --------: | ----------: | --------: | --------: |
-| 1x            |   4.477 s |   3.732 s |      -16.6% |   2.468 s |   2.009 s |
-| 2x            |   6.288 s |   5.284 s |      -16.0% |   2.552 s |   2.104 s |
-| 4x            |  11.390 s |  10.030 s |      -11.9% |   2.526 s |   2.022 s |
+| 1x            |   4.756 s |   3.992 s |      -16.1% |   2.580 s |   2.083 s |
+| 2x            |   6.390 s |   5.457 s |      -14.6% |   2.571 s |   2.073 s |
+| 4x            |  11.745 s |  10.251 s |      -12.7% |   2.568 s |   2.126 s |
 
 **Result: pass without a performance exception.** There are 46 process runs: cold/warm repetitions
 for the three-clip workload, all four styles on the asymmetric fixture, and explicit mirroring. The
@@ -56,19 +61,24 @@ representative workload is **96 frames**: idle/walk/action, four samples, eight 
 cells, 32 px/m and padding 16. The accepted textured canonical mesh is copied from F0; it is a
 mechanical fixture, not evidence of new model quality or likeness.
 
+These are the final UTF-8-manifest runtime's measurements, repeated after installed-path fixes. The
+earlier native-PNG trial also passed; both raw runs are retained. The final runtime receipt is from
+`de1768d`, and the installed Tauri launcher's source is `8ac908b`. The renderer/codec bundles are
+unchanged between those builds.
+
 Reports retain per-clip render/readback/PNG throughput, sampled process RSS and whole-GPU memory.
 RSS samples are taken every 20 ms; GPU memory every 100 ms includes the desktop and other GPU users.
 They are observed peaks, not exact process VRAM allocations or admission floors.
 
 | Sampling | Deno max RSS | Node max RSS | Deno render/readback/PNG | Node render/readback/PNG |
 | -------- | -----------: | -----------: | -----------------------: | -----------------------: |
-| 1x       |    455.5 MiB |    344.6 MiB |                146.2 fps |                228.4 fps |
-| 2x       |    468.3 MiB |    469.0 MiB |                 75.2 fps |                146.0 fps |
-| 4x       |    742.4 MiB |    701.0 MiB |                 28.6 fps |                 75.4 fps |
+| 1x       |    446.0 MiB |    357.2 MiB |                136.5 fps |                202.6 fps |
+| 2x       |    431.6 MiB |    444.9 MiB |                 71.0 fps |                145.3 fps |
+| 4x       |    737.3 MiB |    704.7 MiB |                 27.9 fps |                 73.7 fps |
 
 RSS is the largest sampled process value across the three cold trials. Throughput is the median of
 96 frames divided by the sum of their three measured clip-render intervals; it excludes retargeting
-and atlas packing. Whole-GPU use ranges from 1736–1946 MiB for Deno and 1736–1798 MiB for Node over
+and atlas packing. Whole-GPU use ranges from 1784–2009 MiB for Deno and 1784–1828 MiB for Node over
 these trials. These values do not establish model VRAM budgets.
 
 ## Image and structural gates
@@ -123,6 +133,13 @@ and the installer remain locally available.
 The module audit observed bundled Node, Dawn and Vulkan loader paths, plus the VC++ runtime DLLs
 under Windows `System32`. This proves execution without compiler executables or a checkout; it does
 not prove provisioning on a clean Windows machine without those runtime prerequisites.
+
+The tested NSIS installer is **33,397,981 bytes** at
+`.render-bench/f2/tauri-target/release/bundle/nsis/SpriteBook Renderer Proof_0.9.0_x64-setup.exe`.
+Its SHA-256 and installed launcher hash are in the checked-in receipt. Raw delivery results are
+retained at `.render-bench/f2/installed-results/`; the sealed runtime and complete file inventory
+are at `.render-bench/f2/qualified-utf8/`. Installer and modified runtime are unsigned experimental
+artifacts, with release clearance still open.
 
 Two installed-path findings are part of the delivery design:
 
@@ -184,6 +201,24 @@ npm.cmd ci --ignore-scripts --prefix tools/qualification
 node tools/qualification/build.mjs .render-bench/f2/my-payload .render-bench/f0/legacy-control/workspace
 node tools/qualification/measure.mjs .render-bench/f2/my-payload/runtime .render-bench/f2/my-measurements vulkan
 deno run --config deno.json --allow-read --allow-write tools/qualification/compare.ts .render-bench/f2/my-measurements .render-bench/f0/legacy-control
+```
+
+For the resource-layout proof, install the Studio npm dependencies and run the opt-in Tauri build
+from the same repository. The Windows SDK manifest tool must be available at the builder's pinned
+path, or set `SPRITEBOOK_MT_EXE` to its explicit path. From the repository root:
+
+```powershell
+$proofConfig = (Resolve-Path .render-bench/f2/my-payload/tauri.conf.json).Path
+$env:CARGO_TARGET_DIR = Join-Path (Get-Location).Path '.render-bench/f2/tauri-target'
+Push-Location apps/studio
+node node_modules/@tauri-apps/cli/tauri.js build --ci --config $proofConfig --features renderer-qualification -- --locked
+Pop-Location
+```
+
+Install that distinct proof product in a disposable directory, then run:
+
+```powershell
+node tools/qualification/delivery.mjs '<installed-directory>/spritebook-studio.exe' '<new-absolute-results-directory>'
 ```
 
 The builder deliberately rejects unqualified host targets. It uses Deno **at build time**, not in

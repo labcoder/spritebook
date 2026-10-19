@@ -1,0 +1,275 @@
+{
+  "evidenceDate": "2026-10-19",
+  "status": "windows-x64-vulkan-proof-pass",
+  "productionRuntime": "Deno 2.9.2; F4 cutover pending",
+  "scope": "Maintainer-approved Windows x64 F2 proof; native Windows ARM64, macOS ARM64/Intel and Linux qualification deferred to F7-T1/T2.",
+  "hardware": {
+    "os": "Windows 11 Pro 10.0.26200",
+    "arch": "x64",
+    "cpu": "Intel Core i9-10900K",
+    "ramGiB": 63.92,
+    "gpu": "NVIDIA GeForce RTX 3090",
+    "driver": "610.88",
+    "gpuMemoryMiB": 24576
+  },
+  "pins": {
+    "nodeVersion": "24.22.0",
+    "webgpuVersion": "0.6.2",
+    "vulkanVersion": "1.4.341.0",
+    "nodeZipSha256": "f9683a19877e12a9b167305c8db71040d812876359de21f0d2e97c3f321f80c3",
+    "vulkanZipSha256": "20571dcc8292b80a47d68bbbfa4094d87044041f50f4e2e1f326a01e3732b226",
+    "nodeOriginalSha256": "ba93f9a70bd86fce3ebbb39ec758501458453467aa92a34a0a3602d1e3fc2b9c",
+    "nodeManifest": "UTF-8 activeCodePage merged with upstream manifest; requires fresh signing"
+  },
+  "build": {
+    "runtimeSourceCommit": "de1768dcc94359eeb4b9206a4b98bddb668862dc",
+    "runtimeSourceDirty": "",
+    "launcherSourceCommit": "8ac908bbe37e2e9deb77082546598f4871f9e68d",
+    "receiptSha256": "e7c1f8d8f3332957845f30bca399b5dc1e9c80131113b150a5e44479e11e1e94",
+    "runtimeFiles": 118,
+    "selectedFileSha256": {
+      "node.exe": "5b1602bacdc473f60df04b8197e26fbf448617f76a2d5ba86bcba7a0cdfb52d7",
+      "node-run.mjs": "d8f7fc7e7e890450a28171bdea9a369618e04841229f1ee20a5b06db6033bb7a",
+      "core/workload.mjs": "5a146f388dbc59092c12c14ef7381bad416c885ba626024a414a25e259b7e4b6",
+      "core/control-workload.mjs": "50a0040aad21b9f4ef0e4a39f2c2bac7aff4f53f51c3354bce1ca1ed80e160e1",
+      "core/checks.mjs": "05f1f0cf81a8165bce10c4eabe2796cc0ad509125b13c29f341b7e595754cd3b",
+      "core/loss.mjs": "08e6739cc73e92428ca48baa1d355c9f8adb42c30348825494eabc571ca245ca",
+      "vendor/webgpu/dist/win32-x64/dawn.node": "75fff5db8a7541ad7a2d22c468e6f8bc3614b87c3b649c8ce712f7f5148ef338",
+      "vendor/webgpu/dist/win32-x64/vulkan-1.dll": "98bc6e33b384f83e8cc36174ce1ba81357611d0cbe03462e1ca58d0663034039"
+    }
+  },
+  "control": {
+    "deno": "2.9.2",
+    "f0SourceCommit": "42be3bbebfc783edb42fb64001aa9b2e3d638c98",
+    "f0ZipSha256": "a1efcb0956fd52c415eefb1efa6ce467d854defa18b7b1fc5ab12bec3e8dd9f3",
+    "f0ZipUnchanged": true
+  },
+  "workload": {
+    "frames": 96,
+    "clips": [
+      "idle-loop",
+      "walk-loop",
+      "punch-jab"
+    ],
+    "samplesPerClip": 4,
+    "directions": 8,
+    "cellSize": [
+      100,
+      128
+    ],
+    "paddingPx": 16,
+    "worldPixelsPerMeter": 32,
+    "supersampling": [
+      1,
+      2,
+      4
+    ],
+    "styles": [
+      "pixel",
+      "cel-2",
+      "painterly",
+      "clean"
+    ],
+    "fixtureMeaning": "Synthetic textured skinned character and asymmetric fixture; no model-quality qualification."
+  },
+  "performance": {
+    "backend": "vulkan",
+    "timings": [
+      {
+        "sample": 1,
+        "coldDeno": 4.755987399999998,
+        "coldNode": 3.991655899999998,
+        "warmDeno": 2.5802568999999966,
+        "warmNode": 2.0833680000000006,
+        "coldRegressionPct": -16.070931979340408,
+        "warmRegressionPct": -19.257342166200452
+      },
+      {
+        "sample": 2,
+        "coldDeno": 6.390089400000004,
+        "coldNode": 5.456875,
+        "warmDeno": 2.5710831000000036,
+        "warmNode": 2.0726826999999974,
+        "coldRegressionPct": -14.60408988957187,
+        "warmRegressionPct": -19.384842131318337
+      },
+      {
+        "sample": 4,
+        "coldDeno": 11.744858399999996,
+        "coldNode": 10.251293600000004,
+        "warmDeno": 2.5676683000000047,
+        "warmNode": 2.125823599999989,
+        "coldRegressionPct": -12.716754422513876,
+        "warmRegressionPct": -17.208013200147974
+      }
+    ],
+    "budgetMet": true,
+    "measurements": 46,
+    "hardware": "NVIDIA GeForce RTX 3090, 610.88, 24576",
+    "gpuMemoryMeaning": "whole-GPU sampled use, including desktop; not process allocation or VRAM admission",
+    "memoryAndThroughput": [
+      {
+        "sample": 1,
+        "engine": "deno",
+        "maxSampledRssMiB": 446.0390625,
+        "medianRenderReadbackPngFps": 136.5290226569913,
+        "wholeGpuMinMiB": 1784,
+        "wholeGpuPeakMiB": 2009
+      },
+      {
+        "sample": 1,
+        "engine": "node",
+        "maxSampledRssMiB": 357.21484375,
+        "medianRenderReadbackPngFps": 202.55006309645455,
+        "wholeGpuMinMiB": 1784,
+        "wholeGpuPeakMiB": 1810
+      },
+      {
+        "sample": 2,
+        "engine": "deno",
+        "maxSampledRssMiB": 431.57421875,
+        "medianRenderReadbackPngFps": 71.03157153578469,
+        "wholeGpuMinMiB": 1784,
+        "wholeGpuPeakMiB": 1998
+      },
+      {
+        "sample": 2,
+        "engine": "node",
+        "maxSampledRssMiB": 444.87890625,
+        "medianRenderReadbackPngFps": 145.27825249632681,
+        "wholeGpuMinMiB": 1784,
+        "wholeGpuPeakMiB": 1828
+      },
+      {
+        "sample": 4,
+        "engine": "deno",
+        "maxSampledRssMiB": 737.26171875,
+        "medianRenderReadbackPngFps": 27.864167986102746,
+        "wholeGpuMinMiB": 1784,
+        "wholeGpuPeakMiB": 1986
+      },
+      {
+        "sample": 4,
+        "engine": "node",
+        "maxSampledRssMiB": 704.69921875,
+        "medianRenderReadbackPngFps": 73.707906163386,
+        "wholeGpuMinMiB": 1784,
+        "wholeGpuPeakMiB": 1828
+      }
+    ],
+    "warmCacheHitPct": 100,
+    "trialsPerSampling": 3,
+    "osDriverCachesCleared": false
+  },
+  "images": {
+    "carriedChecks": 110,
+    "comparedPages": 40,
+    "decodedPixelExactPages": 40,
+    "compressedByteExactPages": 0,
+    "f0ComparedPages": 15,
+    "f0DecodedPixelExactPages": 15,
+    "sameProcessRawCanary": "pass",
+    "repeatedColdWarmAtlasHashCanary": "pass",
+    "fallbackChannelTolerance8Bit": 2,
+    "fallbackMaxDifferentFractionPerCell": 0.005,
+    "goldensChanged": false,
+    "reviewImage": "windows-x64-review.png",
+    "reviewSha256": "bd4315b2f1675f33b538422dc4867a3c1683256a204510f62314f0faccbc3ba8"
+  },
+  "initialUnchangedCodecTrial": {
+    "timings": [
+      {
+        "sample": 1,
+        "coldDeno": 4.426030799999997,
+        "coldNode": 4.6478117,
+        "warmDeno": 2.473316999999999,
+        "warmNode": 2.5401846999999997,
+        "coldRegressionPct": 5.010830471401229,
+        "warmRegressionPct": 2.7035636758248494
+      },
+      {
+        "sample": 2,
+        "coldDeno": 6.040992399999988,
+        "coldNode": 6.5179346,
+        "warmDeno": 2.4996031000000074,
+        "warmNode": 2.4974148999999963,
+        "coldRegressionPct": 7.895096838724935,
+        "warmRegressionPct": -0.08754189815218805
+      },
+      {
+        "sample": 4,
+        "coldDeno": 11.2782065,
+        "coldNode": 13.004430699999997,
+        "warmDeno": 2.4639137000000044,
+        "warmNode": 2.5160506999999925,
+        "coldRegressionPct": 15.305839629731889,
+        "warmRegressionPct": 2.116023787683319
+      }
+    ],
+    "budgetMet": false,
+    "measurements": 46,
+    "hardware": "NVIDIA GeForce RTX 3090, 610.88, 24576",
+    "gpuMemoryMeaning": "whole-GPU sampled use, including desktop; not process allocation or VRAM admission"
+  },
+  "installer": {
+    "installerSignature": "NotSigned",
+    "installerBytes": 33397981,
+    "nodeSignature": "NotSigned",
+    "installerSha256": "3a1e02e3c7c1dc31bcd15239582656769cde08e53499db5b5151572dda8a5a8b",
+    "launcherSourceCommit": "8ac908bbe37e2e9deb77082546598f4871f9e68d",
+    "installedLauncherSha256": "6d0a693531b5f66d8420630476563b7a9d3aa7568f78502413dcce5b850ac570",
+    "installedRuntimeFiles": 118,
+    "runtimeSourceCommit": "de1768dcc94359eeb4b9206a4b98bddb668862dc",
+    "path": ".render-bench/f2/tauri-target/release/bundle/nsis/SpriteBook Renderer Proof_0.9.0_x64-setup.exe",
+    "emptyChildPath": true,
+    "sourceAndDevNodeModulesInstalled": false,
+    "spacesAndUnicodePaths": true,
+    "carriedChecks": 110,
+    "missingAddonExitCode": 1,
+    "missingLoaderExitCode": 1,
+    "nativeDeviceDestroyedAfterSubmit": [
+      "stub",
+      "clips"
+    ],
+    "deviceLossCode": "device-lost",
+    "deviceLossRetryable": true,
+    "ownerKilledAfterRenderedFrames": true,
+    "ownedNodeGoneAfterOwnerDeath": true,
+    "priorArtifactBytesUnchanged": true,
+    "retryCompleted": true,
+    "nativeModules": [
+      "%App%/renderer-runtime/node.exe",
+      "%App%/renderer-runtime/vendor/webgpu/dist/win32-x64/dawn.node",
+      "%SystemRoot%/SYSTEM32/MSVCP140.dll",
+      "%SystemRoot%/SYSTEM32/VCRUNTIME140.dll",
+      "%SystemRoot%/SYSTEM32/MSVCP140_ATOMIC_WAIT.dll",
+      "%SystemRoot%/SYSTEM32/VCRUNTIME140_1.dll",
+      "%App%/renderer-runtime/vendor/webgpu/dist/win32-x64/vulkan-1.dll"
+    ],
+    "privateInstallationUninstalled": true
+  },
+  "validation": {
+    "denoRegressionTests": 839,
+    "denoRegressionSteps": 44,
+    "existingIgnoredRealModelEngineLanes": 5,
+    "focusedFixturePathTests": 29,
+    "focusedFixturePathSteps": 8,
+    "rustOwnershipTests": 1,
+    "scopedFormatLintTypeChecks": "pass"
+  },
+  "remainingGates": [
+    "F4 production core/CLI/toolchain port and fresh renderer/cache namespace",
+    "F7 native Windows ARM64, macOS ARM64/Intel and Linux execution",
+    "F7 clean-machine VC++ prerequisite provisioning",
+    "F7 native transitive notice completeness and dependency-policy mismatch resolution",
+    "F7 fresh signing after the Node UTF-8 manifest modification",
+    "Long paths beyond Win32 MAX_PATH, leak/soak and physical driver reset not qualified"
+  ],
+  "localRawEvidence": {
+    "build": ".render-bench/f2/qualified-utf8/build.json",
+    "measurements": ".render-bench/f2/measurements-final",
+    "installed": ".render-bench/f2/installed-results",
+    "initialUnchangedCodecTrial": ".render-bench/f2/measurements",
+    "initialNativePngTrial": ".render-bench/f2/measurements-native-png"
+  }
+}
