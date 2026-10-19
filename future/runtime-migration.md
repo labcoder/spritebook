@@ -129,6 +129,8 @@ Pass gates:
 3. Cold/warm wall time, peak RSS, GPU memory, throughput, adapter/driver and failure counts reported
    for Windows DX12/Vulkan, Apple Silicon Metal and Linux Vulkan/lavapipe. A starter target is no
    more than 10% end-to-end regression against the same workload; exceptions need explicit approval.
+   The maintainer narrowed F2 to Windows x64; the other native targets move to F7 release
+   qualification. Record a private DX12 experiment separately from the packaged Vulkan candidate.
 4. Device loss and mid-job cancellation produce honest terminal results and never publish a partial
    bake. Missing hardware is reported as unverified, not a passing platform.
 5. Packaged execution works without a source checkout or development toolchain. Inspect every

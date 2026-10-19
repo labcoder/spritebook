@@ -131,4 +131,5 @@ The [workspace persistence protocol](workspace-persistence.md) defines the recov
 canonical asset revisions, job ownership and consistent read projections. The
 [execution policy](execution-policy.md) defines project pins, receipt verification, declared consent
 and configuration-specific VRAM admission. These protocols preserve the laws above while the runtime
-is still Deno; replacing that runtime is F2/F4 work.
+is still Deno. The isolated [F2 Node/Dawn proof](../../future/renderer-qualification.md) qualifies
+the Windows renderer and resource layout; F4 owns the production runtime/CLI/toolchain port.

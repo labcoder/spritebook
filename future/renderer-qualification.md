@@ -60,6 +60,17 @@ Reports retain per-clip render/readback/PNG throughput, sampled process RSS and 
 RSS samples are taken every 20 ms; GPU memory every 100 ms includes the desktop and other GPU users.
 They are observed peaks, not exact process VRAM allocations or admission floors.
 
+| Sampling | Deno max RSS | Node max RSS | Deno render/readback/PNG | Node render/readback/PNG |
+| -------- | -----------: | -----------: | -----------------------: | -----------------------: |
+| 1x       |    455.5 MiB |    344.6 MiB |                146.2 fps |                228.4 fps |
+| 2x       |    468.3 MiB |    469.0 MiB |                 75.2 fps |                146.0 fps |
+| 4x       |    742.4 MiB |    701.0 MiB |                 28.6 fps |                 75.4 fps |
+
+RSS is the largest sampled process value across the three cold trials. Throughput is the median of
+96 frames divided by the sum of their three measured clip-render intervals; it excludes retargeting
+and atlas packing. Whole-GPU use ranges from 1736–1946 MiB for Deno and 1736–1798 MiB for Node over
+these trials. These values do not establish model VRAM budgets.
+
 ## Image and structural gates
 
 **110 original assertions run on Node**, including exact framing/scale/pivots, alpha and material
@@ -70,13 +81,18 @@ resource sanitizer, so this is not a leak/soak qualification.
 
 Fresh comparisons cover **40 atlas pages**. All decoded channels match Deno exactly; the **15**
 representative pages also match the sealed F0 pixels. PNG CRCs are checked through the independent
-decoder. Same-process raw double rendering and repeated cold/warm whole-bake byte canaries pass. The
+decoder. Same-process raw double rendering and repeated cold/warm atlas-byte canaries pass. The
 fallback tolerance remains 2/255 per channel and at most 0.5% differing pixels **per cell**; blank
 atlas space cannot dilute it. A failing comparison writes expected/actual/diff PNGs.
 
 The review image groups **Deno / Node / thresholded difference**, four directions per group. Rows
 are pixel 1x/2x/4x, explicit mirroring, then asymmetric pixel/cel/painterly/clean. It compares the
 first idle frame; the structural/numeric tests and atlas comparisons cover the remaining cases.
+
+The environment adapter must return an ordinary, freshly backed `Uint8Array` for file reads.
+Returning Node's `Buffer` made existing `.slice()` calls return views; typed-array alignment then
+corrupted sampled poses. The original numeric and render assertions caught this. F4 must preserve
+the readers' copy/alignment contract explicitly rather than relying on the proof adapter.
 
 ## Installed layout and failures
 
@@ -93,6 +109,39 @@ removing the packaged loader, missing addon, abrupt owner death during real rend
 compares every prior bake byte after failures. Device-loss tests require `device-lost` with
 `retryable: true`, no done event and no completed failed-attempt manifest. They simulate destruction
 through the real API, not a physical driver reset.
+
+**Installed result: pass on Windows 11 Pro 10.0.26200 x64.** A fresh, unsigned NSIS proof installer
+was executed into a private temporary directory containing spaces and **Ω**. All **118** runtime
+files matched their sealed hashes. From that installed resource tree, the 96-frame bake and **110**
+carried checks passed with no system runtime on PATH. Both device-loss cases retained a classified
+retryable error. Removing the addon or loader produced exit **1** and the expected diagnostic;
+neither published a completed bake. Killing the owner after real PNG frames appeared removed its
+owned Node child. The subsequent 4x bake completed, and every prior accepted bake file, including
+its manifest, remained SHA-256 identical. The private installation was then uninstalled; raw results
+and the installer remain locally available.
+
+The module audit observed bundled Node, Dawn and Vulkan loader paths, plus the VC++ runtime DLLs
+under Windows `System32`. This proves execution without compiler executables or a checkout; it does
+not prove provisioning on a clean Windows machine without those runtime prerequisites.
+
+Two installed-path findings are part of the delivery design:
+
+- On this code-page-1252 host, Dawn's ANSI DLL path handling fails under an installation directory
+  containing **Ω**, even with the loader beside the addon. The builder merges a process-local UTF-8
+  manifest setting into the app-owned Node executable, retaining its original settings and recording
+  input/output hashes. This uses the Windows SDK's `mt.exe` at build time; installed execution needs
+  no SDK. Release signing must follow the modification. No system locale or executable is changed.
+  Paths beyond Win32 `MAX_PATH` remain unqualified.
+- Tauri's default event loop exited with OS code 0 even when the worker and saved report said 1. The
+  proof now uses its returning event loop and explicitly propagates the recorded worker code.
+  Missing-addon and missing-loader checks assert the actual OS status as well as the diagnostic.
+
+The Unicode workaround follows Microsoft's
+[process UTF-8 manifest guidance](https://learn.microsoft.com/en-us/windows/apps/design/globalizing/use-utf8-code-page).
+The pinned Dawn source uses
+[ANSI module-path discovery](https://dawn.googlesource.com/dawn/+/77f9a9aa5f7180958480de17680c61a84c006842/src/dawn/common/SystemUtils.cpp)
+and
+[ANSI DLL loading](https://dawn.googlesource.com/dawn/+/77f9a9aa5f7180958480de17680c61a84c006842/src/dawn/common/DynamicLib.cpp).
 
 The experiment exposed two production compatibility defects, now fixed: GIF namespace selection
 across CJS/ESM, and bake dropping a renderer error's code/retryability. Fixture URL helpers now use
