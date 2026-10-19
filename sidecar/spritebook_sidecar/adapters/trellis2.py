@@ -456,9 +456,9 @@ def _load_pipeline(model_dir: Path, low_vram: bool) -> Any:
                 "TRELLIS.2's image conditioner "
                 "'facebook/dinov3-vitl16-pretrain-lvd1689m' is a MANUALLY GATED Hugging "
                 "Face repo and this machine is not authorised for it. Request access from "
-                "Meta on that model's page, then log in with `huggingface-cli login`. "
-                "It cannot be installed through SpriteBook's registry because the gate is "
-                "granted per person, not per download.",
+                "Meta on that model's page, then log in with `hf auth login`. "
+                "Access approval is manual; the conditioner is not yet declared in "
+                "SpriteBook's registry.",
             ) from err
         raise AdapterError("backend-failed", f"Loading TRELLIS.2 failed: {err}") from err
 

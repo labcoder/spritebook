@@ -16,7 +16,7 @@ paths, which break when the application path contains Unicode on Windows. Source
 uv's editable default. No virtual environment or weights are copied from the builder.
 
 F4's fresh-profile base sync, handshake and shutdown pass with an empty PATH; real
-registry-installed U?-Net prep also passes. This does **not** install optional CUDA backends. For
+registry-installed U2-Net prep also passes. This does **not** install optional CUDA backends. For
 the incumbent adapters, set absolute paths outside the checkout:
 
 - `SPRITEBOOK_TRELLIS2_CODE`: an explicitly prepared TRELLIS.2 source directory; its optional
@@ -29,11 +29,14 @@ the incumbent adapters, set absolute paths outside the checkout:
   at CDN redirects. It never records token values. See the
   [Hub environment contract](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables).
 
-**Open model gate:** the existing TRELLIS.2 CUDA stack has evaluation-only and unlicensed components
-listed in the BOM. DINOv3 remains manually gated and absent from its registry file set; upstream may
-fetch it after authentication. Fully declared fresh/offline generation and UniRig environment
-provisioning are not established by the Node port. They remain explicit roadmap gates, rather than
-an implicit dependency on an old HF cache or a builder's deleted environment.
+**Open model gate:** the existing TRELLIS.2 CUDA stack has evaluation-only NVIDIA components and an
+unverified O-Voxel wheel provenance/notice gap listed in the BOM. DINOv3 remains manually gated and
+absent from its registry file set; upstream may fetch it after authentication. Fully declared
+fresh/offline generation and UniRig environment provisioning are not established by the Node port.
+They remain explicit roadmap gates, rather than an implicit dependency on an old HF cache or a
+builder's deleted environment. See the
+[F4 model gate investigation](../future/model-provisioning-gate.md) for the exact artifacts, local
+dependency resolution defects, frozen setup requirements and closure checks.
 
 ## How core launches it
 

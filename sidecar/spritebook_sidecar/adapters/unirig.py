@@ -37,12 +37,10 @@ upstream patch. ``HF_HUB_OFFLINE=1`` is set on every stage as a second lock: an
 adapter that silently re-downloads a 5.8 GB checkpoint it was handed is a bug,
 and this way it cannot.
 
-The one thing the registry does NOT ship is the ``facebook/opt-350m`` ARCHITECTURE
-config (a few KB of JSON that ``AutoConfig.from_pretrained`` resolves to build
-the AR model — no weights are fetched, they come from the checkpoint). If
-``<modelDir>/opt-350m/config.json`` exists it is used; otherwise the adapter
-falls back to the local HF cache, warns, and refuses to run if the cache does
-not have it either.
+The registry also installs ``opt-350m/config.json``: architecture hyperparameters
+for ``AutoConfig.from_pretrained``, not OPT weights. The adapter prefers that
+verified local file; a legacy install may use the local HF cache with a warning,
+and refuses if neither is present. No config is fetched during inference.
 
 ## Upstream configuration this adapter supplies
 

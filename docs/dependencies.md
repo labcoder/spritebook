@@ -164,23 +164,31 @@ planning-era and described MODELS; the rows now describe STACKS, which is what s
 
 ### TRELLIS.2 CUDA extension wheels (the runtime stack)
 
-Not bundled — `spikes/trellis2/wheels/*.whl` is gitignored, only the sha256 pins are committed and
-the user's machine fetches them, as with model weights. Licences below were read from each installed
+Not bundled — `sidecar/wheels/*.whl` is gitignored, only the sha256 pins are committed and the
+user's machine fetches them, as with model weights. Licences below were read from each installed
 `dist-info/`, not from a project page.
 
 | Wheel                    | License                                                                                                           | Status                                                                                                                                  |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `nvdiffrast` 0.4.0       | **Nvidia Source Code License (1-Way Commercial)** — §3.3 non-commercial, _"research or evaluation purposes only"_ | **⚠ blocks commercial use.** On the happy path: `o_voxel.postprocess.to_glb` calls `dr.rasterize`/`dr.interpolate` for the texture bake |
 | `nvdiffrec_render` 0.0.0 | **NVIDIA Source Code License for nvdiffrec** — §3.3 same non-commercial limitation                                | **⚠ blocks commercial use**                                                                                                             |
-| `o_voxel` 0.0.1          | **none declared** (no LICENSE, no classifier) — defaults to all rights reserved                                   | **⚠ unlicensed**; the module our adapter imports directly                                                                               |
+| `o_voxel` 0.0.1          | Wheel has no license text/metadata; official Microsoft source is MIT                                              | **⚠ exact artifact unverified**: Windows changes/native build origin and required notices remain unresolved; see the F4 model gate      |
 | `cumesh` 1.0             | MIT                                                                                                               | ✓                                                                                                                                       |
 | `flex_gemm` 0.0.1        | MIT                                                                                                               | ✓                                                                                                                                       |
 | `utils3d`                | pinned to a git commit (no PyPI release)                                                                          | imports `nvdiffrast` in `torch/rasterization.py`                                                                                        |
 
-**Trap:** an MIT badge on a generative-3D repo describes the model, not the stack. Every candidate
-surveyed reaches NVIDIA's non-commercial rasterizer, because `nvdiffrast` is the differentiable
-rasterizer this whole field is built on. Check `NOTICE` and the installed `dist-info/`, not the
-README.
+**Trap:** an MIT badge on a generative-3D repo does not clear its whole stack. TRELLIS.2's current
+textured GLB export calls the restricted rasterizer, so disabling visualization is insufficient.
+Check exact artifact notices and source/build provenance. The
+[F4 model gate](../future/model-provisioning-gate.md) records current primary license evidence and
+distinguishes private evaluation, user-installed model terms and commercial product claims.
+
+DINOv3's separately gated conditioner is also an existing dependency, but is not yet declared in the
+model's catalog file set. The authorized `ea8dc2863c51be0a264bab82070e3e8836b02d51` snapshot's
+August 19, 2025 agreement has custom use/trade and redistribution terms; it is not MIT. Its exact
+license SHA-256 is `25d122eb8f5b880fd23c736fb6ea8018ee45c12237e00b8a86d14c653904999e`. That text
+omits the older public website's “Built with DINOv3” clause. Preserve the applicable agreement and
+explicit acceptance; do not substitute a blanket attribution or output-rights claim.
 
 ## Rigging
 
