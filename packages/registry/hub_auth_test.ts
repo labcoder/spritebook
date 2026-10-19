@@ -41,4 +41,12 @@ test('Hub authentication stays on its HTTPS origin across CDN redirects', async 
   calls.length = 0;
   await fetchToFile('https://huggingface.co.evil.invalid/weight', join(root, 'other'));
   assert.equal(calls[0].auth, null);
+  process.env.HF_TOKEN = 'private\nvalue';
+  const sent = calls.length;
+  await assert.rejects(
+    fetchToFile('https://huggingface.co/model', join(root, 'invalid')),
+    (error: Error) =>
+      /Invalid Hugging Face token format/.test(error.message) && !error.message.includes('private'),
+  );
+  assert.equal(calls.length, sent, 'Invalid credentials never reach fetch or its error formatting');
 });

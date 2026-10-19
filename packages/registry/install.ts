@@ -83,6 +83,9 @@ export const fetchToFile: Fetcher = async (url, destPath, onBytes) => {
         });
       }
     }
+    if (token && !/^[\x21-\x7e]+$/.test(token)) {
+      throw new Error('Invalid Hugging Face token format - run hf auth login or fix HF_TOKEN');
+    }
     resp = await fetch(current, {
       redirect: 'manual',
       headers: token ? { Authorization: `Bearer ${token}` } : {},

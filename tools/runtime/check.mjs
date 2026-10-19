@@ -31,7 +31,21 @@ const env = {
   NODE_OPTIONS: '',
   SPRITEBOOK_RESOURCES: join(runtime, 'assets'),
   SPRITEBOOK_UV_BIN: join(runtime, process.platform === 'win32' ? 'uv.exe' : 'uv'),
+  LOCALAPPDATA: join(root, 'profile'),
+  XDG_DATA_HOME: join(root, 'profile'),
+  UV_CACHE_DIR: join(root, 'uv-cache'),
+  UV_PYTHON_INSTALL_DIR: join(root, 'python'),
+  UV_PYTHON_PREFERENCE: 'only-managed',
 };
+for (
+  const name of [
+    'UV_PROJECT_ENVIRONMENT',
+    'UV_PYTHON',
+    'SPRITEBOOK_SIDECAR_DIR',
+    'PYTHONPATH',
+    'PYTHONHOME',
+  ]
+) delete env[name];
 const binary = join(runtime, process.platform === 'win32' ? 'spritebook.exe' : 'spritebook');
 const transcript = [];
 function cli(args, allowUnavailable = false) {
@@ -88,6 +102,115 @@ for (const mode of ['production', 'development']) {
 }
 
 if (gpuArg === '--gpu') {
+  const image = join(root, 'reference.png'), workspace = join(root, 'hero');
+  const imageModule =
+    pathToFileURL(join(runtime, 'node_modules/@spritebook/image/dist/mod.js')).href;
+  execFileSync(node, [
+    '--input-type=module',
+    '-e',
+    `
+    import { writeFile } from 'node:fs/promises';
+    const { encode } = await import(${JSON.stringify(imageModule)});
+    const data = new Uint8Array(512 * 512 * 4);
+    for(let i=0;i<data.length;i+=4)data.set([128,64,32,255],i);
+    await writeFile(${JSON.stringify(image)},encode({width:512,height:512,data}));
+  `,
+  ], { cwd: root, env, windowsHide: true });
+  const models = join(root, 'models');
+  cli(['models', 'install', 'fixture-gen', '--models-dir', models, '--json']);
+  const relocated = join(root, 'models moved é 空');
+  await rename(models, relocated);
+  env.SPRITEBOOK_MODELS_DIR = relocated;
+  for (
+    const args of [
+      [
+        'gen',
+        '--workspace',
+        workspace,
+        '--character',
+        'hero',
+        '--image',
+        image,
+        '--model',
+        'fixture-gen',
+        '--seed',
+        '7',
+        '--height',
+        '1.7',
+      ],
+      ['pick', '--workspace', workspace, '--result', 'r1'],
+      [
+        'rig',
+        '--track-a',
+        '--body',
+        'ubc-male',
+        '--workspace',
+        workspace,
+        '--model',
+        join(workspace, 'canonical/model.glb'),
+        '--out',
+        join(workspace, 'rig'),
+      ],
+      ['rig', '--accept', '--workspace', workspace],
+      ['anim', '--enable', 'idle-loop:2,walk-loop:2,punch-jab:2', '--workspace', workspace],
+      ['anim', '--preview', 'idle-loop', '--workspace', workspace],
+      ['look', '--workspace', workspace, '--style', 'pixel', '--cell', '100x128'],
+    ]
+  ) cli([...args, '--json']);
+  for (const temperature of ['cold', 'warm']) {
+    cli([
+      'bake',
+      '--workspace',
+      workspace,
+      '--cache',
+      join(root, 'cache'),
+      '--only-invalidated',
+      '--json',
+    ]);
+    const character = JSON.parse(await readFile(join(workspace, 'character.json'), 'utf8'));
+    const bake = join(workspace, 'bakes', `bake-${character.lastBakeId}`);
+    const manifest = JSON.parse(await readFile(join(bake, 'manifest.json'), 'utf8'));
+    assert.equal(manifest.frames.length, 48);
+    assert.equal(manifest.metrics.cacheHitPct, temperature === 'cold' ? 0 : 100);
+    if (temperature === 'warm') {
+      cli([
+        'export',
+        '--bake',
+        bake,
+        '--out',
+        join(root, 'hero-exports'),
+        '--targets',
+        'godot,aseprite,texturepacker,strips',
+        '--json',
+      ]);
+    }
+  }
+  // A corrupt registry receipt must refuse before starting a new generation.
+  const receiptPath = join(relocated, 'fixture-gen/1.0.0/receipt.json');
+  const modelReceipt = await readFile(receiptPath);
+  await writeFile(receiptPath, '{broken');
+  try {
+    const failure = cli([
+      'gen',
+      '--workspace',
+      join(root, 'refused'),
+      '--character',
+      'refused',
+      '--image',
+      image,
+      '--model',
+      'fixture-gen',
+      '--json',
+    ], true);
+    assert.equal(failure.code, 1);
+    assert.match(failure.output, /receipt|JSON|corrupt/i);
+    assert(
+      !existsSync(join(root, 'refused/character.json')),
+      'Corrupt installs cannot publish a character',
+    );
+  } finally {
+    await writeFile(receiptPath, modelReceipt);
+  }
   const events = cli([
     'bake',
     '--model',
@@ -233,7 +356,20 @@ await writeFile(
         'catalog',
         'doctor',
         'OBJ importer/CJS assets',
-        ...(gpuArg === '--gpu' ? ['styled/AOV bake', 'all four exporters'] : []),
+        ...(gpuArg === '--gpu'
+          ? [
+            'fresh owned Python/base environment',
+            'relocated model root',
+            'synthetic gen/pick/Track A rig',
+            'core-retargeted preview clip',
+            'cold/warm styled AOVs',
+            'all four exporters',
+            'corrupt receipt refusal',
+            'missing native assets',
+            'prior bake unchanged',
+            ...(process.platform === 'win32' ? ['owner death after rendered frame', 'retry'] : []),
+          ]
+          : []),
       ],
       transcript,
     },

@@ -257,7 +257,10 @@ async function readListeningLine(
 export async function startSidecar(cfg: SidecarConfig): Promise<SidecarHandle> {
   const token = mintToken();
   const env: NodeJS.ProcessEnv = { ...process.env, [SIDECAR_TOKEN_ENV]: token };
-  if (env.SPRITEBOOK_RESOURCES) env.PYTHONDONTWRITEBYTECODE ??= '1';
+  if (env.SPRITEBOOK_RESOURCES) {
+    env.PYTHONDONTWRITEBYTECODE ??= '1';
+    env.PYTHONUTF8 ??= '1';
+  }
   if (env.SPRITEBOOK_RESOURCES && !env.UV_PROJECT_ENVIRONMENT) {
     const data = process.platform === 'win32'
       ? env.LOCALAPPDATA ?? join(homedir(), 'AppData/Local')
