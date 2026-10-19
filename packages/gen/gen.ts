@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { workspaceJob } from '@spritebook/core';
 /**
  * `spritebook gen` — one image in, one canonical textured glb out, with a
@@ -237,7 +238,7 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     }
     const resultId = nextResultId(manifest);
     const rp = resultPaths(opts.workspace, resultId);
-    await Deno.mkdir(rp.dir, { recursive: true });
+    await fs.mkdir(rp.dir, { recursive: true });
     yield { t: 'progress', jobId, at: at(), step: 'generate', done: 1, total: 3 };
 
     // 5. the backend, through the sidecar
@@ -336,11 +337,11 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
     for (let i = 0; i < rawPaths.length; i++) {
       const cid = i === 0 ? resultId : nextResultId(m);
       const crp = i === 0 ? rp : resultPaths(opts.workspace, cid);
-      await Deno.mkdir(crp.dir, { recursive: true });
+      await fs.mkdir(crp.dir, { recursive: true });
       // candidate raws land in candidate 0's dir; each moves home as its
       // result is minted, keeping results/<id>/raw.glb the invariant
-      if (rawPaths[i] !== crp.raw) await Deno.rename(rawPaths[i], crp.raw);
-      await Deno.stat(crp.raw).catch(() => {
+      if (rawPaths[i] !== crp.raw) await fs.rename(rawPaths[i], crp.raw);
+      await fs.stat(crp.raw).catch(() => {
         throw new GenFail(
           'no-mesh',
           `Backend "${entry.id}" announced a mesh but ${crp.raw} is missing`,
@@ -371,8 +372,8 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
           }`,
         );
       }
-      await Deno.writeFile(crp.model, canonical.bytes);
-      await Deno.writeTextFile(crp.preflight, JSON.stringify(canonical.report, null, 2) + '\n');
+      await fs.writeFile(crp.model, canonical.bytes);
+      await fs.writeFile(crp.preflight, JSON.stringify(canonical.report, null, 2) + '\n');
 
       // W5b: the candidates screen judges meshes, not numbers - a front-view
       // lit render per result, through the bake's own pipeline. Best-effort:
@@ -511,7 +512,7 @@ export async function readEffectiveSeed(
 ): Promise<number> {
   if (metaPath === undefined) return requested;
   try {
-    const doc = JSON.parse(await Deno.readTextFile(metaPath)) as {
+    const doc = JSON.parse(await fs.readFile(metaPath, 'utf8')) as {
       effectiveSeed?: unknown;
       candidates?: Array<{ effectiveSeed?: unknown }>;
     };

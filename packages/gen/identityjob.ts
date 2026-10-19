@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { workspaceJob } from '@spritebook/core';
 /**
  * The `identity` job (P3-T4, Track A): decals, attachments and bone masks
@@ -107,7 +108,7 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
       );
     }
     try {
-      await Deno.stat(paths.canonicalModel);
+      await fs.stat(paths.canonicalModel);
     } catch {
       throw new IdentityFail(
         'identity-not-picked',
@@ -123,7 +124,7 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
     if (opts.bodyManifestPath !== undefined) {
       let text: string;
       try {
-        text = await Deno.readTextFile(opts.bodyManifestPath);
+        text = await fs.readFile(opts.bodyManifestPath, 'utf8');
       } catch (err) {
         throw new IdentityFail(
           'identity-body-invalid',
@@ -216,7 +217,7 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
       }
       current = outPath;
       const reportPath = `${root}/identity-${stage.step}-report.json`;
-      await Deno.writeTextFile(reportPath, JSON.stringify(report, null, 2) + '\n');
+      await fs.writeFile(reportPath, JSON.stringify(report, null, 2) + '\n');
       done++;
       // a stage's non-fatal notes are worth an event, not just a line in a
       // file nobody opens on a green run (an ambiguous decal atlas is
@@ -244,7 +245,7 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
     }
 
     // Core retains both revisions and publishes these staged bytes with the manifest patch.
-    const bytes = await Deno.readFile(current);
+    const bytes = new Uint8Array(await fs.readFile(current));
     const gltfSha256 = await sha256Hex(bytes);
     let meshRepin: { gltfSha256: string; heightM?: number } | undefined;
     if (gltfSha256 !== canonicalMesh.gltfSha256) {
@@ -271,7 +272,7 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
         recorded.push({
           id: a.id,
           socketId: a.socketId,
-          meshSha256: await sha256Hex(await Deno.readFile(a.meshPath)),
+          meshSha256: await sha256Hex(new Uint8Array(await fs.readFile(a.meshPath))),
         });
       }
       fields.attachments = recorded;
@@ -307,7 +308,7 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
     if (!committed) tmp.push(...reports);
     for (const p of tmp) {
       try {
-        await Deno.remove(p);
+        await fs.rm(p);
       } catch {
         // renamed into place, or never written — either way there is nothing
         // left to clean

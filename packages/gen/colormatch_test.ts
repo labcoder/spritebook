@@ -1,10 +1,14 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Colour-match (A2): the transfer, its compensation term, and every guard rail
  * the adversarial review demanded — each pinned to the failure it prevents.
  *
  * Synthetic glbs with known textures, so every expectation is arithmetic.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { Document, NodeIO } from '@gltf-transform/core';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import { srgbToLab } from '@spritebook/core';
@@ -16,7 +20,7 @@ import {
   L_BLEND,
   STD_RATIO_MAX,
   STD_RATIO_MIN,
-} from './colormatch.ts';
+} from './dist/colormatch.js';
 
 /** A one-triangle glb whose baseColor texture is the given solid colour. */
 async function glbWithTexture(
@@ -46,7 +50,7 @@ async function glbWithTexture(
   const prim = doc.createPrimitive().setAttribute('POSITION', pos)
     .setAttribute('TEXCOORD_0', uv).setMaterial(mat);
   doc.createScene().addChild(doc.createNode('n').setMesh(doc.createMesh().addPrimitive(prim)));
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
 /** An RGBA cutout image of one solid colour. */
@@ -59,16 +63,16 @@ async function cutout(path: string, rgb: [number, number, number]): Promise<void
     data[i * 4 + 2] = rgb[2];
     data[i * 4 + 3] = 255;
   }
-  await Deno.writeFile(path, encodePng({ width: w, height: h, data }));
+  await fs.writeFile(path, encodePng({ width: w, height: h, data }));
 }
 
 async function textureOf(glbPath: string): Promise<Uint8Array> {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(glbPath));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(glbPath)));
   const img = decodePng(doc.getRoot().listTextures()[0].getImage()!);
   return img.data as Uint8Array;
 }
 
-Deno.test('the compensation term IS the rig: shade = AMBIENT + (1-AMBIENT)/4', () => {
+test('the compensation term IS the rig: shade = AMBIENT + (1-AMBIENT)/4', () => {
   // Lambert's mean over a sphere of normals is exactly 1/4, so this is the
   // closed form LIGHTING-REPORT.md derives — imported from @spritebook/render
   // rather than restated, so a rig change moves this pass with it.
@@ -76,12 +80,12 @@ Deno.test('the compensation term IS the rig: shade = AMBIENT + (1-AMBIENT)/4', (
   assert(expectedMeanShade() > 0.4 && expectedMeanShade() < 0.6, 'sane at the shipped ambient');
 });
 
-Deno.test('a green-shifted texture moves onto a teal reference', async () => {
+test('a green-shifted texture moves onto a teal reference', async () => {
   // the bulma failure in miniature: the backend painted GREEN where the
   // reference is TEAL. After the match, the painted texels' mean hue must sit
   // on the reference's hue, and L must sit ABOVE the reference's L (the
   // shade-compensated target), not on it.
-  const dir = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const glb = `${dir}/m.glb`, out = `${dir}/o.glb`, img = `${dir}/ref.png`;
     await glbWithTexture(glb, 32, 32, () => [24, 106, 76]); // #186a4c, the measured hair green
@@ -135,14 +139,14 @@ Deno.test('a green-shifted texture moves onto a teal reference', async () => {
       `low-L clipping is visible to the metric: ${s0.gamutClipFraction}`,
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('a near-monochrome source SKIPS, and the texture is untouched', async () => {
+test('a near-monochrome source SKIPS, and the texture is untouched', async () => {
   // the review's blocker-class footgun: matching to a grayscale sketch would
   // crush the texture toward grey while claiming to "match" it
-  const dir = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const glb = `${dir}/m.glb`, out = `${dir}/o.glb`, img = `${dir}/ref.png`;
     await glbWithTexture(glb, 16, 16, (i) => [200, 40 + (i % 8), 60]);
@@ -157,12 +161,12 @@ Deno.test('a near-monochrome source SKIPS, and the texture is untouched', async 
       'the texture bytes decode identically - nothing was drained',
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('UV-island filler neither contributes statistics nor gets painted', async () => {
-  const dir = await Deno.makeTempDir();
+test('UV-island filler neither contributes statistics nor gets painted', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const glb = `${dir}/m.glb`, out = `${dir}/o.glb`, img = `${dir}/ref.png`;
     // half painted red, half near-black filler
@@ -175,12 +179,12 @@ Deno.test('UV-island filler neither contributes statistics nor gets painted', as
     assertEquals([got[4], got[5], got[6]], [0, 0, 0], 'filler texels stay black');
     assert(got[0] !== 200 || got[2] !== 30, 'painted texels moved');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('a pathological spread ratio is clamped, and says which channels', async () => {
-  const dir = await Deno.makeTempDir();
+test('a pathological spread ratio is clamped, and says which channels', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const glb = `${dir}/m.glb`, out = `${dir}/o.glb`, img = `${dir}/ref.png`;
     // texture with almost NO spread; a colourful reference would demand a huge
@@ -195,13 +199,13 @@ Deno.test('a pathological spread ratio is clamped, and says which channels', asy
       data[i * 4 + 2] = (i * 197) % 256;
       data[i * 4 + 3] = 255;
     }
-    await Deno.writeFile(img, encodePng({ width: w, height: h, data }));
+    await fs.writeFile(img, encodePng({ width: w, height: h, data }));
 
     const stats = await colorMatchTexture({ modelPath: glb, imagePath: img, outPath: out });
     assert(stats.clamped.length > 0, `at least one channel hit the clamp: ${stats.clamped}`);
     assert(STD_RATIO_MIN === 0.5 && STD_RATIO_MAX === 2.0, 'the documented band');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
@@ -209,7 +213,7 @@ Deno.test('a pathological spread ratio is clamped, and says which channels', asy
 // pick integration: ON by default, ordered before reproject, sha in the patch
 // ---------------------------------------------------------------------------
 
-Deno.test('pick colour-matches by default, pins the image sha, and one undo takes it back', async () => {
+test('pick colour-matches by default, pins the image sha, and one undo takes it back', async () => {
   const {
     appendGenerationResult,
     moveManifestCursor,
@@ -223,15 +227,15 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
   const { CharacterManifestSchema, parseWith } = await import(
     '@spritebook/schema'
   );
-  const { runPickJob } = await import('./mod.ts');
+  const { runPickJob } = await import('./dist/mod.js');
 
-  const ws = await Deno.makeTempDir({ prefix: 'sb-cm-' });
+  const ws = await fs.mkdtemp(join(tmpdir(), 'sb-cm-'));
   const img = `${ws}/tmp-ref.png`;
   await cutout(img, [95, 214, 208]); // teal reference
   const sha = await (async () => {
     const d = await crypto.subtle.digest(
       'SHA-256',
-      (await Deno.readFile(img)) as BufferSource,
+      (new Uint8Array(await fs.readFile(img))) as BufferSource,
     );
     return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
   })();
@@ -241,11 +245,11 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
     displayName: 'cm',
     source: { kind: 'image', originalFilename: 'ref.png', sha256: sha },
   });
-  await Deno.mkdir(`${ws}/source`, { recursive: true });
-  await Deno.rename(img, `${ws}/source/${sha}.png`);
+  await fs.mkdir(`${ws}/source`, { recursive: true });
+  await fs.rename(img, `${ws}/source/${sha}.png`);
 
   const rp = resultPaths(ws, 'r1');
-  await Deno.mkdir(rp.dir, { recursive: true });
+  await fs.mkdir(rp.dir, { recursive: true });
   await glbWithTexture(rp.model, 32, 32, () => [24, 106, 76]);
   const receipt = {
     id: 'r1',
@@ -255,7 +259,7 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
     startedAt: '2026-07-30T00:00:00.000Z',
     wallTimeS: 1,
     output: {
-      gltfSha256: await sha256Bytes(await Deno.readFile(rp.model)),
+      gltfSha256: await sha256Bytes(new Uint8Array(await fs.readFile(rp.model))),
       tris: 1,
       kind: 'mesh' as const,
     },
@@ -278,7 +282,7 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
 
   const m = parseWith(
     CharacterManifestSchema,
-    JSON.parse(await Deno.readTextFile(`${ws}/character.json`)),
+    JSON.parse(await fs.readFile(`${ws}/character.json`, 'utf8')),
     'manifest',
   );
   assertEquals(m.canonicalMesh?.colorMatched, true, 'recorded in the manifest');
@@ -314,9 +318,9 @@ Deno.test('pick colour-matches by default, pins the image sha, and one undo take
   assert(!steps2.some((s) => s.startsWith('color-match:')), 'the opt-out opts out');
   const m2 = parseWith(
     CharacterManifestSchema,
-    JSON.parse(await Deno.readTextFile(`${ws}/character.json`)),
+    JSON.parse(await fs.readFile(`${ws}/character.json`, 'utf8')),
     'manifest2',
   );
   assertEquals(m2.canonicalMesh?.colorMatched, undefined, 'and the manifest says so');
-  await Deno.remove(ws, { recursive: true });
+  await fs.rm(ws, { recursive: true });
 });

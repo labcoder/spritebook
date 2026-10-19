@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Track A's roster fit (P3-T4): ONE canonical rigged humanoid, fitted to each
  * generated mesh, so the skeleton, the UV layout and the animation bindings are
@@ -84,7 +85,7 @@ import {
   parseWith,
   SCHEMA_VERSION,
 } from '@spritebook/schema';
-import { UAL_HUMANOID } from '../anim/profile.ts';
+import { UAL_HUMANOID } from '@spritebook/anim';
 import {
   qConj,
   qFromMat4,
@@ -94,7 +95,7 @@ import {
   type Quat,
   type Vec3,
   vSub,
-} from '../anim/quat.ts';
+} from '@spritebook/anim/quat';
 import { IBM_IDENTITY_TOLERANCE, packWeightRows } from './apply.ts';
 import { boundsOf } from './orient.ts';
 import {
@@ -711,7 +712,7 @@ export async function fitCanonicalBody(opts: FitCanonicalBodyOptions): Promise<F
   // ---- the canonical body ------------------------------------------------
   let manifestJson: unknown;
   try {
-    manifestJson = JSON.parse(await Deno.readTextFile(opts.bodyManifestPath));
+    manifestJson = JSON.parse(await fs.readFile(opts.bodyManifestPath, 'utf8'));
   } catch (err) {
     throw new Error(
       `${label}: cannot read body manifest "${opts.bodyManifestPath}" ` +
@@ -726,7 +727,7 @@ export async function fitCanonicalBody(opts: FitCanonicalBodyOptions): Promise<F
 
   let bodyDoc: Document;
   try {
-    bodyDoc = await io.readBinary(await Deno.readFile(opts.bodyPath));
+    bodyDoc = await io.readBinary(new Uint8Array(await fs.readFile(opts.bodyPath)));
   } catch (err) {
     throw new Error(`${label}: cannot read body "${opts.bodyPath}" (${(err as Error).message})`);
   }
@@ -744,7 +745,7 @@ export async function fitCanonicalBody(opts: FitCanonicalBodyOptions): Promise<F
   // ---- 1. measure both ---------------------------------------------------
   let targetDoc: Document;
   try {
-    targetDoc = await io.readBinary(await Deno.readFile(opts.targetPath));
+    targetDoc = await io.readBinary(new Uint8Array(await fs.readFile(opts.targetPath)));
   } catch (err) {
     throw new Error(
       `${label}: cannot read target "${opts.targetPath}" (${(err as Error).message})`,
@@ -920,7 +921,7 @@ export async function fitCanonicalBody(opts: FitCanonicalBodyOptions): Promise<F
 
   // ---- 5. write ----------------------------------------------------------
   writeFitted(bodyDoc, asset, fitted, jointPos, jointRot, rows, label);
-  await Deno.writeFile(opts.outPath, await io.writeBinary(bodyDoc));
+  await fs.writeFile(opts.outPath, await io.writeBinary(bodyDoc));
 
   const frozen = parseWith(FitResultSchema, {
     schemaVersion: SCHEMA_VERSION,
@@ -1059,7 +1060,7 @@ export async function buildCanonicalBody(
   const label = 'buildCanonicalBody';
   let bytes: Uint8Array;
   try {
-    bytes = await Deno.readFile(opts.sourcePath);
+    bytes = new Uint8Array(await fs.readFile(opts.sourcePath));
   } catch (err) {
     throw new Error(`${label}: cannot read "${opts.sourcePath}" (${(err as Error).message})`);
   }
@@ -1191,10 +1192,10 @@ export async function buildCanonicalBody(
     ...(bodyMaterial ? { bodyMaterial } : {}),
   }, `canonical body "${opts.id}"`);
 
-  await Deno.mkdir(opts.outDir, { recursive: true });
+  await fs.mkdir(opts.outDir, { recursive: true });
   const glbPath = `${opts.outDir}/${CANONICAL_BODY_FILE}`;
   const manifestPath = `${opts.outDir}/${CANONICAL_BODY_MANIFEST}`;
-  await Deno.writeFile(glbPath, bytes);
-  await Deno.writeTextFile(manifestPath, canonicalJson(body));
+  await fs.writeFile(glbPath, bytes);
+  await fs.writeFile(manifestPath, canonicalJson(body));
   return { body, glbPath, manifestPath };
 }

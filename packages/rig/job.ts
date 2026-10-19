@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import { adapterFor, defaultsFor, paramsSchemaFor, preflightVram } from '@spritebook/schema';
 import {
@@ -154,7 +155,7 @@ async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
       yield { t: 'warn', jobId, at: at(), code: `vram-${vram.status}`, message: vram.warn };
     }
     await verifyExecutionModel({ root, catalog, entry, version, receipt: installed.receipt });
-    await Deno.mkdir(opts.outDir, { recursive: true });
+    await fs.mkdir(opts.outDir, { recursive: true });
     // Taken BEFORE the orientation fixes and the facing check, cheap as those
     // are, because the alternative is worse: a job that rewrites the user's
     // mesh on disk and only then discovers it must queue for twenty minutes
@@ -260,7 +261,7 @@ async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
       try {
         const prior = parseWith(
           RigSkeletonSchema,
-          JSON.parse(await Deno.readTextFile(priorPath)),
+          JSON.parse(await fs.readFile(priorPath, 'utf8')),
           'RigSkeleton',
         );
         hints.push(...hintsFromEdits(applyJointEdits(prior, opts.edits).skeleton, opts.edits));
@@ -311,7 +312,7 @@ async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
     try {
       skeleton = parseWith(
         RigSkeletonSchema,
-        JSON.parse(await Deno.readTextFile(skeletonPath)),
+        JSON.parse(await fs.readFile(skeletonPath, 'utf8')),
         'RigSkeleton',
       );
     } catch (err) {
@@ -394,8 +395,8 @@ async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
       }
       const editedPath = `${opts.outDir}/rigged-edited.glb`;
       await applyEditsToRiggedGlb(riggedPath, editedPath, skeleton, editResult.skeleton);
-      await Deno.rename(editedPath, riggedPath);
-      await Deno.writeTextFile(
+      await fs.rename(editedPath, riggedPath);
+      await fs.writeFile(
         skeletonPath,
         JSON.stringify(editResult.skeleton, null, 2) + '\n',
       );

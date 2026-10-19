@@ -1,3 +1,8 @@
+import { rejects } from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The identity layer is UV-space and graph-space surgery, so it is testable
  * EXACTLY: a body whose three quads sit in three known UV rects and are weighted
@@ -9,7 +14,7 @@
  * identity is first-class — and it is the assertion that fails the day someone
  * decides mirroring is a helpful default.
  */
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import { Document, NodeIO } from '@gltf-transform/core';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { CanonicalBody } from '@spritebook/schema';
@@ -19,7 +24,7 @@ import {
   compositeDecals,
   REGION_WEIGHT_FLOOR,
   sidePartnerRegion,
-} from './identity.ts';
+} from './dist/identity.js';
 
 const TEX = 64;
 
@@ -139,7 +144,7 @@ async function bodyGlb(path: string): Promise<void> {
   node.setSkin(skin);
   doc.createScene('s').addChild(node).addChild(jointNodes[0]);
 
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
 /** A rigid quad prop, optionally under a translated node (world-transform test). */
@@ -156,7 +161,7 @@ async function propGlb(path: string, lift = 0): Promise<void> {
     .setMesh(doc.createMesh('prop').addPrimitive(prim))
     .setTranslation([0, lift, 0]);
   doc.createScene('s').addChild(node);
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
 /**
@@ -188,7 +193,7 @@ async function skinnedReplacementGlb(path: string, jointName: string): Promise<v
     .setMesh(doc.createMesh('replacement').addPrimitive(prim))
     .setSkin(skin);
   doc.createScene('s').addChild(node).addChild(joint);
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
 /** Left column red, everything else blue — a pattern a flip cannot hide. */
@@ -213,12 +218,12 @@ function solid(size: number, rgba: [number, number, number, number]): Uint8Array
 }
 
 async function readTexture(path: string) {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path)));
   return decodePng(doc.getRoot().listTextures()[0].getImage()!);
 }
 
 async function readPositions(path: string): Promise<number[]> {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path)));
   const out: number[] = [];
   for (const mesh of doc.getRoot().listMeshes()) {
     for (const prim of mesh.listPrimitives()) {
@@ -229,11 +234,11 @@ async function readPositions(path: string): Promise<number[]> {
 }
 
 async function withTmp(fn: (dir: string) => Promise<void>): Promise<void> {
-  const dir = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     await fn(dir);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 }
 
@@ -241,13 +246,13 @@ async function withTmp(fn: (dir: string) => Promise<void>): Promise<void> {
 // Decals
 // ---------------------------------------------------------------------------
 
-Deno.test('decal: lands inside its region rect and nowhere else', async () => {
+test('decal: lands inside its region rect and nowhere else', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const out = `${dir}/out.glb`;
     const png = `${dir}/decal.png`;
     await bodyGlb(model);
-    await Deno.writeFile(png, encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 0, 255]) }));
+    await fs.writeFile(png, encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 0, 255]) }));
 
     const report = await compositeDecals({
       modelPath: model,
@@ -280,13 +285,13 @@ Deno.test('decal: lands inside its region rect and nowhere else', async () => {
   });
 });
 
-Deno.test('decal: mirrored paints BOTH sides, and the copy really is flipped', async () => {
+test('decal: mirrored paints BOTH sides, and the copy really is flipped', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const out = `${dir}/out.glb`;
     const png = `${dir}/decal.png`;
     await bodyGlb(model);
-    await Deno.writeFile(png, encodePng({ width: 8, height: 8, data: sidedDecal(8) }));
+    await fs.writeFile(png, encodePng({ width: 8, height: 8, data: sidedDecal(8) }));
 
     const report = await compositeDecals({
       modelPath: model,
@@ -322,13 +327,13 @@ Deno.test('decal: mirrored paints BOTH sides, and the copy really is flipped', a
   });
 });
 
-Deno.test('decal: mirrored:false paints exactly one side (D-008, the negative proof)', async () => {
+test('decal: mirrored:false paints exactly one side (D-008, the negative proof)', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const out = `${dir}/out.glb`;
     const png = `${dir}/decal.png`;
     await bodyGlb(model);
-    await Deno.writeFile(png, encodePng({ width: 8, height: 8, data: sidedDecal(8) }));
+    await fs.writeFile(png, encodePng({ width: 8, height: 8, data: sidedDecal(8) }));
 
     const report = await compositeDecals({
       modelPath: model,
@@ -356,13 +361,13 @@ Deno.test('decal: mirrored:false paints exactly one side (D-008, the negative pr
   });
 });
 
-Deno.test('decal: z order wins overlaps; equal z keeps input order', async () => {
+test('decal: z order wins overlaps; equal z keeps input order', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     await bodyGlb(model);
     const red = `${dir}/red.png`, blue = `${dir}/blue.png`;
-    await Deno.writeFile(red, encodePng({ width: 4, height: 4, data: solid(4, [255, 0, 0, 255]) }));
-    await Deno.writeFile(
+    await fs.writeFile(red, encodePng({ width: 4, height: 4, data: solid(4, [255, 0, 0, 255]) }));
+    await fs.writeFile(
       blue,
       encodePng({ width: 4, height: 4, data: solid(4, [0, 0, 255, 255]) }),
     );
@@ -400,12 +405,12 @@ Deno.test('decal: z order wins overlaps; equal z keeps input order', async () =>
   });
 });
 
-Deno.test('decal: a composite that changes nothing is REPORTED, not swallowed', async () => {
+test('decal: a composite that changes nothing is REPORTED, not swallowed', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const png = `${dir}/empty.png`;
     await bodyGlb(model);
-    await Deno.writeFile(png, encodePng({ width: 8, height: 8, data: new Uint8Array(8 * 8 * 4) }));
+    await fs.writeFile(png, encodePng({ width: 8, height: 8, data: new Uint8Array(8 * 8 * 4) }));
     const report = await compositeDecals({
       modelPath: model,
       body: BODY,
@@ -418,12 +423,12 @@ Deno.test('decal: a composite that changes nothing is REPORTED, not swallowed', 
   });
 });
 
-Deno.test('decal: an unknown region is refused, with the real options listed', async () => {
+test('decal: an unknown region is refused, with the real options listed', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const png = `${dir}/decal.png`;
     await bodyGlb(model);
-    await Deno.writeFile(png, encodePng({ width: 4, height: 4, data: solid(4, [1, 2, 3, 255]) }));
+    await fs.writeFile(png, encodePng({ width: 4, height: 4, data: solid(4, [1, 2, 3, 255]) }));
     let threw = false;
     try {
       await compositeDecals({
@@ -443,12 +448,12 @@ Deno.test('decal: an unknown region is refused, with the real options listed', a
   });
 });
 
-Deno.test('decal: a mirrored decal on a centre region is refused', async () => {
+test('decal: a mirrored decal on a centre region is refused', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const png = `${dir}/decal.png`;
     await bodyGlb(model);
-    await Deno.writeFile(png, encodePng({ width: 4, height: 4, data: solid(4, [1, 2, 3, 255]) }));
+    await fs.writeFile(png, encodePng({ width: 4, height: 4, data: solid(4, [1, 2, 3, 255]) }));
     let threw = false;
     try {
       await compositeDecals({
@@ -465,13 +470,13 @@ Deno.test('decal: a mirrored decal on a centre region is refused', async () => {
   });
 });
 
-Deno.test('decal: geometry is bit-identical after compositing', async () => {
+test('decal: geometry is bit-identical after compositing', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const out = `${dir}/out.glb`;
     const png = `${dir}/decal.png`;
     await bodyGlb(model);
-    await Deno.writeFile(png, encodePng({ width: 8, height: 8, data: sidedDecal(8) }));
+    await fs.writeFile(png, encodePng({ width: 8, height: 8, data: sidedDecal(8) }));
     await compositeDecals({
       modelPath: model,
       body: BODY,
@@ -486,7 +491,7 @@ Deno.test('decal: geometry is bit-identical after compositing', async () => {
   });
 });
 
-Deno.test('side partner: naming only, in every spelling a body id can use', () => {
+test('side partner: naming only, in every spelling a body id can use', () => {
   assertEquals(sidePartnerRegion('forearm-l'), 'forearm-r');
   assertEquals(sidePartnerRegion('forearm-r'), 'forearm-l');
   assertEquals(sidePartnerRegion('forearm_l'), 'forearm_r'); // the rig's joint spelling
@@ -503,7 +508,7 @@ const SOCKETS = [
   { id: 'head-top', bone: 'root', localOffset: [0, 0, 0] },
 ];
 
-Deno.test('attachment: lands under its socket joint, offset applied, body untouched', async () => {
+test('attachment: lands under its socket joint, offset applied, body untouched', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const prop = `${dir}/prop.glb`;
@@ -522,7 +527,7 @@ Deno.test('attachment: lands under its socket joint, offset applied, body untouc
     assertEquals(report.attached[0].offset, [0.5, 0.1, 0], 'socket offset + the user nudge');
     assertEquals(report.attached[0].vertices, 4);
 
-    const doc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(out)));
     const joint = doc.getRoot().listNodes().find((n) => n.getName() === 'forearm-r')!;
     const wrapper = joint.listChildren().find((c) => c.getName() === 'attach-sword');
     assert(wrapper, 'the attachment hangs off the joint, so animation carries it');
@@ -538,7 +543,7 @@ Deno.test('attachment: lands under its socket joint, offset applied, body untouc
   });
 });
 
-Deno.test('attachment: an unknown socket is refused, listing the sockets that exist', async () => {
+test('attachment: an unknown socket is refused, listing the sockets that exist', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const prop = `${dir}/prop.glb`;
@@ -563,7 +568,7 @@ Deno.test('attachment: an unknown socket is refused, listing the sockets that ex
   });
 });
 
-Deno.test('attachment: a skinned "prop" is refused with the reason', async () => {
+test('attachment: a skinned "prop" is refused with the reason', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const skinned = `${dir}/skinned.glb`;
@@ -589,7 +594,7 @@ Deno.test('attachment: a skinned "prop" is refused with the reason', async () =>
 // Bone masks
 // ---------------------------------------------------------------------------
 
-Deno.test('bone mask: replaces exactly its region, rigid-bound and SAID so', async () => {
+test('bone mask: replaces exactly its region, rigid-bound and SAID so', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const replacement = `${dir}/arm.glb`;
@@ -613,7 +618,7 @@ Deno.test('bone mask: replaces exactly its region, rigid-bound and SAID so', asy
     assertEquals(r.rigidJoint, 'forearm-l', 'so it follows the joint that owned the region');
     assert(r.note?.includes('rigidly'), `and the report says so: ${r.note}`);
 
-    const doc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(out)));
     const prims = doc.getRoot().listMeshes()[0].listPrimitives();
     const positions = prims.flatMap((p) => Array.from(p.getAttribute('POSITION')!.getArray()!));
     assertEquals(positions.length / 3, 12, '12 - 4 removed + 4 inserted');
@@ -633,7 +638,7 @@ Deno.test('bone mask: replaces exactly its region, rigid-bound and SAID so', asy
   });
 });
 
-Deno.test('bone mask: a skinned replacement keeps its weights, remapped BY NAME', async () => {
+test('bone mask: a skinned replacement keeps its weights, remapped BY NAME', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const replacement = `${dir}/arm.glb`;
@@ -651,7 +656,7 @@ Deno.test('bone mask: a skinned replacement keeps its weights, remapped BY NAME'
     assertEquals(report.replaced[0].rigidJoint, undefined);
     assertEquals(report.replaced[0].note, undefined, 'nothing to warn about');
 
-    const doc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(out)));
     const prims = doc.getRoot().listMeshes()[0].listPrimitives();
     const joints = prims[prims.length - 1].getAttribute('JOINTS_0')!.getArray()!;
     for (let v = 0; v < 4; v++) {
@@ -660,7 +665,7 @@ Deno.test('bone mask: a skinned replacement keeps its weights, remapped BY NAME'
   });
 });
 
-Deno.test('bone mask: a replacement naming unknown joints falls back to rigid, loudly', async () => {
+test('bone mask: a replacement naming unknown joints falls back to rigid, loudly', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const replacement = `${dir}/arm.glb`;
@@ -682,7 +687,7 @@ Deno.test('bone mask: a replacement naming unknown joints falls back to rigid, l
   });
 });
 
-Deno.test('bone mask: an unknown region is refused, with the regions that exist', async () => {
+test('bone mask: an unknown region is refused, with the regions that exist', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const replacement = `${dir}/arm.glb`;
@@ -706,7 +711,7 @@ Deno.test('bone mask: an unknown region is refused, with the regions that exist'
   });
 });
 
-Deno.test('bone mask: the weight floor is the ownership rule, and it is tunable', async () => {
+test('bone mask: the weight floor is the ownership rule, and it is tunable', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const replacement = `${dir}/arm.glb`;
@@ -742,25 +747,25 @@ Deno.test('bone mask: the weight floor is the ownership rule, and it is tunable'
   });
 });
 
-Deno.test('compositeDecals: an RGB (3-channel) base texture is normalized, not a crash', async () => {
+test('compositeDecals: an RGB (3-channel) base texture is normalized, not a crash', async () => {
   // fixture-gen and other generators emit RGB base textures; every stride
   // computation in the compositor assumes RGBA, so an un-normalized base died
   // inside fast-png with "wrong data size" (found by the identity job's decal
   // test - this pins the fix at the decode boundary)
-  const dir = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const model = `${dir}/rgb-body.glb`;
     await bodyGlb(model);
     // swap the texture for a 3-channel RGB one, same size
-    const doc = await new NodeIO().readBinary(await Deno.readFile(model));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(model)));
     const rgb = new Uint8Array(TEX * TEX * 3).fill(99);
     doc.getRoot().listTextures()[0]
       .setImage(encodePng({ width: TEX, height: TEX, data: rgb, channels: 3 }))
       .setMimeType('image/png');
-    await Deno.writeFile(model, await new NodeIO().writeBinary(doc));
+    await fs.writeFile(model, await new NodeIO().writeBinary(doc));
 
     const decalPng = `${dir}/mark.png`;
-    await Deno.writeFile(
+    await fs.writeFile(
       decalPng,
       encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
     );
@@ -778,7 +783,7 @@ Deno.test('compositeDecals: an RGB (3-channel) base texture is normalized, not a
     assertEquals(report.missed, [], 'nothing silently missed');
 
     // and the output texture is valid RGBA with the untouched area preserved
-    const outDoc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const outDoc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(out)));
     const tex = decodePng(outDoc.getRoot().listTextures()[0].getImage()!);
     assertEquals(tex.channels, 4, 'output is RGBA');
     const px = tex.data as Uint8Array;
@@ -792,7 +797,7 @@ Deno.test('compositeDecals: an RGB (3-channel) base texture is normalized, not a
       'RGB base preserved outside the decal, alpha filled to 255',
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
@@ -819,7 +824,7 @@ async function skinlessTexturedGlb(path: string): Promise<void> {
   doc.createScene('s').addChild(
     doc.createNode('body').setMesh(doc.createMesh('body').addPrimitive(prim)),
   );
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
 // A region is the set of texels its JOINTS own. When that ownership cannot be
@@ -827,12 +832,12 @@ async function skinlessTexturedGlb(path: string): Promise<void> {
 // AABB spans nearly the whole page (ubc-male's arm-l is 0.996 wide), so
 // painting it would cover the entire character, both arms, perfectly
 // mirrored: exactly what D-008 forbids. Both ways to lose ownership refuse.
-Deno.test('decals: a region decal on an UNSKINNED model is refused, not page-painted', async () => {
+test('decals: a region decal on an UNSKINNED model is refused, not page-painted', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/picked.glb`;
     const png = `${dir}/decal.png`;
     await skinlessTexturedGlb(model);
-    await Deno.writeFile(
+    await fs.writeFile(
       png,
       encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
     );
@@ -851,21 +856,19 @@ Deno.test('decals: a region decal on an UNSKINNED model is refused, not page-pai
       /no skeleton/.test(err.message) && /rig --track-a/.test(err.message),
       `the refusal must name the fix (fit first, or place by uvRect): ${err.message}`,
     );
-    await assertRejects(
-      () => Deno.stat(`${dir}/out.glb`),
-      Deno.errors.NotFound,
-      undefined,
+    await rejects(
+      () => fs.stat(`${dir}/out.glb`), { code: 'ENOENT' },
       'a refused decal writes no model',
     );
   });
 });
 
-Deno.test('decals: a body whose region joints are absent from the skin is refused', async () => {
+test('decals: a body whose region joints are absent from the skin is refused', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const png = `${dir}/decal.png`;
     await bodyGlb(model); // joints: root, forearm-l, forearm-r
-    await Deno.writeFile(
+    await fs.writeFile(
       png,
       encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
     );
@@ -892,13 +895,13 @@ Deno.test('decals: a body whose region joints are absent from the skin is refuse
   });
 });
 
-Deno.test('decals: a uvRect decal still paints on an unskinned model (explicit aim)', async () => {
+test('decals: a uvRect decal still paints on an unskinned model (explicit aim)', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/picked.glb`;
     const out = `${dir}/out.glb`;
     const png = `${dir}/decal.png`;
     await skinlessTexturedGlb(model);
-    await Deno.writeFile(
+    await fs.writeFile(
       png,
       encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
     );
@@ -943,16 +946,16 @@ async function deep16Glb(path: string): Promise<void> {
   doc.createScene('s').addChild(
     doc.createNode('body').setMesh(doc.createMesh('body').addPrimitive(prim)),
   );
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
-Deno.test('decals: a 16-bit base texture narrows to its high byte, not mod 256', async () => {
+test('decals: a 16-bit base texture narrows to its high byte, not mod 256', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/deep.glb`;
     const out = `${dir}/out.glb`;
     const png = `${dir}/decal.png`;
     await deep16Glb(model);
-    await Deno.writeFile(
+    await fs.writeFile(
       png,
       encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
     );
@@ -980,13 +983,13 @@ Deno.test('decals: a 16-bit base texture narrows to its high byte, not mod 256',
   });
 });
 
-Deno.test('decals: an unnamed atlas on a multi-material model warns which one it took', async () => {
+test('decals: an unnamed atlas on a multi-material model warns which one it took', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const out = `${dir}/out.glb`;
     const png = `${dir}/decal.png`;
     await multiMaterialGlb(model);
-    await Deno.writeFile(
+    await fs.writeFile(
       png,
       encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
     );
@@ -1012,12 +1015,12 @@ Deno.test('decals: an unnamed atlas on a multi-material model warns which one it
   });
 });
 
-Deno.test('decals: a body that NAMES its atlas paints there, with no warning', async () => {
+test('decals: a body that NAMES its atlas paints there, with no warning', async () => {
   await withTmp(async (dir) => {
     const model = `${dir}/body.glb`;
     const png = `${dir}/decal.png`;
     await multiMaterialGlb(model);
-    await Deno.writeFile(
+    await fs.writeFile(
       png,
       encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
     );
@@ -1079,5 +1082,5 @@ async function multiMaterialGlb(path: string): Promise<void> {
         .addPrimitive(quad(4, atlas('hair', 64))),
     ),
   );
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }

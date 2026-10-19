@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Orientation detection is a measurement, so it is testable exactly: build a
  * humanoid-ish body whose facing we KNOW, rotate it by a known angle, and
@@ -8,7 +12,7 @@
  * whose toes stick out the front. If the detector were secretly relying on
  * something else, this fixture would not satisfy it.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { Document, NodeIO } from '@gltf-transform/core';
 import {
   applyOrientationFixes,
@@ -16,7 +20,7 @@ import {
   detectFacing,
   detectFacingFile,
   worldPositions,
-} from './orient.ts';
+} from './dist/orient.js';
 
 /** Axis-aligned box as 8 corners (enough for bounds + mass asymmetry). */
 function box(cx: number, cy: number, cz: number, sx: number, sy: number, sz: number): number[] {
@@ -83,17 +87,17 @@ async function writeGlb(
   }
   const mesh = doc.createMesh('m').addPrimitive(prim);
   doc.createScene('s').addChild(doc.createNode('n').setMesh(mesh));
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
-Deno.test('facing: a +Z humanoid is recognised and needs no fix', () => {
+test('facing: a +Z humanoid is recognised and needs no fix', () => {
   const r = detectFacing(humanoidPositions());
   assertEquals(r.facing, '+Z');
   assertEquals(r.suggestedFix, undefined, 'nothing to fix when already canonical');
   assert(r.confidence > 0.2, `confident enough to act on: ${r.confidence}`);
 });
 
-Deno.test('facing: every quarter-turn is detected with the verb that undoes it', () => {
+test('facing: every quarter-turn is detected with the verb that undoes it', () => {
   const base = humanoidPositions();
   for (
     const [deg, expectFacing, expectFix] of [
@@ -108,7 +112,7 @@ Deno.test('facing: every quarter-turn is detected with the verb that undoes it',
   }
 });
 
-Deno.test('facing: a symmetric barrel reports low confidence instead of guessing', () => {
+test('facing: a symmetric barrel reports low confidence instead of guessing', () => {
   // square cross-section, no front/back asymmetry: there IS no facing, and
   // saying so is better than rotating someone's asset on a coin flip
   const barrel = Float32Array.from(box(0, 0.5, 0, 0.4, 1.0, 0.4));
@@ -116,8 +120,8 @@ Deno.test('facing: a symmetric barrel reports low confidence instead of guessing
   assert(r.confidence < 0.2, `low confidence on a barrel, got ${r.confidence}`);
 });
 
-Deno.test('ACCEPTANCE: a -Z mesh is fixed by ONE verb, and the geometry follows', async () => {
-  const dir = await Deno.makeTempDir();
+test('ACCEPTANCE: a -Z mesh is fixed by ONE verb, and the geometry follows', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const backwards = `${dir}/backwards.glb`;
     const fixed = `${dir}/fixed.glb`;
@@ -133,7 +137,7 @@ Deno.test('ACCEPTANCE: a -Z mesh is fixed by ONE verb, and the geometry follows'
 
     // and the FILE really changed - a report that flips without the geometry
     // following would be the worst possible outcome here
-    const doc = await new NodeIO().readBinary(await Deno.readFile(fixed));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(fixed)));
     const p = worldPositions(doc);
     const b = boundsOf(p);
     const footCut = b.min[1] + (b.max[1] - b.min[1]) * 0.15;
@@ -143,12 +147,12 @@ Deno.test('ACCEPTANCE: a -Z mesh is fixed by ONE verb, and the geometry follows'
     }
     assert(toeZ > 0, `toes now point +Z in world space (max toe z = ${toeZ})`);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('face-front is idempotent and never rotates an already-correct mesh', async () => {
-  const dir = await Deno.makeTempDir();
+test('face-front is idempotent and never rotates an already-correct mesh', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const a = `${dir}/a.glb`, b = `${dir}/b.glb`, c = `${dir}/c.glb`;
     await writeGlb(a, humanoidPositions());
@@ -159,17 +163,17 @@ Deno.test('face-front is idempotent and never rotates an already-correct mesh', 
     assertEquals(first.facing, '+Z');
     assertEquals(second.facing, '+Z');
     assertEquals(
-      await Deno.readFile(b),
-      await Deno.readFile(c),
+      new Uint8Array(await fs.readFile(b)),
+      new Uint8Array(await fs.readFile(c)),
       'a second face-front is a no-op, byte for byte',
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('feet-ground and center place the body without fighting each other', async () => {
-  const dir = await Deno.makeTempDir();
+test('feet-ground and center place the body without fighting each other', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const src = `${dir}/floating.glb`;
     const out = `${dir}/placed.glb`;
@@ -183,13 +187,13 @@ Deno.test('feet-ground and center place the body without fighting each other', a
     await writeGlb(src, p);
     await applyOrientationFixes(src, out, ['center', 'feet-ground']);
 
-    const doc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(out)));
     const b = boundsOf(worldPositions(doc));
     assert(Math.abs(b.min[1]) < 1e-4, `feet on the ground plane (min y = ${b.min[1]})`);
     assert(Math.abs((b.min[0] + b.max[0]) / 2) < 1e-4, 'centred on X');
     assert(Math.abs((b.min[2] + b.max[2]) / 2) < 1e-4, 'centred on Z');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
@@ -205,7 +209,7 @@ function vertexPositions(doc: Document): Float32Array {
   return Float32Array.from(out);
 }
 
-Deno.test('an orientation fix lands in the DATA, so skinning cannot discard it', async () => {
+test('an orientation fix lands in the DATA, so skinning cannot discard it', async () => {
   // These fixes run on the canonical mesh moments before `applyRig` attaches a
   // skin, and the glTF spec says a skinned mesh node's transform no longer
   // places the mesh. A fix written only onto the node is therefore a fix that
@@ -216,7 +220,7 @@ Deno.test('an orientation fix lands in the DATA, so skinning cannot discard it',
   // Every other assertion in this file reads `worldPositions`, which applies
   // node transforms - which is exactly why they all passed while the verb did
   // not work. This one reads the vertices.
-  const dir = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const src = `${dir}/sunken.glb`;
     const out = `${dir}/grounded.glb`;
@@ -225,7 +229,7 @@ Deno.test('an orientation fix lands in the DATA, so skinning cannot discard it',
     await writeGlb(src, p);
     await applyOrientationFixes(src, out, ['feet-ground']);
 
-    const doc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(out)));
     const b = boundsOf(vertexPositions(doc));
     assert(Math.abs(b.min[1]) < 1e-4, `feet at Y=0 in the VERTICES, got ${b.min[1]}`);
     for (const node of doc.getRoot().listNodes()) {
@@ -239,23 +243,23 @@ Deno.test('an orientation fix lands in the DATA, so skinning cannot discard it',
       }
     }
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('a baked rotation keeps normals pointing where the faces do', async () => {
+test('a baked rotation keeps normals pointing where the faces do', async () => {
   // POSITION and NORMAL have to move together. A bake that transformed only
   // positions would light the character as though it had never turned - and
   // nothing else in this file would notice, because facing is measured from
   // positions alone.
-  const dir = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const src = `${dir}/facing.glb`;
     const out = `${dir}/turned.glb`;
     await writeGlb(src, humanoidPositions(), { normal: [0, 0, 1] });
     await applyOrientationFixes(src, out, ['rotate-90']);
 
-    const doc = await new NodeIO().readBinary(await Deno.readFile(out));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(out)));
     const n = doc.getRoot().listMeshes()[0].listPrimitives()[0].getAttribute('NORMAL')!.getArray()!;
     // rotate-90 takes +Z to +X (yawMatrix's stated convention)
     assert(Math.abs(n[0] - 1) < 1e-5, `normal x -> 1, got ${n[0]}`);
@@ -266,6 +270,6 @@ Deno.test('a baked rotation keeps normals pointing where the faces do', async ()
       'and it is still a unit vector',
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });

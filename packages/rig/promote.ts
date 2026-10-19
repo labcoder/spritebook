@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { readWorkspace, sha256Bytes } from '@spritebook/core';
 
 type Promotion =
@@ -14,7 +15,7 @@ export async function prepareCanonicalPromotion(
   try {
     const manifest = await readWorkspace(workspace);
     if (!manifest.canonicalMesh) return { ready: false, reason: 'no-canonical-mesh' };
-    const gltfSha256 = await sha256Bytes(await Deno.readFile(sourcePath));
+    const gltfSha256 = await sha256Bytes(new Uint8Array(await fs.readFile(sourcePath)));
     return {
       ready: true,
       canonicalSource: sourcePath,

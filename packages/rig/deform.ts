@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The deform check (P3-T3): does this rig actually deform, and does it shred?
  *
@@ -71,7 +72,7 @@
  */
 import type { DeformJointStat, DeformReport } from '@spritebook/schema';
 import { DeformReportSchema, parseWith, SCHEMA_VERSION } from '@spritebook/schema';
-import { qAxisAngle, qToMat4, vDot, type Vec3, vLen, vNormalize } from '../anim/quat.ts';
+import { qAxisAngle, qToMat4, vDot, type Vec3, vLen, vNormalize } from '@spritebook/anim/quat';
 import {
   loadRiggedAsset,
   mat4Multiply,
@@ -417,8 +418,8 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
   };
   parseWith(DeformReportSchema, report, 'DeformReport');
 
-  await Deno.mkdir(opts.outDir, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(opts.outDir, { recursive: true });
+  await fs.writeFile(
     `${opts.outDir}/${DEFORM_REPORT_FILE}`,
     `${JSON.stringify(report, null, 2)}\n`,
   );

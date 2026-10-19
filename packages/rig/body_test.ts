@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The bundled canonical bodies, tested as SHIPPED ARTIFACTS (P3-T4 close-out):
  * schema-valid manifests, a real UAL skeleton, and — the acceptance — a clean
@@ -5,11 +9,11 @@
  * against the committed bytes, because the committed bytes are what a user
  * gets.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { NodeIO } from '@gltf-transform/core';
 import { CanonicalBodySchema, parseWith } from '@spritebook/schema';
-import { UAL_HUMANOID } from '../anim/profile.ts';
-import { fitCanonicalBody } from './fit.ts';
+import { UAL_HUMANOID } from '../anim/dist/profile.js';
+import { fitCanonicalBody } from './dist/fit.js';
 
 const BODIES_DIR = decodeURIComponent(
   new URL('./bodies', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
@@ -18,18 +22,18 @@ const FIXTURES = decodeURIComponent(
   new URL('../anim/fixtures', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
 );
 
-Deno.test('bundled bodies: schema-valid, CC0, full UAL core, regions sided', async () => {
+test('bundled bodies: schema-valid, CC0, full UAL core, regions sided', async () => {
   for (const id of ['ubc-male', 'ubc-female']) {
     const body = parseWith(
       CanonicalBodySchema,
-      JSON.parse(await Deno.readTextFile(`${BODIES_DIR}/${id}/body.json`)),
+      JSON.parse(await fs.readFile(`${BODIES_DIR}/${id}/body.json`, 'utf8')),
       `${id} body.json`,
     );
     assertEquals(body.license, 'CC0-1.0', `${id}: bundled means permissive, stated`);
     assertEquals(body.skeleton, 'ual-humanoid');
 
     const doc = await new NodeIO().readBinary(
-      await Deno.readFile(`${BODIES_DIR}/${id}/body.glb`),
+      new Uint8Array(await fs.readFile(`${BODIES_DIR}/${id}/body.glb`)),
     );
     const joints = doc.getRoot().listSkins()[0].listJoints().map((j) => j.getName());
     const lower = new Set(joints.map((j) => j.toLowerCase()));
@@ -46,8 +50,8 @@ Deno.test('bundled bodies: schema-valid, CC0, full UAL core, regions sided', asy
   }
 });
 
-Deno.test('ACCEPTANCE: the male body fits all three proportioned humanoids cleanly', async () => {
-  const dir = await Deno.makeTempDir();
+test('ACCEPTANCE: the male body fits all three proportioned humanoids cleanly', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     // expected heights are the fixtures' MEASURED mesh extents, not the
     // skeleton design heights from the P3-T1 notes (1.908 vs the folkloric
@@ -99,10 +103,10 @@ Deno.test('ACCEPTANCE: the male body fits all three proportioned humanoids clean
       );
 
       // the fitted glb is real: parses, one skin, weights intact
-      const doc = await new NodeIO().readBinary(await Deno.readFile(out));
+      const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(out)));
       assertEquals(doc.getRoot().listSkins().length, 1, `${target}: one skin`);
     }
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });

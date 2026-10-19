@@ -1,12 +1,13 @@
+import { test } from 'node:test';
 /**
  * The strip's contract, pinned: skins and skinning attributes go, geometry
  * and mesh placement stay, and the two joint-node cases part ways — a joint
  * that is an ancestor of a mesh is KEPT (removing it would move the mesh), a
  * leaf-only joint chain is removed so re-rigs do not accumulate dead nodes.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { Document } from '@gltf-transform/core';
-import { stripSkins } from './strip.ts';
+import { stripSkins } from './dist/strip.js';
 
 /** A minimal skinned doc: one triangle, two joints, one skin. */
 function skinnedDoc(opts: { meshUnderJoint: boolean }): Document {
@@ -48,7 +49,7 @@ function skinnedDoc(opts: { meshUnderJoint: boolean }): Document {
   return doc;
 }
 
-Deno.test('strip removes the skin, the attributes, and a mesh-free joint chain', () => {
+test('strip removes the skin, the attributes, and a mesh-free joint chain', () => {
   const doc = skinnedDoc({ meshUnderJoint: false });
   const r = stripSkins(doc);
   assertEquals(r.skinsRemoved, 1);
@@ -67,7 +68,7 @@ Deno.test('strip removes the skin, the attributes, and a mesh-free joint chain',
   );
 });
 
-Deno.test('a joint that is an ANCESTOR of the mesh survives as a plain node', () => {
+test('a joint that is an ANCESTOR of the mesh survives as a plain node', () => {
   const doc = skinnedDoc({ meshUnderJoint: true });
   const r = stripSkins(doc);
   assertEquals(r.skinsRemoved, 1);
@@ -78,7 +79,7 @@ Deno.test('a joint that is an ANCESTOR of the mesh survives as a plain node', ()
   assertEquals(hips.getTranslation(), [0, 1, 0], 'its transform is untouched');
 });
 
-Deno.test('a clean mesh is untouched and reports zero', () => {
+test('a clean mesh is untouched and reports zero', () => {
   const doc = new Document();
   const buffer = doc.createBuffer();
   const position = doc.createAccessor('POSITION').setType('VEC3').setBuffer(buffer)
@@ -91,7 +92,7 @@ Deno.test('a clean mesh is untouched and reports zero', () => {
   assertEquals(r, { skinsRemoved: 0, jointNodesRemoved: 0, attributesRemoved: 0 });
 });
 
-Deno.test('a joint targeted by an animation is kept - channels must not dangle', () => {
+test('a joint targeted by an animation is kept - channels must not dangle', () => {
   const doc = skinnedDoc({ meshUnderJoint: false });
   const spine = doc.getRoot().listNodes().find((n) => n.getName() === 'spine')!;
   const input = doc.createAccessor().setType('SCALAR').setBuffer(doc.getRoot().listBuffers()[0]!)

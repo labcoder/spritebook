@@ -18,6 +18,12 @@
     },
     {
       "path": "packages/render"
+    },
+    {
+      "path": "packages/gen"
+    },
+    {
+      "path": "packages/rig"
     }
   ]
 }

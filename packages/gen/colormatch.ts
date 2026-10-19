@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Colour-match (A2 of the quality plan): reconcile a generated texture's colour
  * statistics with the SOURCE IMAGE the character was generated from.
@@ -32,7 +33,8 @@
  *   contribute statistics nor get painted.
  */
 import { NodeIO } from '@gltf-transform/core';
-import { decode as decodePng, encode as encodePng } from 'fast-png';
+import { decode as decodePng } from 'fast-png';
+import { encode as encodePng } from '@spritebook/render/png';
 import { type Lab, linearToSrgb, oklabToLinearRgb, srgbToLab } from '@spritebook/core';
 import { AMBIENT } from '@spritebook/render';
 
@@ -143,7 +145,7 @@ function* paintedPixels(rgba: Uint8Array, count: number): Generator<[number, num
  */
 export async function colorMatchTexture(opts: ColorMatchOptions): Promise<ColorMatchStats> {
   const io = new NodeIO();
-  const doc = await io.readBinary(await Deno.readFile(opts.modelPath));
+  const doc = await io.readBinary(new Uint8Array(await fs.readFile(opts.modelPath)));
   const material = doc.getRoot().listMaterials()[0];
   const texture = material?.getBaseColorTexture();
   if (!texture) {
@@ -153,7 +155,7 @@ export async function colorMatchTexture(opts: ColorMatchOptions): Promise<ColorM
     );
   }
 
-  const img = decodePng(await Deno.readFile(opts.imagePath));
+  const img = decodePng(new Uint8Array(await fs.readFile(opts.imagePath)));
   if (img.channels !== 4) {
     throw new Error(
       `color-match: the source image must be RGBA (a cutout whose alpha marks the subject); ` +
@@ -197,7 +199,7 @@ export async function colorMatchTexture(opts: ColorMatchOptions): Promise<ColorM
   };
 
   if (src.chroma < CHROMA_FLOOR) {
-    await Deno.writeFile(opts.outPath, await io.writeBinary(doc));
+    await fs.writeFile(opts.outPath, await io.writeBinary(doc));
     return { ...base, skipped: 'low-chroma' };
   }
 
@@ -252,7 +254,7 @@ export async function colorMatchTexture(opts: ColorMatchOptions): Promise<ColorM
 
   texture.setImage(encodePng({ width: texPng.width, height: texPng.height, data: out }))
     .setMimeType('image/png');
-  await Deno.writeFile(opts.outPath, await io.writeBinary(doc));
+  await fs.writeFile(opts.outPath, await io.writeBinary(doc));
 
   const afterMean: Lab = painted > 0
     ? [sums[0] / painted, sums[1] / painted, sums[2] / painted]

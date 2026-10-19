@@ -1,3 +1,8 @@
+import { rejects } from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Promotion is what makes a rig reach the character. Track A had it; Track B
  * did not, so `rig --workspace` left the manifest describing a skeleton that
@@ -5,7 +10,7 @@
  * `bake --clips` failing at retarget with "target skeleton is missing the hips
  * joint" immediately after a rig that reported success.
  */
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import {
   appendGenerationResult,
   createWorkspace,
@@ -15,7 +20,7 @@ import {
   sha256Bytes,
   workspacePaths,
 } from '@spritebook/core';
-import { prepareCanonicalPromotion } from './promote.ts';
+import { prepareCanonicalPromotion } from './dist/promote.js';
 
 const NOW = () => '2026-07-12T00:00:00Z';
 const sha = (c: string) => c.repeat(64);
@@ -24,7 +29,7 @@ async function withCharacter(
   fn: (dir: string) => Promise<void>,
   opts: { picked?: boolean } = {},
 ): Promise<void> {
-  const raw = await Deno.makeTempDir({ prefix: 'sb-promote-' });
+  const raw = await fs.mkdtemp(join(tmpdir(), 'sb-promote-'));
   const dir = raw.replaceAll('\\', '/');
   try {
     await createWorkspace({
@@ -49,41 +54,41 @@ async function withCharacter(
     }
     await fn(dir);
   } finally {
-    await Deno.remove(raw, { recursive: true });
+    await fs.rm(raw, { recursive: true });
   }
 }
 
-Deno.test('the rigged bytes become the canonical mesh, and the hash follows', async () => {
+test('the rigged bytes become the canonical mesh, and the hash follows', async () => {
   await withCharacter(async (dir) => {
     const rigged = `${dir}/rigged.glb`;
     const bytes = Uint8Array.from([1, 2, 3, 4, 5]);
-    await Deno.writeFile(rigged, bytes);
+    await fs.writeFile(rigged, bytes);
 
     const result = await prepareCanonicalPromotion(dir, rigged);
     assert(result.ready, 'promoted');
     assertEquals(result.meshRepin?.gltfSha256, await sha256Bytes(bytes));
     assertEquals(result.meshRepin?.heightM, undefined, 'a rig does not restate height');
 
-    await assertRejects(() => Deno.stat(workspacePaths(dir).canonicalModel), Deno.errors.NotFound);
+    await rejects(() => fs.stat(workspacePaths(dir).canonicalModel), { code: 'ENOENT' },);
     await setCanonicalMesh(dir, result.meshRepin!, { canonicalSource: result.canonicalSource });
-    assertEquals(await Deno.readFile(workspacePaths(dir).canonicalModel), bytes);
+    assertEquals(new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel)), bytes);
   });
 });
 
-Deno.test('a fit restates its height; a rig deliberately does not', async () => {
+test('a fit restates its height; a rig deliberately does not', async () => {
   // rigging adds a skeleton to the vertices it was given and does not change
   // how tall the character stands, so carrying the pick's height forward is the
   // truthful move - inventing one would be provenance fiction
   await withCharacter(async (dir) => {
     const src = `${dir}/fitted.glb`;
-    await Deno.writeFile(src, Uint8Array.from([9, 9, 9]));
+    await fs.writeFile(src, Uint8Array.from([9, 9, 9]));
     const fit = await prepareCanonicalPromotion(dir, src, 1.74);
     assert(fit.ready);
     assertEquals(fit.meshRepin?.heightM, 1.74);
   });
 });
 
-Deno.test('unchanged bytes need no patch', async () => {
+test('unchanged bytes need no patch', async () => {
   // re-pinning the hash already recorded would journal a step that changes
   // nothing, and an undo stack with empty steps is one a user stops trusting.
   // The helper REPORTS the re-pin and the caller journals it, so the second
@@ -92,7 +97,7 @@ Deno.test('unchanged bytes need no patch', async () => {
   await withCharacter(async (dir) => {
     const bytes = Uint8Array.from([7, 7, 7]);
     const src = `${dir}/rigged.glb`;
-    await Deno.writeFile(src, bytes);
+    await fs.writeFile(src, bytes);
 
     const first = await prepareCanonicalPromotion(dir, src);
     assert(first.ready && first.meshRepin, 'the first rig moves the hash');
@@ -108,20 +113,20 @@ Deno.test('unchanged bytes need no patch', async () => {
   });
 });
 
-Deno.test('nothing picked yet: the rig is kept, and the refusal says which verb', async () => {
+test('nothing picked yet: the rig is kept, and the refusal says which verb', async () => {
   await withCharacter(async (dir) => {
     const src = `${dir}/rigged.glb`;
-    await Deno.writeFile(src, Uint8Array.from([1]));
+    await fs.writeFile(src, Uint8Array.from([1]));
     const result = await prepareCanonicalPromotion(dir, src);
     assertEquals(result.ready, false);
     assert(!result.ready && result.reason === 'no-canonical-mesh');
     // the source is untouched - the rig's real work is never thrown away over
     // bookkeeping, which is the same rule the job's catch already followed
-    assertEquals((await Deno.stat(src)).isFile, true);
+    assertEquals((await fs.stat(src)).isFile(), true);
   }, { picked: false });
 });
 
-Deno.test('an unreadable source is an io refusal carrying the real error', async () => {
+test('an unreadable source is an io refusal carrying the real error', async () => {
   await withCharacter(async (dir) => {
     const result = await prepareCanonicalPromotion(dir, `${dir}/does-not-exist.glb`);
     assertEquals(result.ready, false);

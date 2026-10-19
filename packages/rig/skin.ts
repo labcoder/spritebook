@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * CPU linear-blend skinning and the rest-skeleton reader the deform check runs
  * on (P3-T3).
@@ -277,6 +278,6 @@ export function documentToRiggedAsset(doc: Document, label: string): RiggedAsset
 
 /** documentToRiggedAsset over a glb on disk. */
 export async function loadRiggedAsset(path: string): Promise<RiggedAsset> {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path)));
   return documentToRiggedAsset(doc, path);
 }

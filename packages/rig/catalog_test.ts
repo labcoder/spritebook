@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * THE P0-T4 FAILURE-CATALOG DISPOSITION TABLE (P3-T3 acceptance).
  *
@@ -23,11 +24,11 @@
  * The point of the table is that a limit the user is WARNED about is a
  * different product from a limit they discover in a shipped sprite sheet.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { RigSkeletonSchema } from '@spritebook/schema';
-import { applyJointEdits, sidePartner } from './edits.ts';
-import { packWeightRows } from './apply.ts';
-import { detectFacing } from './orient.ts';
+import { applyJointEdits, sidePartner } from './dist/edits.js';
+import { packWeightRows } from './dist/apply.js';
+import { detectFacing } from './dist/orient.js';
 
 type Disposition = 'fixed-by-adapter' | 'fixed-by-core' | 'fixed-upstream' | 'documented-limit';
 
@@ -79,7 +80,7 @@ const CATALOG: CatalogItem[] = [
   },
 ];
 
-Deno.test('catalog item 3: generic names are a first-class fact, not a guess', () => {
+test('catalog item 3: generic names are a first-class fact, not a guess', () => {
   // the contract REQUIRES the adapter to state this, so a rig cannot arrive
   // with unknown naming provenance
   const base = {
@@ -103,7 +104,7 @@ Deno.test('catalog item 3: generic names are a first-class fact, not a guess', (
   assert(RigSkeletonSchema.safeParse({ ...base, semanticNames: false }).success);
 });
 
-Deno.test('catalog item 4: the NaN retry is recorded, so a rig never lies about its seed', () => {
+test('catalog item 4: the NaN retry is recorded, so a rig never lies about its seed', () => {
   const withRetry = RigSkeletonSchema.safeParse({
     schemaVersion: 1,
     backend: { modelId: 'unirig', version: 'x' },
@@ -125,7 +126,7 @@ Deno.test('catalog item 4: the NaN retry is recorded, so a rig never lies about 
   assertEquals(withRetry.data!.validation.retries, 1);
 });
 
-Deno.test('catalog item 5: zero-weight vertices are bound and counted, never divided by zero', () => {
+test('catalog item 5: zero-weight vertices are bound and counted, never divided by zero', () => {
   // one vertex with no influence at all — the merge-stage crash from P0-T4
   const rows = packWeightRows(
     new Uint32Array([0, 0, 0, 0, 1, 0, 0, 0]),
@@ -146,7 +147,7 @@ Deno.test('catalog item 5: zero-weight vertices are bound and counted, never div
   assertEquals(Number(sum1.toFixed(5)), 1, 'the live vertex renormalizes to 1');
 });
 
-Deno.test('catalog item 6: sides come from names, so float noise cannot flip them', () => {
+test('catalog item 6: sides come from names, so float noise cannot flip them', () => {
   assertEquals(sidePartner('upperarm_l'), 'upperarm_r');
   // the failure mode was geometric detection tying itself to float noise; a
   // name-based rule is stable under ANY perturbation of the mesh
@@ -176,7 +177,7 @@ Deno.test('catalog item 6: sides come from names, so float noise cannot flip the
   assertEquals(r.missingPartners, []);
 });
 
-Deno.test('items 1 and 2 are LIMITS: named, measured, and warned about', () => {
+test('items 1 and 2 are LIMITS: named, measured, and warned about', () => {
   // The honest half of the table. Neither is repairable by a verb, so what we
   // owe the user is detection and a warning rather than a silent shrug:
   //  - item 1 (shredding) surfaces as excessive-stretch in the deform report,
@@ -190,7 +191,7 @@ Deno.test('items 1 and 2 are LIMITS: named, measured, and warned about', () => {
   }
 });
 
-Deno.test('ACCEPTANCE: every P0-T4 catalog item has an explicit disposition', () => {
+test('ACCEPTANCE: every P0-T4 catalog item has an explicit disposition', () => {
   assertEquals(CATALOG.length, 6, 'all six items from the REPORT.md catalog are accounted for');
   const byDisposition = new Map<Disposition, number[]>();
   for (const item of CATALOG) {
@@ -204,7 +205,7 @@ Deno.test('ACCEPTANCE: every P0-T4 catalog item has an explicit disposition', ()
   assertEquals(byDisposition.get('documented-limit'), [1, 2]);
 });
 
-Deno.test('the -Z front-derivation proof, as the catalog s companion', () => {
+test('the -Z front-derivation proof, as the catalog s companion', () => {
   // Not a catalog item but the other half of the acceptance: a mesh that is
   // simply turned around must be DETECTED, not silently baked backwards.
   const facingAway = new Float32Array([

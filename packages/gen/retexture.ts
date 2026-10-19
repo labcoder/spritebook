@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { acquireVramLeaseEvents, type VramLease, workspaceJob } from '@spritebook/core';
 /**
  * `spritebook retexture` — keep the mesh, reroll the paint.
@@ -168,7 +169,7 @@ async function* executeRetextureJob(
       );
     }
     const parentPaths = resultPaths(opts.workspace, parent.id);
-    const parentBytes = await Deno.readFile(parentPaths.model).catch(() => {
+    const parentBytes = await fs.readFile(parentPaths.model).then((bytes) => new Uint8Array(bytes)).catch(() => {
       throw new RetextureFail(
         'no-parent-mesh',
         `Result "${parent.id}" has no canonical mesh at ${parentPaths.model}, so there is ` +
@@ -179,7 +180,7 @@ async function* executeRetextureJob(
     // the SOURCE image conditions the texture, exactly as it did for `gen` —
     // repainting from a different reference is a different feature
     const imagePath = sourceImagePath(opts.workspace, manifest);
-    await Deno.stat(imagePath).catch(() => {
+    await fs.stat(imagePath).catch(() => {
       // its OWN code: a `--json` consumer branching on this cannot fix a
       // missing source image the way it would fix a missing mesh
       throw new RetextureFail(
@@ -306,7 +307,7 @@ async function* executeRetextureJob(
 
     const resultId = nextResultId(manifest);
     const rp = resultPaths(opts.workspace, resultId);
-    await Deno.mkdir(rp.dir, { recursive: true });
+    await fs.mkdir(rp.dir, { recursive: true });
     yield { t: 'progress', jobId, at: at(), step: 'retexture', done: 1, total: 3 };
 
     // 5. the backend
@@ -363,7 +364,7 @@ async function* executeRetextureJob(
       );
     }
     const rawPath = `${rp.dir}/${RAW_MODEL}`;
-    await Deno.stat(rawPath).catch(() => {
+    await fs.stat(rawPath).catch(() => {
       throw new RetextureFail(
         'no-mesh',
         `Backend "${entry.id}" announced a mesh but ${rawPath} is missing`,
@@ -395,8 +396,8 @@ async function* executeRetextureJob(
         }`,
       );
     }
-    await Deno.writeFile(rp.model, canonical.bytes);
-    await Deno.writeTextFile(rp.preflight, JSON.stringify(canonical.report, null, 2) + '\n');
+    await fs.writeFile(rp.model, canonical.bytes);
+    await fs.writeFile(rp.preflight, JSON.stringify(canonical.report, null, 2) + '\n');
 
     // W5b: a repaint earns a card too - same best-effort front view as gen
     const thumbPath = `${rp.dir}/thumb.png`;

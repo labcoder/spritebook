@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * The deform check is a measurement, so the fixture is built so the right
  * answers are known in advance: three joints own one rigid band of rings each
@@ -6,7 +8,7 @@
  * and still cannot move it. Then one vertex is re-weighted onto a distant,
  * unmoving joint and the same rig has to report a torn band.
  */
-import { assert, assertAlmostEquals, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertAlmostEquals, assertEquals } from '@std/assert';
 import { DeformReportSchema } from '@spritebook/schema';
 import {
   chainSkeleton,
@@ -14,14 +16,14 @@ import {
   shreddedWeights,
   stageCase,
   weightsNpz,
-} from './_fixtures.ts';
-import { applyRig } from './apply.ts';
+} from './dist/_fixtures.js';
+import { applyRig } from './dist/apply.js';
 import {
   DEFORM_REPORT_FILE,
   deformCheck,
   dominantPerpendicularAxis,
   uniqueEdges,
-} from './deform.ts';
+} from './dist/deform.js';
 import type { DeformJointStat, DeformReport } from '@spritebook/schema';
 
 function stat(report: DeformReport, joint: string): DeformJointStat {
@@ -30,7 +32,7 @@ function stat(report: DeformReport, joint: string): DeformJointStat {
   return s;
 }
 
-Deno.test('deformCheck measures a working joint and writes its report', async () => {
+test('deformCheck measures a working joint and writes its report', async () => {
   const c = await stageCase();
   try {
     await applyRig(c);
@@ -53,15 +55,15 @@ Deno.test('deformCheck measures a working joint and writes its report', async ()
     assertEquals(middle.flags, []);
 
     // the report on disk is the same document, and it validates
-    const onDisk = JSON.parse(await Deno.readTextFile(`${c.dir}/${DEFORM_REPORT_FILE}`));
+    const onDisk = JSON.parse(await fs.readFile(`${c.dir}/${DEFORM_REPORT_FILE}`, 'utf8'));
     DeformReportSchema.parse(onDisk);
     assertEquals(onDisk, report);
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('deformCheck flags a joint with no weights and a joint that cannot move', async () => {
+test('deformCheck flags a joint with no weights and a joint that cannot move', async () => {
   const c = await stageCase();
   try {
     await applyRig(c);
@@ -81,11 +83,11 @@ Deno.test('deformCheck flags a joint with no weights and a joint that cannot mov
 
     assertEquals(report.flaggedJoints, ['bone_3', 'bone_4']);
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('deformCheck reports excessive stretch for a torn weight map', async () => {
+test('deformCheck reports excessive stretch for a torn weight map', async () => {
   const good = await stageCase();
   const bad = await stageCase(chainSkeleton(), await weightsNpz(shreddedWeights()));
   try {
@@ -104,12 +106,12 @@ Deno.test('deformCheck reports excessive stretch for a torn weight map', async (
     assertEquals(shredded.flags, ['excessive-stretch']);
     assert(torn.flaggedJoints.includes('bone_1'));
   } finally {
-    await Deno.remove(good.dir, { recursive: true });
-    await Deno.remove(bad.dir, { recursive: true });
+    await fs.rm(good.dir, { recursive: true });
+    await fs.rm(bad.dir, { recursive: true });
   }
 });
 
-Deno.test('deformCheck honours the weight floor', async () => {
+test('deformCheck honours the weight floor', async () => {
   const c = await stageCase(chainSkeleton(), await weightsNpz(shreddedWeights()));
   try {
     await applyRig(c);
@@ -127,11 +129,11 @@ Deno.test('deformCheck honours the weight floor', async () => {
     // and it moved to bone_0's set, where the whole subtree turns rigidly
     assertEquals(stat(report, 'bone_0').influencedVertices, 13);
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('deformCheck rejects nonsense pose parameters', async () => {
+test('deformCheck rejects nonsense pose parameters', async () => {
   const c = await stageCase();
   try {
     await applyRig(c);
@@ -150,11 +152,11 @@ Deno.test('deformCheck rejects nonsense pose parameters', async () => {
       assert(message.includes(needle), `expected "${needle}", got: ${message}`);
     }
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('dominantPerpendicularAxis picks the most perpendicular world axis', () => {
+test('dominantPerpendicularAxis picks the most perpendicular world axis', () => {
   // a vertical bone: X and Z are both perpendicular, the tie breaks to X
   assertEquals([...dominantPerpendicularAxis([0, 1, 0])], [1, 0, 0]);
   // a bone along X: Y wins the tie against Z
@@ -169,7 +171,7 @@ Deno.test('dominantPerpendicularAxis picks the most perpendicular world axis', (
   assertEquals(a[2], 1); // Z is untouched by a bone in the XY plane
 });
 
-Deno.test('uniqueEdges deduplicates the shared edges of a quad', () => {
+test('uniqueEdges deduplicates the shared edges of a quad', () => {
   const edges = uniqueEdges(Uint32Array.from([0, 1, 2, 0, 2, 3]), 4);
   const pairs = new Set<string>();
   for (let i = 0; i < edges.length; i += 2) pairs.add(`${edges[i]}-${edges[i + 1]}`);
@@ -177,18 +179,18 @@ Deno.test('uniqueEdges deduplicates the shared edges of a quad', () => {
   assert(pairs.has('0-2'));
 });
 
-Deno.test('the torn vertex is the one the fixture aimed at', async () => {
+test('the torn vertex is the one the fixture aimed at', async () => {
   const c = await stageCase(chainSkeleton(), await weightsNpz(shreddedWeights()));
   try {
     const result = await applyRig(c);
     assertEquals(result.renormalizedVertices, 0); // 0.06 + 0.94 sums to 1 already
     assertEquals(SHREDDED_VERTEX, 20);
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('a huge max on scattered edges no longer convicts a joint', async () => {
+test('a huge max on scattered edges no longer convicts a joint', async () => {
   // The bulma finding in miniature (spikes/trellis2/deform_dist.py): calf_l
   // carried maxEdgeStretch 3.76 from 5 outlier edges of 21,909 (0.02%, P99
   // 1.24) and was flagged identically to spine_02's genuine 712-edge band.
@@ -210,11 +212,11 @@ Deno.test('a huge max on scattered edges no longer convicts a joint', async () =
     assert(s.stretchedEdges < s.influencedEdges * 0.9, 'but it is not a seam at this fraction');
     assertEquals(s.flags, [], 'so the max alone no longer convicts');
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('the seam rule needs two edges - one outlier is never a tear', async () => {
+test('the seam rule needs two edges - one outlier is never a tear', async () => {
   // MIN_STRETCHED_EDGES exists so a single wild edge cannot flag a joint no
   // matter how small the influenced set is. The torn fixture tears several
   // incident edges, so it clears the floor; this pins the floor itself.
@@ -229,12 +231,12 @@ Deno.test('the seam rule needs two edges - one outlier is never a tear', async (
     // the report carries the denominator, so a reader can judge the fraction
     assert(s.influencedEdges > 0);
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('auto-hints: a torn joint far from its flesh gets an edit; a floor filters', async () => {
-  const { deriveAutoHints } = await import('./autohints.ts');
+test('auto-hints: a torn joint far from its flesh gets an edit; a floor filters', async () => {
+  const { deriveAutoHints } = await import('./dist/autohints.js');
   const c = await stageCase(chainSkeleton(), await weightsNpz(shreddedWeights()));
   try {
     await applyRig(c);
@@ -256,15 +258,15 @@ Deno.test('auto-hints: a torn joint far from its flesh gets an edit; a floor fil
     assert(below, 'bone_1 lands below the floor');
     assertEquals(below.offsetM, Math.hypot(...edit.delta), 'same measurement, either side');
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('a joint spanning detached shells is reported as cross-component', async () => {
+test('a joint spanning detached shells is reported as cross-component', async () => {
   // The fact that lets auto-hints say "this tear crosses components" instead
   // of a bare "no offset". Measured on robot-astro, whose floating hands held
   // its repair to 18.5% -> 15.0% where a single-body mesh went 12.7% -> 4.9%.
-  const { deriveAutoHints } = await import('./autohints.ts');
+  const { deriveAutoHints } = await import('./dist/autohints.js');
   const c = await stageCase(chainSkeleton(), await weightsNpz(shreddedWeights()));
   try {
     await applyRig(c);
@@ -290,6 +292,6 @@ Deno.test('a joint spanning detached shells is reported as cross-component', asy
       'a cross-component joint is never hinted - its centroid is in the gap',
     );
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });

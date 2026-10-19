@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { workspaceJob } from '@spritebook/core';
 /**
  * `spritebook pick` — promote one generation result to THE canonical mesh,
@@ -122,7 +123,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
     const canonicalPath = `${paths.canonicalDir}/${CANONICAL_MODEL}`;
     let bytes: Uint8Array;
     try {
-      bytes = await Deno.readFile(rp.model);
+      bytes = new Uint8Array(await fs.readFile(rp.model));
     } catch {
       throw Object.assign(
         new Error(
@@ -131,7 +132,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
         { code: 'missing-model' },
       );
     }
-    await Deno.mkdir(paths.canonicalDir, { recursive: true });
+    await fs.mkdir(paths.canonicalDir, { recursive: true });
 
     // `pick` promotes what it was ASKED to promote — it does not silently
     // choose a different result — but it is the last point before ~90 s of
@@ -191,7 +192,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
     // every stage of this verb has succeeded
     let staged = `${paths.canonicalDir}/pick-${crypto.randomUUID()}-${opts.resultId}.tmp.glb`;
     tmp.push(staged);
-    await Deno.writeFile(staged, bytes);
+    await fs.writeFile(staged, bytes);
     yield { t: 'progress', jobId, at: at(), step: 'promote', done: ++done, total };
 
     // texturedBy is a property of the JOB, so derive it from what the backend
@@ -217,7 +218,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
     if (wantColorMatch) {
       let readable = true;
       try {
-        await Deno.stat(fidelityImage);
+        await fs.stat(fidelityImage);
       } catch {
         readable = false;
       }
@@ -264,7 +265,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
         } else {
           staged = matched;
           colorMatched = true;
-          imageSha = await sha256Hex(await Deno.readFile(fidelityImage));
+          imageSha = await sha256Hex(new Uint8Array(await fs.readFile(fidelityImage)));
           const clamp = stats.clamped.length > 0 ? ` clamped:${stats.clamped.join('')}` : '';
           yield {
             t: 'progress',
@@ -285,7 +286,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
       const image = fidelityImage;
       let readable = true;
       try {
-        await Deno.stat(image);
+        await fs.stat(image);
       } catch {
         readable = false;
       }
@@ -330,7 +331,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
           done: ++done,
           total,
         };
-        imageSha = imageSha ?? await sha256Hex(await Deno.readFile(image));
+        imageSha = imageSha ?? await sha256Hex(new Uint8Array(await fs.readFile(image)));
         if (stats.coverage < 0.05) {
           yield {
             t: 'warn',
@@ -352,7 +353,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
     }
 
     // Core retains both revisions and publishes these staged bytes with the manifest patch.
-    const finalBytes = await Deno.readFile(staged);
+    const finalBytes = new Uint8Array(await fs.readFile(staged));
     const repainted = reprojected || colorMatched;
     const suffix = reprojected && colorMatched
       ? ' (color-matched, reprojected)'
@@ -404,7 +405,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
   } finally {
     for (const path of tmp) {
       try {
-        await Deno.remove(path);
+        await fs.rm(path);
       } catch {
         // renamed into place, or never written — either way there is nothing
         // left to clean

@@ -1,11 +1,12 @@
+import { test } from 'node:test';
 /**
  * Tier-1 repairs: the nudge, the opt-in mirror, and the promise that an edit
  * survives a re-run as a hint. Pure data in, pure data out — no GPU, no glb
  * needed for most of it.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import type { JointEdit, RigSkeleton } from '@spritebook/schema';
-import { applyJointEdits, hintsFromEdits, sidePartner } from './edits.ts';
+import { applyJointEdits, hintsFromEdits, sidePartner } from './dist/edits.js';
 
 function skeleton(names: string[]): RigSkeleton {
   return {
@@ -30,7 +31,7 @@ function skeleton(names: string[]): RigSkeleton {
   };
 }
 
-Deno.test('sidePartner reads naming conventions, never geometry', () => {
+test('sidePartner reads naming conventions, never geometry', () => {
   assertEquals(sidePartner('upperarm_l'), 'upperarm_r');
   assertEquals(sidePartner('upperarm_r'), 'upperarm_l');
   assertEquals(sidePartner('Hand.L'), 'Hand.R');
@@ -39,7 +40,7 @@ Deno.test('sidePartner reads naming conventions, never geometry', () => {
   assertEquals(sidePartner('bone_7'), null, 'generic names carry no side');
 });
 
-Deno.test('a nudge moves head AND tail, leaving other joints alone', () => {
+test('a nudge moves head AND tail, leaving other joints alone', () => {
   const s = skeleton(['root', 'upperarm_l', 'upperarm_r']);
   const r = applyJointEdits(s, [{ joint: 'upperarm_l', delta: [0.05, -0.02, 0], mirrored: false }]);
   assertEquals(r.moved, ['upperarm_l']);
@@ -52,7 +53,7 @@ Deno.test('a nudge moves head AND tail, leaving other joints alone', () => {
   assertEquals(s.joints[1].head[0], 0.1, 'applyJointEdits is pure');
 });
 
-Deno.test('mirroring is opt-in and negates X only (D-008)', () => {
+test('mirroring is opt-in and negates X only (D-008)', () => {
   const s = skeleton(['root', 'upperarm_l', 'upperarm_r']);
   const off = applyJointEdits(s, [{ joint: 'upperarm_l', delta: [0.05, 0, 0], mirrored: false }]);
   assertEquals(off.moved, ['upperarm_l'], 'asymmetric by default');
@@ -65,7 +66,7 @@ Deno.test('mirroring is opt-in and negates X only (D-008)', () => {
   assertEquals(left.head[1], right.head[1], 'Y is not mirrored');
 });
 
-Deno.test('unknown joints and missing partners are reported, never silent', () => {
+test('unknown joints and missing partners are reported, never silent', () => {
   const s = skeleton(['root', 'upperarm_l']);
   const r = applyJointEdits(s, [
     { joint: 'nose', delta: [1, 0, 0], mirrored: false },
@@ -76,7 +77,7 @@ Deno.test('unknown joints and missing partners are reported, never silent', () =
   assertEquals(r.moved, ['upperarm_l'], 'the valid edit still applied');
 });
 
-Deno.test('edits become ABSOLUTE hints for the next run', () => {
+test('edits become ABSOLUTE hints for the next run', () => {
   const s = skeleton(['root', 'upperarm_l', 'upperarm_r']);
   const edits: JointEdit[] = [{ joint: 'upperarm_l', delta: [0.05, 0, 0], mirrored: true }];
   const edited = applyJointEdits(s, edits).skeleton;

@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The symptom the promotion actually fixes, before and after.
  *
@@ -14,7 +18,7 @@
  * the only thing that changed. CPU-only — the retarget is where the skeleton is
  * consulted, so no GPU is needed to prove it.
  */
-import { assert, assertEquals, assertThrows } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 import { Document, NodeIO } from '@gltf-transform/core';
 import {
   appendGenerationResult,
@@ -30,7 +34,7 @@ import {
   retargetClip,
   UAL_HUMANOID,
 } from '@spritebook/anim';
-import { prepareCanonicalPromotion } from './promote.ts';
+import { prepareCanonicalPromotion } from './dist/promote.js';
 
 const NOW = () => '2026-07-12T00:00:00Z';
 const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
@@ -50,11 +54,11 @@ async function unskinnedGlb(path: string): Promise<void> {
     doc.createPrimitive().setAttribute('POSITION', pos),
   );
   doc.createScene().addChild(doc.createNode('bodyNode').setMesh(mesh));
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
-Deno.test('promotion is what lets the very next clip bake retarget at all', async () => {
-  const raw = await Deno.makeTempDir({ prefix: 'sb-promoted-bake-' });
+test('promotion is what lets the very next clip bake retarget at all', async () => {
+  const raw = await fs.mkdtemp(join(tmpdir(), 'sb-promoted-bake-'));
   const dir = raw.replaceAll('\\', '/');
   try {
     await createWorkspace({
@@ -73,7 +77,7 @@ Deno.test('promotion is what lets the very next clip bake retarget at all', asyn
       startedAt: NOW(),
       wallTimeS: 1,
       output: {
-        gltfSha256: await sha256Bytes(await Deno.readFile(workspacePaths(dir).canonicalModel)),
+        gltfSha256: await sha256Bytes(new Uint8Array(await fs.readFile(workspacePaths(dir).canonicalModel))),
         tris: 1,
         kind: 'mesh',
       },
@@ -120,6 +124,6 @@ Deno.test('promotion is what lets the very next clip bake retarget at all', asyn
     assertEquals(report.unmappedTarget, [], 'every joint of the rigged body is driven');
     assertEquals(report.mapped.length, UAL_HUMANOID.core.length, 'all 21 core joints');
   } finally {
-    await Deno.remove(raw, { recursive: true });
+    await fs.rm(raw, { recursive: true });
   }
 });

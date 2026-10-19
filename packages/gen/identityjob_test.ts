@@ -1,3 +1,8 @@
+import { runProcess } from '../../tools/testing/process.ts';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * runIdentityJob drives the identity layer over a REAL picked workspace, so
  * the setup is the P3-T2 acceptance path on the weightless fixture backend
@@ -10,7 +15,7 @@
  * imported — test files do not import test files — and the minimal skinned
  * body is adapted from identity_test.ts's fixture for the same reason.
  */
-import { assert, assertEquals, assertGreater } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertGreater } from '@std/assert';
 import { encode as encodePng } from 'fast-png';
 import { Document, NodeIO } from '@gltf-transform/core';
 import type { CanonicalBody, JobEvent, RigState } from '@spritebook/schema';
@@ -22,7 +27,7 @@ import {
 } from '@spritebook/schema';
 import { setRigState, workspacePaths } from '@spritebook/core';
 import { loadCatalog, runInstallJob } from '@spritebook/registry';
-import { runGenJob, runIdentityJob, runPickJob } from './mod.ts';
+import { runGenJob, runIdentityJob, runPickJob } from './dist/mod.js';
 
 const SIDECAR_DIR = decodeURIComponent(
   new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
@@ -30,13 +35,8 @@ const SIDECAR_DIR = decodeURIComponent(
 
 async function sidecarAvailable(): Promise<boolean> {
   try {
-    await Deno.stat(`${SIDECAR_DIR}/pyproject.toml`);
-    const uv = await new Deno.Command('uv', {
-      args: ['--version'],
-      stdout: 'null',
-      stderr: 'null',
-      stdin: 'null',
-    }).output();
+    await fs.stat(`${SIDECAR_DIR}/pyproject.toml`);
+    const uv = await runProcess('uv', ['--version']);
     return uv.success;
   } catch {
     return false;
@@ -109,19 +109,19 @@ interface Fixture {
 }
 
 async function setup(): Promise<Fixture> {
-  const root = await Deno.makeTempDir({ prefix: 'sb-identity-models-' });
-  const work = await Deno.makeTempDir({ prefix: 'sb-identity-' });
+  const root = await fs.mkdtemp(join(tmpdir(), 'sb-identity-models-'));
+  const work = await fs.mkdtemp(join(tmpdir(), 'sb-identity-'));
   await installFixtureBackend(root);
   const image = `${work}/cutout.png`;
-  await Deno.writeFile(image, encodePng({ width: 128, height: 192, data: cutout() }));
+  await fs.writeFile(image, encodePng({ width: 128, height: 192, data: cutout() }));
   return {
     root,
     work,
     workspace: `${work}/character`,
     image,
     cleanup: async () => {
-      await Deno.remove(root, { recursive: true });
-      await Deno.remove(work, { recursive: true });
+      await fs.rm(root, { recursive: true });
+      await fs.rm(work, { recursive: true });
     },
   };
 }
@@ -257,7 +257,7 @@ async function miniBodyGlb(path: string): Promise<void> {
   node.setSkin(skin);
   doc.createScene('s').addChild(node).addChild(jointNodes[0]);
 
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
 /** A rigid quad prop, optionally under a lifted node (world transform bakes in). */
@@ -274,18 +274,15 @@ async function propGlb(path: string, lift = 0): Promise<void> {
     .setMesh(doc.createMesh('prop').addPrimitive(prim))
     .setTranslation([0, lift, 0]);
   doc.createScene('s').addChild(node);
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
 // ---------------------------------------------------------------------------
 // The tests
 // ---------------------------------------------------------------------------
 
-Deno.test('identity: a decal-only run changes the canonical bytes and the manifest follows', async () => {
-  if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
-    return;
-  }
+test('identity: a decal-only run changes the canonical bytes and the manifest follows', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   // picked WITH reprojection — the order Track A documents (pick, then
   // reproject, then identity). RGB backend textures are no longer the reason:
   // compositeDecals normalizes any channel layout at its decode boundary, and
@@ -294,9 +291,9 @@ Deno.test('identity: a decal-only run changes the canonical bytes and the manife
   const f = await pickedWorkspace(true);
   try {
     const paths = workspacePaths(f.workspace);
-    const before = await Deno.readFile(paths.canonicalModel);
+    const before = new Uint8Array(await fs.readFile(paths.canonicalModel));
     const png = `${f.work}/tattoo.png`;
-    await Deno.writeFile(
+    await fs.writeFile(
       png,
       encodePng({ width: 8, height: 8, data: solid(8, [255, 0, 255, 255]) }),
     );
@@ -317,20 +314,20 @@ Deno.test('identity: a decal-only run changes the canonical bytes and the manife
 
     const canonicalPath = artifact(events, 'canonical-model');
     assertEquals(canonicalPath, paths.canonicalModel, 'identity edits THE canonical mesh');
-    const after = await Deno.readFile(canonicalPath);
+    const after = new Uint8Array(await fs.readFile(canonicalPath));
     assert(
       before.length !== after.length || !before.every((v, i) => v === after[i]),
       'the decal changed the canonical bytes',
     );
 
-    const report = JSON.parse(await Deno.readTextFile(artifact(events, 'identity-decals-report')));
+    const report = JSON.parse(await fs.readFile(artifact(events, 'identity-decals-report'), 'utf8'));
     assertGreater(report.changedTexels, 0, 'the decal painted real texels');
     assertEquals(report.missed, [], 'nothing silently missed');
 
     // the manifest pins the bytes that are NOW on disk, and records the layer
     const manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(artifact(events, 'character-manifest'))),
+      JSON.parse(await fs.readFile(artifact(events, 'character-manifest'), 'utf8')),
       'CharacterManifest',
     );
     assertEquals(manifest.canonicalMesh?.gltfSha256, await sha256Hex(after));
@@ -346,7 +343,7 @@ Deno.test('identity: a decal-only run changes the canonical bytes and the manife
     // ONE patch for the whole pass: the identity records and the canonical
     // re-pin land together, so a single undo cannot leave a manifest that
     // claims no identity while pinning the tattooed bytes
-    const lines = (await Deno.readTextFile(paths.journal)).split('\n').filter((l) => l);
+    const lines = (await fs.readFile(paths.journal, 'utf8')).split('\n').filter((l) => l);
     const patch = JSON.parse(lines.at(-1)!);
     const touched = (patch.op as { path: string }[]).map((o) => o.path).sort();
     assertEquals(touched, ['/canonicalMesh', '/detailLayers'], 'both facts, one patch');
@@ -356,14 +353,14 @@ Deno.test('identity: a decal-only run changes the canonical bytes and the manife
   }
 });
 
-Deno.test('identity: refused when nothing is picked, naming `spritebook pick`', async () => {
-  if (!(await sidecarAvailable())) return;
+test('identity: refused when nothing is picked, naming `spritebook pick`', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     const gen = await collect(runGenJob(genOpts(f)));
     assert(!gen.find((e) => e.t === 'error'), JSON.stringify(gen.at(-1)));
     const png = `${f.work}/tattoo.png`;
-    await Deno.writeFile(
+    await fs.writeFile(
       png,
       encodePng({ width: 4, height: 4, data: solid(4, [255, 0, 0, 255]) }),
     );
@@ -388,7 +385,7 @@ Deno.test('identity: refused when nothing is picked, naming `spritebook pick`', 
     // and nothing was mutated: no canonical model appeared
     let exists = true;
     try {
-      await Deno.stat(workspacePaths(f.workspace).canonicalModel);
+      await fs.stat(workspacePaths(f.workspace).canonicalModel);
     } catch {
       exists = false;
     }
@@ -398,9 +395,9 @@ Deno.test('identity: refused when nothing is picked, naming `spritebook pick`', 
   }
 });
 
-Deno.test('identity: refused when no operation is given', async () => {
+test('identity: refused when no operation is given', async () => {
   // no sidecar needed: the refusal happens before the workspace is even read
-  const dir = await Deno.makeTempDir({ prefix: 'sb-identity-noop-' });
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-identity-noop-'));
   try {
     const events = await collect(runIdentityJob({
       jobId: 'itest-identity-noop',
@@ -414,12 +411,12 @@ Deno.test('identity: refused when no operation is given', async () => {
       assert(err.message.includes('decal'), `says what WOULD count: ${err.message}`);
     }
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('identity: bone mask -> attachments -> decals, in that order, all journaled', async () => {
-  if (!(await sidecarAvailable())) return;
+test('identity: bone mask -> attachments -> decals, in that order, all journaled', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   // a plain pick suffices: the canonical mesh is replaced by the mini body
   // below, so the fixture texture never reaches the decal compositor
   const f = await pickedWorkspace(false);
@@ -429,7 +426,7 @@ Deno.test('identity: bone mask -> attachments -> decals, in that order, all jour
     const stagedBody = `${f.work}/body.glb`;
     await miniBodyGlb(stagedBody);
     const bodyJson = `${f.work}/body.json`;
-    await Deno.writeTextFile(bodyJson, JSON.stringify(MINI_BODY));
+    await fs.writeFile(bodyJson, JSON.stringify(MINI_BODY));
     const rig: RigState = {
       track: 'B',
       backend: { modelId: 'unirig', version: 'test' },
@@ -442,7 +439,7 @@ Deno.test('identity: bone mask -> attachments -> decals, in that order, all jour
     };
     await setRigState(f.workspace, rig, {
       canonicalSource: stagedBody,
-      canonicalMesh: { gltfSha256: await sha256Hex(await Deno.readFile(stagedBody)) },
+      canonicalMesh: { gltfSha256: await sha256Hex(new Uint8Array(await fs.readFile(stagedBody))) },
     });
 
     const prop = `${f.work}/prop.glb`;
@@ -450,7 +447,7 @@ Deno.test('identity: bone mask -> attachments -> decals, in that order, all jour
     const png = `${f.work}/emblem.png`;
     await propGlb(prop);
     await propGlb(replacement, 5);
-    await Deno.writeFile(
+    await fs.writeFile(
       png,
       encodePng({ width: 8, height: 8, data: solid(8, [0, 255, 0, 255]) }),
     );
@@ -484,7 +481,7 @@ Deno.test('identity: bone mask -> attachments -> decals, in that order, all jour
     );
 
     // every stage really landed, on ONE file
-    const doc = await new NodeIO().readBinary(await Deno.readFile(paths.canonicalModel));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(paths.canonicalModel)));
     const joint = doc.getRoot().listNodes().find((n) => n.getName() === 'forearm-r');
     assert(
       joint?.listChildren().some((c) => c.getName() === 'attach-sword'),
@@ -505,19 +502,19 @@ Deno.test('identity: bone mask -> attachments -> decals, in that order, all jour
     // and the whole pass is in the manifest, hash re-pinned to the final bytes
     const manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(paths.manifest)),
+      JSON.parse(await fs.readFile(paths.manifest, 'utf8')),
       'CharacterManifest',
     );
     assertEquals(
       manifest.canonicalMesh?.gltfSha256,
-      await sha256Hex(await Deno.readFile(paths.canonicalModel)),
+      await sha256Hex(new Uint8Array(await fs.readFile(paths.canonicalModel))),
       'the manifest follows the bytes ACTUALLY on disk',
     );
     assertEquals(manifest.rig?.boneMask, { 'forearm-l': replacement });
     assertEquals(manifest.attachments, [{
       id: 'sword',
       socketId: 'hand-r',
-      meshSha256: await sha256Hex(await Deno.readFile(prop)),
+      meshSha256: await sha256Hex(new Uint8Array(await fs.readFile(prop))),
     }]);
     assertEquals(manifest.detailLayers, [{ id: 'emblem', uvDecalPng: png, region: 'chest' }]);
   } finally {

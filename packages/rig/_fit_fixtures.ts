@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Fixtures for the roster fit (P3-T4). Nothing is checked in as binary: the
  * canonical body, its texture and every target mesh are built in memory, so the
@@ -482,11 +485,11 @@ export async function stageFitCase(
   target: Uint8Array,
   bodyBytes?: Uint8Array,
 ): Promise<FitCase> {
-  const dir = await Deno.makeTempDir({ prefix: 'spritebook-fit-' });
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-fit-'));
   const sourcePath = `${dir}/source.glb`;
-  await Deno.writeFile(sourcePath, bodyBytes ?? await buildBodyGlb());
+  await fs.writeFile(sourcePath, bodyBytes ?? await buildBodyGlb());
   const targetPath = `${dir}/target.glb`;
-  await Deno.writeFile(targetPath, target);
+  await fs.writeFile(targetPath, target);
   return {
     dir,
     sourcePath,

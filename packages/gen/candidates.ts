@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Candidate ranking (B2): when `gen --candidates N` makes several results in
  * one job, rank them by the quality signals the pipeline already measures, and
@@ -40,7 +41,7 @@ export interface RankedCandidate extends CandidateInput {
  * ranking does not depend on which backend generated the mesh. */
 async function metalFractionOf(modelPath: string): Promise<number> {
   try {
-    const doc = await new NodeIO().readBinary(await Deno.readFile(modelPath));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(modelPath)));
     const mr = doc.getRoot().listMaterials()[0]?.getMetallicRoughnessTexture();
     if (!mr) return 0;
     const img = decodePng(mr.getImage()!);
@@ -80,7 +81,7 @@ function meanLab(
 
 async function hueDistOf(modelPath: string, imagePath: string): Promise<number | null> {
   try {
-    const doc = await new NodeIO().readBinary(await Deno.readFile(modelPath));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(modelPath)));
     const tex = doc.getRoot().listMaterials()[0]?.getBaseColorTexture();
     if (!tex) return null;
     const t = decodePng(tex.getImage()!);
@@ -92,7 +93,7 @@ async function hueDistOf(modelPath: string, imagePath: string): Promise<number |
       ts,
       (i) => td[i * ts] + td[i * ts + 1] + td[i * ts + 2] >= 0.02 * 3 * 255,
     );
-    const s = decodePng(await Deno.readFile(imagePath));
+    const s = decodePng(new Uint8Array(await fs.readFile(imagePath)));
     if (s.channels !== 4) return null;
     const sd = s.data as Uint8Array;
     const srcMean = meanLab(sd, s.width * s.height, 4, (i) => sd[i * 4 + 3] > 128);

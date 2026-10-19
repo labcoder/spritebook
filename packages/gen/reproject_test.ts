@@ -1,13 +1,17 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Reprojection is a projection, so it is testable EXACTLY: build a quad whose
  * world-to-UV mapping is known, feed a source image with a known pattern, and
  * assert the pattern lands on the texels it must. No GPU, no fixtures, no
  * eyeballing.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { Document, NodeIO } from '@gltf-transform/core';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
-import { reprojectTexture } from './reproject.ts';
+import { reprojectTexture } from './dist/reproject.js';
 
 /**
  * A unit quad in the XY plane: x in [-0.5, 0.5], y in [0, 1], z = 0.
@@ -85,7 +89,7 @@ async function quadGlb(path: string, normalZ: number, baseGrey = 128): Promise<v
   const mesh = doc.createMesh('quad').addPrimitive(prim);
   const node = doc.createNode('quad').setMesh(mesh);
   doc.createScene('s').addChild(node);
-  await Deno.writeFile(path, await new NodeIO().writeBinary(doc));
+  await fs.writeFile(path, await new NodeIO().writeBinary(doc));
 }
 
 /** Left half red, right half blue, fully opaque. */
@@ -105,19 +109,19 @@ function halvesImage(w: number, h: number): Uint8Array {
 }
 
 async function readTexture(path: string) {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path)));
   const img = doc.getRoot().listTextures()[0].getImage()!;
   return decodePng(img);
 }
 
-Deno.test('reproject: a front-facing quad takes the source pattern, side for side', async () => {
-  const dir = await Deno.makeTempDir();
+test('reproject: a front-facing quad takes the source pattern, side for side', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const model = `${dir}/quad.glb`;
     const out = `${dir}/painted.glb`;
     const image = `${dir}/src.png`;
     await quadGlb(model, 1);
-    await Deno.writeFile(
+    await fs.writeFile(
       image,
       encodePng({ width: 64, height: 64, data: halvesImage(64, 64) }),
     );
@@ -142,18 +146,18 @@ Deno.test('reproject: a front-facing quad takes the source pattern, side for sid
       'right half of the texture is the source blue',
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('reproject: back-facing geometry keeps its generated color', async () => {
-  const dir = await Deno.makeTempDir();
+test('reproject: back-facing geometry keeps its generated color', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const model = `${dir}/quad.glb`;
     const out = `${dir}/painted.glb`;
     const image = `${dir}/src.png`;
     await quadGlb(model, -1, 77); // facing away from the camera
-    await Deno.writeFile(
+    await fs.writeFile(
       image,
       encodePng({ width: 64, height: 64, data: halvesImage(64, 64) }),
     );
@@ -174,12 +178,12 @@ Deno.test('reproject: back-facing geometry keeps its generated color', async () 
       'the generated base color survives untouched',
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('reproject: transparent source pixels never paint', async () => {
-  const dir = await Deno.makeTempDir();
+test('reproject: transparent source pixels never paint', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const model = `${dir}/quad.glb`;
     const out = `${dir}/painted.glb`;
@@ -188,7 +192,7 @@ Deno.test('reproject: transparent source pixels never paint', async () => {
     // fully transparent cut-out: the subject is empty, so there is nothing to
     // paint and every texel must keep the generated color
     const data = new Uint8Array(64 * 64 * 4);
-    await Deno.writeFile(image, encodePng({ width: 64, height: 64, data }));
+    await fs.writeFile(image, encodePng({ width: 64, height: 64, data }));
 
     const stats = await reprojectTexture({
       modelPath: model,
@@ -200,26 +204,26 @@ Deno.test('reproject: transparent source pixels never paint', async () => {
     const tex = await readTexture(out);
     assertEquals((tex.data as Uint8Array)[0], 99);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('reproject: geometry is untouched - only the texture changes', async () => {
-  const dir = await Deno.makeTempDir();
+test('reproject: geometry is untouched - only the texture changes', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const model = `${dir}/quad.glb`;
     const out = `${dir}/painted.glb`;
     const image = `${dir}/src.png`;
     await quadGlb(model, 1);
-    await Deno.writeFile(
+    await fs.writeFile(
       image,
       encodePng({ width: 64, height: 64, data: halvesImage(64, 64) }),
     );
     await reprojectTexture({ modelPath: model, imagePath: image, outPath: out });
 
     const io = new NodeIO();
-    const before = await io.readBinary(await Deno.readFile(model));
-    const after = await io.readBinary(await Deno.readFile(out));
+    const before = await io.readBinary(new Uint8Array(await fs.readFile(model)));
+    const after = await io.readBinary(new Uint8Array(await fs.readFile(out)));
     const posOf = (d: Document) =>
       d.getRoot().listMeshes()[0].listPrimitives()[0].getAttribute('POSITION')!.getArray()!;
     assertEquals(
@@ -228,17 +232,17 @@ Deno.test('reproject: geometry is untouched - only the texture changes', async (
       'vertex positions are bit-identical after reprojection',
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('reproject: a non-RGBA source is refused actionably', async () => {
-  const dir = await Deno.makeTempDir();
+test('reproject: a non-RGBA source is refused actionably', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const model = `${dir}/quad.glb`;
     const image = `${dir}/gray.png`;
     await quadGlb(model, 1);
-    await Deno.writeFile(
+    await fs.writeFile(
       image,
       encodePng({ width: 8, height: 8, data: new Uint8Array(64), channels: 1, depth: 8 }),
     );
@@ -252,6 +256,6 @@ Deno.test('reproject: a non-RGBA source is refused actionably', async () => {
     }
     assert(threw, 'a non-cut-out source must be refused, not silently painted');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });

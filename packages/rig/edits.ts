@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Tier-1 repairs: joint nudges (P3-T3).
  *
@@ -154,7 +155,7 @@ export async function applyEditsToRiggedGlb(
   after: RigSkeleton,
 ): Promise<{ updatedJoints: number }> {
   const io = new NodeIO();
-  const doc = await io.readBinary(await Deno.readFile(inPath));
+  const doc = await io.readBinary(new Uint8Array(await fs.readFile(inPath)));
   const deltas = new Map<string, [number, number, number]>();
   for (const [i, j] of after.joints.entries()) {
     const b = before.joints[i];
@@ -195,7 +196,7 @@ export async function applyEditsToRiggedGlb(
     }
     ibm.setArray(out as Float32Array<ArrayBuffer>);
   }
-  await Deno.writeFile(outPath, await io.writeBinary(doc));
+  await fs.writeFile(outPath, await io.writeBinary(doc));
   return { updatedJoints };
 }
 

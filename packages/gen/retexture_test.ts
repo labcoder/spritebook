@@ -1,3 +1,8 @@
+import { runProcess } from '../../tools/testing/process.ts';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * `retexture`: keep the mesh, reroll the paint — end to end on the real
  * sidecar, with the weightless `fixture-retexture` backend so the whole path
@@ -9,14 +14,14 @@
  * that last is the promise that makes a second texturing model catalog data
  * instead of a code change.
  */
-import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import { encode as encodePng } from 'fast-png';
 import { NodeIO } from '@gltf-transform/core';
 import { CharacterManifestSchema, parseWith } from '@spritebook/schema';
 import type { JobEvent, ModelEntry } from '@spritebook/schema';
 import { loadCatalog, runInstallJob } from '@spritebook/registry';
 import { toyEntry, toyVersion } from '../registry/_testutil.ts';
-import { retextureBackends, runGenJob, runRetextureJob } from './mod.ts';
+import { retextureBackends, runGenJob, runRetextureJob } from './dist/mod.js';
 
 const SIDECAR_DIR = decodeURIComponent(
   new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
@@ -24,13 +29,8 @@ const SIDECAR_DIR = decodeURIComponent(
 
 async function sidecarAvailable(): Promise<boolean> {
   try {
-    await Deno.stat(`${SIDECAR_DIR}/pyproject.toml`);
-    const uv = await new Deno.Command('uv', {
-      args: ['--version'],
-      stdout: 'null',
-      stderr: 'null',
-      stdin: 'null',
-    }).output();
+    await fs.stat(`${SIDECAR_DIR}/pyproject.toml`);
+    const uv = await runProcess('uv', ['--version']);
     return uv.success;
   } catch {
     return false;
@@ -85,8 +85,8 @@ interface Fixture {
 }
 
 async function setup(): Promise<Fixture> {
-  const root = await Deno.makeTempDir({ prefix: 'sb-rt-models-' });
-  const work = await Deno.makeTempDir({ prefix: 'sb-rt-' });
+  const root = await fs.mkdtemp(join(tmpdir(), 'sb-rt-models-'));
+  const work = await fs.mkdtemp(join(tmpdir(), 'sb-rt-'));
   const events = await collect(runInstallJob({
     jobId: 'rt-install',
     catalog: await loadCatalog(),
@@ -95,14 +95,14 @@ async function setup(): Promise<Fixture> {
   }));
   assertEquals(events.at(-1)?.t, 'done', `install: ${JSON.stringify(events.at(-1))}`);
   const image = `${work}/cutout.png`;
-  await Deno.writeFile(image, encodePng({ width: 96, height: 144, data: cutout() }));
+  await fs.writeFile(image, encodePng({ width: 96, height: 144, data: cutout() }));
   return {
     root,
     workspace: `${work}/character`,
     image,
     cleanup: async () => {
-      await Deno.remove(root, { recursive: true });
-      await Deno.remove(work, { recursive: true });
+      await fs.rm(root, { recursive: true });
+      await fs.rm(work, { recursive: true });
     },
   };
 }
@@ -133,11 +133,8 @@ const rtOpts = (f: Fixture, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-Deno.test('ACCEPTANCE: the surface survives, the paint changes, the parent is named', async () => {
-  if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
-    return;
-  }
+test('ACCEPTANCE: the surface survives, the paint changes, the parent is named', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     await genOnce(f);
@@ -184,7 +181,7 @@ Deno.test('ACCEPTANCE: the surface survives, the paint changes, the parent is na
     // the receipt: a new id, its parent named, and the SEED it ran with
     const manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(`${f.workspace}/character.json`)),
+      JSON.parse(await fs.readFile(`${f.workspace}/character.json`, 'utf8')),
       'manifest',
     );
     assertEquals(manifest.generation.results.map((r) => r.id), ['r1', 'r2']);
@@ -197,18 +194,15 @@ Deno.test('ACCEPTANCE: the surface survives, the paint changes, the parent is na
     assertEquals(manifest.generation.results[0].derivedFrom, undefined);
     assertEquals(manifest.generation.pickedResultId, undefined);
     // and the journal carries it, so `undo` takes the retexture back
-    const journal = await Deno.readTextFile(`${f.workspace}/character.json.journal.ndjson`);
+    const journal = await fs.readFile(`${f.workspace}/character.json.journal.ndjson`, 'utf8');
     assert(journal.includes('Retexture r1 -> r2'), 'the patch label says what happened');
   } finally {
     await f.cleanup();
   }
 });
 
-Deno.test('a different seed paints differently; the same seed reproduces', async () => {
-  if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
-    return;
-  }
+test('a different seed paints differently; the same seed reproduces', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     await genOnce(f);
@@ -219,7 +213,7 @@ Deno.test('a different seed paints differently; the same seed reproduces', async
     }
     const manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(`${f.workspace}/character.json`)),
+      JSON.parse(await fs.readFile(`${f.workspace}/character.json`, 'utf8')),
       'manifest',
     );
     const [, r2, r3, r4] = manifest.generation.results;
@@ -232,11 +226,8 @@ Deno.test('a different seed paints differently; the same seed reproduces', async
   }
 });
 
-Deno.test('refusals name what is wrong and what could work', async () => {
-  if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
-    return;
-  }
+test('refusals name what is wrong and what could work', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     await genOnce(f);
@@ -259,7 +250,7 @@ Deno.test('refusals name what is wrong and what could work', async () => {
     );
 
     // the parent's mesh can be deleted while its receipt survives
-    await Deno.remove(`${f.workspace}/results/r1/model.glb`);
+    await fs.rm(`${f.workspace}/results/r1/model.glb`);
     const gone = await errorOf({});
     assertEquals(gone.code, 'no-parent-mesh');
   } finally {
@@ -267,7 +258,7 @@ Deno.test('refusals name what is wrong and what could work', async () => {
   }
 });
 
-Deno.test('the backend is chosen by capability, and the parent wins ties', () => {
+test('the backend is chosen by capability, and the parent wins ties', () => {
   const painter = (id: string): ModelEntry =>
     toyEntry({
       id,
@@ -291,7 +282,7 @@ Deno.test('the backend is chosen by capability, and the parent wins ties', () =>
   assertEquals(retextureBackends([toyEntry({ id: 'rigger' })]).length, 0);
 });
 
-Deno.test('the bundled catalog can actually retexture', async () => {
+test('the bundled catalog can actually retexture', async () => {
   // the unit test above proves the RULE; this proves the catalog satisfies it,
   // which is the half that breaks when an entry is edited
   const cat = await loadCatalog();

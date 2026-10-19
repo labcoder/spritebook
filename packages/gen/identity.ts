@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The identity layer (P3-T4, Track A): everything that makes two characters on
  * ONE shared body different from each other.
@@ -53,7 +54,8 @@ import {
   type Primitive,
   type Skin,
 } from '@gltf-transform/core';
-import { decode as decodePng, encode as encodePng } from 'fast-png';
+import { decode as decodePng } from 'fast-png';
+import { encode as encodePng } from '@spritebook/render/png';
 import type {
   AttachmentPlacement,
   BodyRegion,
@@ -70,7 +72,7 @@ const io = new NodeIO();
 
 async function readDoc(path: string, what: string): Promise<Document> {
   try {
-    return await io.readBinary(await Deno.readFile(path));
+    return await io.readBinary(new Uint8Array(await fs.readFile(path)));
   } catch (err) {
     throw new Error(`${what}: cannot read "${path}" (${(err as Error).message})`);
   }
@@ -119,7 +121,7 @@ async function writeVerifyingGeometry(
   what: string,
   mode: 'exact' | 'appended' = 'exact',
 ): Promise<void> {
-  await Deno.writeFile(outPath, await io.writeBinary(doc));
+  await fs.writeFile(outPath, await io.writeBinary(doc));
   const after = positionBytes(await readDoc(outPath, what));
   const grew = mode === 'appended' ? after.length >= before.length : after.length === before.length;
   if (!grew) {
@@ -770,7 +772,7 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
   const landings: DecalLanding[] = [];
   for (const { decal } of ordered) {
     const { rect, region } = resolveRect(decal, opts.body);
-    const png = decodePng(await Deno.readFile(decal.pngPath));
+    const png = decodePng(new Uint8Array(await fs.readFile(decal.pngPath)));
     if (png.channels !== 4) {
       throw new Error(
         `decal "${decal.id}": "${decal.pngPath}" has ${png.channels} channels - a decal must ` +
@@ -1285,7 +1287,7 @@ export async function applyBoneMask(opts: ApplyBoneMaskOptions): Promise<BoneMas
   for (const mesh of skinnedMeshes) {
     if (mesh.listPrimitives().length === 0) mesh.dispose();
   }
-  await Deno.writeFile(opts.outPath, await io.writeBinary(doc));
+  await fs.writeFile(opts.outPath, await io.writeBinary(doc));
   return { weightFloor: floor, replaced };
 }
 

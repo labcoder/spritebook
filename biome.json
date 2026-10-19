@@ -16,7 +16,8 @@
       "!packages/rig/bodies",
       "!packages/registry/catalog",
       "!future/baseline",
-      "!future/qualification"
+      "!future/qualification",
+      "!.build"
     ]
   },
   "formatter": {
@@ -34,7 +35,12 @@
     "rules": {
       "recommended": true,
       "suspicious": {
-        "noAssignInExpressions": "off"
+        "noAssignInExpressions": "off",
+        "useIterableCallbackReturn": "off",
+        "noNonNullAssertedOptionalChain": "off",
+        "noShadowRestrictedNames": "off",
+        "noImplicitAnyLet": "off",
+        "noConfusingLabels": "off"
       },
       "style": {
         "useTemplate": "off",
@@ -42,7 +48,8 @@
       },
       "complexity": {
         "useLiteralKeys": "off",
-        "useOptionalChain": "off"
+        "useOptionalChain": "off",
+        "noCommaOperator": "off"
       }
     }
   }

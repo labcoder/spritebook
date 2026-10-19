@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Detail reprojection (P3-T2): paint the SOURCE image back onto the picked
  * mesh's texture, so the fine detail a user chose the photo for survives
@@ -31,7 +32,8 @@
  * tie left it empty.
  */
 import { type Document, NodeIO } from '@gltf-transform/core';
-import { decode as decodePng, encode as encodePng } from 'fast-png';
+import { decode as decodePng } from 'fast-png';
+import { encode as encodePng } from '@spritebook/render/png';
 
 export interface ReprojectOptions {
   /** canonical glb whose baseColorTexture gets repainted */
@@ -256,10 +258,10 @@ function resample(
  */
 export async function reprojectTexture(opts: ReprojectOptions): Promise<ReprojectStats> {
   const io = new NodeIO();
-  const doc = await io.readBinary(await Deno.readFile(opts.modelPath));
+  const doc = await io.readBinary(new Uint8Array(await fs.readFile(opts.modelPath)));
   const m = readPrimitive(doc);
 
-  const srcPng = decodePng(await Deno.readFile(opts.imagePath));
+  const srcPng = decodePng(new Uint8Array(await fs.readFile(opts.imagePath)));
   if (srcPng.channels !== 4) {
     throw new Error(
       `reproject: source image must be RGBA (a cut-out); "${opts.imagePath}" has ` +
@@ -319,15 +321,13 @@ export async function reprojectTexture(opts: ReprojectOptions): Promise<Reprojec
         );
         if (!l) continue;
         // interpolate world position + normal at this texel
-        let wx = 0, wy = 0, wz = 0, nx = 0, ny = 0, nz = 0;
+        let wx = 0, wy = 0, wz = 0, nz = 0;
         const tri = [a, bIdx, c];
         for (let k = 0; k < 3; k++) {
           const i3 = tri[k] * 3;
           wx += l[k] * m.position[i3];
           wy += l[k] * m.position[i3 + 1];
           wz += l[k] * m.position[i3 + 2];
-          nx += l[k] * m.normal[i3];
-          ny += l[k] * m.normal[i3 + 1];
           nz += l[k] * m.normal[i3 + 2];
         }
         if (nz <= 1e-3) continue; // back-facing to a front camera
@@ -363,7 +363,7 @@ export async function reprojectTexture(opts: ReprojectOptions): Promise<Reprojec
       }
     }
   }
-  await Deno.writeFile(opts.outPath, await io.writeBinary(doc));
+  await fs.writeFile(opts.outPath, await io.writeBinary(doc));
 
   return {
     textureSize: size,

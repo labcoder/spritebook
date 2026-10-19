@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Programmatic fixtures for the rig tests (P3-T3). Nothing is checked in as
  * binary: the mesh, the skeleton and the npz are all built in memory, so the
@@ -367,7 +370,7 @@ export async function stageCase(
 ): Promise<RigCase> {
   const weights = weightsBytes ?? await weightsNpz(cleanWeights());
   const glb = glbBytes ?? await buildTubeGlb();
-  const dir = await Deno.makeTempDir({ prefix: 'spritebook-rig-' });
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-rig-'));
   const c: RigCase = {
     dir,
     meshPath: `${dir}/mesh.glb`,
@@ -375,8 +378,8 @@ export async function stageCase(
     weightsPath: `${dir}/rig.npz`,
     outPath: `${dir}/rigged.glb`,
   };
-  await Deno.writeFile(c.meshPath, glb);
-  await Deno.writeTextFile(c.skeletonPath, JSON.stringify(skeleton));
-  await Deno.writeFile(c.weightsPath, weights);
+  await fs.writeFile(c.meshPath, glb);
+  await fs.writeFile(c.skeletonPath, JSON.stringify(skeleton));
+  await fs.writeFile(c.weightsPath, weights);
   return c;
 }

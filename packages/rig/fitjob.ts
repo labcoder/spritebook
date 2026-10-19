@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { workspaceJob } from '@spritebook/core';
 /**
  * The Track A `fit` job (P3-T4): fit the ONE canonical rigged body onto a
@@ -76,7 +77,7 @@ async function* executeFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
     const bodyManifestPath = `${bodyDir}/${CANONICAL_BODY_MANIFEST}`;
     let manifestText: string;
     try {
-      manifestText = await Deno.readTextFile(bodyManifestPath);
+      manifestText = await fs.readFile(bodyManifestPath, 'utf8');
     } catch {
       throw new FitFail(
         'fit-body-invalid',
@@ -101,7 +102,7 @@ async function* executeFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
       );
     }
     try {
-      await Deno.stat(bodyPath);
+      await fs.stat(bodyPath);
     } catch {
       throw new FitFail(
         'fit-body-invalid',
@@ -110,7 +111,7 @@ async function* executeFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
       );
     }
 
-    await Deno.mkdir(opts.outDir, { recursive: true });
+    await fs.mkdir(opts.outDir, { recursive: true });
     const fittedPath = `${opts.outDir}/fitted.glb`;
     let report: FitReport;
     try {
@@ -127,7 +128,7 @@ async function* executeFitJob(opts: FitJobOptions): AsyncIterable<JobEvent> {
     yield { t: 'progress', jobId, at: at(), step: 'fit', done: 1, total: 2 };
 
     const reportPath = `${opts.outDir}/fit-report.json`;
-    await Deno.writeTextFile(reportPath, JSON.stringify(report, null, 2) + '\n');
+    await fs.writeFile(reportPath, JSON.stringify(report, null, 2) + '\n');
     yield { t: 'artifact', jobId, at: at(), kind: 'fit-model', path: fittedPath };
     yield { t: 'artifact', jobId, at: at(), kind: 'fit-report', path: reportPath };
 

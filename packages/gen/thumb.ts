@@ -1,3 +1,6 @@
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Front-view thumbnail per generation result (W5b). The candidates screen
  * judged meshes by NUMBERS — seed, tris, seconds — and choosing between two
@@ -38,7 +41,7 @@ export async function writeResultThumb(
     pivot: 'feet-baseline' as const,
     orthographic: true as const,
   };
-  const tmp = await Deno.makeTempDir({ prefix: 'sb-thumb-' });
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'sb-thumb-'));
   try {
     for await (
       const e of render.runRenderJob({
@@ -53,11 +56,11 @@ export async function writeResultThumb(
     ) {
       if (e.t === 'error') return 'failed';
     }
-    await Deno.copyFile(`${tmp}/frames/d00_f000_lit.png`, outPath);
+    await fs.copyFile(`${tmp}/frames/d00_f000_lit.png`, outPath);
     return 'written';
   } catch {
     return 'failed';
   } finally {
-    await Deno.remove(tmp, { recursive: true }).catch(() => {});
+    await fs.rm(tmp, { recursive: true }).catch(() => {});
   }
 }

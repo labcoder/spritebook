@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Remove existing skin data from a mesh so it can be rigged AGAIN.
  *
@@ -26,7 +27,7 @@
  * gltf-pipeline skill records prune/dedup breakage, and this surgery is small
  * enough to do by hand where every removal states its condition.
  */
-import { Document, NodeIO } from '@gltf-transform/core';
+import { type Document, NodeIO } from '@gltf-transform/core';
 import type { Node } from '@gltf-transform/core';
 
 export interface StripResult {
@@ -123,9 +124,9 @@ export async function stripSkinsFile(
   outPath: string,
 ): Promise<{ path: string; result: StripResult }> {
   const io = new NodeIO();
-  const doc = await io.readBinary(await Deno.readFile(inPath));
+  const doc = await io.readBinary(new Uint8Array(await fs.readFile(inPath)));
   const result = stripSkins(doc);
   if (result.skinsRemoved === 0) return { path: inPath, result };
-  await Deno.writeFile(outPath, await io.writeBinary(doc));
+  await fs.writeFile(outPath, await io.writeBinary(doc));
   return { path: outPath, result };
 }

@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * `bodies` on the receipt, and what `pick` does with it.
  *
@@ -13,7 +17,7 @@
  * backend swap must not change. gen's own measurement is covered by
  * components_test.ts in @spritebook/importer, on real geometry.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { Document, NodeIO } from '@gltf-transform/core';
 import type { GenerationResult, JobEvent } from '@spritebook/schema';
 import {
@@ -23,7 +27,7 @@ import {
   sha256Bytes,
 } from '@spritebook/core';
 import type { CharacterId } from '@spritebook/schema';
-import { runPickJob } from './mod.ts';
+import { runPickJob } from './dist/mod.js';
 
 async function collect(it: AsyncIterable<JobEvent>): Promise<JobEvent[]> {
   const out: JobEvent[] = [];
@@ -67,7 +71,7 @@ function receipt(id: string, bodies?: number): GenerationResult {
 
 /** A workspace holding the given receipts, each with a real model.glb. */
 async function workspaceWith(receipts: GenerationResult[]): Promise<string> {
-  const ws = await Deno.makeTempDir({ prefix: 'sb-bodies-' });
+  const ws = await fs.mkdtemp(join(tmpdir(), 'sb-bodies-'));
   await createWorkspace({
     workspace: ws,
     characterId: 'ch-bodies' as CharacterId,
@@ -81,8 +85,8 @@ async function workspaceWith(receipts: GenerationResult[]): Promise<string> {
       output: { ...r.output, gltfSha256: await sha256Bytes(glb) },
     });
     const rp = resultPaths(ws, r.id);
-    await Deno.mkdir(rp.dir, { recursive: true });
-    await Deno.writeFile(rp.model, glb);
+    await fs.mkdir(rp.dir, { recursive: true });
+    await fs.writeFile(rp.model, glb);
   }
   return ws;
 }
@@ -92,7 +96,7 @@ function warnOf(events: JobEvent[], code: string): string | undefined {
   return w && w.t === 'warn' ? w.message : undefined;
 }
 
-Deno.test('picking a split body warns, and names the connected sibling', async () => {
+test('picking a split body warns, and names the connected sibling', async () => {
   // the astro case exactly: seed 7 split, seed 100 did not
   const ws = await workspaceWith([receipt('r1', 2), receipt('r2', 1)]);
   const events = await collect(runPickJob({ jobId: 'pick', workspace: ws, resultId: 'r1' }));
@@ -109,10 +113,10 @@ Deno.test('picking a split body warns, and names the connected sibling', async (
     events.some((e) => e.t === 'artifact' && e.kind === 'canonical-model'),
     'and canonical/model.glb is written',
   );
-  await Deno.remove(ws, { recursive: true });
+  await fs.rm(ws, { recursive: true });
 });
 
-Deno.test('no connected sibling: the advice is to re-generate, not to re-pick', async () => {
+test('no connected sibling: the advice is to re-generate, not to re-pick', async () => {
   const ws = await workspaceWith([receipt('r1', 2), receipt('r2', 3)]);
   const events = await collect(runPickJob({ jobId: 'pick', workspace: ws, resultId: 'r1' }));
 
@@ -120,20 +124,20 @@ Deno.test('no connected sibling: the advice is to re-generate, not to re-pick', 
   assert(msg, 'still warned');
   assert(!msg.includes('pick --result r2'), `r2 is split too, so it is not offered: ${msg}`);
   assert(msg.includes('another seed'), `the remedy is a new generation: ${msg}`);
-  await Deno.remove(ws, { recursive: true });
+  await fs.rm(ws, { recursive: true });
 });
 
-Deno.test('a discarded sibling is not offered as the alternative', async () => {
+test('a discarded sibling is not offered as the alternative', async () => {
   const ws = await workspaceWith([receipt('r1', 2), { ...receipt('r2', 1), discarded: true }]);
   const events = await collect(runPickJob({ jobId: 'pick', workspace: ws, resultId: 'r1' }));
 
   const msg = warnOf(events, 'picked-multi-body');
   assert(msg, 'still warned');
   assert(!msg.includes('"r2"'), `pick would refuse r2 outright, so it is not advice: ${msg}`);
-  await Deno.remove(ws, { recursive: true });
+  await fs.rm(ws, { recursive: true });
 });
 
-Deno.test('a single body is silent, and so is a result that never measured one', async () => {
+test('a single body is silent, and so is a result that never measured one', async () => {
   const one = await workspaceWith([receipt('r1', 1)]);
   assertEquals(
     warnOf(
@@ -156,11 +160,11 @@ Deno.test('a single body is silent, and so is a result that never measured one',
     'an unmeasured result is not accused of being split',
   );
 
-  await Deno.remove(one, { recursive: true });
-  await Deno.remove(old, { recursive: true });
+  await fs.rm(one, { recursive: true });
+  await fs.rm(old, { recursive: true });
 });
 
-Deno.test('zero bodies is reported as fragments, not rounded up to one', async () => {
+test('zero bodies is reported as fragments, not rounded up to one', async () => {
   const ws = await workspaceWith([receipt('r1', 0)]);
   const msg = warnOf(
     await collect(runPickJob({ jobId: 'pick', workspace: ws, resultId: 'r1' })),
@@ -168,5 +172,5 @@ Deno.test('zero bodies is reported as fragments, not rounded up to one', async (
   );
   assert(msg, 'a mesh with no body-sized piece is warned about');
   assert(msg.includes('NO body-sized piece'), `and named for what it is: ${msg}`);
-  await Deno.remove(ws, { recursive: true });
+  await fs.rm(ws, { recursive: true });
 });

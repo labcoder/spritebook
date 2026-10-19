@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Orientation detection and the tier-2 structural repairs (P3-T3).
  *
@@ -28,7 +29,7 @@
  * clear asymmetry, so a barrel (no meaningful facing) reports ~0 and the
  * caller can decline to act rather than rotating something arbitrarily.
  */
-import { Document, type Node, NodeIO } from '@gltf-transform/core';
+import { type Document, type Node, NodeIO } from '@gltf-transform/core';
 import type { FacingReport, OrientationFix } from '@spritebook/schema';
 
 /** Every position in the document, in world space, as a flat XYZ array. */
@@ -178,7 +179,7 @@ export function fixFor(facing: FacingReport['facing']): OrientationFix | undefin
 
 /** Detect facing straight from a glb on disk. */
 export async function detectFacingFile(path: string): Promise<FacingReport> {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path)));
   return detectFacing(worldPositions(doc));
 }
 
@@ -309,7 +310,7 @@ export async function applyOrientationFixes(
   fixes: OrientationFix[],
 ): Promise<{ applied: OrientationFix[]; facingAfter: FacingReport }> {
   const io = new NodeIO();
-  const doc = await io.readBinary(await Deno.readFile(inPath));
+  const doc = await io.readBinary(new Uint8Array(await fs.readFile(inPath)));
 
   for (const fix of fixes) {
     const positions = worldPositions(doc);
@@ -356,7 +357,7 @@ export async function applyOrientationFixes(
   }
 
   bakeNodeTransforms(doc);
-  await Deno.writeFile(outPath, await io.writeBinary(doc));
+  await fs.writeFile(outPath, await io.writeBinary(doc));
   const after = await detectFacingFile(outPath);
   return { applied: fixes, facingAfter: after };
 }

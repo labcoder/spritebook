@@ -1,3 +1,8 @@
+import { runProcess } from '../../tools/testing/process.ts';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * P3-T2 generation acceptance, end to end on the REAL sidecar (gated on uv +
  * the sidecar checkout). The roadmap sentence, tested literally:
@@ -14,7 +19,7 @@
  * runs on any machine with no GPU and no download, which is exactly why it
  * exists.
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { encode as encodePng } from 'fast-png';
 import { NodeIO } from '@gltf-transform/core';
 import { CharacterManifestSchema, parseWith } from '@spritebook/schema';
@@ -22,7 +27,7 @@ import type { JobEvent } from '@spritebook/schema';
 import { runInstallJob } from '@spritebook/registry';
 import { loadCatalog } from '@spritebook/registry';
 import { applyPatchOps, workspacePaths } from '@spritebook/core';
-import { runGenJob, runPickJob } from './mod.ts';
+import { runGenJob, runPickJob } from './dist/mod.js';
 
 const SIDECAR_DIR = decodeURIComponent(
   new URL('../../sidecar', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
@@ -30,13 +35,8 @@ const SIDECAR_DIR = decodeURIComponent(
 
 async function sidecarAvailable(): Promise<boolean> {
   try {
-    await Deno.stat(`${SIDECAR_DIR}/pyproject.toml`);
-    const uv = await new Deno.Command('uv', {
-      args: ['--version'],
-      stdout: 'null',
-      stderr: 'null',
-      stdin: 'null',
-    }).output();
+    await fs.stat(`${SIDECAR_DIR}/pyproject.toml`);
+    const uv = await runProcess('uv', ['--version']);
     return uv.success;
   } catch {
     return false;
@@ -105,18 +105,18 @@ interface Fixture {
 }
 
 async function setup(): Promise<Fixture> {
-  const root = await Deno.makeTempDir({ prefix: 'sb-gen-models-' });
-  const work = await Deno.makeTempDir({ prefix: 'sb-gen-' });
+  const root = await fs.mkdtemp(join(tmpdir(), 'sb-gen-models-'));
+  const work = await fs.mkdtemp(join(tmpdir(), 'sb-gen-'));
   await installFixtureBackend(root);
   const image = `${work}/cutout.png`;
-  await Deno.writeFile(image, encodePng({ width: 128, height: 192, data: cutout() }));
+  await fs.writeFile(image, encodePng({ width: 128, height: 192, data: cutout() }));
   return {
     root,
     workspace: `${work}/character`,
     image,
     cleanup: async () => {
-      await Deno.remove(root, { recursive: true });
-      await Deno.remove(work, { recursive: true });
+      await fs.rm(root, { recursive: true });
+      await fs.rm(work, { recursive: true });
     },
   };
 }
@@ -134,11 +134,8 @@ const genOpts = (f: Fixture, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-Deno.test('ACCEPTANCE: image -> gen -> canonical textured glb with full provenance', async () => {
-  if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
-    return;
-  }
+test('ACCEPTANCE: image -> gen -> canonical textured glb with full provenance', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     const events = await collect(runGenJob(genOpts(f)));
@@ -151,7 +148,7 @@ Deno.test('ACCEPTANCE: image -> gen -> canonical textured glb with full provenan
     const modelPath = artifact(events, 'gen-model');
     const rawPath = artifact(events, 'gen-raw');
     const preflightPath = artifact(events, 'gen-preflight');
-    const bytes = await Deno.readFile(modelPath);
+    const bytes = new Uint8Array(await fs.readFile(modelPath));
     const doc = await new NodeIO().readBinary(bytes);
     const prim = doc.getRoot().listMeshes()[0].listPrimitives()[0];
     assert(prim.getAttribute('POSITION')!.getCount() > 3, 'the mesh has vertices');
@@ -170,15 +167,15 @@ Deno.test('ACCEPTANCE: image -> gen -> canonical textured glb with full provenan
       'spritebook-import@0.1.0',
       'the canonical file itself declares who made it',
     );
-    const preflight = JSON.parse(await Deno.readTextFile(preflightPath));
+    const preflight = JSON.parse(await fs.readFile(preflightPath, 'utf8'));
     assert(Array.isArray(preflight.checks) && preflight.checks.length > 0, 'preflight recorded');
     // raw.glb is kept beside the canonical one, on purpose
-    assert((await Deno.stat(rawPath)).size > 0, 'the backend output is retained');
+    assert((await fs.stat(rawPath)).size > 0, 'the backend output is retained');
 
     // FULL PROVENANCE: the receipt pins the CANONICAL bytes and can re-run
     const manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(artifact(events, 'character-manifest'))),
+      JSON.parse(await fs.readFile(artifact(events, 'character-manifest'), 'utf8')),
       'CharacterManifest',
     );
     assertEquals(manifest.generation.results.length, 1, 'gen defaults to ONE result');
@@ -204,8 +201,8 @@ Deno.test('ACCEPTANCE: image -> gen -> canonical textured glb with full provenan
   }
 });
 
-Deno.test('ACCEPTANCE: the same seed reproduces the same canonical bytes', async () => {
-  if (!(await sidecarAvailable())) return;
+test('ACCEPTANCE: the same seed reproduces the same canonical bytes', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const a = await setup();
   const b = await setup();
   try {
@@ -213,8 +210,8 @@ Deno.test('ACCEPTANCE: the same seed reproduces the same canonical bytes', async
     const eb = await collect(runGenJob(genOpts(b)));
     assert(!ea.find((e) => e.t === 'error') && !eb.find((e) => e.t === 'error'));
     assertEquals(
-      await Deno.readFile(artifact(ea, 'gen-model')),
-      await Deno.readFile(artifact(eb, 'gen-model')),
+      new Uint8Array(await fs.readFile(artifact(ea, 'gen-model'))),
+      new Uint8Array(await fs.readFile(artifact(eb, 'gen-model'))),
       'seed 7 twice -> byte-identical canonical glb (the receipt can re-run it)',
     );
   } finally {
@@ -223,22 +220,22 @@ Deno.test('ACCEPTANCE: the same seed reproduces the same canonical bytes', async
   }
 });
 
-Deno.test('ACCEPTANCE: a different seed produces a different mesh', async () => {
-  if (!(await sidecarAvailable())) return;
+test('ACCEPTANCE: a different seed produces a different mesh', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     const first = await collect(runGenJob(genOpts(f)));
     const second = await collect(runGenJob(genOpts(f, { seed: 8, jobId: 'itest-gen2' })));
     assert(!second.find((e) => e.t === 'error'), JSON.stringify(second.at(-1)));
-    const one = await Deno.readFile(artifact(first, 'gen-model'));
-    const two = await Deno.readFile(artifact(second, 'gen-model'));
+    const one = new Uint8Array(await fs.readFile(artifact(first, 'gen-model')));
+    const two = new Uint8Array(await fs.readFile(artifact(second, 'gen-model')));
     assert(
       one.length !== two.length || !one.every((v, i) => v === two[i]),
       'seed 8 differs from seed 7 - "more like this" actually explores',
     );
     const manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(artifact(second, 'character-manifest'))),
+      JSON.parse(await fs.readFile(artifact(second, 'character-manifest'), 'utf8')),
       'CharacterManifest',
     );
     assertEquals(manifest.generation.results.map((r) => r.id), ['r1', 'r2'], 'ids never reused');
@@ -247,8 +244,8 @@ Deno.test('ACCEPTANCE: a different seed produces a different mesh', async () => 
   }
 });
 
-Deno.test('ACCEPTANCE: invalid --adjust params are refused core-side, no backend run', async () => {
-  if (!(await sidecarAvailable())) return;
+test('ACCEPTANCE: invalid --adjust params are refused core-side, no backend run', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     // textureSize 999 is not in the entry's enum, and tris is over maximum
@@ -264,7 +261,7 @@ Deno.test('ACCEPTANCE: invalid --adjust params are refused core-side, no backend
     // nothing was generated: no workspace results, no manifest mutation
     let results = 0;
     try {
-      for await (const _ of Deno.readDir(`${f.workspace}/results`)) results++;
+      for await (const _ of await fs.readdir(`${f.workspace}/results`, { withFileTypes: true })) results++;
     } catch {
       // no results dir at all is the strongest form of "nothing ran"
     }
@@ -274,8 +271,8 @@ Deno.test('ACCEPTANCE: invalid --adjust params are refused core-side, no backend
   }
 });
 
-Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash', async () => {
-  if (!(await sidecarAvailable())) return;
+test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     const gen = await collect(runGenJob(genOpts(f)));
@@ -293,7 +290,7 @@ Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash'
     const canonicalPath = artifact(picked, 'canonical-model');
     let manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(artifact(picked, 'character-manifest'))),
+      JSON.parse(await fs.readFile(artifact(picked, 'character-manifest'), 'utf8')),
       'CharacterManifest',
     );
     assertEquals(manifest.generation.pickedResultId, 'r1');
@@ -317,13 +314,13 @@ Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash'
     );
     assert(!plain.find((e) => e.t === 'error'), JSON.stringify(plain.at(-1)));
     assertEquals(
-      await Deno.readFile(canonicalPath),
-      await Deno.readFile(artifact(gen, 'gen-model')),
+      new Uint8Array(await fs.readFile(canonicalPath)),
+      new Uint8Array(await fs.readFile(artifact(gen, 'gen-model'))),
       'pick --no-color-match --no-reproject is a byte copy',
     );
     manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(artifact(plain, 'character-manifest'))),
+      JSON.parse(await fs.readFile(artifact(plain, 'character-manifest'), 'utf8')),
       'CharacterManifest',
     );
     const beforeHash = manifest.canonicalMesh!.gltfSha256;
@@ -338,10 +335,10 @@ Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash'
       }),
     );
     assert(!re.find((e) => e.t === 'error'), JSON.stringify(re.at(-1)));
-    const after = await Deno.readFile(canonicalPath);
+    const after = new Uint8Array(await fs.readFile(canonicalPath));
     manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(artifact(re, 'character-manifest'))),
+      JSON.parse(await fs.readFile(artifact(re, 'character-manifest'), 'utf8')),
       'CharacterManifest',
     );
     assertEquals(manifest.canonicalMesh?.reprojected, true);
@@ -360,12 +357,12 @@ Deno.test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash'
 
 /** The ManifestPatch lines the workspace's journal currently holds. */
 async function journalPatches(workspace: string) {
-  const text = await Deno.readTextFile(workspacePaths(workspace).journal).catch(() => '');
+  const text = await fs.readFile(workspacePaths(workspace).journal, 'utf8').catch(() => '');
   return text.split('\n').filter((l) => l.length > 0).map((l) => JSON.parse(l));
 }
 
-Deno.test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', async () => {
-  if (!(await sidecarAvailable())) return;
+test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     const gen = await collect(runGenJob(genOpts(f)));
@@ -393,7 +390,7 @@ Deno.test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', 
 
     // ...and popping it undoes the WHOLE pick, rather than leaving a manifest
     // that pins the pre-reproject sha for bytes that were repainted
-    const doc = JSON.parse(await Deno.readTextFile(workspacePaths(f.workspace).manifest));
+    const doc = JSON.parse(await fs.readFile(workspacePaths(f.workspace).manifest, 'utf8'));
     const undone = applyPatchOps(doc, patches[patches.length - 1].inverse);
     const restored = parseWith(CharacterManifestSchema, undone, 'undone CharacterManifest');
     assertEquals(restored.generation.pickedResultId, undefined, 'the pick came off');
@@ -401,7 +398,7 @@ Deno.test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', 
 
     // the staging temps do not outlive the step
     const strays: string[] = [];
-    for await (const e of Deno.readDir(workspacePaths(f.workspace).canonicalDir)) {
+    for await (const e of await fs.readdir(workspacePaths(f.workspace).canonicalDir, { withFileTypes: true })) {
       if (e.name.includes('.tmp.')) strays.push(e.name);
     }
     assertEquals(strays, [], 'no staging temps left in canonical/');
@@ -410,11 +407,8 @@ Deno.test('ACCEPTANCE: pick --reproject is ONE patch, so ONE undo is coherent', 
   }
 });
 
-Deno.test('gen says so when nobody declared what size the character is', async () => {
-  if (!(await sidecarAvailable())) {
-    console.log('skip: uv or sidecar/ not available');
-    return;
-  }
+test('gen says so when nobody declared what size the character is', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     // Without --height the border does not rescale, so the mesh keeps whatever
@@ -446,8 +440,8 @@ Deno.test('gen says so when nobody declared what size the character is', async (
   }
 });
 
-Deno.test('ACCEPTANCE: gen --candidates makes N receipts and ranks them', async () => {
-  if (!(await sidecarAvailable())) return;
+test('ACCEPTANCE: gen --candidates makes N receipts and ranks them', async (t) => {
+  if (!(await sidecarAvailable())) { t.skip('uv or sidecar unavailable'); return; }
   const f = await setup();
   try {
     const events = await collect(runGenJob(genOpts(f, { candidates: 3 })));
@@ -456,7 +450,7 @@ Deno.test('ACCEPTANCE: gen --candidates makes N receipts and ranks them', async 
 
     const manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(artifact(events, 'character-manifest'))),
+      JSON.parse(await fs.readFile(artifact(events, 'character-manifest'), 'utf8')),
       'CharacterManifest',
     );
     assertEquals(
@@ -475,8 +469,8 @@ Deno.test('ACCEPTANCE: gen --candidates makes N receipts and ranks them', async 
     );
     for (const id of ['r1', 'r2', 'r3']) {
       const rp = `${f.workspace}/results/${id}`;
-      assert((await Deno.stat(`${rp}/raw.glb`)).size > 0, `${id} kept its raw`);
-      assert((await Deno.stat(`${rp}/model.glb`)).size > 0, `${id} has a canonical model`);
+      assert((await fs.stat(`${rp}/raw.glb`)).size > 0, `${id} kept its raw`);
+      assert((await fs.stat(`${rp}/model.glb`)).size > 0, `${id} has a canonical model`);
     }
     // nothing was picked FOR the user; the ranking is a suggestion
     assertEquals(manifest.generation.pickedResultId, undefined);

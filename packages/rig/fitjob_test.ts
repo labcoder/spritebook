@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * runFitJob wraps fit.ts in the JobEvent contract, so these tests are about
  * DISCIPLINE rather than geometry (fit_test.ts owns the numbers):
@@ -14,7 +18,7 @@
  * bodies/ubc-male) fitted to the P3-T1 proportioned box humanoid — real data,
  * CPU-only, fast.
  */
-import { assert, assertEquals, assertGreater } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertGreater } from '@std/assert';
 import type { CharacterId, JobEvent } from '@spritebook/schema';
 import { CharacterManifestSchema, JobEventSchema, parseWith } from '@spritebook/schema';
 import {
@@ -23,8 +27,8 @@ import {
   pickResult,
   workspacePaths,
 } from '@spritebook/core';
-import { BODY, buildTargetGlb, CHUNKY } from './_fit_fixtures.ts';
-import { runFitJob } from './fitjob.ts';
+import { BODY, buildTargetGlb, CHUNKY } from './dist/_fit_fixtures.js';
+import { runFitJob } from './dist/fitjob.js';
 
 /** The bundled 65-joint UAL body (packages/rig/bodies/ubc-male). */
 const UBC_MALE = decodeURIComponent(
@@ -44,11 +48,11 @@ function artifact(events: JobEvent[], kind: string): string {
   return (e as { path: string }).path;
 }
 
-Deno.test('runFitJob: the real ubc-male onto the fixture humanoid ends done', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'sb-fitjob-' });
+test('runFitJob: the real ubc-male onto the fixture humanoid ends done', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-fitjob-'));
   try {
     const targetPath = `${dir}/target.glb`;
-    await Deno.writeFile(targetPath, await buildTargetGlb(BODY));
+    await fs.writeFile(targetPath, await buildTargetGlb(BODY));
     const events = await collect(runFitJob({
       jobId: 'fit-happy',
       bodyDir: UBC_MALE,
@@ -67,24 +71,24 @@ Deno.test('runFitJob: the real ubc-male onto the fixture humanoid ends done', as
 
     const fitted = artifact(events, 'fit-model');
     assertEquals(fitted, `${dir}/out/fitted.glb`);
-    assertGreater((await Deno.stat(fitted)).size, 0, 'fitted.glb exists');
+    assertGreater((await fs.stat(fitted)).size, 0, 'fitted.glb exists');
 
-    const report = JSON.parse(await Deno.readTextFile(artifact(events, 'fit-report')));
+    const report = JSON.parse(await fs.readFile(artifact(events, 'fit-report'), 'utf8'));
     assertEquals(report.bodyId, 'ubc-male', 'the report is bound to the body that produced it');
     assert(Number.isFinite(report.meanSurfaceErrorM), 'the report parses with its numbers');
     assert(Number.isInteger(report.unprojectedVertices), 'the additive count rides along');
     assert(Array.isArray(report.strayJoints));
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('runFitJob: a torn fit WARNS with the joints named - NEVER an error', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'sb-fitjob-' });
+test('runFitJob: a torn fit WARNS with the joints named - NEVER an error', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-fitjob-'));
   try {
     const targetPath = `${dir}/target.glb`;
     // CHUNKY's box hands give the 65-joint body's fingers nowhere to land
-    await Deno.writeFile(targetPath, await buildTargetGlb(CHUNKY));
+    await fs.writeFile(targetPath, await buildTargetGlb(CHUNKY));
     const events = await collect(runFitJob({
       jobId: 'fit-torn',
       bodyDir: UBC_MALE,
@@ -92,7 +96,7 @@ Deno.test('runFitJob: a torn fit WARNS with the joints named - NEVER an error', 
       outDir: `${dir}/out`,
     }));
 
-    const report = JSON.parse(await Deno.readTextFile(artifact(events, 'fit-report')));
+    const report = JSON.parse(await fs.readFile(artifact(events, 'fit-report'), 'utf8'));
     assertGreater(report.strayJoints.length, 0, 'this fixture is supposed to tear');
 
     const warn = events.find((e) => e.t === 'warn' && e.code === 'fit-stray-joints');
@@ -107,12 +111,12 @@ Deno.test('runFitJob: a torn fit WARNS with the joints named - NEVER an error', 
     assertEquals(events.filter((e) => e.t === 'error'), [], 'a tear is a warn, never an error');
     assertEquals(events.at(-1)?.t, 'done', 'done is still the terminal event');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('runFitJob: with a workspace, the fit is ONE journaled Track A patch', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'sb-fitjob-' });
+test('runFitJob: with a workspace, the fit is ONE journaled Track A patch', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-fitjob-'));
   try {
     const ws = `${dir}/character`;
     await createWorkspace({
@@ -122,7 +126,7 @@ Deno.test('runFitJob: with a workspace, the fit is ONE journaled Track A patch',
       source: { kind: 'image', originalFilename: 'hero.png', sha256: 'a'.repeat(64) },
     });
     const targetPath = `${dir}/target.glb`;
-    await Deno.writeFile(targetPath, await buildTargetGlb(BODY));
+    await fs.writeFile(targetPath, await buildTargetGlb(BODY));
     const events = await collect(runFitJob({
       jobId: 'fit-ws',
       bodyDir: UBC_MALE,
@@ -138,10 +142,10 @@ Deno.test('runFitJob: with a workspace, the fit is ONE journaled Track A patch',
 
     const manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(artifact(events, 'character-manifest'))),
+      JSON.parse(await fs.readFile(artifact(events, 'character-manifest'), 'utf8')),
       'CharacterManifest',
     );
-    const bodyJson = JSON.parse(await Deno.readTextFile(`${UBC_MALE}/body.json`));
+    const bodyJson = JSON.parse(await fs.readFile(`${UBC_MALE}/body.json`, 'utf8'));
     assertEquals(manifest.rig?.track, 'A');
     assertEquals(manifest.rig?.skeletonProfile, 'ual-humanoid');
     assertEquals(manifest.rig?.jointCount, bodyJson.jointCount, "the BODY's joint count (65)");
@@ -164,22 +168,22 @@ Deno.test('runFitJob: with a workspace, the fit is ONE journaled Track A patch',
     assertEquals(manifest.rig?.sockets?.find((s) => s.id === 'hand-r')?.bone, 'hand_r');
 
     // the journal grew by exactly ONE patch, and it carries its inverse
-    const lines = (await Deno.readTextFile(workspacePaths(ws).journal))
+    const lines = (await fs.readFile(workspacePaths(ws).journal, 'utf8'))
       .split('\n')
       .filter((l) => l);
     assertEquals(lines.length, 1, 'one mutation, one patch');
     const patch = JSON.parse(lines[0]);
     assert(Array.isArray(patch.inverse) && patch.inverse.length > 0, 'undo can take the fit back');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('runFitJob: a missing or invalid body dir is an error naming the file', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'sb-fitjob-' });
+test('runFitJob: a missing or invalid body dir is an error naming the file', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-fitjob-'));
   try {
     const targetPath = `${dir}/target.glb`;
-    await Deno.writeFile(targetPath, await buildTargetGlb(BODY));
+    await fs.writeFile(targetPath, await buildTargetGlb(BODY));
 
     // missing entirely
     const missing = await collect(runFitJob({
@@ -200,8 +204,8 @@ Deno.test('runFitJob: a missing or invalid body dir is an error naming the file'
 
     // present but not a canonical body manifest
     const bodyDir = `${dir}/bad-body`;
-    await Deno.mkdir(bodyDir, { recursive: true });
-    await Deno.writeTextFile(`${bodyDir}/body.json`, '{"schemaVersion": 2}');
+    await fs.mkdir(bodyDir, { recursive: true });
+    await fs.writeFile(`${bodyDir}/body.json`, '{"schemaVersion": 2}');
     const invalid = await collect(runFitJob({
       jobId: 'fit-badbody',
       bodyDir,
@@ -215,12 +219,12 @@ Deno.test('runFitJob: a missing or invalid body dir is an error naming the file'
       assert(bad.message.includes(`${bodyDir}/body.json`), `names the file: ${bad.message}`);
     }
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('runFitJob: on a picked workspace the fit BECOMES the canonical mesh', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'sb-fitjob-' });
+test('runFitJob: on a picked workspace the fit BECOMES the canonical mesh', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-fitjob-'));
   try {
     const ws = `${dir}/character`;
     await createWorkspace({
@@ -242,10 +246,10 @@ Deno.test('runFitJob: on a picked workspace the fit BECOMES the canonical mesh',
     });
     await pickResult(ws, 'r1', { heightM: 1.7, texturedBy: 'backend' });
     const paths = workspacePaths(ws);
-    const before = (await Deno.readTextFile(paths.journal)).split('\n').filter((l) => l).length;
+    const before = (await fs.readFile(paths.journal, 'utf8')).split('\n').filter((l) => l).length;
 
     const targetPath = `${dir}/target.glb`;
-    await Deno.writeFile(targetPath, await buildTargetGlb(BODY));
+    await fs.writeFile(targetPath, await buildTargetGlb(BODY));
     const events = await collect(runFitJob({
       jobId: 'fit-promote',
       bodyDir: UBC_MALE,
@@ -260,8 +264,8 @@ Deno.test('runFitJob: on a picked workspace the fit BECOMES the canonical mesh',
     );
 
     // 1. the bytes: canonical/model.glb IS the fitted body
-    const fitted = await Deno.readFile(`${dir}/out/fitted.glb`);
-    const canonical = await Deno.readFile(paths.canonicalModel);
+    const fitted = new Uint8Array(await fs.readFile(`${dir}/out/fitted.glb`));
+    const canonical = new Uint8Array(await fs.readFile(paths.canonicalModel));
     assertEquals(canonical, fitted, 'the fitted body became the canonical mesh');
     assertEquals(
       artifact(events, 'canonical-model'),
@@ -272,7 +276,7 @@ Deno.test('runFitJob: on a picked workspace the fit BECOMES the canonical mesh',
     // 2. the manifest pins the bytes that are actually on disk (D-011)
     const manifest = parseWith(
       CharacterManifestSchema,
-      JSON.parse(await Deno.readTextFile(paths.manifest)),
+      JSON.parse(await fs.readFile(paths.manifest, 'utf8')),
       'CharacterManifest',
     );
     const digest = await crypto.subtle.digest('SHA-256', canonical as BufferSource);
@@ -282,13 +286,13 @@ Deno.test('runFitJob: on a picked workspace the fit BECOMES the canonical mesh',
 
     // 3. ONE patch for the whole fit — rig and re-pin undo together, so an
     //    undo can never leave a manifest pinning bytes it does not describe
-    const lines = (await Deno.readTextFile(paths.journal)).split('\n').filter((l) => l);
+    const lines = (await fs.readFile(paths.journal, 'utf8')).split('\n').filter((l) => l);
     assertEquals(lines.length - before, 1, 'one fit, one journal entry');
     const patch = JSON.parse(lines.at(-1)!);
     const paths_ = (patch.op as { path: string }[]).map((o) => o.path).sort();
     assertEquals(paths_, ['/canonicalMesh', '/rig'], 'both facts in the same patch');
     assert(Array.isArray(patch.inverse) && patch.inverse.length === 2, 'and both are reversible');
-    const history = await Deno.readTextFile(paths.journal);
+    const history = await fs.readFile(paths.journal, 'utf8');
     const repeat = await collect(
       runFitJob({
         jobId: 'fit-repeat',
@@ -300,12 +304,12 @@ Deno.test('runFitJob: on a picked workspace the fit BECOMES the canonical mesh',
     );
     assertEquals(repeat.at(-1)?.t, 'done', 'an identical rerun is a successful no-op');
     assertEquals(
-      await Deno.readTextFile(paths.journal),
+      await fs.readFile(paths.journal, 'utf8'),
       history,
       'no undo entry for an unchanged rig',
     );
-    assertEquals(await Deno.readFile(paths.canonicalModel), canonical);
+    assertEquals(new Uint8Array(await fs.readFile(paths.canonicalModel)), canonical);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });

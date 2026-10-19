@@ -1,3 +1,4 @@
+import { test } from 'node:test';
 /**
  * The npz reader is parsed bytes, so it is tested against bytes: `_fixtures.ts`
  * encodes npy headers and ZIP records independently (numpy's own layout,
@@ -6,9 +7,9 @@
  * both npy header versions — and that every malformed shape fails with a
  * message naming what was wrong rather than a stack trace inside a byte loop.
  */
-import { assert, assertEquals, assertThrows } from 'jsr:@std/assert@1';
-import { encodeNpy, encodeNpz, encodeZip, type FixtureDType } from './_fixtures.ts';
-import { parseNpy, readNpz } from './npz.ts';
+import { assert, assertEquals, assertThrows } from '@std/assert';
+import { encodeNpy, encodeNpz, encodeZip, type FixtureDType } from './dist/_fixtures.js';
+import { parseNpy, readNpz } from './dist/npz.js';
 
 async function expectThrows(fn: () => Promise<unknown>, ...needles: string[]): Promise<void> {
   let message = '';
@@ -23,7 +24,7 @@ async function expectThrows(fn: () => Promise<unknown>, ...needles: string[]): P
   }
 }
 
-Deno.test('npy round-trips every supported dtype', () => {
+test('npy round-trips every supported dtype', () => {
   const cases: [FixtureDType, number[]][] = [
     ['uint8', [0, 1, 254, 255]],
     ['uint16', [0, 7, 65535, 300]],
@@ -39,7 +40,7 @@ Deno.test('npy round-trips every supported dtype', () => {
   }
 });
 
-Deno.test('npy handles 1-D shapes and the v2 header', () => {
+test('npy handles 1-D shapes and the v2 header', () => {
   const flat = parseNpy(encodeNpy('float32', [3], [1, 2, 3]), 'flat');
   assertEquals(flat.shape, [3]);
   assertEquals([...flat.data], [1, 2, 3]);
@@ -49,7 +50,7 @@ Deno.test('npy handles 1-D shapes and the v2 header', () => {
   assertEquals([...v2.data], [1, 2, 3, 4, 5, 6]);
 });
 
-Deno.test('npy rejects Fortran order, big-endian and unsupported dtypes', () => {
+test('npy rejects Fortran order, big-endian and unsupported dtypes', () => {
   assertThrows(
     () => parseNpy(encodeNpy('float32', [2, 2], [1, 2, 3, 4], { fortranOrder: true }), 'f'),
     Error,
@@ -67,7 +68,7 @@ Deno.test('npy rejects Fortran order, big-endian and unsupported dtypes', () => 
   );
 });
 
-Deno.test('npy rejects bad magic and truncated data', () => {
+test('npy rejects bad magic and truncated data', () => {
   const good = encodeNpy('float32', [2, 2], [1, 2, 3, 4]);
   const bad = good.slice();
   bad[1] = 0x41;
@@ -76,7 +77,7 @@ Deno.test('npy rejects bad magic and truncated data', () => {
   assertThrows(() => parseNpy(good.subarray(0, 4), 'tiny'), Error, 'truncated npy');
 });
 
-Deno.test('npz round-trips stored and deflated members', async () => {
+test('npz round-trips stored and deflated members', async () => {
   const joints = [0, 1, 2, 3, 4, 5];
   const weights = [1, 0, 0.5, 0.5, 0.25, 0.75];
   for (const deflate of [false, true]) {
@@ -92,7 +93,7 @@ Deno.test('npz round-trips stored and deflated members', async () => {
   }
 });
 
-Deno.test('npz names members by stripping .npy', async () => {
+test('npz names members by stripping .npy', async () => {
   const bytes = await encodeZip([
     { name: 'predict_skin.npy', data: encodeNpy('float32', [1], [1]) },
   ]);
@@ -100,7 +101,7 @@ Deno.test('npz names members by stripping .npy', async () => {
   assert(npz.has('predict_skin'));
 });
 
-Deno.test('npz fails actionably on a non-zip and on a corrupt member', async () => {
+test('npz fails actionably on a non-zip and on a corrupt member', async () => {
   await expectThrows(
     () => readNpz(new TextEncoder().encode('this is not a zip archive at all'), 'rig.npz'),
     'rig.npz',
@@ -113,7 +114,7 @@ Deno.test('npz fails actionably on a non-zip and on a corrupt member', async () 
   await expectThrows(() => readNpz(bytes, 'rig.npz'), 'rig.npz[weights]', 'truncated data');
 });
 
-Deno.test('npz rejects an unsupported compression method by number', async () => {
+test('npz rejects an unsupported compression method by number', async () => {
   const bytes = await encodeZip([{ name: 'weights.npy', data: encodeNpy('float32', [1], [1]) }]);
   const view = new DataView(bytes.buffer);
   const cdOffset = view.getUint32(bytes.length - 22 + 16, true);

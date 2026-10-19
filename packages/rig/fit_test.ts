@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * fitCanonicalBody is a writer whose whole value is a NUMBER being right, so
  * the assertions are about the file it wrote, re-read from disk, and about the
@@ -16,10 +20,10 @@
  *   against a different one. Either half alone can be faked; together they
  *   cannot.
  */
-import { assert, assertAlmostEquals, assertEquals, assertGreater } from 'jsr:@std/assert@1';
+import { assert, assertAlmostEquals, assertEquals, assertGreater } from '@std/assert';
 import { NodeIO } from '@gltf-transform/core';
 import { CanonicalBodySchema, parseWith } from '@spritebook/schema';
-import { UAL_HUMANOID } from '../anim/profile.ts';
+import { UAL_HUMANOID } from '../anim/dist/profile.js';
 import {
   BODY,
   BODY_META,
@@ -31,7 +35,7 @@ import {
   type FitCase,
   stageFitCase,
   TALL,
-} from './_fit_fixtures.ts';
+} from './dist/_fit_fixtures.js';
 import {
   buildCanonicalBody,
   closestOnTriangle,
@@ -39,9 +43,9 @@ import {
   type FitReport,
   readSurface,
   TriangleGrid,
-} from './fit.ts';
-import { boundsOf } from './orient.ts';
-import { loadRiggedAsset, restWorlds, type RiggedAsset, skinAll, skinMatrices } from './skin.ts';
+} from './dist/fit.js';
+import { boundsOf } from './dist/orient.js';
+import { loadRiggedAsset, restWorlds, type RiggedAsset, skinAll, skinMatrices } from './dist/skin.js';
 
 /** Stage a case, build the canonical body, fit it, and hand back everything. */
 async function fitTo(
@@ -80,11 +84,11 @@ function assertMentions(message: string, ...needles: string[]): void {
   for (const n of needles) assert(message.includes(n), `expected "${n}" in: ${message}`);
 }
 
-Deno.test('fitCanonicalBody matches a taller target, and the joints scale with it', async () => {
+test('fitCanonicalBody matches a taller target, and the joints scale with it', async () => {
   const { c, report, fitted, source } = await fitTo(await buildTargetGlb(TALL));
   try {
     const targetBounds = boundsOf(
-      (await new NodeIO().readBinary(await Deno.readFile(c.targetPath)))
+      (await new NodeIO().readBinary(new Uint8Array(await fs.readFile(c.targetPath))))
         .getRoot().listMeshes()[0].listPrimitives()[0].getAttribute('POSITION')!
         .getArray() as Float32Array,
     );
@@ -119,15 +123,15 @@ Deno.test('fitCanonicalBody matches a taller target, and the joints scale with i
     }
     assertEquals(report.strayJoints, []);
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('fitCanonicalBody takes X from the target bands, not from a uniform scale', async () => {
+test('fitCanonicalBody takes X from the target bands, not from a uniform scale', async () => {
   const { c, report, fitted, source } = await fitTo(await buildTargetGlb(BROAD));
   try {
     const target = boundsOf(
-      (await new NodeIO().readBinary(await Deno.readFile(c.targetPath)))
+      (await new NodeIO().readBinary(new Uint8Array(await fs.readFile(c.targetPath))))
         .getRoot().listMeshes()[0].listPrimitives()[0].getAttribute('POSITION')!
         .getArray() as Float32Array,
     );
@@ -150,14 +154,14 @@ Deno.test('fitCanonicalBody takes X from the target bands, not from a uniform sc
     );
     assertEquals(report.strayJoints, []);
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test("fitCanonicalBody preserves the body's own weights and skin", async () => {
+test("fitCanonicalBody preserves the body's own weights and skin", async () => {
   const { c, report, fitted, source } = await fitTo(await buildTargetGlb(CHUNKY));
   try {
-    const doc = await new NodeIO().readBinary(await Deno.readFile(c.outPath));
+    const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(c.outPath)));
     assertEquals(doc.getRoot().listSkins().length, 1, 'exactly one skin');
     assertEquals(doc.getRoot().listSkins()[0].listJoints().length, source.jointCount);
     assertEquals(fitted.vertexCount, source.vertexCount, 'topology is untouched');
@@ -185,11 +189,11 @@ Deno.test("fitCanonicalBody preserves the body's own weights and skin", async ()
     assertEquals(uv!.getCount(), source.vertexCount);
     assert(prim.getMaterial()?.getBaseColorTexture(), 'the base colour texture survived');
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('fitCanonicalBody round-trips the fitted rest pose through its new IBMs', async () => {
+test('fitCanonicalBody round-trips the fitted rest pose through its new IBMs', async () => {
   const { c, fitted } = await fitTo(await buildTargetGlb(TALL));
   try {
     const mats = skinMatrices(restWorlds(fitted), fitted.inverseBind, fitted.jointCount);
@@ -199,11 +203,11 @@ Deno.test('fitCanonicalBody round-trips the fitted rest pose through its new IBM
       assertAlmostEquals(skinned[i], fitted.positions[i], 1e-5, `component ${i}`);
     }
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('fitCanonicalBody NAMES the joints a torn fit pushed outside the target', async () => {
+test('fitCanonicalBody NAMES the joints a torn fit pushed outside the target', async () => {
   // a barrel with no arms: the bands read a torso where the body has a waist,
   // the fit widens it to match, and the arms end up outside the mesh entirely
   const blob = await buildTargetGlb({ ...BODY, width: 0.7, thick: 0.1 }, { withoutArms: true });
@@ -218,7 +222,7 @@ Deno.test('fitCanonicalBody NAMES the joints a torn fit pushed outside the targe
     }
     // every named joint really is outside, and every unnamed one really is in
     const target = boundsOf(
-      (await new NodeIO().readBinary(await Deno.readFile(c.targetPath)))
+      (await new NodeIO().readBinary(new Uint8Array(await fs.readFile(c.targetPath))))
         .getRoot().listMeshes()[0].listPrimitives()[0].getAttribute('POSITION')!
         .getArray() as Float32Array,
     );
@@ -233,16 +237,16 @@ Deno.test('fitCanonicalBody NAMES the joints a torn fit pushed outside the targe
     });
     // and it is still a file someone can open to see what went wrong
     assertEquals(
-      (await new NodeIO().readBinary(await Deno.readFile(c.outPath)))
+      (await new NodeIO().readBinary(new Uint8Array(await fs.readFile(c.outPath))))
         .getRoot().listSkins().length,
       1,
     );
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('fitCanonicalBody reports the surface error honestly', async () => {
+test('fitCanonicalBody reports the surface error honestly', async () => {
   const same = await fitTo(await buildTargetGlb(BODY));
   try {
     // fitted to its own shape, the error really is zero — the baseline that
@@ -251,7 +255,7 @@ Deno.test('fitCanonicalBody reports the surface error honestly', async () => {
     assertEquals(same.report.maxSurfaceErrorM, 0);
     assertEquals(same.report.scale.map((s) => Math.round(s * 1e6) / 1e6), [1, 1, 1]);
   } finally {
-    await Deno.remove(same.c.dir, { recursive: true });
+    await fs.rm(same.c.dir, { recursive: true });
   }
 
   const other = await fitTo(await buildTargetGlb(CHUNKY));
@@ -261,11 +265,11 @@ Deno.test('fitCanonicalBody reports the surface error honestly', async () => {
     assertGreater(mean, 0, 'a different shape cannot be matched exactly, and saying so is the job');
     assertGreater(max, mean, 'the worst vertex is worse than the average one');
   } finally {
-    await Deno.remove(other.c.dir, { recursive: true });
+    await fs.rm(other.c.dir, { recursive: true });
   }
 });
 
-Deno.test('fitCanonicalBody keeps vertices the target cannot reach, and counts them', async () => {
+test('fitCanonicalBody keeps vertices the target cannot reach, and counts them', async () => {
   // a 0.3 m cube: most of a humanoid has no target surface anywhere near it
   const { c, report, fitted } = await fitTo(await buildBoxGlb(0.3, 0.3, 0.3));
   try {
@@ -275,19 +279,19 @@ Deno.test('fitCanonicalBody keeps vertices the target cannot reach, and counts t
       assert(Number.isFinite(fitted.positions[i]), `component ${i} is finite, never stretched`);
     }
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('TriangleGrid finds the same nearest point brute force does', async () => {
+test('TriangleGrid finds the same nearest point brute force does', async () => {
   // the reported surface error is only as honest as the search that produced
   // it, so the acceleration structure is checked against the definition
-  const dir = await Deno.makeTempDir({ prefix: 'spritebook-grid-' });
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-grid-'));
   try {
     const path = `${dir}/target.glb`;
-    await Deno.writeFile(path, await buildTargetGlb(CHUNKY));
+    await fs.writeFile(path, await buildTargetGlb(CHUNKY));
     const surface = readSurface(
-      await new NodeIO().readBinary(await Deno.readFile(path)),
+      await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path))),
       'grid test',
     );
     const grid = new TriangleGrid(surface);
@@ -330,7 +334,7 @@ Deno.test('TriangleGrid finds the same nearest point brute force does', async ()
       }
     }
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
@@ -338,11 +342,11 @@ Deno.test('TriangleGrid finds the same nearest point brute force does', async ()
 // buildCanonicalBody
 // ---------------------------------------------------------------------------
 
-Deno.test('buildCanonicalBody derives regions covering every core UAL joint', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'spritebook-body-' });
+test('buildCanonicalBody derives regions covering every core UAL joint', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-body-'));
   try {
     const sourcePath = `${dir}/source.glb`;
-    await Deno.writeFile(sourcePath, await buildBodyGlb());
+    await fs.writeFile(sourcePath, await buildBodyGlb());
     const built = await buildCanonicalBody({
       sourcePath,
       outDir: `${dir}/out`,
@@ -353,7 +357,7 @@ Deno.test('buildCanonicalBody derives regions covering every core UAL joint', as
     // it is schema-valid as WRITTEN, not just as returned
     const onDisk = parseWith(
       CanonicalBodySchema,
-      JSON.parse(await Deno.readTextFile(built.manifestPath)),
+      JSON.parse(await fs.readFile(built.manifestPath, 'utf8')),
       'written body.json',
     );
     assertEquals(onDisk, built.body);
@@ -390,39 +394,39 @@ Deno.test('buildCanonicalBody derives regions covering every core UAL joint', as
 
     // the glb is the source bytes, so its hash is the artist's, not our writer's
     assertEquals(
-      await Deno.readFile(built.glbPath),
-      await Deno.readFile(sourcePath),
+      new Uint8Array(await fs.readFile(built.glbPath)),
+      new Uint8Array(await fs.readFile(sourcePath)),
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('buildCanonicalBody refuses a source without UVs, and names the fix', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'spritebook-body-' });
+test('buildCanonicalBody refuses a source without UVs, and names the fix', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-body-'));
   try {
     const sourcePath = `${dir}/source.glb`;
-    await Deno.writeFile(sourcePath, await buildBodyGlb(BODY, { withoutUvs: true }));
+    await fs.writeFile(sourcePath, await buildBodyGlb(BODY, { withoutUvs: true }));
     const message = await messageOf(() =>
       buildCanonicalBody({ sourcePath, outDir: `${dir}/out`, ...BODY_META })
     );
     assertMentions(message, 'TEXCOORD_0', 'UV-unwrap', 'unwrap the source');
-    await Deno.stat(`${dir}/out`).then(
+    await fs.stat(`${dir}/out`).then(
       () => {
         throw new Error('nothing should have been written');
       },
       () => {},
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('buildCanonicalBody reports what a non-UAL source is missing', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'spritebook-body-' });
+test('buildCanonicalBody reports what a non-UAL source is missing', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-body-'));
   try {
     const sourcePath = `${dir}/source.glb`;
-    await Deno.writeFile(
+    await fs.writeFile(
       sourcePath,
       await buildBodyGlb(BODY, { omitJoints: ['clavicle_l', 'neck_01'] }),
     );
@@ -431,25 +435,25 @@ Deno.test('buildCanonicalBody reports what a non-UAL source is missing', async (
     );
     assertMentions(message, 'clavicle_l', 'neck_01', 'core UAL joint');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('buildCanonicalBody refuses an unrigged source', async () => {
-  const dir = await Deno.makeTempDir({ prefix: 'spritebook-body-' });
+test('buildCanonicalBody refuses an unrigged source', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-body-'));
   try {
     const sourcePath = `${dir}/source.glb`;
-    await Deno.writeFile(sourcePath, await buildBodyGlb(BODY, { withoutSkin: true }));
+    await fs.writeFile(sourcePath, await buildBodyGlb(BODY, { withoutSkin: true }));
     const message = await messageOf(() =>
       buildCanonicalBody({ sourcePath, outDir: `${dir}/out`, ...BODY_META })
     );
     assertMentions(message, 'no skin', 'rig the source');
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('fitCanonicalBody rejects a manifest from a different build', async () => {
+test('fitCanonicalBody rejects a manifest from a different build', async () => {
   const c = await stageFitCase(await buildTargetGlb(BODY));
   try {
     const built = await buildCanonicalBody({
@@ -457,7 +461,7 @@ Deno.test('fitCanonicalBody rejects a manifest from a different build', async ()
       outDir: `${c.dir}/body`,
       ...BODY_META,
     });
-    await Deno.writeTextFile(
+    await fs.writeFile(
       c.bodyManifestPath,
       JSON.stringify({ ...built.body, vertexCount: built.body.vertexCount + 1 }),
     );
@@ -471,11 +475,11 @@ Deno.test('fitCanonicalBody rejects a manifest from a different build', async ()
     );
     assertMentions(message, 'different builds', 'rebuild the canonical body');
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });
 
-Deno.test('fitCanonicalBody honours a declared target height', async () => {
+test('fitCanonicalBody honours a declared target height', async () => {
   const c = await stageFitCase(await buildTargetGlb(BODY));
   try {
     await buildCanonicalBody({ sourcePath: c.sourcePath, outDir: `${c.dir}/body`, ...BODY_META });
@@ -491,6 +495,6 @@ Deno.test('fitCanonicalBody honours a declared target height', async () => {
     const b = boundsOf(fitted.positions);
     assertAlmostEquals(b.max[1] - b.min[1], 1.8, 1e-3, 'the body stands at the declared height');
   } finally {
-    await Deno.remove(c.dir, { recursive: true });
+    await fs.rm(c.dir, { recursive: true });
   }
 });

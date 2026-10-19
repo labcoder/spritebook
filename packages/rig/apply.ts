@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Apply NEUTRAL rig data to the canonical mesh (P3-T3): `rig.json` +
  * `rig.npz` in, a real glTF skin out. This is the core half of the licence
@@ -76,7 +77,7 @@ import {
   vLen,
   vNormalize,
   vSub,
-} from '../anim/quat.ts';
+} from '@spritebook/anim/quat';
 import { readNpzFile } from './npz.ts';
 import { mat4InvertRigid, mat4Multiply } from './skin.ts';
 
@@ -409,7 +410,7 @@ export async function applyRig(opts: ApplyRigOptions): Promise<ApplyRigResult> {
   // ---- skeleton ----------------------------------------------------------
   let skeletonJson: unknown;
   try {
-    skeletonJson = JSON.parse(await Deno.readTextFile(opts.skeletonPath));
+    skeletonJson = JSON.parse(await fs.readFile(opts.skeletonPath, 'utf8'));
   } catch (err) {
     throw new Error(
       `${label}: cannot read skeleton "${opts.skeletonPath}" (${(err as Error).message})`,
@@ -469,7 +470,7 @@ export async function applyRig(opts: ApplyRigOptions): Promise<ApplyRigResult> {
   const io = new NodeIO();
   let doc: Document;
   try {
-    doc = await io.readBinary(await Deno.readFile(opts.meshPath));
+    doc = await io.readBinary(new Uint8Array(await fs.readFile(opts.meshPath)));
   } catch (err) {
     throw new Error(`${label}: cannot read mesh "${opts.meshPath}" (${(err as Error).message})`);
   }
@@ -531,7 +532,7 @@ export async function applyRig(opts: ApplyRigOptions): Promise<ApplyRigResult> {
     if (node.getMesh()) node.setSkin(skin);
   }
 
-  await Deno.writeFile(opts.outPath, await io.writeBinary(doc));
+  await fs.writeFile(opts.outPath, await io.writeBinary(doc));
 
   return {
     jointCount,

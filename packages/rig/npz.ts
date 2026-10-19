@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * A minimal NPZ/NPY reader (P3-T3). The rig adapter returns per-vertex arrays
  * as `rig.npz` (schema/rig.ts) because they are large and numeric, and core
@@ -301,7 +302,7 @@ export async function readNpz(bytes: Uint8Array, label: string): Promise<Map<str
 export async function readNpzFile(path: string): Promise<Map<string, NpyArray>> {
   let bytes: Uint8Array;
   try {
-    bytes = await Deno.readFile(path);
+    bytes = new Uint8Array(await fs.readFile(path));
   } catch (err) {
     throw new Error(`readNpz: cannot read "${path}" (${(err as Error).message})`);
   }
