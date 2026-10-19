@@ -271,5 +271,110 @@
     "installed": ".render-bench/f2/installed-results",
     "initialUnchangedCodecTrial": ".render-bench/f2/measurements",
     "initialNativePngTrial": ".render-bench/f2/measurements-native-png"
+  },
+  "privateD3d12Trial": {
+    "backend": "d3d12",
+    "timings": [
+      {
+        "sample": 1,
+        "coldDeno": 4.617437999999998,
+        "coldNode": 3.8881985999999995,
+        "warmDeno": 2.5432338999999993,
+        "warmNode": 2.034651700000002,
+        "coldRegressionPct": -15.793160622838876,
+        "warmRegressionPct": -19.99746071330668
+      },
+      {
+        "sample": 2,
+        "coldDeno": 6.22534120000001,
+        "coldNode": 5.178345500000003,
+        "warmDeno": 2.550114399999991,
+        "warmNode": 2.042872100000008,
+        "coldRegressionPct": -16.818286200923495,
+        "warmRegressionPct": -19.89096253877807
+      },
+      {
+        "sample": 4,
+        "coldDeno": 11.600601800000003,
+        "coldNode": 9.82322140000001,
+        "warmDeno": 2.5569870999999984,
+        "warmNode": 2.039128599999996,
+        "coldRegressionPct": -15.321449961328671,
+        "warmRegressionPct": -20.252683324057543
+      }
+    ],
+    "budgetMet": true,
+    "measurements": 46,
+    "hardware": "NVIDIA GeForce RTX 3090, 610.88, 24576",
+    "gpuMemoryMeaning": "whole-GPU sampled use, including desktop; not process allocation or VRAM admission",
+    "installedArtifactQualified": false,
+    "includedInVulkanInstaller": false,
+    "baseRuntimeFilesMatchVulkanReceipt": true,
+    "extraFileSha256": {
+      "vendor/webgpu/dist/win32-x64/dxcompiler-LICENSE.TXT": "05f32c081b3c75cd2cc2a0655b571ba94ebcfc64e9ccca6e5a9e36d6cb67e540",
+      "vendor/webgpu/dist/win32-x64/dxcompiler-ThirdPartyNotices.txt": "87539fdc00b6350520942dbb0683c56acba5e38f5ddbcded046a6958a1386188",
+      "vendor/webgpu/dist/win32-x64/dxcompiler.dll": "04cf618004bf19f789f54e8931c7f7106223bccd354b093c4ff725c748512602"
+    },
+    "extraDllLicense": "LLVM / University of Illinois-NCSA plus shipped third-party notices; not cleared by the strict bundling allowlist",
+    "carriedChecks": 110,
+    "memoryAndThroughput": [
+      {
+        "sample": 1,
+        "engine": "deno",
+        "maxSampledRssMiB": 556.7578125,
+        "medianRenderReadbackPngFps": 138.63228277981986,
+        "wholeGpuMinMiB": 1775,
+        "wholeGpuPeakMiB": 1958
+      },
+      {
+        "sample": 1,
+        "engine": "node",
+        "maxSampledRssMiB": 357.296875,
+        "medianRenderReadbackPngFps": 218.09690908971106,
+        "wholeGpuMinMiB": 1775,
+        "wholeGpuPeakMiB": 1829
+      },
+      {
+        "sample": 2,
+        "engine": "deno",
+        "maxSampledRssMiB": 529.01171875,
+        "medianRenderReadbackPngFps": 73.96049677416671,
+        "wholeGpuMinMiB": 1775,
+        "wholeGpuPeakMiB": 1955
+      },
+      {
+        "sample": 2,
+        "engine": "node",
+        "maxSampledRssMiB": 472.921875,
+        "medianRenderReadbackPngFps": 153.88963259972329,
+        "wholeGpuMinMiB": 1775,
+        "wholeGpuPeakMiB": 1828
+      },
+      {
+        "sample": 4,
+        "engine": "deno",
+        "maxSampledRssMiB": 823.73046875,
+        "medianRenderReadbackPngFps": 28.150196900364225,
+        "wholeGpuMinMiB": 1775,
+        "wholeGpuPeakMiB": 1970
+      },
+      {
+        "sample": 4,
+        "engine": "node",
+        "maxSampledRssMiB": 717.56640625,
+        "medianRenderReadbackPngFps": 76.43821487148467,
+        "wholeGpuMinMiB": 1775,
+        "wholeGpuPeakMiB": 1836
+      }
+    ],
+    "warmCacheHitPct": 100,
+    "comparedPages": 40,
+    "decodedPixelExactPages": 26,
+    "pagesWithinExistingTolerance": 40,
+    "worstDifferentFractionPerCell": 0,
+    "f0DecodedPixelExactPages": 7,
+    "sameMachineAtlasHashCanary": "pass",
+    "localEvidence": ".render-bench/f2/measurements-d3d12",
+    "localReviewSha256": "bd4315b2f1675f33b538422dc4867a3c1683256a204510f62314f0faccbc3ba8"
   }
 }

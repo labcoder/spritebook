@@ -39,6 +39,13 @@ load the system copy by basename. The Vulkan payload excludes FXC, DXC and their
 experiments with DXC are separate from that artifact. PE imports also require the Microsoft VC++
 runtime on the machine; it is not silently copied from Visual Studio.
 
+The private Direct3D 12 experiment adds the npm distribution's `dxcompiler.dll`,
+`dxcompiler-LICENSE.TXT` and `dxcompiler-ThirdPartyNotices.txt`. The shipped DXC license is **LLVM /
+University of Illinois-NCSA**, outside the strict bundling allowlist. These files are excluded from
+the Vulkan installer; their hashes and measured results are recorded in
+[`future/qualification/windows-x64.json`](../future/qualification/windows-x64.json). No Direct3D 12
+redistribution clearance or installed-artifact support claim follows from the private run.
+
 The Windows proof merges a process-local UTF-8 `activeCodePage` into its **app-owned copy** of
 Node's PE manifest, using the Windows SDK's build-time `mt.exe`. Dawn's ANSI loader otherwise cannot
 resolve a Unicode installation directory on the tested code page 1252 host. Upstream manifest

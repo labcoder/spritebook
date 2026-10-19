@@ -89,11 +89,11 @@ readback, palette membership, AOV encoding/layout, mirror normal handling and st
 runner preserves their expectations; it does not reproduce their implementation. It lacks Deno's
 resource sanitizer, so this is not a leak/soak qualification.
 
-Fresh comparisons cover **40 atlas pages**. All decoded channels match Deno exactly; the **15**
-representative pages also match the sealed F0 pixels. PNG CRCs are checked through the independent
-decoder. Same-process raw double rendering and repeated cold/warm atlas-byte canaries pass. The
-fallback tolerance remains 2/255 per channel and at most 0.5% differing pixels **per cell**; blank
-atlas space cannot dilute it. A failing comparison writes expected/actual/diff PNGs.
+Fresh Vulkan comparisons cover **40 atlas pages**. All decoded channels match Deno exactly; the
+**15** representative pages also match the sealed F0 pixels. PNG CRCs are checked through the
+independent decoder. Same-process raw double rendering and repeated cold/warm atlas-byte canaries
+pass. The fallback tolerance remains 2/255 per channel and at most 0.5% differing pixels **per
+cell**; blank atlas space cannot dilute it. A failing comparison writes expected/actual/diff PNGs.
 
 The review image groups **Deno / Node / thresholded difference**, four directions per group. Rows
 are pixel 1x/2x/4x, explicit mirroring, then asymmetric pixel/cel/painterly/clean. It compares the
@@ -103,6 +103,31 @@ The environment adapter must return an ordinary, freshly backed `Uint8Array` for
 Returning Node's `Buffer` made existing `.slice()` calls return views; typed-array alignment then
 corrupted sampled poses. The original numeric and render assertions caught this. F4 must preserve
 the readers' copy/alignment contract explicitly rather than relying on the proof adapter.
+
+## Separate Direct3D 12 experiment
+
+The same base runtime also ran **110 carried checks** and **46 paired process runs** using Dawn
+`d3d12` and Deno `dx12`, with an extra DXC library copied from the pinned npm distribution. Cold
+medians are below; warm Node medians are approximately **2.04 s**, all unchanged frames hit the
+cache, and repeated atlas hashes are stable. Memory and throughput are in the checked-in receipt.
+
+| Sampling | Deno cold | Node cold | Node change |
+| -------- | --------: | --------: | ----------: |
+| 1x       |   4.617 s |   3.888 s |      -15.8% |
+| 2x       |   6.225 s |   5.178 s |      -16.8% |
+| 4x       |  11.601 s |   9.823 s |      -15.3% |
+
+All **40** fresh-control pages pass the existing tolerance; **26** have exact decoded pixels. The
+differences are confined to albedo/normal/depth pages, and no cell pixel exceeds the existing
+channel threshold. The reviewed lit comparison has an empty thresholded difference panel. Only
+**7/15** pages match the original Vulkan F0 pixels exactly, which is recorded rather than treated as
+a cross-backend equality requirement.
+
+This is a **private backend experiment**, excluded from the Vulkan installer. DXC's shipped license
+is LLVM/University of Illinois-NCSA with additional notices, outside the repository's strict
+bundling allowlist. Its exact DLL/notice hashes are recorded. No FXC DLL is copied. Direct3D 12
+installed delivery and redistribution are unqualified; this result makes no license exception or
+second production-renderer commitment.
 
 ## Installed layout and failures
 
