@@ -188,7 +188,7 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       all 30 existing schema/fixture/migration assertions pass on emitted JavaScript through
       `node:test`, with a separate TypeScript check. Remaining package and lifecycle checks follow
       with their ports; no global Deno adapter is being adopted.
-- [ ] **F4-T2 · Port runtime-bound calls in package order.** Keep algorithms and package boundaries.
+- [~] **F4-T2 · Port runtime-bound calls in package order.** Keep algorithms and package boundaries.
       Convert filesystem/process/env/path/error handling in `core` and `registry`; then `importer`,
       `gen` and `rig`; `anim`/`style`; `pack`/`export`; and `cli` composition. `schema` is covered
       by F4-T1 and `render` by F4-T3. Each group keeps its existing fixtures and gains Node
@@ -199,7 +199,10 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       **Progress:** core and registry compile on Node; 192 checks cover their first package group,
       including the real process-crash/concurrency and VRAM lease fixtures. Kernel workspace locks
       use a small Rust helper; policy stays in TypeScript. Two tests that also call the CLI remain
-      queued with that package's port, rather than counted as passing here.
+      queued with that package's port, rather than counted as passing here. Importer and animation
+      now add 54 passing Node checks for deterministic GLB/OBJ/FBX/VRM import, rig preservation,
+      retargeting, clip packing and preview parity. Animation's render/bake integration checks are
+      queued with the renderer port.
 - [ ] **F4-T3 · Promote the qualified renderer.** Integrate the F2 path through the existing render
       seam. Assign a fresh renderer signature/cache namespace, including build/backend/adapter and
       available driver identity. Never reuse old cached frames as evidence of Node rendering. Keep

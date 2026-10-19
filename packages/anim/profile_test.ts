@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * Profile + loader validation (P3-T1). The profile is checked against the REAL
  * UAL subset fixture, never against itself: `core` must be exactly the
@@ -6,16 +8,16 @@
  * validation (unit quats, hemisphere continuity, exact counts), actionable
  * errors for the unsupported (CUBICSPLINE, mixed interpolation modes).
  */
-import { assert, assertAlmostEquals, assertEquals, assertThrows } from 'jsr:@std/assert@1';
+import { assert, assertAlmostEquals, assertEquals, assertThrows } from '@std/assert';
 import { Document, NodeIO } from '@gltf-transform/core';
-import { loadClip, loadSkeletonRest, UAL_HUMANOID } from './profile.ts';
-import { qAngle, qFromMat4, type Quat } from './quat.ts';
+import { loadClip, loadSkeletonRest, UAL_HUMANOID } from './dist/profile.js';
+import { qAngle, qFromMat4, type Quat } from './dist/quat.js';
 
 const io = new NodeIO();
 const FIXTURES = new URL('./fixtures/', import.meta.url);
 
 async function readDoc(name: string): Promise<Document> {
-  return await io.readBinary(await Deno.readFile(new URL(name, FIXTURES)));
+  return await io.readBinary(new Uint8Array(await fs.readFile(new URL(name, FIXTURES))));
 }
 
 let ualP: Promise<Document> | undefined;
@@ -49,7 +51,7 @@ const CORE_21 = [
   'upperarm_r',
 ];
 
-Deno.test('UAL_HUMANOID: core is exactly the 21-joint fixture body', () => {
+test('UAL_HUMANOID: core is exactly the 21-joint fixture body', () => {
   assertEquals(UAL_HUMANOID.id, 'ual-humanoid');
   assertEquals([...UAL_HUMANOID.core].sort(), CORE_21);
   assertEquals(new Set(UAL_HUMANOID.core).size, 21);
@@ -65,7 +67,7 @@ Deno.test('UAL_HUMANOID: core is exactly the 21-joint fixture body', () => {
   }
 });
 
-Deno.test('UAL_HUMANOID: extended is exactly the remaining UAL joints (fixture-derived)', async () => {
+test('UAL_HUMANOID: extended is exactly the remaining UAL joints (fixture-derived)', async () => {
   const clip = loadClip(await ualDoc(), 'Walk_Loop', 'walk');
   const coreSet = new Set(UAL_HUMANOID.core);
   const remaining = [...clip.tracks.keys()].filter((n) => !coreSet.has(n)).sort();
@@ -75,7 +77,7 @@ Deno.test('UAL_HUMANOID: extended is exactly the remaining UAL joints (fixture-d
   }
 });
 
-Deno.test('UAL_HUMANOID: side pairs are explicit, left first, covering every sided joint', () => {
+test('UAL_HUMANOID: side pairs are explicit, left first, covering every sided joint', () => {
   const all = new Set([...UAL_HUMANOID.core, ...UAL_HUMANOID.extended]);
   const seen = new Set<string>();
   for (const [l, r] of UAL_HUMANOID.sidePairs) {
@@ -93,7 +95,7 @@ Deno.test('UAL_HUMANOID: side pairs are explicit, left first, covering every sid
   assertEquals(UAL_HUMANOID.sidePairs.length, 29);
 });
 
-Deno.test('loadSkeletonRest: UAL subset keeps 65 joints + the Armature wrapper, hierarchy intact', async () => {
+test('loadSkeletonRest: UAL subset keeps 65 joints + the Armature wrapper, hierarchy intact', async () => {
   const rest = loadSkeletonRest(await ualDoc());
   assertEquals(rest.locals.size, 66);
   assertEquals(rest.parents.get('Armature'), '');
@@ -108,7 +110,7 @@ Deno.test('loadSkeletonRest: UAL subset keeps 65 joints + the Armature wrapper, 
   }
 });
 
-Deno.test('loadSkeletonRest: fixture humanoids expose exactly the 21 core joints (mesh node excluded)', async () => {
+test('loadSkeletonRest: fixture humanoids expose exactly the 21 core joints (mesh node excluded)', async () => {
   for (
     const name of ['humanoid-normal.glb', 'humanoid-tall-thin.glb', 'humanoid-short-chunky.glb']
   ) {
@@ -122,7 +124,7 @@ Deno.test('loadSkeletonRest: fixture humanoids expose exactly the 21 core joints
   assertAlmostEquals(pelvis[13], 0.9, 1e-6, 'translation lives in m[12..14] (column-major)');
 });
 
-Deno.test('loadClip: Walk_Loop — duration ~1.33 s, 65 joint tracks, unit continuous quats', async () => {
+test('loadClip: Walk_Loop — duration ~1.33 s, 65 joint tracks, unit continuous quats', async () => {
   const clip = loadClip(await ualDoc(), 'Walk_Loop', 'walk');
   assertEquals(clip.id, 'walk');
   assertAlmostEquals(clip.duration, 1.3333334, 1e-3);
@@ -152,7 +154,7 @@ Deno.test('loadClip: Walk_Loop — duration ~1.33 s, 65 joint tracks, unit conti
   assertEquals(pelvis.times[0], 0);
 });
 
-Deno.test('loadClip: A_TPose parses and matches the source rest pose (bind pose = T-pose)', async () => {
+test('loadClip: A_TPose parses and matches the source rest pose (bind pose = T-pose)', async () => {
   const doc = await ualDoc();
   const clip = loadClip(doc, 'A_TPose', 'tpose');
   assertAlmostEquals(clip.duration, 2.5, 1e-6);
@@ -173,7 +175,7 @@ Deno.test('loadClip: A_TPose parses and matches the source rest pose (bind pose 
   }
 });
 
-Deno.test('loadClip: unknown animation name throws, listing what exists', async () => {
+test('loadClip: unknown animation name throws, listing what exists', async () => {
   const doc = await ualDoc();
   const err = assertThrows(() => loadClip(doc, 'Run_Loop', 'run'), Error, 'not found');
   assert(err.message.includes('Walk_Loop'), 'lists Walk_Loop');
@@ -215,7 +217,7 @@ function synthDoc(
   return doc;
 }
 
-Deno.test('loadClip: CUBICSPLINE is an actionable error, never a silent fallback', () => {
+test('loadClip: CUBICSPLINE is an actionable error, never a silent fallback', () => {
   const err = assertThrows(
     () => loadClip(synthDoc('CUBICSPLINE'), 'synth', 'x'),
     Error,
@@ -225,7 +227,7 @@ Deno.test('loadClip: CUBICSPLINE is an actionable error, never a silent fallback
   assert(err.message.includes('resample'), 'says how to fix it');
 });
 
-Deno.test('loadClip: a joint mixing LINEAR and STEP paths is an actionable error', () => {
+test('loadClip: a joint mixing LINEAR and STEP paths is an actionable error', () => {
   const err = assertThrows(
     () => loadClip(synthDoc('LINEAR', 'STEP'), 'synth', 'x'),
     Error,

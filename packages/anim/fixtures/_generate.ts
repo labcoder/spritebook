@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Anim fixture generator (deterministic; run once, files are checked in):
  * THREE rigged humanoids of deliberately different proportions, all on the
@@ -239,7 +240,7 @@ function buildBody(p: Proportions): Uint8Array | Promise<Uint8Array> {
 for (const p of BODIES) {
   const bytes = await buildBody(p);
   const path = win(new URL(`humanoid-${p.name}.glb`, here));
-  await Deno.writeFile(path, bytes);
+  await fs.writeFile(path, bytes);
   console.log(
     `${path.split('/').at(-1)}: ${bytes.length} B, height ~${
       (p.legLen + p.torsoLen * 1.8 + p.headSize).toFixed(2)

@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Extract a small, committable clip-subset fixture from the maintainer's local
  * UAL download (CC0 1.0 — see the pack's License.txt; that license is what
@@ -12,9 +13,9 @@
  *     packages/anim/fixtures/_extract-ual.ts [ualGlbPath]
  */
 import { NodeIO } from '@gltf-transform/core';
-import { prune, resample } from 'npm:@gltf-transform/functions@4.4.1';
+import { prune, resample } from '@gltf-transform/functions';
 
-const SRC = Deno.args[0] ??
+const SRC = process.argv.slice(2)[0] ??
   'C:/dev/vendor-assets/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb';
 const KEEP = ['Walk_Loop', 'A_TPose'];
 
@@ -22,7 +23,7 @@ const here = new URL('.', import.meta.url);
 const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
 const io = new NodeIO();
-const doc = await io.readBinary(await Deno.readFile(SRC));
+const doc = await io.readBinary(new Uint8Array(await fs.readFile(SRC)));
 const root = doc.getRoot();
 
 for (const anim of root.listAnimations()) {
@@ -48,5 +49,5 @@ if (kept.length !== KEEP.length) {
 }
 const bytes = await io.writeBinary(doc);
 const out = win(new URL('ual-subset.glb', here));
-await Deno.writeFile(out, bytes);
+await fs.writeFile(out, bytes);
 console.log(`ual-subset.glb: ${bytes.length} B, clips: ${kept.join(', ')}`);

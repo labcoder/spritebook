@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * ClipBinding sampling + the poses artifact (P3-T1 integrator half). Samples a
  * Clip (native or retargeted) at the contract's frame times and writes the
@@ -207,13 +208,13 @@ export async function writePoses(
   const out = new Uint8Array(head.length + blob.length);
   out.set(head, 0);
   out.set(blob, head.length);
-  await Deno.writeFile(path, out);
+  await fs.writeFile(path, out);
 }
 
 export async function readPoses(
   path: string,
 ): Promise<{ header: PosesHeader; data: Float32Array }> {
-  const bytes = await Deno.readFile(path);
+  const bytes = new Uint8Array(await fs.readFile(path));
   const nl = bytes.indexOf(0x0a);
   if (nl < 0) throw new Error(`${path}: not a poses file (no header line)`);
   const header = JSON.parse(new TextDecoder().decode(bytes.subarray(0, nl))) as PosesHeader;

@@ -1,28 +1,32 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Sampling semantics + the poses artifact (integrator half of P3-T1):
  * frame-time laws from contracts.ts, TRS composition against rest, and the
  * CROSS-PACKAGE round-trip — anim writes, RENDER reads — which is the pin that
  * keeps the two ends of the poses seam from drifting.
  */
-import { assert, assertAlmostEquals, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertAlmostEquals, assertEquals } from '@std/assert';
 import { NodeIO } from '@gltf-transform/core';
 import { mapPosesJoints, readPoses as renderReadPoses } from '../render/poses.ts';
-import type { Clip } from './contracts.ts';
-import { loadClip, loadSkeletonRest } from './profile.ts';
-import { frameTimes, readPoses, sampleClip, writePoses } from './sample.ts';
+import type { Clip } from './dist/contracts.js';
+import { loadClip, loadSkeletonRest } from './dist/profile.js';
+import { frameTimes, readPoses, sampleClip, writePoses } from './dist/sample.js';
 
 const UAL = new URL('./fixtures/ual-subset.glb', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,
   '$1',
 );
 
-Deno.test('frameTimes: loop is exclusive-end; holdLast lands on the end', () => {
+test('frameTimes: loop is exclusive-end; holdLast lands on the end', () => {
   assertEquals(frameTimes(2, { frames: 4, speed: 1, holdLast: false }), [0, 0.5, 1, 1.5]);
   assertEquals(frameTimes(2, { frames: 3, speed: 1, holdLast: true }), [0, 1, 2]);
   assertEquals(frameTimes(1, { frames: 1, speed: 1, holdLast: true }), [0]);
 });
 
-Deno.test('sampleClip: untracked joints hold rest; tracked joints move; STEP steps', () => {
+test('sampleClip: untracked joints hold rest; tracked joints move; STEP steps', () => {
   const rest = {
     parents: new Map([['a', ''], ['b', 'a']]),
     locals: new Map([
@@ -51,13 +55,13 @@ Deno.test('sampleClip: untracked joints hold rest; tracked joints move; STEP ste
   assertAlmostEquals(s.data[3 * 16 + 13], 1, 1e-6, 'b.ty frame 1');
 });
 
-Deno.test('poses round-trip: anim writes, ANIM and RENDER read identical bytes', async () => {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(UAL));
+test('poses round-trip: anim writes, ANIM and RENDER read identical bytes', async () => {
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(UAL)));
   const rest = loadSkeletonRest(doc);
   const clip = loadClip(doc, 'Walk_Loop', 'walk-loop');
   const sampled = sampleClip(clip, rest, { frames: 6, speed: 1, holdLast: false });
 
-  const dir = await Deno.makeTempDir();
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const path = `${dir}/poses-walk-loop.bin`;
     await writePoses(path, 'walk-loop', sampled);
@@ -78,13 +82,13 @@ Deno.test('poses round-trip: anim writes, ANIM and RENDER read identical bytes',
     // determinism: write twice -> byte-identical files
     const path2 = `${dir}/again.bin`;
     await writePoses(path2, 'walk-loop', sampled);
-    assertEquals(await Deno.readFile(path), await Deno.readFile(path2));
+    assertEquals(new Uint8Array(await fs.readFile(path)), new Uint8Array(await fs.readFile(path2)));
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await fs.rm(dir, { recursive: true });
   }
 });
 
-Deno.test('frameTimes: speed does NOT shrink the sampling window', () => {
+test('frameTimes: speed does NOT shrink the sampling window', () => {
   // This replaces an assertion that `frameTimes(2, {frames:4, speed:2})` is
   // [0, 0.25, 0.5, 0.75] - i.e. that double speed samples only the FIRST HALF
   // of the clip. That locked the defect in as the contract: `walk-loop:6@0.5`

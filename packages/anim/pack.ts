@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { type ExecutionContext, verifyPackPin } from '@spritebook/registry';
 /**
  * Animation-pack tooling (P3-T1; D-009 packs are catalog data, D-013 bundle
@@ -25,7 +26,7 @@ import { type ExecutionContext, verifyPackPin } from '@spritebook/registry';
  *  - tags: the kebab id's words + the category, deduped (clipTags).
  */
 import { Logger, NodeIO, PropertyType, type Root } from '@gltf-transform/core';
-import { prune, resample } from 'npm:@gltf-transform/functions@4.4.1';
+import { prune, resample } from '@gltf-transform/functions';
 import {
   type AnimClipMeta,
   type AnimPack,
@@ -135,17 +136,17 @@ export interface BuildPackOptions {
 export async function buildPack(opts: BuildPackOptions): Promise<AnimPack> {
   const io = new NodeIO().setLogger(SILENT);
   const clipsDir = `${opts.outDir}/${PACK_CLIP_DIR}`;
-  await Deno.remove(clipsDir, { recursive: true }).catch((err) => {
-    if (!(err instanceof Deno.errors.NotFound)) throw err;
+  await fs.rm(clipsDir, { recursive: true }).catch((err) => {
+    if (!((err as NodeJS.ErrnoException)?.code === 'ENOENT')) throw err;
   });
-  await Deno.mkdir(clipsDir, { recursive: true });
+  await fs.mkdir(clipsDir, { recursive: true });
 
   const takenIds = new Set<string>();
   const clips: AnimClipMeta[] = [];
   let skeletonNames: string | undefined;
 
   for (const srcPath of opts.srcGlbs) {
-    const srcBytes = await Deno.readFile(srcPath).catch((err) => {
+    const srcBytes = await fs.readFile(srcPath).then((bytes) => new Uint8Array(bytes)).catch((err) => {
       throw new Error(`buildPack: cannot read source glb ${srcPath}: ${message(err)}`);
     });
     const probe = await io.readBinary(srcBytes);
@@ -255,7 +256,7 @@ export async function buildPack(opts: BuildPackOptions): Promise<AnimPack> {
         durationS,
         loop: name.endsWith('_Loop'),
       });
-      await Deno.writeFile(`${clipsDir}/${id}.glb`, await io.writeBinary(doc));
+      await fs.writeFile(`${clipsDir}/${id}.glb`, await io.writeBinary(doc));
     }
   }
 
@@ -275,7 +276,7 @@ export async function buildPack(opts: BuildPackOptions): Promise<AnimPack> {
     },
     `AnimPack "${opts.meta.id}" (buildPack)`,
   );
-  await Deno.writeTextFile(`${opts.outDir}/${PACK_MANIFEST}`, canonicalJson(pack));
+  await fs.writeFile(`${opts.outDir}/${PACK_MANIFEST}`, canonicalJson(pack));
   return pack;
 }
 
@@ -323,8 +324,8 @@ export async function loadPack(dir: string, context: ExecutionContext = {}): Pro
   const missing: string[] = [];
   for (const clip of pack.clips) {
     const path = `${dir}/${PACK_CLIP_DIR}/${clip.id}.glb`;
-    const stat = await Deno.stat(path).catch(() => undefined);
-    if (!stat?.isFile) missing.push(path);
+    const stat = await fs.stat(path).catch(() => undefined);
+    if (!stat?.isFile()) missing.push(path);
   }
   if (missing.length > 0) {
     throw new Error(
@@ -366,15 +367,15 @@ export async function importPack(srcDir: string, packsRoot: string): Promise<Ani
   }
   const pack = await loadPack(srcDir);
   const destDir = `${packsRoot}/${pack.id}`;
-  if (await Deno.stat(destDir).catch(() => undefined)) {
+  if (await fs.stat(destDir).catch(() => undefined)) {
     throw new Error(
       `pack "${pack.id}" is already installed at ${destDir} — remove it first to re-import`,
     );
   }
-  await Deno.mkdir(`${destDir}/${PACK_CLIP_DIR}`, { recursive: true });
-  await Deno.writeTextFile(`${destDir}/${PACK_MANIFEST}`, canonicalJson(pack));
+  await fs.mkdir(`${destDir}/${PACK_CLIP_DIR}`, { recursive: true });
+  await fs.writeFile(`${destDir}/${PACK_MANIFEST}`, canonicalJson(pack));
   for (const clip of pack.clips) {
-    await Deno.copyFile(
+    await fs.copyFile(
       `${srcDir}/${PACK_CLIP_DIR}/${clip.id}.glb`,
       `${destDir}/${PACK_CLIP_DIR}/${clip.id}.glb`,
     );
@@ -385,7 +386,7 @@ export async function importPack(srcDir: string, packsRoot: string): Promise<Ani
 /** Read `dir/pack.json` as parsed-but-unvalidated JSON, errors actionable. */
 async function readManifest(dir: string): Promise<unknown> {
   const path = `${dir}/${PACK_MANIFEST}`;
-  const text = await Deno.readTextFile(path).catch((err) => {
+  const text = await fs.readFile(path, 'utf8').catch((err) => {
     throw new Error(`not an animation pack: cannot read ${path}: ${message(err)}`);
   });
   try {
@@ -401,7 +402,7 @@ async function readManifest(dir: string): Promise<unknown> {
  */
 export async function loadPackClip(packDir: string, clipId: string): Promise<Clip> {
   const path = `${packDir}/${PACK_CLIP_DIR}/${clipId}.glb`;
-  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path)));
   const anims = doc.getRoot().listAnimations();
   if (anims.length !== 1) {
     throw new Error(`${path}: expected exactly one animation, found ${anims.length}`);

@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Preview-clip emission (D-006 retarget-once): write a retargeted Clip back
  * into the TARGET model's glTF as a single animation, producing the GLB the
@@ -55,7 +56,7 @@ export async function writePreviewGlb(
   // glb writer in the repo emits plain per-attribute buffers and renders;
   // the preview must too.
   const io = new NodeIO().setVertexLayout(VertexLayout.SEPARATE);
-  const doc = await io.readBinary(await Deno.readFile(targetModelPath));
+  const doc = await io.readBinary(new Uint8Array(await fs.readFile(targetModelPath)));
   addClipToDocument(doc, clip, clip.id);
-  await Deno.writeFile(outPath, await io.writeBinary(doc));
+  await fs.writeFile(outPath, await io.writeBinary(doc));
 }

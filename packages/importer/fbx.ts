@@ -95,7 +95,9 @@ export function threeSceneToDocument(scene: THREE.Group, path: string): Document
         throw new ImportError(`${path}: skinned mesh "${obj.name}" has no skeleton`);
       }
       const ibm = new Float32Array(skeleton.bones.length * 16);
-      skeleton.boneInverses.forEach((m: THREE.Matrix4, i: number) => ibm.set(m.elements, i * 16));
+      skeleton.boneInverses.forEach((m: THREE.Matrix4, i: number) => {
+        ibm.set(m.elements, i * 16);
+      });
       const skin = doc.createSkin(`${obj.name}-skin`)
         .setInverseBindMatrices(
           doc.createAccessor(`${obj.name}-ibm`).setType('MAT4').setArray(ibm).setBuffer(buffer),

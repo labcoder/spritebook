@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * UAL humanoid profile + glTF -> in-memory loaders for @spritebook/anim
  * (P3-T1). The profile is the semantic namespace for humanoid retargeting:
@@ -316,6 +317,6 @@ export const loadClip: LoadClip = (doc, animationName, clipId): Clip => {
 
 /** loadSkeletonRest over a glb on disk (bake-side convenience; same semantics). */
 export async function loadSkeletonRestFromFile(path: string): Promise<SkeletonRest> {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path)));
   return loadSkeletonRest(doc);
 }

@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
 /**
  * Numeric validation for the humanoid retarget core (P3-T1) — the
  * animation-retargeting skill's "numbers first, eyeballs second" as tests.
@@ -17,11 +19,11 @@
  *   mismatch: UAL rests with a ~4° knee pre-bend, fixture rigs rest straight)
  * - A_TPose null transfer: 0 rad deviation, pelvis dev < 3e-8 m
  */
-import { assert, assertAlmostEquals, assertEquals, assertThrows } from 'jsr:@std/assert@1';
+import { assert, assertAlmostEquals, assertEquals, assertThrows } from '@std/assert';
 import { NodeIO } from '@gltf-transform/core';
-import type { Clip, RetargetResult, SkeletonRest } from './contracts.ts';
-import { loadClip, loadSkeletonRest, UAL_HUMANOID } from './profile.ts';
-import { CONTACT_EPS_M, measureRestFacingYaw, retargetClip } from './retarget.ts';
+import type { Clip, RetargetResult, SkeletonRest } from './dist/contracts.js';
+import { loadClip, loadSkeletonRest, UAL_HUMANOID } from './dist/profile.js';
+import { CONTACT_EPS_M, measureRestFacingYaw, retargetClip } from './dist/retarget.js';
 import {
   qAngle,
   qFromMat4,
@@ -32,7 +34,7 @@ import {
   type Quat,
   vAdd,
   type Vec3,
-} from './quat.ts';
+} from './dist/quat.js';
 
 // ---------------------------------------------------------------------------
 // Independent forward kinematics over the frozen contracts
@@ -169,7 +171,7 @@ function fx(): Promise<Fixtures> {
     const io = new NodeIO();
     const dir = new URL('./fixtures/', import.meta.url);
     const read = async (name: string) =>
-      await io.readBinary(await Deno.readFile(new URL(name, dir)));
+      await io.readBinary(new Uint8Array(await fs.readFile(new URL(name, dir))));
     const ualDoc = await read('ual-subset.glb');
     const ualRest = loadSkeletonRest(ualDoc);
     const srcSk = fkRest(ualRest);
@@ -193,7 +195,7 @@ function fx(): Promise<Fixtures> {
 // Tests
 // ---------------------------------------------------------------------------
 
-Deno.test('facing yaw: measured ~0 for UAL and all three fixture bodies (never assumed)', async () => {
+test('facing yaw: measured ~0 for UAL and all three fixture bodies (never assumed)', async () => {
   const f = await fx();
   assert(Math.abs(measureRestFacingYaw(f.ualRest, UAL_HUMANOID)) < 1e-6, 'source yaw ~0');
   for (const [name, rest] of f.targets) {
@@ -201,7 +203,7 @@ Deno.test('facing yaw: measured ~0 for UAL and all three fixture bodies (never a
   }
 });
 
-Deno.test('hipScale: pelvis rest-height ratio, per fixture body', async () => {
+test('hipScale: pelvis rest-height ratio, per fixture body', async () => {
   const f = await fx();
   const srcHipY = f.srcRestPos.get('pelvis')![1]; // measured 0.9167 m
   assertAlmostEquals(srcHipY, 0.9167, 1e-3);
@@ -218,7 +220,7 @@ Deno.test('hipScale: pelvis rest-height ratio, per fixture body', async () => {
   }
 });
 
-Deno.test('Walk_Loop: knee flexion transfers onto all three bodies (a static result fails)', async () => {
+test('Walk_Loop: knee flexion transfers onto all three bodies (a static result fails)', async () => {
   const f = await fx();
   for (const [name, rest] of f.targets) {
     const res = retargetClip(f.walk, f.ualRest, rest, UAL_HUMANOID);
@@ -251,7 +253,7 @@ Deno.test('Walk_Loop: knee flexion transfers onto all three bodies (a static res
   }
 });
 
-Deno.test('Walk_Loop: source ground-contact frames keep target feet planted within 2 cm', async () => {
+test('Walk_Loop: source ground-contact frames keep target feet planted within 2 cm', async () => {
   const f = await fx();
   for (const [name, rest] of f.targets) {
     const res = retargetClip(f.walk, f.ualRest, rest, UAL_HUMANOID);
@@ -292,7 +294,7 @@ Deno.test('Walk_Loop: source ground-contact frames keep target feet planted with
   }
 });
 
-Deno.test('Walk_Loop: hip sway and bob transfer scaled by hipScale (in-place variant: no forward drift)', async () => {
+test('Walk_Loop: hip sway and bob transfer scaled by hipScale (in-place variant: no forward drift)', async () => {
   const f = await fx();
   const spans = (clip: Clip, sk: FkSkeleton, times: Float32Array) => {
     const mins: Vec3 = [Infinity, Infinity, Infinity];
@@ -326,7 +328,7 @@ Deno.test('Walk_Loop: hip sway and bob transfer scaled by hipScale (in-place var
   }
 });
 
-Deno.test('Walk_Loop: mapping report is exact — 21 core mapped, 44 extended dropped and reported', async () => {
+test('Walk_Loop: mapping report is exact — 21 core mapped, 44 extended dropped and reported', async () => {
   const f = await fx();
   for (const [name, rest] of f.targets) {
     const res = retargetClip(f.walk, f.ualRest, rest, UAL_HUMANOID);
@@ -350,7 +352,7 @@ Deno.test('Walk_Loop: mapping report is exact — 21 core mapped, 44 extended dr
   }
 });
 
-Deno.test('Walk_Loop: output rotations are hemisphere-continuous and unit length', async () => {
+test('Walk_Loop: output rotations are hemisphere-continuous and unit length', async () => {
   const f = await fx();
   for (const [name, rest] of f.targets) {
     const res = retargetClip(f.walk, f.ualRest, rest, UAL_HUMANOID);
@@ -390,7 +392,7 @@ function canon(res: RetargetResult) {
   };
 }
 
-Deno.test('retargetClip is deterministic: identical inputs give deep-equal results', async () => {
+test('retargetClip is deterministic: identical inputs give deep-equal results', async () => {
   const f = await fx();
   const [, rest] = f.targets[0];
   const a = retargetClip(f.walk, f.ualRest, rest, UAL_HUMANOID);
@@ -398,7 +400,7 @@ Deno.test('retargetClip is deterministic: identical inputs give deep-equal resul
   assertEquals(canon(a), canon(b));
 });
 
-Deno.test('A_TPose null transfer: every target stays at rest (identity-ish deltas, ~zero correction)', async () => {
+test('A_TPose null transfer: every target stays at rest (identity-ish deltas, ~zero correction)', async () => {
   const f = await fx();
   for (const [name, rest] of f.targets) {
     const res = retargetClip(f.tpose, f.ualRest, rest, UAL_HUMANOID);
@@ -429,7 +431,7 @@ Deno.test('A_TPose null transfer: every target stays at rest (identity-ish delta
   }
 });
 
-Deno.test('degenerate target hips rest height fails loud (review F6)', async () => {
+test('degenerate target hips rest height fails loud (review F6)', async () => {
   const f = await fx();
   // a target whose pelvis rests at Y=0: hipScale would silently zero root motion
   const flat: SkeletonRest = {
@@ -449,7 +451,7 @@ Deno.test('degenerate target hips rest height fails loud (review F6)', async () 
   assert(threw, 'flat target must be rejected, not silently mirrored/zeroed');
 });
 
-Deno.test('non-unit rest scale fails loud, naming the joint (review F7)', async () => {
+test('non-unit rest scale fails loud, naming the joint (review F7)', async () => {
   const f = await fx();
   const [, normal] = f.targets[0];
   // clone the normal body and bake a 2x scale into one joint's rest local —
@@ -484,7 +486,7 @@ function renamed(rest: SkeletonRest, ren: Record<string, string>): SkeletonRest 
   return { parents, locals };
 }
 
-Deno.test('D-040: a hips/head dialect target maps through aliases, keeping its own names', async () => {
+test('D-040: a hips/head dialect target maps through aliases, keeping its own names', async () => {
   const f = await fx();
   const canonical = f.targets.find(([n]) => n === 'normal')![1];
   const dialect = renamed(canonical, { pelvis: 'hips', Head: 'head' });

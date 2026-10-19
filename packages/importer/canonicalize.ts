@@ -13,7 +13,7 @@
  * formulation that is exact for skins, and it is why a consumer must compose
  * node transforms to see the normalized character.
  */
-import { Document, type Node } from '@gltf-transform/core';
+import type { Document, Node } from '@gltf-transform/core';
 import { getBounds } from '@gltf-transform/core';
 import { dedup, normals, prune, resample, weld } from '@gltf-transform/functions';
 import { ImportError } from './errors.ts';

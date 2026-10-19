@@ -1,10 +1,11 @@
+import { test } from 'node:test';
 /**
  * The component check exists to predict a rig ceiling from geometry alone, so
  * the two things it must get right are the false positive it nearly had (UV
  * seams and specks) and the true positive (a real second body).
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { connectedComponents, disconnectedWarning, SIGNIFICANT_FRACTION } from './components.ts';
+import { assert, assertEquals } from '@std/assert';
+import { connectedComponents, disconnectedWarning, SIGNIFICANT_FRACTION } from './dist/components.js';
 
 /** A quad at x-offset `dx`, as 4 verts + 2 triangles appended to the buffers. */
 function quad(pos: number[], idx: number[], dx: number, copies = 1): void {
@@ -20,7 +21,7 @@ function quad(pos: number[], idx: number[], dx: number, copies = 1): void {
   }
 }
 
-Deno.test('a UV seam does not become a second component', () => {
+test('a UV seam does not become a second component', () => {
   // THE false positive this was designed around: the border's weld merges
   // vertices identical in ALL attributes, so a texture seam legitimately
   // leaves two vertices at the same POINT. Walking raw indices would call one
@@ -38,7 +39,7 @@ Deno.test('a UV seam does not become a second component', () => {
   assertEquals(disconnectedWarning(r), null);
 });
 
-Deno.test('one body plus specks is quiet; two bodies warn', () => {
+test('one body plus specks is quiet; two bodies warn', () => {
   // Measured on the real subjects: bulma is 73 shells (largest 92.4%, next
   // 1.7%) and healthy; astro is 76 shells but its second is 20% and its rig
   // ceiling is real. The RAW count separates nothing - the significant one does.
@@ -63,14 +64,14 @@ Deno.test('one body plus specks is quiet; two bodies warn', () => {
   assert(w.includes('no joint placement or hint can repair') || w.includes('hint can repair'), w);
 });
 
-Deno.test('the significance threshold is the documented one', () => {
+test('the significance threshold is the documented one', () => {
   // pinned because the constant is argued from three subjects, not derived:
   // it sits between the largest decoration seen (4.0%) and the smallest real
   // second body (20.0%). Moving it should be a deliberate, visible change.
   assertEquals(SIGNIFICANT_FRACTION, 0.1);
 });
 
-Deno.test('all fragments and no body is its own finding, not silence', () => {
+test('all fragments and no body is its own finding, not silence', () => {
   // Reachable once `gen` records the significant count on the receipt: zero
   // reads the same as one to a length check and means the opposite. Twenty
   // equal shells is 5% each, so nothing clears the 10% floor.
@@ -85,7 +86,7 @@ Deno.test('all fragments and no body is its own finding, not silence', () => {
   assert(w.includes('another seed'), `the remedy is a new generation, not a repair: ${w}`);
 });
 
-Deno.test('an empty mesh reports nothing rather than dividing by zero', () => {
+test('an empty mesh reports nothing rather than dividing by zero', () => {
   const r = connectedComponents(new Float32Array(), new Uint32Array());
   assertEquals(r.components.length, 0);
   assertEquals(r.weldedVertices, 0);

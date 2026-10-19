@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Hermetic pack-tooling tests (P3-T1): no vendor-assets dependency — sources
  * are synthesized in-test with 2-5 tiny animations each, covering every
@@ -5,7 +9,7 @@
  * the split invariants (ONE animation, NO meshes/skins, full skeleton), the
  * resample effect, loadPack/listClips/importPack, and byte determinism.
  */
-import { assert, assertEquals, assertRejects, assertStringIncludes } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects, assertStringIncludes } from '@std/assert';
 import { Document, NodeIO } from '@gltf-transform/core';
 import { canonicalJson } from '@spritebook/schema';
 import {
@@ -16,8 +20,8 @@ import {
   listClips,
   loadPack,
   toClipId,
-} from './pack.ts';
-import { PACK_CLIP_DIR, PACK_MANIFEST } from './contracts.ts';
+} from './dist/pack.js';
+import { PACK_CLIP_DIR, PACK_MANIFEST } from './dist/contracts.js';
 
 const SQ = Math.SQRT1_2;
 const DENSE_KEYS = 31;
@@ -113,19 +117,19 @@ const META = {
 };
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
-  const dir = (await Deno.makeTempDir({ prefix: 'spritebook-pack-test-' })).replaceAll('\\', '/');
+  const dir = (await fs.mkdtemp(join(tmpdir(), 'spritebook-pack-test-'))).replaceAll('\\', '/');
   try {
     await fn(dir);
   } finally {
-    await Deno.remove(dir, { recursive: true }).catch(() => {});
+    await fs.rm(dir, { recursive: true }).catch(() => {});
   }
 }
 
 /** Write both synthetic sources and build the pack into `<dir>/pack`. */
 async function buildFixture(dir: string) {
   const srcGlbs = [`${dir}/srcA.glb`, `${dir}/srcB.glb`];
-  await Deno.writeFile(srcGlbs[0], await makeSourceGlb(SRC_A));
-  await Deno.writeFile(srcGlbs[1], await makeSourceGlb(SRC_B));
+  await fs.writeFile(srcGlbs[0], await makeSourceGlb(SRC_A));
+  await fs.writeFile(srcGlbs[1], await makeSourceGlb(SRC_B));
   const outDir = `${dir}/pack`;
   const pack = await buildPack({ srcGlbs, outDir, meta: META });
   return { srcGlbs, outDir, pack };
@@ -135,7 +139,7 @@ function assertSameBytes(a: Uint8Array, b: Uint8Array, what: string) {
   assert(a.length === b.length && a.every((v, i) => v === b[i]), `${what}: bytes differ`);
 }
 
-Deno.test('derivation helpers: kebab ids, prefix categories, tags', () => {
+test('derivation helpers: kebab ids, prefix categories, tags', () => {
   assertEquals(toClipId('Walk_Loop'), 'walk-loop');
   assertEquals(toClipId('A_TPose'), 'a-tpose'); // uppercase runs stay one word
   assertEquals(toClipId('PickUp_Table'), 'pick-up-table');
@@ -154,7 +158,7 @@ Deno.test('derivation helpers: kebab ids, prefix categories, tags', () => {
   assertEquals(clipTags('idle-loop', 'idle'), ['idle', 'loop']); // category deduped
 });
 
-Deno.test('buildPack splits every animation into a clip with derived metadata', async () => {
+test('buildPack splits every animation into a clip with derived metadata', async () => {
   await withTempDir(async (dir) => {
     const { outDir, pack } = await buildFixture(dir);
 
@@ -191,19 +195,19 @@ Deno.test('buildPack splits every animation into a clip with derived metadata', 
     assertEquals(byId.get('punch-jab')!.durationS, 0.5);
 
     for (const clip of pack.clips) {
-      const stat = await Deno.stat(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`);
-      assert(stat.isFile && stat.size > 0, `${clip.id}.glb missing or empty`);
+      const stat = await fs.stat(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`);
+      assert(stat.isFile() && stat.size > 0, `${clip.id}.glb missing or empty`);
     }
   });
 });
 
-Deno.test('built clip glbs: exactly one animation, no meshes/skins, full skeleton', async () => {
+test('built clip glbs: exactly one animation, no meshes/skins, full skeleton', async () => {
   await withTempDir(async (dir) => {
     const { outDir, pack } = await buildFixture(dir);
     const io = new NodeIO();
     for (const clip of pack.clips) {
       const doc = await io.readBinary(
-        await Deno.readFile(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`),
+        new Uint8Array(await fs.readFile(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`)),
       );
       const root = doc.getRoot();
       assertEquals(root.listAnimations().length, 1, `${clip.id}: not exactly one animation`);
@@ -219,11 +223,11 @@ Deno.test('built clip glbs: exactly one animation, no meshes/skins, full skeleto
   });
 });
 
-Deno.test('resample strips dense-baked redundant keys', async () => {
+test('resample strips dense-baked redundant keys', async () => {
   await withTempDir(async (dir) => {
     const { outDir } = await buildFixture(dir);
     const doc = await new NodeIO().readBinary(
-      await Deno.readFile(`${outDir}/${PACK_CLIP_DIR}/walk-loop.glb`),
+      new Uint8Array(await fs.readFile(`${outDir}/${PACK_CLIP_DIR}/walk-loop.glb`)),
     );
     const anim = doc.getRoot().listAnimations()[0];
     const dense = anim.listChannels().find((c) => c.getTargetPath() === 'translation');
@@ -232,26 +236,26 @@ Deno.test('resample strips dense-baked redundant keys', async () => {
   });
 });
 
-Deno.test('pack.json is canonical JSON', async () => {
+test('pack.json is canonical JSON', async () => {
   await withTempDir(async (dir) => {
     const { outDir } = await buildFixture(dir);
-    const text = await Deno.readTextFile(`${outDir}/${PACK_MANIFEST}`);
+    const text = await fs.readFile(`${outDir}/${PACK_MANIFEST}`, 'utf8');
     assertEquals(text, canonicalJson(JSON.parse(text)));
   });
 });
 
-Deno.test('loadPack round-trips and reports missing clip files', async () => {
+test('loadPack round-trips and reports missing clip files', async () => {
   await withTempDir(async (dir) => {
     const { outDir, pack } = await buildFixture(dir);
     assertEquals(await loadPack(outDir), pack);
 
-    await Deno.remove(`${outDir}/${PACK_CLIP_DIR}/walk-loop.glb`);
+    await fs.rm(`${outDir}/${PACK_CLIP_DIR}/walk-loop.glb`);
     const err = await assertRejects(() => loadPack(outDir), Error);
     assertStringIncludes(err.message, 'walk-loop.glb');
   });
 });
 
-Deno.test('listClips filters by tag and category (AND semantics)', async () => {
+test('listClips filters by tag and category (AND semantics)', async () => {
   await withTempDir(async (dir) => {
     const { pack } = await buildFixture(dir);
     const ids = (r: { id: string }[]) => r.map((c) => c.id);
@@ -264,7 +268,7 @@ Deno.test('listClips filters by tag and category (AND semantics)', async () => {
   });
 });
 
-Deno.test('importPack installs a valid pack into the packs root', async () => {
+test('importPack installs a valid pack into the packs root', async () => {
   await withTempDir(async (dir) => {
     const { outDir, pack } = await buildFixture(dir);
     const packsRoot = `${dir}/packs`;
@@ -275,20 +279,20 @@ Deno.test('importPack installs a valid pack into the packs root', async () => {
     assertEquals(installed, pack);
     for (const clip of pack.clips) {
       assertSameBytes(
-        await Deno.readFile(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`),
-        await Deno.readFile(`${packsRoot}/${pack.id}/${PACK_CLIP_DIR}/${clip.id}.glb`),
+        new Uint8Array(await fs.readFile(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`)),
+        new Uint8Array(await fs.readFile(`${packsRoot}/${pack.id}/${PACK_CLIP_DIR}/${clip.id}.glb`)),
         `${clip.id}.glb`,
       );
     }
   });
 });
 
-Deno.test('importPack rejects a manifest that does not declare redistributable', async () => {
+test('importPack rejects a manifest that does not declare redistributable', async () => {
   await withTempDir(async (dir) => {
     const { outDir } = await buildFixture(dir);
-    const manifest = JSON.parse(await Deno.readTextFile(`${outDir}/${PACK_MANIFEST}`));
+    const manifest = JSON.parse(await fs.readFile(`${outDir}/${PACK_MANIFEST}`, 'utf8'));
     delete manifest.redistributable;
-    await Deno.writeTextFile(`${outDir}/${PACK_MANIFEST}`, canonicalJson(manifest));
+    await fs.writeFile(`${outDir}/${PACK_MANIFEST}`, canonicalJson(manifest));
 
     const err = await assertRejects(() => importPack(outDir, `${dir}/packs`), Error);
     assertStringIncludes(err.message, 'redistributable');
@@ -296,7 +300,7 @@ Deno.test('importPack rejects a manifest that does not declare redistributable',
   });
 });
 
-Deno.test('importPack refuses to overwrite an installed pack', async () => {
+test('importPack refuses to overwrite an installed pack', async () => {
   await withTempDir(async (dir) => {
     const { outDir } = await buildFixture(dir);
     const packsRoot = `${dir}/packs`;
@@ -306,7 +310,7 @@ Deno.test('importPack refuses to overwrite an installed pack', async () => {
   });
 });
 
-Deno.test('building twice produces byte-identical pack.json and clip glbs', async () => {
+test('building twice produces byte-identical pack.json and clip glbs', async () => {
   await withTempDir(async (dir) => {
     const { srcGlbs, outDir, pack } = await buildFixture(dir);
     const outDir2 = `${dir}/pack2`;
@@ -314,26 +318,26 @@ Deno.test('building twice produces byte-identical pack.json and clip glbs', asyn
 
     assertEquals(pack2, pack);
     assertSameBytes(
-      await Deno.readFile(`${outDir}/${PACK_MANIFEST}`),
-      await Deno.readFile(`${outDir2}/${PACK_MANIFEST}`),
+      new Uint8Array(await fs.readFile(`${outDir}/${PACK_MANIFEST}`)),
+      new Uint8Array(await fs.readFile(`${outDir2}/${PACK_MANIFEST}`)),
       PACK_MANIFEST,
     );
     for (const clip of pack.clips) {
       assertSameBytes(
-        await Deno.readFile(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`),
-        await Deno.readFile(`${outDir2}/${PACK_CLIP_DIR}/${clip.id}.glb`),
+        new Uint8Array(await fs.readFile(`${outDir}/${PACK_CLIP_DIR}/${clip.id}.glb`)),
+        new Uint8Array(await fs.readFile(`${outDir2}/${PACK_CLIP_DIR}/${clip.id}.glb`)),
         `${clip.id}.glb`,
       );
     }
   });
 });
 
-Deno.test('buildPack rejects mismatched skeletons and unreadable sources', async () => {
+test('buildPack rejects mismatched skeletons and unreadable sources', async () => {
   await withTempDir(async (dir) => {
     const srcA = `${dir}/srcA.glb`;
     const srcC = `${dir}/srcC.glb`;
-    await Deno.writeFile(srcA, await makeSourceGlb(SRC_A));
-    await Deno.writeFile(
+    await fs.writeFile(srcA, await makeSourceGlb(SRC_A));
+    await fs.writeFile(
       srcC,
       await makeSourceGlb([{ name: 'Wave', duration: 1 }], ['root', 'spine']),
     );

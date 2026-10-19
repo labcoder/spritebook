@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Importer fixture generator (deterministic; run once, files are checked in):
  *  - cube.obj             hand-built OBJ, no normals (exercises the generate-normals fix)
@@ -38,7 +39,7 @@ const quads = [
   [5, 1, 4, 8],
 ];
 for (const q of quads) objLines.push(`f ${q.join(' ')}`);
-await Deno.writeTextFile(new URL('cube.obj', here), objLines.join('\n') + '\n');
+await fs.writeFile(new URL('cube.obj', here), objLines.join('\n') + '\n');
 
 // --- vrm0-arrow.gltf: 4 verts, 2 tris; single "nose" vertex at z = -1 -------
 const positions = new Float32Array([
@@ -94,10 +95,10 @@ const gltf = {
     { byteLength: buffer.length, uri: `data:application/octet-stream;base64,${b64}` },
   ],
 };
-await Deno.writeTextFile(new URL('vrm0-arrow.gltf', here), JSON.stringify(gltf, null, 2) + '\n');
+await fs.writeFile(new URL('vrm0-arrow.gltf', here), JSON.stringify(gltf, null, 2) + '\n');
 
 // --- skinned-column.glb: reuse the committed renderer fixture ---------------
 const src = new URL('../../render/fixtures/skinned-column.glb', here);
-await Deno.writeFile(new URL('skinned-column.glb', here), await Deno.readFile(src));
+await fs.writeFile(new URL('skinned-column.glb', here), new Uint8Array(await fs.readFile(src)));
 
 console.log('importer fixtures written: cube.obj, vrm0-arrow.gltf, skinned-column.glb');

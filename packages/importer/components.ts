@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * Connected components of a mesh, and why the pipeline cares (P3-T3).
  *
@@ -195,7 +196,7 @@ export function disconnectedWarning(report: ComponentReport): string | null {
  * has to reach.
  */
 export async function componentsOfFile(path: string): Promise<ComponentReport> {
-  const doc = await new NodeIO().readBinary(await Deno.readFile(path));
+  const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(path)));
   const pos: number[] = [];
   const idx: number[] = [];
   let base = 0;

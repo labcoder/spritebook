@@ -1,3 +1,7 @@
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * P3-T1 end-to-end acceptance on a REAL GPU bake (gated like the other seams):
  * a UAL walk retargeted onto a proportioned fixture body, sampled per binding,
@@ -7,7 +11,7 @@
  *   - the retarget-once preview GLB is a bake artifact;
  *   - a second clip in the same bake shares one palette (per-character law).
  */
-import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from '@std/assert';
 import { BakeManifestSchema, parseWith } from '@spritebook/schema';
 import { PIXEL } from '@spritebook/style';
 import { tryGetGpu } from '../render/gpu.ts';
@@ -28,9 +32,9 @@ const CAM: CameraPreset = {
   orthographic: true,
 };
 
-Deno.test('acceptance: multi-clip bake — exact counts, clip ids, previews', async () => {
+test('acceptance: multi-clip bake — exact counts, clip ids, previews', async () => {
   if (!(await tryGetGpu())) return;
-  const root = await Deno.makeTempDir();
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
     const events: JobEvent[] = [];
     for await (
@@ -80,7 +84,7 @@ Deno.test('acceptance: multi-clip bake — exact counts, clip ids, previews', as
     const bakeDir = manifestPath.slice(0, manifestPath.lastIndexOf('/'));
     const manifest = parseWith(
       BakeManifestSchema,
-      JSON.parse(await Deno.readTextFile(manifestPath)),
+      JSON.parse(await fs.readFile(manifestPath, 'utf8')),
       'BakeManifest',
     );
 
@@ -112,23 +116,23 @@ Deno.test('acceptance: multi-clip bake — exact counts, clip ids, previews', as
     for (const c of timings) assert(c.fps > 0 && Number.isFinite(c.fps), `real fps: ${c.fps}`);
 
     // retarget-once artifacts: one preview GLB per clip
-    await Deno.stat(`${bakeDir}/preview-walk-loop.glb`);
-    await Deno.stat(`${bakeDir}/preview-idle-loop.glb`);
+    await fs.stat(`${bakeDir}/preview-walk-loop.glb`);
+    await fs.stat(`${bakeDir}/preview-idle-loop.glb`);
     // per-clip contact sheets
-    await Deno.stat(`${bakeDir}/contact-walk-loop.gif`);
-    await Deno.stat(`${bakeDir}/contact-idle-loop.gif`);
+    await fs.stat(`${bakeDir}/contact-walk-loop.gif`);
+    await fs.stat(`${bakeDir}/contact-idle-loop.gif`);
 
     // one palette across BOTH clips (the per-character palette law). Bounded by
     // the PRESET's own budget, not a literal: this said `<= 8` and was really
     // asserting what pixel's maxColors happened to be, so raising it to 16 broke
     // a test that has nothing to do with palette size.
-    const styleResult = JSON.parse(await Deno.readTextFile(`${bakeDir}/style-result.json`));
+    const styleResult = JSON.parse(await fs.readFile(`${bakeDir}/style-result.json`, 'utf8'));
     assert(
       styleResult.paletteHex.length <= PIXEL.quantize!.maxColors &&
         styleResult.paletteHex.length > 0,
       `one pooled palette within budget, got ${styleResult.paletteHex.length}`,
     );
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await fs.rm(root, { recursive: true });
   }
 });

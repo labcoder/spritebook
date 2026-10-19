@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 /**
  * The importer border entry: everything becomes canonical glTF (D-012),
  * deterministically. Pure function + JobEvent-emitting executor; the
@@ -50,7 +51,7 @@ async function readAsDocument(
       const { default: obj2gltf } = await import('obj2gltf');
       const glb = await obj2gltf(input, { binary: true });
       return {
-        doc: await io.readBinary(new Uint8Array(glb.buffer ?? glb)),
+        doc: await io.readBinary(new Uint8Array(glb)),
         tool: 'obj2gltf',
         converter: 'obj2gltf@3',
       };
@@ -72,7 +73,7 @@ export async function importToCanonical(opts: ImportOptions): Promise<ImportResu
   const format = formatFromPath(opts.input);
   let bytes: Uint8Array;
   try {
-    bytes = await Deno.readFile(opts.input);
+    bytes = new Uint8Array(await fs.readFile(opts.input));
   } catch {
     throw new ImportError(`Cannot read "${opts.input}" - does the file exist?`);
   }
@@ -158,7 +159,7 @@ export function makeImportExecutor(opts: Omit<ImportOptions, 'now'> & { outDir: 
     });
     const discard = async () => {
       for (const path of written) {
-        await Deno.remove(path).catch(() => {});
+        await fs.rm(path).catch(() => {});
       }
     };
 
@@ -178,12 +179,12 @@ export function makeImportExecutor(opts: Omit<ImportOptions, 'now'> & { outDir: 
       }
       yield { t: 'progress', jobId, at: now(), step: 'canonicalize', done: 2, total: 3 };
 
-      await Deno.mkdir(opts.outDir, { recursive: true });
+      await fs.mkdir(opts.outDir, { recursive: true });
       const glbPath = `${opts.outDir}/canonical.glb`;
       const reportPath = `${opts.outDir}/preflight.json`;
-      await Deno.writeFile(glbPath, result.bytes);
+      await fs.writeFile(glbPath, result.bytes);
       written.push(glbPath);
-      await Deno.writeTextFile(reportPath, canonicalJson(result.report));
+      await fs.writeFile(reportPath, canonicalJson(result.report));
       written.push(reportPath);
       // a cancel landing mid-write leaves half an import on disk, so the files
       // go back before the terminal event claims nothing happened

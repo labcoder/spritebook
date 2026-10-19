@@ -1,14 +1,19 @@
+import { rejects } from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /**
  * P1-T4 acceptance (CI): double-import determinism (the P1 exit gate),
  * prune supervision, VRM 0.x reorientation, FBX round-trip, actionable errors.
  */
-import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import { getBounds } from '@gltf-transform/core';
 import { EventBus, JobQueue, sha256Hex } from '@spritebook/core';
 import { JobSpecSchema, parseWith } from '@spritebook/schema';
-import { getIO } from './io.ts';
-import { ImportError } from './errors.ts';
-import { importToCanonical, makeImportExecutor } from './import.ts';
+import { getIO } from './dist/io.js';
+import { ImportError } from './dist/errors.js';
+import { importToCanonical, makeImportExecutor } from './dist/import.js';
 
 const fx = (name: string) =>
   new URL(`./fixtures/${name}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
@@ -20,7 +25,7 @@ async function importHash(input: string, declaredHeightM?: number): Promise<stri
 
 // --- acceptance: double-import determinism (the glTF-Transform tripwire) ----
 for (const fixture of ['skinned-column.glb', 'cube.obj', 'rigged-cube.fbx', 'vrm0-arrow.gltf']) {
-  Deno.test(`acceptance: double-import of ${fixture} yields identical sha256`, async () => {
+  test(`acceptance: double-import of ${fixture} yields identical sha256`, async () => {
     const a = await importHash(fx(fixture), 1.8);
     const b = await importHash(fx(fixture), 1.8);
     assertEquals(a, b);
@@ -28,7 +33,7 @@ for (const fixture of ['skinned-column.glb', 'cube.obj', 'rigged-cube.fbx', 'vrm
 }
 
 // --- acceptance: prune supervision keeps skins/joints ------------------------
-Deno.test('acceptance: skinned fixture keeps skin/joint counts through canonicalization', async () => {
+test('acceptance: skinned fixture keeps skin/joint counts through canonicalization', async () => {
   const { bytes, report } = await importToCanonical({ input: fx('skinned-column.glb') });
   const io = await getIO();
   const doc = await io.readBinary(bytes);
@@ -39,7 +44,7 @@ Deno.test('acceptance: skinned fixture keeps skin/joint counts through canonical
 });
 
 // --- acceptance: VRM 0.x faces +Z after import -------------------------------
-Deno.test('acceptance: VRM 0.x fixture faces +Z after import (nose flips -Z -> +Z)', async () => {
+test('acceptance: VRM 0.x fixture faces +Z after import (nose flips -Z -> +Z)', async () => {
   const { bytes, report, provenance } = await importToCanonical({ input: fx('vrm0-arrow.gltf') });
   assertEquals(provenance.vrm, 'vrm0');
   const io = await getIO();
@@ -79,7 +84,7 @@ Deno.test('acceptance: VRM 0.x fixture faces +Z after import (nose flips -Z -> +
 });
 
 // --- acceptance: FBX round-trips ---------------------------------------------
-Deno.test('acceptance: FBX fixture round-trips with skin intact and valid binds', async () => {
+test('acceptance: FBX fixture round-trips with skin intact and valid binds', async () => {
   const { bytes, provenance } = await importToCanonical({
     input: fx('rigged-cube.fbx'),
     declaredHeightM: 1.0,
@@ -124,7 +129,7 @@ function multiply4(a: ArrayLike<number>, b: ArrayLike<number>): number[] {
 }
 
 // --- conventions on the skinned glb ------------------------------------------
-Deno.test('declared height + feet grounding hold for skinned sources too', async () => {
+test('declared height + feet grounding hold for skinned sources too', async () => {
   const { bytes } = await importToCanonical({
     input: fx('skinned-column.glb'),
     declaredHeightM: 1.8,
@@ -147,7 +152,7 @@ Deno.test('declared height + feet grounding hold for skinned sources too', async
 });
 
 // --- acceptance: actionable errors -------------------------------------------
-Deno.test('acceptance: failures are actionable - no stack traces, names named', async () => {
+test('acceptance: failures are actionable - no stack traces, names named', async () => {
   const missing = await assertRejects(
     () => importToCanonical({ input: fx('does-not-exist.glb') }),
     ImportError,
@@ -164,8 +169,8 @@ Deno.test('acceptance: failures are actionable - no stack traces, names named', 
 });
 
 // --- executor: cancelling means cancelled, on the wire and on disk -----------
-Deno.test('cancelled import emits ONE terminal event and leaves no artifacts', async () => {
-  const outDir = await Deno.makeTempDir({ prefix: 'sb-import-cancel-' });
+test('cancelled import emits ONE terminal event and leaves no artifacts', async () => {
+  const outDir = await fs.mkdtemp(join(tmpdir(), 'sb-import-cancel-'));
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 1 });
   const spec = parseWith(
@@ -204,18 +209,17 @@ Deno.test('cancelled import emits ONE terminal event and leaves no artifacts', a
 
   // and a cancelled import does not leave a workspace claiming it finished
   for (const name of ['canonical.glb', 'preflight.json']) {
-    await assertRejects(
-      () => Deno.stat(`${outDir}/${name}`),
-      Deno.errors.NotFound,
-      undefined,
+    await rejects(
+      () => fs.stat(`${outDir}/${name}`),
+      { code: 'ENOENT' },
       `${name} survived a cancelled import`,
     );
   }
 });
 
 // --- executor: preflight lands as an artifact event ---------------------------
-Deno.test('import executor emits canonical + preflight artifacts through the bus', async () => {
-  const outDir = await Deno.makeTempDir({ prefix: 'sb-import-' });
+test('import executor emits canonical + preflight artifacts through the bus', async () => {
+  const outDir = await fs.mkdtemp(join(tmpdir(), 'sb-import-'));
   const bus = new EventBus();
   const queue = new JobQueue({ bus, concurrency: 1 });
   const spec = parseWith(
@@ -231,7 +235,7 @@ Deno.test('import executor emits canonical + preflight artifacts through the bus
   const events = bus.ring.snapshot();
   const artifacts = events.filter((e) => e.t === 'artifact');
   assertEquals(artifacts.map((a) => a.kind), ['canonical-gltf', 'preflight']);
-  const preflight = JSON.parse(await Deno.readTextFile(artifacts[1].path));
+  const preflight = JSON.parse(await fs.readFile(artifacts[1].path, 'utf8'));
   assert(Array.isArray(preflight.checks));
   assert(
     preflight.checks.some((c: { id: string }) => c.id === 'normals'),
@@ -258,7 +262,7 @@ function vertexSpanY(doc: Awaited<ReturnType<typeof readDoc>>): { min: number; m
 
 const readDoc = async (bytes: Uint8Array) => await (await getIO()).readBinary(bytes);
 
-Deno.test('an unskinned canonical mesh carries its scale in the VERTICES', async () => {
+test('an unskinned canonical mesh carries its scale in the VERTICES', async () => {
   // THE regression. The scale used to live only on a `world` node, and glTF
   // says a SKINNED mesh node's transform is ignored because the skin's joints
   // place it. An unskinned canonical mesh is exactly the one about to be
@@ -289,7 +293,7 @@ Deno.test('an unskinned canonical mesh carries its scale in the VERTICES', async
   assert(Math.abs(span.min) < 1e-3, `feet at Y=0 in the DATA, got ${span.min}`);
 });
 
-Deno.test('the canonical height survives the mesh becoming skinned', async () => {
+test('the canonical height survives the mesh becoming skinned', async () => {
   // A faithful, GPU-free stand-in for `rig`: what rigging does that broke this
   // is attach a skin, after which the spec says the mesh node's transform no
   // longer places the mesh. If the scale is in the vertices, that is a no-op.
