@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * Install gates (D-009), pure functions so the CLI/event layer stays thin.
@@ -130,7 +132,13 @@ export type CommandRunner = (cmd: string[]) => Promise<{ ok: boolean; stdout: st
 /** Default runner: any spawn failure (missing binary, no permission) is a clean "no". */
 export const runCommand: CommandRunner = async (cmd) => {
   try {
-    const out = await promisify(execFile)(cmd[0], cmd.slice(1), { windowsHide: true });
+    const driverTool = process.platform === 'win32' && process.env.SystemRoot
+      ? join(process.env.SystemRoot, 'System32/nvidia-smi.exe')
+      : undefined;
+    const executable = cmd[0] === 'nvidia-smi' && driverTool && existsSync(driverTool)
+      ? driverTool
+      : cmd[0];
+    const out = await promisify(execFile)(executable, cmd.slice(1), { windowsHide: true });
     return { ok: true, stdout: out.stdout };
   } catch {
     return { ok: false, stdout: '' };

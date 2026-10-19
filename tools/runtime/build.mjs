@@ -1,20 +1,11 @@
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
-  chmod,
-  cp,
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installVulkan } from '../setup-gpu.mjs';
+import { publishRuntime, recoverRuntime } from './publish.ts';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const build = resolve(repo, '.build');
@@ -68,6 +59,7 @@ async function removeGenerated(path) {
 }
 
 await mkdir(build, { recursive: true });
+await recoverRuntime(out);
 const stage = await mkdtemp(join(build, 'runtime-stage-'));
 const temp = await mkdtemp(join(build, 'runtime-input-'));
 try {
@@ -207,7 +199,7 @@ try {
     join(stage, 'core/cli.mjs'),
     "import '../node_modules/@spritebook/cli/dist/entry.js';\n",
   );
-  await copy(join(repo, 'LICENSE'), join(stage, 'LICENSE'));
+  for (const name of ['LICENSE', 'NOTICE']) await copy(join(repo, name), join(stage, name));
   for (
     const [from, to] of [
       ['docs/quickstart.md', 'quickstart.md'],
@@ -244,21 +236,7 @@ try {
       files: hashes,
     }),
   );
-  const backup = join(build, `runtime-backup-${crypto.randomUUID()}`);
-  let previous = false;
-  try {
-    await rename(out, backup);
-    previous = true;
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
-  try {
-    await rename(stage, out);
-  } catch (error) {
-    if (previous) await rename(backup, out);
-    throw error;
-  }
-  if (previous) await removeGenerated(backup);
+  await publishRuntime(stage, out);
   console.log(
     `${versions}: ${
       Object.keys(hashes).length

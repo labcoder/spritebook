@@ -32,6 +32,47 @@ async function fixture() {
 }
 
 const A = new Uint8Array([1, 2, 3, 4]), B = new Uint8Array([5, 6, 7, 8]);
+
+test('disk-full writes recover either the prior state or the durable pending transaction', async (t) => {
+  for (const phase of ['intent', 'manifest']) {
+    const workspace = await fixture();
+    const manifest = workspacePaths(workspace).manifest;
+    const before = await fs.readFile(manifest, 'utf8');
+    const write = fs.writeFile;
+    let injected = false;
+    const mock = t.mock.method(
+      fs,
+      'writeFile',
+      async (...args: Parameters<typeof fs.writeFile>) => {
+        const [path] = args;
+        const prefix = phase === 'intent' ? `${manifest}.pending.json.` : `${manifest}.`;
+        const name = String(path);
+        if (
+          !injected && name.startsWith(prefix) &&
+          /^[0-9a-f-]+\.tmp$/.test(name.slice(prefix.length))
+        ) {
+          injected = true;
+          throw Object.assign(new Error('disk full'), { code: 'ENOSPC' });
+        }
+        return await write(...args);
+      },
+    );
+    try {
+      await rejects(() => append(workspace, 'new'), { code: 'ENOSPC' });
+      mock.mock.restore();
+      assert(injected, `did not reach the ${phase} write`);
+      const recovered = await readWorkspace(workspace);
+      if (phase === 'intent') assertEquals(await fs.readFile(manifest, 'utf8'), before);
+      else assertEquals(recovered.generation.results.map((r) => r.id), ['new']);
+      await append(workspace, 'retry');
+      assertEquals((await readWorkspace(workspace)).generation.results.at(-1)?.id, 'retry');
+    } finally {
+      mock.mock.restore();
+      await fs.rm(workspace, { recursive: true });
+    }
+  }
+});
+
 async function assetFixture() {
   const workspace = await fixture();
   await fs.writeFile(`${workspace}/a.glb`, A);

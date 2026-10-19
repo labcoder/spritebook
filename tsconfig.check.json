@@ -11,7 +11,8 @@
     "tools/anim/**/*.ts",
     "tools/registry/**/*.ts",
     "tools/roster/**/*.ts",
-    "tools/proofs/**/*.ts"
+    "tools/proofs/**/*.ts",
+    "tools/runtime/**/*.ts"
   ],
   "exclude": [
     "**/dist/**"

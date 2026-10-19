@@ -1,8 +1,10 @@
 // Exercise an actual copied payload, outside the checkout and without developer tools on PATH.
 import { strict as assert } from 'node:assert';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { existsSync, globSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { cp, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rename, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -59,23 +61,31 @@ assert(
   doctor.code === 0 || health.available === false,
   'Only adapter absence may pass a non-GPU smoke',
 );
+if (
+  health.adapter?.vendor === 'nvidia' && process.platform === 'win32' &&
+  existsSync(join(process.env.SystemRoot, 'System32/nvidia-smi.exe'))
+) {
+  assert(health.vramGb > 0, 'Installed CUDA/VRAM discovery must not depend on PATH');
+}
 
 // These dynamic importer branches and CJS-relative assets must exist in the installed tree.
 const obj = join(root, 'triangle.obj');
 await writeFile(obj, 'v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n');
 const node = join(runtime, process.platform === 'win32' ? 'node.exe' : 'node');
 const importer = pathToFileURL(join(runtime, 'node_modules/@spritebook/importer/dist/mod.js')).href;
-execFileSync(node, [
-  '--input-type=module',
-  '-e',
-  `
+for (const mode of ['production', 'development']) {
+  execFileSync(node, [
+    '--input-type=module',
+    '-e',
+    `
   import { strict as assert } from 'node:assert';
   const { importToCanonical } = await import(${JSON.stringify(importer)});
   const result = await importToCanonical({ input: ${JSON.stringify(obj)} });
   assert.equal(result.provenance.tool, 'obj2gltf');
   assert(result.bytes.length > 100);
 `,
-], { cwd: root, env, windowsHide: true, timeout: 60_000 });
+  ], { cwd: root, env: { ...env, NODE_ENV: mode }, windowsHide: true, timeout: 60_000 });
+}
 
 if (gpuArg === '--gpu') {
   const events = cli([
@@ -119,6 +129,94 @@ if (gpuArg === '--gpu') {
     '--json',
   ]);
   assert((await readFile(join(root, 'exports/godot/installed.tres'))).length > 0);
+  const prior = {};
+  for (
+    const path of globSync('bakes/**/*', { cwd: root, withFileTypes: true }).filter((entry) =>
+      entry.isFile()
+    ).map((entry) => join(entry.parentPath, entry.name))
+  ) {
+    prior[path] = createHash('sha256').update(await readFile(path)).digest('hex');
+  }
+  const addon = join(runtime, 'node_modules/webgpu/dist', `${process.platform}-${process.arch}`);
+  for (const file of ['dawn.node', ...(process.platform === 'win32' ? ['vulkan-1.dll'] : [])]) {
+    const path = join(addon, file);
+    await rename(path, `${path}.missing`);
+    try {
+      const failure = cli(['doctor', '--json'], true);
+      assert.equal(failure.code, 1, `Missing ${file} must fail the OS process`);
+      assert.match(failure.output, /error|unavailable|false/);
+    } finally {
+      await rename(`${path}.missing`, path);
+    }
+  }
+  if (process.platform === 'win32') {
+    const temp = join(root, 'owner-temp');
+    await mkdir(temp);
+    const child = spawn(binary, [
+      'bake',
+      '--model',
+      join(runtime, 'sample/asymmetric.glb'),
+      '--character',
+      'interrupted',
+      '--out',
+      join(root, 'interrupted'),
+      '--style',
+      'pixel',
+      '--frames',
+      '120',
+      '--json',
+    ], { cwd: root, env: { ...env, TEMP: temp, TMP: temp }, windowsHide: true });
+    const closed = once(child, 'close');
+    child.stdout.resume();
+    child.stderr.resume();
+    const deadline = performance.now() + 60_000;
+    try {
+      while (globSync('**/*.png', { cwd: temp }).length === 0) {
+        assert(
+          child.exitCode === null && performance.now() < deadline,
+          'Owned bake never reached a rendered frame',
+        );
+        await new Promise((done) => setTimeout(done, 25));
+      }
+    } finally {
+      child.kill();
+    }
+    await Promise.race([
+      closed,
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Owned descendants retained stdout after launcher death')),
+          5000,
+        ).unref()
+      ),
+    ]);
+    assert.equal(
+      globSync('interrupted/**/manifest.json', { cwd: root }).length,
+      0,
+      'Interrupted bake cannot publish a manifest',
+    );
+    cli([
+      'bake',
+      '--model',
+      join(runtime, 'sample/asymmetric.glb'),
+      '--character',
+      'retry',
+      '--out',
+      join(root, 'retry'),
+      '--style',
+      'pixel',
+      '--frames',
+      '1',
+      '--json',
+    ]);
+  }
+  for (const [path, hash] of Object.entries(prior)) {
+    assert.equal(
+      createHash('sha256').update(await readFile(path)).digest('hex'),
+      hash,
+      'Prior accepted bake survived failure and retry',
+    );
+  }
 }
 await writeFile(
   join(report, 'report.json'),
