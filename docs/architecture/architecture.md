@@ -148,8 +148,9 @@ bundled body ID; explicit body paths remain supported. The installer includes th
 package tree so importer CJS loaders and decoders retain their relative assets. It contains no
 source TypeScript, development node_modules, compiler, model weights or copied virtual environment.
 
-Owned uv uses frozen resolution. Installed Python environments live in writable platform application
-data, keyed by the sidecar lock; `UV_PROJECT_ENVIRONMENT` remains an explicit override. Runtime
-builds stage and seal the complete payload before publishing, and recover a previous generated
-payload if interrupted between directory renames. This builder guarantee is separate from F7's
-clean-machine installer upgrade/uninstall qualification.
+Owned uv uses frozen resolution and normal wheel installation, avoiding locale-decoded editable
+paths on Windows. Installed Python environments live in writable platform application data, keyed by
+the sidecar lock; `UV_PROJECT_ENVIRONMENT` remains an explicit override. Runtime builds stage and
+seal the complete payload before publishing, and recover a previous generated payload if interrupted
+between directory renames. This builder guarantee is separate from F7's clean-machine installer
+upgrade/uninstall qualification.

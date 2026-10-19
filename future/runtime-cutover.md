@@ -18,9 +18,10 @@ real-model setup exit gate remains open pending the explicit roadmap decision be
   OBJ/CJS and decoder assets; the importer is included. `@spritebook/image` supplies the qualified
   PNG writer and PNG/JPEG ndarray IO without Sharp/libvips. Three security patches are recorded in
   the BOM; other production transitive pins retain the legacy versions.
-- Owned uv uses frozen resolution and writable, lock-specific user environments. Python bytecode is
-  disabled in installed resources. Model weights and optional environments are never copied from the
-  builder. Hub credentials stay on their HTTPS origin and are omitted at CDN redirects.
+- Owned uv uses frozen resolution, normal wheel installation and writable, lock-specific user
+  environments. Python bytecode is disabled in installed resources. Model weights and optional
+  environments are never copied from the builder. Hub credentials stay on their HTTPS origin and are
+  omitted at CDN redirects.
 - Vite excludes Rust/generated runtime output from watching and uses a bounded optimizer list. The
   forced cold server starts in 599 ms and serves the source entry; real WebView/Tauri projection,
   cancellation/retry and editor ownership checks pass.

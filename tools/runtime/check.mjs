@@ -256,7 +256,7 @@ if (gpuArg === '--gpu') {
   for (
     const path of globSync('bakes/**/*', { cwd: root, withFileTypes: true }).filter((entry) =>
       entry.isFile()
-    ).map((entry) => join(entry.parentPath, entry.name))
+    ).map((entry) => resolve(root, entry.parentPath, entry.name))
   ) {
     prior[path] = createHash('sha256').update(await readFile(path)).digest('hex');
   }

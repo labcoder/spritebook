@@ -21,11 +21,12 @@ try {
       const lines=[];
       const stop=await event.listen('cli:desktop-runtime',e=>lines.push(e.payload));
       let code;
-      try{code=await core.invoke('run_cli',{jobId:'desktop-runtime',args:['doctor','--json']})}
+      try{code=await core.invoke('run_cli',{jobId:'desktop-runtime',args:['doctor','--sidecar','--json']})}
       finally{await stop()}
       if(code!==0)throw new Error('doctor failed: '+lines.join('\\n'));
       const doctor=JSON.parse(lines[0]);
       if(doctor.node!=='24.22.0'||!doctor.probe?.ok)throw new Error('owned Node/GPU probe failed');
+      if(!doctor.sidecar?.ok)throw new Error('owned sidecar handshake failed');
       const root=${JSON.stringify(resolve(rootArg))},dir=${JSON.stringify(resolve(workspaceArg))};
       const rows=await core.invoke('list_workspaces',{root});
       const thumb=await core.invoke('read_thumb',{dir});

@@ -6,12 +6,14 @@ use the `packages/schema/jobs.ts` vocabulary with strict shapes — no extra fie
 
 ## Installed candidates
 
-The Node launcher provides an absolute owned uv path. Core uses `uv run --frozen` against the
-shipped Python source, with a lock-specific `sidecar-<hash>` environment under the platform's
-writable `spritebook/runtime/` data directory. Windows uses `%LOCALAPPDATA%`; Mac uses
+The Node launcher provides an absolute owned uv path. Core uses `uv run --frozen --no-editable`
+against the shipped Python source, with a lock-specific `sidecar-<hash>` environment under the
+platform's writable `spritebook/runtime/` data directory. Windows uses `%LOCALAPPDATA%`; Mac uses
 `~/Library/Application Support`; Linux uses `$XDG_DATA_HOME` or `~/.local/share`.
 `UV_PROJECT_ENVIRONMENT` remains an explicit override. Python bytecode is disabled for immutable
-installed resources. No virtual environment or weights are copied from the builder.
+installed resources. Normal wheel installation avoids Python 3.11's locale-decoded editable `.pth`
+paths, which break when the application path contains Unicode on Windows. Source development keeps
+uv's editable default. No virtual environment or weights are copied from the builder.
 
 F4's fresh-profile base sync, handshake and shutdown pass with an empty PATH; real
 registry-installed U?-Net prep also passes. This does **not** install optional CUDA backends. For

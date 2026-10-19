@@ -274,6 +274,8 @@ export async function startSidecar(cfg: SidecarConfig): Promise<SidecarHandle> {
   const proc = spawn(cfg.uvBin ?? env.SPRITEBOOK_UV_BIN ?? 'uv', [
     'run',
     '--frozen',
+    // Python 3.11's editable .pth loader corrupts Unicode installation paths on Windows.
+    ...(env.SPRITEBOOK_RESOURCES ? ['--no-editable'] : []),
     '--project',
     cfg.sidecarDir,
     'spritebook-sidecar',
