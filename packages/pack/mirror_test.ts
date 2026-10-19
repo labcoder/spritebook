@@ -12,6 +12,7 @@
  * "mirrored on == mirrored off" would be a false pass on a symmetric model.
  */
 import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert@1';
+import { fileURLToPath } from 'node:url';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { BakeManifest, CameraPreset, JobEvent, RenderPass } from '@spritebook/schema';
 import { BakeManifestSchema, parseWith, renderedDirections } from '@spritebook/schema';
@@ -23,10 +24,7 @@ import { buildCacheInputs, runBakeJob } from './bake.ts';
 import { predictInvalidation } from './cache.ts';
 import { frameGrid } from './manifest.ts';
 
-const GLB = new URL('../style/fixtures/asymmetric.glb', import.meta.url).pathname.replace(
-  /^\/([A-Za-z]:)/,
-  '$1',
-);
+const GLB = fileURLToPath(new URL('../style/fixtures/asymmetric.glb', import.meta.url));
 const CAM: CameraPreset = {
   id: 'mirror-30x4',
   elevationDeg: 30,

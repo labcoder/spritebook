@@ -5,6 +5,7 @@
  * perceptual per-preset goldens live in goldens_test.ts.
  */
 import { assert, assertEquals, assertRejects, assertThrows } from 'jsr:@std/assert@1';
+import { fileURLToPath } from 'node:url';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import type { CameraPreset } from '@spritebook/schema';
 import { parseWith, StylePresetSchema } from '@spritebook/schema';
@@ -13,10 +14,7 @@ import { CEL_2, PAINTERLY, PIXEL, PRESETS } from './presets.ts';
 import { srgbToHex } from '@spritebook/core';
 import type { AovSource } from './contracts.ts';
 
-const FRAMES = new URL('./fixtures/aov/frames/', import.meta.url).pathname.replace(
-  /^\/([A-Za-z]:)/,
-  '$1',
-);
+const FRAMES = fileURLToPath(new URL('./fixtures/aov/frames/', import.meta.url));
 const SRC: AovSource = { framesDir: FRAMES, directions: 2, frames: 6, width: 256, height: 256 };
 const CAM: CameraPreset = {
   id: 'style-fixture-30x2',

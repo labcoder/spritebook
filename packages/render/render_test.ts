@@ -10,6 +10,7 @@
  * pure property of the framing and is proven exhaustively in camera_test.ts.
  */
 import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { fileURLToPath } from 'node:url';
 import { decode as decodePng } from 'fast-png';
 import type { CameraPreset } from '@spritebook/schema';
 import { tryGetGpu } from './gpu.ts';
@@ -18,8 +19,7 @@ import { loadSkinnedAsset, posedBounds } from './skinning.ts';
 import { solveFraming } from './camera.ts';
 import { Renderer } from './renderer.ts';
 
-const winPath = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const FIXTURE = winPath(new URL('./fixtures/skinned-column.glb', import.meta.url));
+const FIXTURE = fileURLToPath(new URL('./fixtures/skinned-column.glb', import.meta.url));
 const SHADERS = new URL('./shaders.wgsl', import.meta.url);
 
 function preset(over: Partial<CameraPreset> = {}): CameraPreset {

@@ -7,6 +7,7 @@
  * fixtures/_gen-goldens.ts, never by loosening the assertion.
  */
 import { assert, assertEquals } from 'jsr:@std/assert@1';
+import { fileURLToPath } from 'node:url';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import pixelmatch from 'pixelmatch';
 import type { CameraPreset } from '@spritebook/schema';
@@ -15,10 +16,9 @@ import { styleFromAovs } from './pipeline.ts';
 import { PRESETS } from './presets.ts';
 import { GOLDEN_FRAMES, goldenName } from './fixtures/golden-config.ts';
 
-const win = (u: URL) => u.pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const GOLDENS = win(new URL('./fixtures/goldens/', import.meta.url));
-const FRAMES = win(new URL('./fixtures/aov/frames/', import.meta.url));
-const FAILURES = win(new URL('../../tests/failures/style-goldens/', import.meta.url));
+const GOLDENS = fileURLToPath(new URL('./fixtures/goldens/', import.meta.url));
+const FRAMES = fileURLToPath(new URL('./fixtures/aov/frames/', import.meta.url));
+const FAILURES = fileURLToPath(new URL('../../tests/failures/style-goldens/', import.meta.url));
 
 const SRC: AovSource = { framesDir: FRAMES, directions: 2, frames: 6, width: 256, height: 256 };
 const CAM: CameraPreset = {
