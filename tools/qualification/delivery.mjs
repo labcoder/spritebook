@@ -25,8 +25,7 @@ function launch(dir, ...args) {
     },
   });
 }
-async function run(name, args, expectedCode = 0) {
-  const dir = `${out}/${name}`;
+async function run(name, args, expectedCode = 0, dir = `${out}/${name}`) {
   const child = launch(dir, ...args);
   const [code] = await once(child, 'close');
   assert.equal(code, expectedCode, `installed ${name} exit code`);
@@ -35,6 +34,8 @@ async function run(name, args, expectedCode = 0) {
   assert.equal(report.path, '');
   assert(resolve(report.node).startsWith(dirname(exe) + '\\'), 'runtime must be app-owned');
   results[name] = report;
+  await writeFile(`${out}/${name}.ndjson`, await readFile(`${dir}/stdout.ndjson`));
+  await writeFile(`${out}/${name}.stderr`, await readFile(`${dir}/stderr.log`));
   return dir;
 }
 async function hashes(dir) {
@@ -55,7 +56,7 @@ const checkEvents = (await readFile(`${checks}/stdout.ndjson`, 'utf8')).trim().s
 assert(checkEvents.some((e) => e.t === 'checks-done' && e.passed > 80));
 results.carriedChecks = checkEvents.at(-1).passed;
 for (const mode of ['stub', 'clips']) {
-  const dir = await run(`loss-${mode}`, ['loss', mode]);
+  const dir = await run(`loss-${mode}`, ['loss', mode], 0, bake);
   const loss = JSON.parse(await readFile(`${dir}/loss.json`, 'utf8'));
   assert.equal(loss.error.code, 'device-lost');
   assert.equal(loss.error.retryable, true);
@@ -73,7 +74,7 @@ for (
   const path = `${runtime}/vendor/webgpu/dist/win32-x64/${file}`;
   await rename(path, `${path}.missing`);
   try {
-    const dir = await run(name, ['1', 'pixel', 'cold'], 1);
+    const dir = await run(name, ['1', 'pixel', 'cold'], 1, bake);
     const stderr = await readFile(`${dir}/stderr.log`, 'utf8');
     const stdout = await readFile(`${dir}/stdout.ndjson`, 'utf8');
     assert((stderr + stdout).includes(diagnostic));
@@ -83,7 +84,7 @@ for (
   }
 }
 
-const cancelDir = `${out}/cancel`;
+const cancelDir = bake;
 const owner = launch(cancelDir, '4', 'pixel', 'cold');
 const ownerClosed = once(owner, 'close');
 let rendered = false;
@@ -118,20 +119,29 @@ try {
     assert.equal(live.length, 0);
   }
   const files = await readdir(`${cancelDir}/bakes`, { recursive: true });
-  assert(!files.some((name) => name.endsWith('manifest.json')));
+  assert.deepEqual(
+    files.filter((name) => name.endsWith('manifest.json')).map((name) =>
+      resolve(cancelDir, 'bakes', name)
+    ).sort(),
+    Object.keys(prior).filter((name) => name.endsWith('manifest.json')).sort(),
+  );
   const stdout = await readFile(`${cancelDir}/stdout.ndjson`, 'utf8');
   assert(!stdout.includes('"t":"done"'));
   await writeFile(`${out}/cancelled.ndjson`, stdout);
-  results.cancel = { rendered, workers, ownerExitCode: owner.exitCode };
+  results.cancel = {
+    rendered,
+    workers,
+    ownerExitCode: owner.exitCode,
+    ownerSignal: owner.signalCode,
+  };
 } finally {
   if (owner.exitCode === null) owner.kill();
 }
-await run('cancel', ['4', 'pixel', 'cold']);
-assert.deepEqual(
-  await hashes(`${bake}/bakes`),
-  prior,
-  'every prior bake byte must survive failures',
-);
+await run('retry', ['4', 'pixel', 'cold'], 0, bake);
+const after = await hashes(`${bake}/bakes`);
+for (const [path, hash] of Object.entries(prior)) {
+  assert.equal(after[path], hash, `prior bake byte changed: ${path}`);
+}
 results.priorArtifactsUnchanged = true;
 results.retryCompleted = true;
 await writeFile(`${out}/delivery.json`, JSON.stringify(results, null, 2) + '\n');

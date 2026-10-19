@@ -8,6 +8,10 @@ import { getGpu } from '../../packages/render/gpu.ts';
 
 const out = resolve(Deno.args[1]);
 await mkdir(out, { recursive: true });
+const completedBefore = (await readdir(`${out}/bakes`, { recursive: true }).catch((error) => {
+  if (error.code === 'ENOENT') return [];
+  throw error;
+})).filter((path) => path.endsWith('manifest.json')).sort();
 const gpu = await getGpu();
 const submit = gpu.device.queue.submit.bind(gpu.device.queue);
 let injected = false;
@@ -57,5 +61,5 @@ assert.equal(error.retryable, true);
 assert(!events.some((event) => event.t === 'done' || event.t === 'artifact'));
 // A failed attempt must not leave a readable completed BakeManifest.
 const files = await readdir(`${out}/bakes`, { recursive: true });
-assert(!files.some((path) => path.endsWith('manifest.json')));
+assert.deepEqual(files.filter((path) => path.endsWith('manifest.json')).sort(), completedBefore);
 await writeFile(`${out}/loss.json`, JSON.stringify({ injected, error }, null, 2) + '\n');
