@@ -29,15 +29,18 @@ import {
   CharacterIdSchema,
   CharacterManifestSchema,
   MANIFEST_FILE,
-  ManifestPatchSchema,
-  migrateCharacterManifest,
   parseWith,
   ROSTER_FILE,
   RosterManifestSchema,
   SCHEMA_VERSION,
 } from '@spritebook/schema';
 import { ManifestJournal } from './journal.ts';
-import { writeAtomic } from './receipts.ts';
+import {
+  commitManifest,
+  initializeManifest,
+  withManifestLock,
+  writeAtomic,
+} from './persistence.ts';
 import { readWorkspace, workspacePaths } from './workspace.ts';
 
 export interface RosterOptions {
@@ -57,34 +60,15 @@ export async function renameCharacter(
   if (displayName.trim().length === 0) {
     throw new Error('rename: the new name cannot be empty');
   }
-  const paths = workspacePaths(workspace);
-  const current = await readWorkspace(workspace);
-  if (current.displayName === displayName) {
-    throw new Error(`This character is already called "${displayName}".`);
-  }
-
-  const now = opts.now;
-  const state = await readJournalState(paths);
-  const kept = state.patches.slice(0, state.cursor);
-  const journal = new ManifestJournal(state.doc, { now });
-  const built = journal.commit({
-    target: { kind: 'character', id: current.id },
-    op: [{ op: 'replace', path: '/displayName', value: displayName }],
-    label: opts.label ?? `Rename to "${displayName}"`,
-  });
-  const patch = parseWith(ManifestPatchSchema, {
-    ...built,
-    seq: kept.length === 0 ? 0 : kept[kept.length - 1].seq + 1,
-  }, 'ManifestPatch');
-  const next = parseWith(CharacterManifestSchema, journal.doc, 'renamed CharacterManifest');
-
-  // journal -> cursor -> manifest, each atomically: same three files as
-  // receipts.ts, so the same crash-safety argument applies (its module header
-  // spells it out). This path used to write them plainly.
-  await writeAtomic(paths.journal, [...kept, patch].map((p) => canonicalJson(p)).join(''));
-  await writeAtomic(paths.cursor, String(kept.length + 1));
-  await writeAtomic(paths.manifest, journal.canonicalBytes);
-  return next;
+  return await commitManifest(workspacePaths(workspace).manifest, (current) => {
+    if (current.displayName === displayName) {
+      throw new Error(`This character is already called "${displayName}".`);
+    }
+    return {
+      op: [{ op: 'replace', path: '/displayName', value: displayName }],
+      label: opts.label ?? `Rename to "${displayName}"`,
+    };
+  }, opts.now);
 }
 
 export interface CloneOptions extends RosterOptions {
@@ -108,6 +92,22 @@ export interface CloneOptions extends RosterOptions {
  * from — history a human reading the undo stack can follow.
  */
 export async function cloneCharacter(
+  sourceWorkspace: string,
+  destWorkspace: string,
+  opts: CloneOptions,
+) {
+  await Deno.mkdir(destWorkspace, { recursive: true });
+  return await withManifestLock(
+    workspacePaths(sourceWorkspace).manifest,
+    () =>
+      withManifestLock(
+        workspacePaths(destWorkspace).manifest,
+        () => cloneUnlocked(sourceWorkspace, destWorkspace, opts),
+      ),
+  );
+}
+
+async function cloneUnlocked(
   sourceWorkspace: string,
   destWorkspace: string,
   opts: CloneOptions,
@@ -135,6 +135,8 @@ export async function cloneCharacter(
       MANIFEST_FILE,
       `${MANIFEST_FILE}.journal.ndjson`,
       `${MANIFEST_FILE}.journal.cursor`,
+      `${MANIFEST_FILE}.lock`,
+      `${MANIFEST_FILE}.pending.json`,
     ]),
   );
 
@@ -162,22 +164,15 @@ export async function cloneCharacter(
   const renamed = validated.displayName !== source.displayName;
   const base = { ...validated, displayName: source.displayName };
   const journal = new ManifestJournal(JSON.parse(canonicalJson(base)), { now: opts.now });
+  const patches = [];
   if (renamed) {
-    const built = journal.commit({
+    patches.push(journal.commit({
       target: { kind: 'character', id: validated.id },
       op: [{ op: 'replace', path: '/displayName', value: validated.displayName }],
       label: opts.label ?? `Clone of ${source.id} ("${source.displayName}")`,
-    });
-    const patch = parseWith(ManifestPatchSchema, { ...built, seq: 0 }, 'ManifestPatch');
-    await writeAtomic(destPaths.journal, canonicalJson(patch));
-    await writeAtomic(destPaths.cursor, '1');
-  } else {
-    // a clone that kept the source's name changed nothing, so there is nothing
-    // to undo — an empty journal, exactly as createWorkspace lays down
-    await writeAtomic(destPaths.journal, '');
-    await writeAtomic(destPaths.cursor, '0');
+    }));
   }
-  await writeAtomic(destPaths.manifest, journal.canonicalBytes);
+  await initializeManifest(destPaths.manifest, journal.doc as CharacterManifest, patches);
   return parseWith(CharacterManifestSchema, journal.doc, 'cloned CharacterManifest');
 }
 
@@ -329,21 +324,4 @@ export async function writeRosterManifest(roster: RosterManifest): Promise<strin
   const path = `${roster.root}/${ROSTER_FILE}`;
   await writeAtomic(path, canonicalJson(roster));
   return path;
-}
-
-async function readJournalState(paths: { manifest: string; journal: string; cursor: string }) {
-  // migrated at the read, for the reason receipts.ts's copy of this spells out:
-  // `doc` becomes the ManifestJournal, and journal.canonicalBytes is written
-  const doc = migrateCharacterManifest(JSON.parse(await Deno.readTextFile(paths.manifest)));
-  const text = await Deno.readTextFile(paths.journal).catch(() => '');
-  const patches = text
-    .split('\n')
-    .filter((l) => l.length > 0)
-    .map((l, i) => parseWith(ManifestPatchSchema, JSON.parse(l), `journal line ${i + 1}`));
-  const cursorText = await Deno.readTextFile(paths.cursor).catch(() => String(patches.length));
-  const cursor = Number(cursorText.trim());
-  if (!Number.isInteger(cursor) || cursor < 0 || cursor > patches.length) {
-    throw new Error(`corrupt cursor file: "${cursorText.trim()}" (journal has ${patches.length})`);
-  }
-  return { doc, patches, cursor };
 }

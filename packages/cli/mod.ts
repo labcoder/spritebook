@@ -23,12 +23,9 @@ import {
   adapterFor,
   BakeManifestSchema,
   canonicalJson,
-  CharacterManifestSchema,
   type ExportTargetId,
   ExportTargetIdSchema,
   type JobEvent,
-  ManifestPatchSchema,
-  migrateCharacterManifest,
   parseWith,
   SCHEMA_VERSION,
 } from '@spritebook/schema';
@@ -44,10 +41,10 @@ import type {
   StylePreset,
 } from '@spritebook/schema';
 import {
-  applyPatchOps,
   CAMERA_PRESETS,
   DEFAULT_CAMERA_PRESET_ID,
   encodeEvent,
+  moveManifestCursor,
   readWorkspace,
   recordBake,
   resolveCamera,
@@ -69,62 +66,6 @@ export interface CliIo {
   stdout(line: string): void;
   stderr(line: string): void;
   now?: () => string;
-}
-
-interface JournalFiles {
-  manifest: string;
-  journal: string;
-  cursor: string;
-}
-
-function files(manifestPath: string): JournalFiles {
-  return {
-    manifest: manifestPath,
-    journal: `${manifestPath}.journal.ndjson`,
-    cursor: `${manifestPath}.journal.cursor`,
-  };
-}
-
-async function readJournal(f: JournalFiles) {
-  // upgraded at the read, like every other manifest loader: `undo` on a
-  // workspace from an older build would otherwise apply an inverse to a v2
-  // document and then be refused by manifestFault for being v2 — a verb whose
-  // whole promise is "put it back", failing on documents that are merely old
-  const doc = migrateCharacterManifest(JSON.parse(await Deno.readTextFile(f.manifest)));
-  const journalText = await Deno.readTextFile(f.journal).catch(() => '');
-  const patches = journalText
-    .split('\n')
-    .filter((l) => l.length > 0)
-    .map((l, i) => parseWith(ManifestPatchSchema, JSON.parse(l), `journal line ${i + 1}`));
-  const cursorText = await Deno.readTextFile(f.cursor).catch(() => String(patches.length));
-  const cursor = Number(cursorText.trim());
-  if (!Number.isInteger(cursor) || cursor < 0 || cursor > patches.length) {
-    throw new Error(`corrupt cursor file: "${cursorText.trim()}" (journal has ${patches.length})`);
-  }
-  return { doc, patches, cursor };
-}
-
-/**
- * `undo` and `redo` write the DOCUMENT, so what they produce has to still BE a
- * CharacterManifest. ManifestPatchSchema judges the shape of a patch, never
- * the shape of the result — and a journal line can be wrong in ways that shape
- * cannot show: hand-edited, truncated, or written by a build whose inverses
- * were not restores. Writing that result unchecked replaces a working
- * workspace with one no verb can load, which is the worst possible outcome of
- * a verb whose entire promise is "put it back".
- *
- * Returns the refusal message, or undefined when the document is sound.
- */
-function manifestFault(doc: unknown, f: JournalFiles, action: string): string | undefined {
-  try {
-    parseWith(CharacterManifestSchema, doc, `CharacterManifest at "${f.manifest}"`);
-    return undefined;
-  } catch (err) {
-    return `${action} would leave "${f.manifest}" holding an invalid manifest, so nothing was ` +
-      `written: ${err instanceof Error ? err.message : String(err)}. The document and ` +
-      `"${f.journal}" disagree — restore the journal from version control, or re-run the verb ` +
-      `that wrote it.`;
-  }
 }
 
 function flag(args: string[], name: string): string | undefined {
@@ -2613,49 +2554,20 @@ export async function runCli(args: string[], io: CliIo): Promise<number> {
   }
 
   const jobId = verb as JobEvent['jobId'];
-  const f = files(manifestPath);
   emit({ t: 'queued', jobId, at: now() }, `${verb}: ${manifestPath}`);
   emit({ t: 'started', jobId, at: now() }, 'applying journal...');
-
-  let state;
   try {
-    state = await readJournal(f);
+    const patch = await moveManifestCursor(manifestPath, verb);
+    emit(
+      { t: 'artifact', jobId, at: now(), kind: 'manifest', path: manifestPath },
+      `${verb === 'undo' ? 'undid' : 'redid'}: ${patch.label}`,
+    );
   } catch (err) {
-    return fail(jobId, 'journal-read', err instanceof Error ? err.message : String(err));
-  }
-
-  try {
-    if (verb === 'undo') {
-      if (state.cursor === 0) return fail(jobId, 'nothing-to-undo', 'Nothing to undo');
-      const patch = state.patches[state.cursor - 1];
-      const next = applyPatchOps(state.doc, patch.inverse);
-      const fault = manifestFault(next, f, `Undoing "${patch.label}"`);
-      if (fault) return fail(jobId, 'invalid-manifest', fault);
-      await Deno.writeTextFile(f.manifest, canonicalJson(next));
-      await Deno.writeTextFile(f.cursor, String(state.cursor - 1));
-      emit(
-        { t: 'artifact', jobId, at: now(), kind: 'manifest', path: f.manifest },
-        `undid: ${patch.label}`,
-      );
-    } else {
-      if (state.cursor >= state.patches.length) {
-        return fail(jobId, 'nothing-to-redo', 'Nothing to redo');
-      }
-      const patch = state.patches[state.cursor];
-      const next = applyPatchOps(state.doc, patch.op);
-      // redo has the same gap for the same reason: the forward ops came off
-      // the same file the inverses did
-      const fault = manifestFault(next, f, `Redoing "${patch.label}"`);
-      if (fault) return fail(jobId, 'invalid-manifest', fault);
-      await Deno.writeTextFile(f.manifest, canonicalJson(next));
-      await Deno.writeTextFile(f.cursor, String(state.cursor + 1));
-      emit(
-        { t: 'artifact', jobId, at: now(), kind: 'manifest', path: f.manifest },
-        `redid: ${patch.label}`,
-      );
-    }
-  } catch (err) {
-    return fail(jobId, 'patch-apply', err instanceof Error ? err.message : String(err));
+    return fail(
+      jobId,
+      (err as { code?: string }).code ?? 'patch-apply',
+      err instanceof Error ? err.message : String(err),
+    );
   }
 
   emit({ t: 'done', jobId, at: now(), wallTimeS: 0 }, 'ok');

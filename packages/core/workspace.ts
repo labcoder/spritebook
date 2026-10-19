@@ -35,12 +35,10 @@ import {
   BAKES_DIR,
   CANONICAL_DIR,
   CANONICAL_MODEL,
-  canonicalJson,
   CHARACTER_SCHEMA_VERSION,
   CharacterIdSchema,
   CharacterManifestSchema,
   MANIFEST_FILE,
-  migrateCharacterManifest,
   parseWith,
   RAW_MODEL,
   RESULT_PREFLIGHT,
@@ -48,6 +46,8 @@ import {
   RESULTS_DIR,
   SOURCE_DIR,
 } from '@spritebook/schema';
+
+import { initializeManifest, readManifest } from './persistence.ts';
 
 /** `r1`, `r2`, ... — creation order, never reused (ResultIdSchema). */
 export type ResultId = string;
@@ -165,39 +165,13 @@ export async function createWorkspace(opts: CreateWorkspaceOptions): Promise<Cha
   await Deno.mkdir(paths.sourceDir, { recursive: true });
   await Deno.mkdir(paths.resultsDir, { recursive: true });
   await Deno.mkdir(paths.canonicalDir, { recursive: true });
-  await Deno.writeTextFile(paths.journal, '');
-  await Deno.writeTextFile(paths.cursor, '0');
-  await Deno.writeTextFile(paths.manifest, canonicalJson(manifest));
+  await initializeManifest(paths.manifest, manifest);
   return manifest;
 }
 
 /** Read and validate the manifest; errors name the path that disappointed. */
 export async function readWorkspace(workspace: string): Promise<CharacterManifest> {
-  const { manifest } = workspacePaths(workspace);
-  let text: string;
-  try {
-    text = await Deno.readTextFile(manifest);
-  } catch {
-    throw new Error(
-      `No character manifest at "${manifest}" - that directory is not a SpriteBook workspace.`,
-    );
-  }
-  let doc: unknown;
-  try {
-    doc = JSON.parse(text);
-  } catch (err) {
-    throw new Error(
-      `"${manifest}" is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-  // upgrade BEFORE validating: `schemaVersion: z.literal(3)` rejects a v2
-  // document outright, so without this a workspace created by an older build
-  // stops opening entirely — the migration table existed but nothing called it
-  return parseWith(
-    CharacterManifestSchema,
-    migrateCharacterManifest(doc),
-    `CharacterManifest at "${manifest}"`,
-  );
+  return await readManifest(workspacePaths(workspace).manifest);
 }
 
 export interface StoredSource {

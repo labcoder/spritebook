@@ -20,15 +20,8 @@
  * on disk would let `redo` replay a patch computed against a document that no
  * longer exists.
  *
- * ## Write order is a crash-safety argument
- *
- * journal -> cursor -> manifest. A crash between the cursor and the manifest
- * leaves a cursor claiming a patch that the document has not received, and
- * `undo` then replays that patch's inverse against the older document: for a
- * replace that restores the value already there (self-healing), and for an
- * append it fails loudly on an out-of-range index. The other order is worse —
- * an understated cursor makes `undo` replay the WRONG patch's inverse and
- * silently corrupt the manifest. Loud beats silent.
+ * Persistence is shared with rename/undo/redo in persistence.ts: an exclusive
+ * OS lock and a write-ahead intent recover the manifest, journal and cursor.
  *
  * ## Where canonicalMesh's non-mesh facts come from
  *
@@ -47,19 +40,11 @@ import type {
   DetailLayer,
   GenerationResult,
   JsonPatchOp,
-  ManifestPatch,
   RigState,
 } from '@spritebook/schema';
-import {
-  canonicalJson,
-  CharacterManifestSchema,
-  GenerationResultSchema,
-  ManifestPatchSchema,
-  migrateCharacterManifest,
-  parseWith,
-} from '@spritebook/schema';
-import { ManifestJournal } from './journal.ts';
-import { type WorkspacePaths, workspacePaths } from './workspace.ts';
+import { canonicalJson, GenerationResultSchema, parseWith } from '@spritebook/schema';
+import { commitManifest } from './persistence.ts';
+import { workspacePaths } from './workspace.ts';
 
 export interface ReceiptOptions {
   /** overrides the default undo-stack label */
@@ -481,112 +466,15 @@ function canonicalMeshOp(
   return { op: 'replace', path: '/canonicalMesh', value: { ...current, ...defined(fields) } };
 }
 
-// ---------------------------------------------------------------------------
-// The journaled read-modify-write
-// ---------------------------------------------------------------------------
-
-interface JournalState {
-  doc: Record<string, unknown>;
-  patches: ManifestPatch[];
-  cursor: number;
-}
-
-/** Mirrors `readJournal` in packages/cli/mod.ts — same files, same checks. */
-async function readJournalState(paths: WorkspacePaths): Promise<JournalState> {
-  let text: string;
-  try {
-    text = await Deno.readTextFile(paths.manifest);
-  } catch {
-    throw new Error(
-      `No character manifest at "${paths.manifest}" - that directory is not a SpriteBook ` +
-        `workspace.`,
-    );
-  }
-  // The raw document is migrated HERE rather than after validation, because
-  // everything downstream reads `doc`: the ManifestJournal is constructed from
-  // it, and `journal.canonicalBytes` is what lands back on disk. Migrating only
-  // the validated copy would journal a patch against a v3 document and then
-  // write out the v2 one. So the first write after an upgrade persists v3 —
-  // upgrade-on-write, and undo returns to the migrated state rather than
-  // resurrecting a schema this build no longer accepts.
-  const doc = migrateCharacterManifest(JSON.parse(text));
-  const journalText = await Deno.readTextFile(paths.journal).catch(() => '');
-  const patches = journalText
-    .split('\n')
-    .filter((l) => l.length > 0)
-    .map((l, i) => parseWith(ManifestPatchSchema, JSON.parse(l), `journal line ${i + 1}`));
-  const cursorText = await Deno.readTextFile(paths.cursor).catch(() => String(patches.length));
-  const cursor = Number(cursorText.trim());
-  if (!Number.isInteger(cursor) || cursor < 0 || cursor > patches.length) {
-    throw new Error(
-      `corrupt cursor file "${paths.cursor}": "${cursorText.trim()}" (journal has ` +
-        `${patches.length} patches)`,
-    );
-  }
-  return { doc, patches, cursor };
-}
-
-/**
- * Read the manifest, let `build` turn it into ops, journal the patch with its
- * precomputed inverse, and persist all three files.
- *
- * `build` throws for a refusal, which is why it runs before anything is
- * written: an unknown result id must cost nothing.
- */
-async function commit(
+function commit(
   workspace: string,
   build: (manifest: CharacterManifest) => { op: JsonPatchOp[]; label: string },
   now?: () => string,
 ): Promise<CharacterManifest> {
-  const paths = workspacePaths(workspace);
-  const state = await readJournalState(paths);
-  const current = parseWith(
-    CharacterManifestSchema,
-    state.doc,
-    `CharacterManifest at "${paths.manifest}"`,
-  );
-  const { op, label } = build(current);
-  // A patch that changes nothing is not history. `recordBake` reaches this when
-  // a bake is re-run unchanged; journaling it would push an empty step onto the
-  // undo stack, and an undo that visibly does nothing is how a user stops
-  // trusting the stack. Refusals still throw from `build` — this is the
-  // narrower case of a build that ran and found no difference.
-  if (op.length === 0) return current;
-
-  const kept = state.patches.slice(0, state.cursor);
-  const journal = new ManifestJournal(state.doc, { now });
-  const built = journal.commit({ target: { kind: 'character', id: current.id }, op, label });
-  // ManifestJournal numbers from zero per instance; the file is the whole
-  // history of the workspace, so the sequence continues from the last line.
-  const patch = parseWith(ManifestPatchSchema, {
-    ...built,
-    seq: kept.length === 0 ? 0 : kept[kept.length - 1].seq + 1,
-  }, 'ManifestPatch');
-  const next = parseWith(
-    CharacterManifestSchema,
-    journal.doc,
-    `patched CharacterManifest ("${label}")`,
-  );
-
-  const journalBytes = [...kept, patch].map((p) => canonicalJson(p)).join('');
-  await writeAtomic(paths.journal, journalBytes);
-  await writeAtomic(paths.cursor, String(kept.length + 1));
-  await writeAtomic(paths.manifest, journal.canonicalBytes);
-  return next;
+  return commitManifest(workspacePaths(workspace).manifest, build, now);
 }
 
-/**
- * Write via a sibling temp file so a reader never sees a half-written doc.
- *
- * Exported because `roster.ts` writes the same three files and was writing them
- * plainly — the crash-safety argument at the top of this module applies to
- * whoever touches the journal, not to whoever happens to live in this file.
- */
-export async function writeAtomic(path: string, text: string): Promise<void> {
-  const tmp = `${path}.tmp`;
-  await Deno.writeTextFile(tmp, text);
-  await Deno.rename(tmp, path);
-}
+export { writeAtomic } from './persistence.ts';
 
 /**
  * `add` when the key is absent, `replace` when it is present — the two are not

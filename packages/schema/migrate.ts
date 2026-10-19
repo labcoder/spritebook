@@ -6,7 +6,7 @@
  *
  * Every loader that turns manifest JSON into a document, at the point of
  * JSON.parse and before any validation: `readWorkspace`, and the three copies
- * of `readJournalState` (core/receipts.ts, core/roster.ts, cli/mod.ts). The
+ * of `readManifest`/`commitManifest` (core/persistence.ts). The
  * order matters — those three hand the RAW object to ManifestJournal and write
  * `journal.canonicalBytes` back, so migrating a validated copy instead would
  * journal a patch against the new shape and then persist the old one.

@@ -6,7 +6,7 @@ import {
   ManifestPatchSchema,
   parseWith,
 } from '@spritebook/schema';
-import { applyPatchOps } from './journal.ts';
+import { moveManifestCursor } from './persistence.ts';
 import { createWorkspace, readWorkspace, workspacePaths } from './workspace.ts';
 import {
   appendGenerationResult,
@@ -61,28 +61,8 @@ const cursorOf = async (dir: string) =>
   Number((await Deno.readTextFile(workspacePaths(dir).cursor)).trim());
 const manifestBytes = (dir: string) => Deno.readTextFile(workspacePaths(dir).manifest);
 
-/**
- * A line-for-line mirror of the `undo` branch in packages/cli/mod.ts: read the
- * document, the journal and the cursor; take the LAST APPLIED patch; replay its
- * PRECOMPUTED inverse through the same applyPatchOps primitive the CLI calls;
- * rewrite the manifest as canonical bytes and step the cursor back one.
- *
- * Mirrored rather than imported because @spritebook/cli depends on core, not
- * the other way round — but every mechanic below is the real one.
- */
 async function cliUndo(dir: string): Promise<ManifestPatch> {
-  const p = workspacePaths(dir);
-  const doc = JSON.parse(await Deno.readTextFile(p.manifest)) as Record<string, unknown>;
-  const patches = await journalLines(dir);
-  const cursorText = await Deno.readTextFile(p.cursor).catch(() => String(patches.length));
-  const cursor = Number(cursorText.trim());
-  assert(Number.isInteger(cursor) && cursor >= 0 && cursor <= patches.length, 'cursor is sane');
-  assert(cursor > 0, 'there is something to undo');
-  const patch = patches[cursor - 1];
-  const next = applyPatchOps(doc, patch.inverse);
-  await Deno.writeTextFile(p.manifest, canonicalJson(next));
-  await Deno.writeTextFile(p.cursor, String(cursor - 1));
-  return patch;
+  return await moveManifestCursor(workspacePaths(dir).manifest, 'undo');
 }
 
 Deno.test('appendGenerationResult journals one patch and advances the cursor', async () => {
