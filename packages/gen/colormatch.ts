@@ -34,7 +34,7 @@ import { promises as fs } from 'node:fs';
  */
 import { NodeIO } from '@gltf-transform/core';
 import { decode as decodePng } from 'fast-png';
-import { encode as encodePng } from '@spritebook/render/png';
+import { encode as encodePng } from '@spritebook/image';
 import { type Lab, linearToSrgb, oklabToLinearRgb, srgbToLab } from '@spritebook/core';
 import { AMBIENT } from '@spritebook/render';
 

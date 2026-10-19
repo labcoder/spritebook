@@ -13,7 +13,7 @@ import { promises as fs } from 'node:fs';
  * styleFromAovs is pure CPU over committed AOV PNGs, so it is deterministic and
  * runs anywhere; the GPU-touching runStyleJob (mod.ts) renders the AOVs first.
  */
-import { encode as encodePng } from '@spritebook/render/png';
+import { encode as encodePng } from '@spritebook/image';
 import type { CameraPreset, QAFlag, StylePreset } from '@spritebook/schema';
 import type { AovImage, AovSource, Palette, StyleResult } from './contracts.ts';
 import { readAov } from './aovio.ts';

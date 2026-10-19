@@ -9,7 +9,7 @@
  * fixed iteration order, no clock, no randomness. PNG encoding uses the qualified native codec,
  * rgba8 -> 8-bit RGBA, gray16 -> 16-bit single-channel, matching PAGE_KIND.
  */
-import { encode as encodePng } from '@spritebook/render/png';
+import { encode as encodePng } from '@spritebook/image';
 import { type CellPlane, frameIdKey, type PackLayout } from './contracts.ts';
 
 /**

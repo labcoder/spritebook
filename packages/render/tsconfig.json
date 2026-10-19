@@ -13,6 +13,9 @@
     },
     {
       "path": "../schema"
+    },
+    {
+      "path": "../image"
     }
   ],
   "include": [

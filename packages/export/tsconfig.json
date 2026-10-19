@@ -16,6 +16,9 @@
     },
     {
       "path": "../render"
+    },
+    {
+      "path": "../image"
     }
   ],
   "include": [

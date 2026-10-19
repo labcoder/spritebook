@@ -1,0 +1,23 @@
+{
+  "name": "@spritebook/image",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/mod.d.ts",
+      "default": "./dist/mod.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "fast-png": "6.2.0",
+    "jpeg-js": "0.4.4",
+    "ndarray": "1.0.19"
+  },
+  "devDependencies": {
+    "@types/ndarray": "1.0.14"
+  }
+}

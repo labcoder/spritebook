@@ -1,3 +1,4 @@
+import { rgba8 } from '@spritebook/image';
 import { promises as fs } from 'node:fs';
 /**
  * The identity layer (P3-T4, Track A): everything that makes two characters on
@@ -55,7 +56,7 @@ import {
   type Skin,
 } from '@gltf-transform/core';
 import { decode as decodePng } from 'fast-png';
-import { encode as encodePng } from '@spritebook/render/png';
+import { encode as encodePng } from '@spritebook/image';
 import type {
   AttachmentPlacement,
   BodyRegion,
@@ -692,37 +693,10 @@ function baseTexture(
   // 3-channel RGB. Every stride computation below assumes 4 channels, so an
   // un-normalized RGB base died inside fast-png with "wrong data size" —
   // found by the identity job's decal test on a plainly-picked fixture mesh.
-  const src = toRgba(decoded.data, decoded.channels ?? 4, decoded.depth ?? 8);
+  const src = rgba8(decoded);
   const size = requested ?? Math.max(decoded.width, decoded.height);
   if (decoded.width === size && decoded.height === size) return { rgba: src, size };
   return { rgba: resampleNearest(src, decoded.width, decoded.height, size, size, false), size };
-}
-
-/** Any PNG channel layout -> RGBA (grey, grey+alpha, RGB, RGBA). */
-function toRgba(data: ArrayLike<number>, channels: number, depth = 8): Uint8Array {
-  // 16-bit samples arrive as a Uint16Array. Writing those into a Uint8Array
-  // wraps mod 256 (65280 -> 0), which is a silent colour corruption rather
-  // than an error, so the high byte is taken explicitly.
-  const to8 = depth === 16 ? (v: number) => v >>> 8 : (v: number) => v;
-  const px = data.length / channels;
-  const out = new Uint8Array(px * 4);
-  for (let i = 0; i < px; i++) {
-    const s = i * channels;
-    const d = i * 4;
-    if (channels >= 3) {
-      out[d] = to8(data[s]);
-      out[d + 1] = to8(data[s + 1]);
-      out[d + 2] = to8(data[s + 2]);
-      out[d + 3] = channels === 4 ? to8(data[s + 3]) : 255;
-    } else if (channels === 2) {
-      out[d] = out[d + 1] = out[d + 2] = to8(data[s]);
-      out[d + 3] = to8(data[s + 1]);
-    } else {
-      out[d] = out[d + 1] = out[d + 2] = to8(data[s]);
-      out[d + 3] = 255;
-    }
-  }
-  return out;
 }
 
 /**
@@ -779,8 +753,8 @@ export async function compositeDecals(opts: CompositeDecalsOptions): Promise<Dec
           'be RGBA, because its alpha is what decides which texels it paints',
       );
     }
-    // 16-bit decals decode to Uint16Array; narrow explicitly (see toRgba)
-    const src = toRgba(png.data, 4, png.depth ?? 8);
+    // 16-bit decals decode to Uint16Array; narrow explicitly (see rgba8)
+    const src = rgba8(png);
 
     const target = texelRect(rect, size, `decal "${decal.id}"`);
     landings.push({

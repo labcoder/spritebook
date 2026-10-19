@@ -33,7 +33,6 @@ group lands. Build/test dependencies below are not bundled in application resour
 | `@vitejs/plugin-react`                                   | Studio's existing React integration, made compatible with Vite 8       | MIT               | 6.0.1                                        |
 | `dprint`                                                 | Retain the existing formatting engine without executing Deno           | MIT               | 0.64.0                                       |
 | `@dprint/typescript`, `@dprint/json`, `@dprint/markdown` | Locally installed formatter Wasm plugins; no first-run plugin download | MIT               | 0.96.1 / 0.25.2 / 0.26.0                     |
-| `rolldown`                                               | Bundle compiled core/CLI; reuse Studio's existing bundler              | MIT               | 1.1.5                                        |
 
 The previous React plugin 5.1.4 declared Vite support only through 7, preventing a clean npm
 workspace install with the already-pinned Vite 8.1.4. The
@@ -79,24 +78,38 @@ settings are retained; input/output hashes and the merged manifest are recorded.
 invalidates upstream executable signing, so release signing must happen afterward. No system
 executable, registry code page or locale is changed.
 
-The qualified-candidate PNG writer uses Node's built-in `zlib` and CRC32, retaining `fast-png`
-decoding. This is a proof-only build substitution; production still uses the original codec. The
-copied Node license includes its native third-party notices. The artifact audit also exposes the
-existing `pako` 2.2.0 transitive declaration **MIT AND Zlib**, beyond this document's strict
-bundling allowlist. Release clearance must resolve that policy mismatch and the prebuilt addon's
-complete static dependency notices; an internal renderer experiment is not clearance to distribute.
+The shared `@spritebook/image` PNG writer uses Node's built-in `zlib` and CRC32, retaining
+`fast-png` decoding. F4 promotes the byte-qualified F2 writer into production. The copied Node
+license includes its native third-party notices. The artifact audit also exposes the existing `pako`
+2.2.0 transitive declaration **MIT AND Zlib**, beyond this document's strict bundling allowlist.
+Release clearance must resolve that policy mismatch and the prebuilt addon's complete static
+dependency notices; an internal renderer experiment is not clearance to distribute.
 
 ## Core render, style, pack
 
 | Dependency        | Role                                                            | License     | Status       |
 | ----------------- | --------------------------------------------------------------- | ----------- | ------------ |
 | WGSL shader stack | NPR passes                                                      | ours        | —            |
-| fast-png          | PNG encode/decode                                               | MIT         | std          |
+| fast-png          | PNG decode                                                      | MIT         | std          |
 | pixelmatch        | golden diffs                                                    | ISC         | std          |
 | OKLab math        | perceptual quantize                                             | ours (tiny) | implement    |
 | maxrects-packer   | atlasing                                                        | MIT         | std          |
 | gifenc            | contact-sheet artifacts only (player is interactive, never GIF) | MIT         | std          |
 | Mesa lavapipe     | CI software Vulkan                                              | MIT         | std, CI-only |
+
+The shared image package also supplies glTF-Transform's byte-only `ndarray-pixels` boundary through
+an npm override. It uses existing `jpeg-js` **0.4.4** (BSD-3-Clause), `ndarray` **1.0.19** (MIT) and
+development-only `@types/ndarray` **1.0.14** (MIT). This avoids bundling Sharp/libvips; PNG/JPEG
+inputs normalize to RGBA8, including palette transparency, packed samples and 16-bit high bytes.
+Unsupported optional encodings remain encoded when an upstream optimization cannot decode them. The
+codec and ndarray notices are retained in the installed package tree.
+
+F4 retains the legacy production transitive versions in `package-lock.json`, with three security
+patches: Ajv **8.18.0** (MIT), fast-uri **3.1.8** (BSD-3-Clause) and DOMPurify **3.4.17**
+(Apache-2.0 option selected). A clean `npm ci --ignore-scripts` and `npm audit` report zero
+vulnerabilities at this cutover. Future audit results may change. The compiled runtime preserves the
+production package tree rather than bundling CJS importer code that depends on private relative
+assets. Development tools and source TypeScript are excluded.
 
 ## Importer border
 

@@ -4,7 +4,7 @@
  * already display-ready sRGB — no re-encode); depth is r32float mapped to 16-bit
  * gray; mask is the r32uint coverage mapped to 16-bit gray FULL SCALE.
  */
-import { encode as encodePng } from './codec.ts';
+import { encode as encodePng } from '@spritebook/image';
 import type { AovTarget } from './contracts.ts';
 
 export function encodeAov(

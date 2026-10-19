@@ -17,7 +17,7 @@ import { promises as fs } from 'node:fs';
  * default an untimed clip falls back to.
  */
 import { decode as decodePng } from 'fast-png';
-import { encode as encodePng } from '@spritebook/render/png';
+import { encode as encodePng } from '@spritebook/image';
 import type { FrameRecord } from '@spritebook/schema';
 import type { Exporter } from '@spritebook/pack/contracts';
 import { frameIdKey } from '@spritebook/pack/contracts';

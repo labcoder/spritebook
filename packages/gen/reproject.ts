@@ -33,7 +33,7 @@ import { promises as fs } from 'node:fs';
  */
 import { type Document, NodeIO } from '@gltf-transform/core';
 import { decode as decodePng } from 'fast-png';
-import { encode as encodePng } from '@spritebook/render/png';
+import { encode as encodePng } from '@spritebook/image';
 
 export interface ReprojectOptions {
   /** canonical glb whose baseColorTexture gets repainted */

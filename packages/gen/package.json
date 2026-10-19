@@ -15,6 +15,7 @@
   "dependencies": {
     "@gltf-transform/core": "4.4.1",
     "@spritebook/core": "0.1.0",
+    "@spritebook/image": "0.1.0",
     "@spritebook/importer": "0.1.0",
     "@spritebook/registry": "0.1.0",
     "@spritebook/render": "0.1.0",
