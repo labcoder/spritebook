@@ -29,6 +29,11 @@ characters. The current code already contains valuable work, while its packaging
 provisioning, and process lifecycle need attention. The
 [architecture review](architecture-review.md) separates those facts from proposals.
 
+Native and Python inference routes deserve separate qualification. Keep app availability separate
+from exact model/runtime/hardware support; preserve the catalog and shared model store without
+making a general workflow graph the first-run experience. The product remains character rosters,
+with findable reference, mesh and motion artifacts and clear next actions in each stage.
+
 ## Recommended direction
 
 **Keep Tauri and the TypeScript core, and modernize this repository incrementally.** The desktop and
@@ -45,8 +50,8 @@ contingency if that path fails; it would not move product behavior out of TypeSc
 defines the unresolved engineering gates.
 
 The migration roadmap is now finalized for this strategy. It separates the required Deno exit from
-later model and editor improvements. This documentation update records the approval and plan;
-implementation and hardware qualification have not been performed.
+later model and editor improvements. F0 has captured the legacy control; F1 safety work is in
+progress. Unverified hardware and installed-artifact gates remain open.
 
 Keep Python or an audited native inference runner for models that need it. Rewriting the UI or
 orchestrator does not make a CUDA-only model run on Metal. Hugging Face remains an artifact source;

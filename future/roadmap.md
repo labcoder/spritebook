@@ -5,11 +5,12 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1-T2 is next.** The [conformance/platform matrix](baseline.md) records fresh Windows
-evidence, known defects and unverified targets. Closing baseline capture does not close platform,
-installed-app, model or release qualification gates. A task closes on evidence, not on a compiled
-binary or an optimistic support claim. Exact dependency pins and schema changes follow the existing
-BOM/decision process; Node/Dawn and new models remain unqualified.
+2026-10-19; F1 is now in progress, starting with F1-T2.** The
+[conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
+unverified targets. Closing baseline capture does not close platform, installed-app, model or
+release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
+support claim. Exact dependency pins and schema changes follow the existing BOM/decision process;
+Node/Dawn and new models remain unqualified.
 
 ## The route
 
@@ -84,12 +85,12 @@ Work **F1-T2 → F1-T1 → F1-T3**, then finish the read/policy checks in F1-T4/
 cutover. F2's read-only fixture experiment may run independently; no real workspace conversion
 precedes F1.
 
-- [ ] **F1-T2 · One recoverable writer.** Consolidate commit/undo/redo persistence in core, protect
-      the entire read-modify-write with a per-workspace inter-process lock, use unique staging
-      paths, and define recovery across journal, cursor, manifest and asset selection. Reuse proven
-      mechanisms where correct. Document process-crash versus power-loss durability. Two writers and
-      injected failure at every commit boundary must produce a recoverable prior/new state, never a
-      silently lost acknowledged edit or a replayed wrong inverse.
+- [~] **F1-T2 · One recoverable writer.** Consolidate commit/undo/redo persistence in core, protect
+  the entire read-modify-write with a per-workspace inter-process lock, use unique staging paths,
+  and define recovery across journal, cursor, manifest and asset selection. Reuse proven mechanisms
+  where correct. Document process-crash versus power-loss durability. Two writers and injected
+  failure at every commit boundary must produce a recoverable prior/new state, never a silently lost
+  acknowledged edit or a replayed wrong inverse.
 - [ ] **F1-T1 · Restore actual assets during undo.** Fix the reproduced pick r1 → pick r2 → undo
       mismatch. Preserve recoverable versions of transformed canonical meshes/textures, not just the
       original generator outputs. Immutable hash-addressed revisions are the proposed minimal
@@ -239,6 +240,15 @@ F4/F7 migration work, even when they touch the same modules as these later impro
 | **F5-T4**        | Further installer/updater and platform integration improvements                                                         | Clean upgrade/rollback and safe paths on claimed targets; required migration delivery is already covered by F4/F7                                                             |
 | **F6-T1, F6-T2** | Expanded identity, motion and pixel-style qualification                                                                 | Asymmetric marks/prosthetics, root/feet, thin features, palettes, alpha, outline, all directions and aligned AOVs survive actual sprite-size review                           |
 | **F6-T3**        | Higher roster throughput and resource efficiency                                                                        | Cold/warm/single-edit/style-pivot predictions and 8-hour soak pass; preserve palette scope and temporal frame order while profiling before parallelism                        |
+
+### Workflow qualification
+
+F6-T4 qualifies complete production workflows on the same inputs and hardware: a textured prop
+through eight directions; an asymmetric humanoid through idle/walk/action; a roster look change with
+failure/restart; and engine playback with pivots, timing and aligned passes. Report setup, download,
+cold inference, warm inference and sprite-bake time separately. Include silhouette, stray-pixel and
+baseline QA without rejecting legitimate poses or asymmetric attachments. A node that runs
+successfully is not evidence that the complete character workflow is ready.
 
 ## Feature preservation map
 

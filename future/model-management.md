@@ -125,3 +125,10 @@ No download, authentication, credential inspection, model run, cache deletion, o
 experiment was performed. This is a source and documentation review. A distinct external desktop
 product meant by “Hugging Face Desktop” remains unidentified; no keep/remove judgment is claimed for
 it. Hub/client behavior and dependency licenses must be rechecked at implementation time.
+
+## Setup and ownership requirements
+
+Separate runtime setup from weight installation. Show per-file/byte progress, stalls, retry/repair
+steps, reused weights, incremental disk cost and dependent model variants. Keep hash-verified
+receipts as the trust anchor. Failed setup or cancellation retains the last accepted asset;
+cancellation reaches the owned process tree, and the UI explains when unloaded weights must reload.

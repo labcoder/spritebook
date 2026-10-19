@@ -6,7 +6,7 @@ behavior. Tauri, the TypeScript core/CLI and incremental migration remain select
 D-041/D-042). No production code, dependency, schema or golden changed during F0.
 
 The product source is `42be3bbebfc783edb42fb64001aa9b2e3d638c98`; the control runner is committed in
-`8c52ea6`. That commit adds only the approved future documents and the proof to the product source.
+`68bad07`. That commit adds only the approved future documents and the proof to the product source.
 [Measured evidence](baseline/windows-x64-vulkan.json) pins the complete checkout, toolchain, driver,
 input hashes, commands, results and preserved local archive. The JSON is an observation, not a new
 product schema.

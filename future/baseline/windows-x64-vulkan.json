@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "8c52ea616af19079f353267693cc6328d228ec4a",
+  "sourceCommit": "68bad074f275db7adfdd676489d236c29a9eec97",
   "startedAt": "2026-10-19T15:01:13.515Z",
   "finishedAt": "2026-10-19T15:01:57.100Z",
   "runtime": {
@@ -162,7 +162,7 @@
   ],
   "recordedAt": "2026-10-19",
   "productSourceCommit": "42be3bbebfc783edb42fb64001aa9b2e3d638c98",
-  "runnerCommit": "8c52ea616af19079f353267693cc6328d228ec4a",
+  "runnerCommit": "68bad074f275db7adfdd676489d236c29a9eec97",
   "host": {
     "os": "Windows 11 Pro",
     "version": "10.0.26200",
@@ -376,7 +376,7 @@
   },
   "inProcessExperiment": {
     "status": "failed; root cause unproven",
-    "sourceCommit": "aa2aa4f5a4bf27bbc33033ddca4a936a9c1574bf",
+    "sourceCommit": "ad09e4d255660e5b22caa637b80c823da3d37ff9",
     "execution": "one runCli process: gen, pick, Track A fit, accept, enable clips, setLook S=1, bake at 100x128 / padding 8",
     "errorCode": "bake-failed",
     "message": "render idle-loop failed: renderer setup validation error: Buffer with '' label is invalid",
@@ -399,7 +399,7 @@
     }
   ],
   "firstControl": {
-    "sourceCommit": "aa2aa4f5a4bf27bbc33033ddca4a936a9c1574bf",
+    "sourceCommit": "ad09e4d255660e5b22caa637b80c823da3d37ff9",
     "startedAt": "2026-10-19T14:57:48.046Z",
     "finishedAt": "2026-10-19T14:58:31.429Z",
     "measurements": [
@@ -583,5 +583,10 @@
     ".render-bench/f0/replay-control/workspace/rig/fit-report.json": "59bb9134846b27996950443a4d5d874c54def95b686b0811303b6eebf1624f00",
     ".render-bench/f0/fmt-check.log": "232cf79936a0177e83ec75035e0a87916328625c5fdb00321d7e71826a91c6d5",
     ".render-bench/f0/lint.log": "80ea5c50201ab695e5aeb812384b29ba6df42b02db15fd01a6f59f7f20ba56b7"
+  },
+  "historyCleanup": {
+    "note": "Documentation-only history cleanup remapped commits; measured product bytes, fixtures, output hashes and sealed local archive are unchanged. Original observations remain in the sealed archive.",
+    "originalSourceCommit": "8c52ea616af19079f353267693cc6328d228ec4a",
+    "originalRunnerCommit": "8c52ea616af19079f353267693cc6328d228ec4a"
   }
 }
