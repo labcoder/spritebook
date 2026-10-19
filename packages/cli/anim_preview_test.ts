@@ -24,7 +24,7 @@ async function cli(args: string[]): Promise<{ code: number; out: string[] }> {
 
 const REPO = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const IMAGE = `${REPO}tests/fixtures/bulma-front.png`;
-const BODY = `${REPO}packages/rig/bodies/ubc-male`;
+const BODY = 'ubc-male';
 
 test('anim --preview writes the retargeted clip onto the rigged character', async () => {
   const root = await fs.mkdtemp(join(tmpdir(), 'sb-preview-'));

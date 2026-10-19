@@ -1,6 +1,12 @@
 import { appendFileSync } from 'node:fs';
 import { resourcePath } from '@spritebook/core';
 import { promises as fs } from 'node:fs';
+
+function bodyDirectory(value: string): string {
+  return value === 'ubc-male' || value === 'packages/rig/bodies/ubc-male'
+    ? resourcePath('rig', 'bodies/ubc-male')
+    : value;
+}
 /**
  * @spritebook/cli - verb surface. P1-T3 landed `undo`/`redo`; P2-T3 lands
  * `bake` (canonical glb -> bake dir via render->style->pack) and `export`
@@ -1958,7 +1964,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         runIdentityJob({
           jobId: 'identity',
           workspace,
-          bodyManifestPath: bodyDir ? `${bodyDir}/body.json` : undefined,
+          bodyManifestPath: bodyDir ? `${bodyDirectory(bodyDir)}/body.json` : undefined,
           decals,
           attachments,
           boneMask,
@@ -2114,7 +2120,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         return fail(
           'rig' as JobEvent['jobId'],
           'missing-arg',
-          '--track-a needs --body <dir> (a bundled body lives at packages/rig/bodies/ubc-male)',
+          '--track-a needs --body <dir|ubc-male>',
         );
       }
       // the same bad-args boundary Track B and gen keep: numFlag throws on a
@@ -2125,7 +2131,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         return await pump(
           runFitJob({
             jobId: 'rig',
-            bodyDir: body,
+            bodyDir: bodyDirectory(body),
             targetPath: target,
             outDir: out,
             heightM: flag(args, 'height') !== undefined ? numFlag(args, 'height', 1.7) : undefined,

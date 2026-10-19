@@ -6,8 +6,8 @@
   "build": {
     "devUrl": "http://localhost:5174",
     "frontendDist": "../dist",
-    "beforeDevCommand": "deno task dev:web",
-    "beforeBuildCommand": "deno task build:web"
+    "beforeDevCommand": "npm --prefix ../.. run dev:desktop:web",
+    "beforeBuildCommand": "npm --prefix ../.. run prepare:desktop"
   },
   "app": {
     "withGlobalTauri": true,
@@ -22,11 +22,20 @@
         "dragDropEnabled": true
       }
     ],
-    "security": { "csp": null }
+    "security": {
+      "csp": null
+    }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "icon": ["icons/icon.ico"]
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../../../.build/runtime/": "runtime/"
+    }
   }
 }

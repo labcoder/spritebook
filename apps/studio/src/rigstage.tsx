@@ -14,7 +14,7 @@ import { Viewport } from './viewport/Viewport';
 import { editsFile, mergeEdits, mirrorPartner, type PendingEdit } from './viewport/picking';
 import { useLandFocus, useRovingRadio } from './focus';
 
-const BUNDLED_BODY = 'packages/rig/bodies/ubc-male';
+const BUNDLED_BODY = 'ubc-male';
 
 interface RunState {
   running: boolean;

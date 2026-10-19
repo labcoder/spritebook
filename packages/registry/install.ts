@@ -2,6 +2,8 @@ import { createWriteStream } from 'node:fs';
 import { Writable } from 'node:stream';
 import { promises as fs } from 'node:fs';
 import type { Stats } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Install / verify / rm jobs (D-009), speaking the runBakeJob event
  * discipline: queued -> started -> per-file progress -> artifact -> done,
@@ -64,9 +66,45 @@ export type Fetcher = (
 
 /** Default fetcher: fetch() streamed straight to disk — never buffered whole. */
 export const fetchToFile: Fetcher = async (url, destPath, onBytes) => {
-  const resp = await fetch(url);
+  let current = new URL(url);
+  let resp: Response;
+  for (let redirects = 0;; redirects++) {
+    let token: string | undefined;
+    if (current.origin === 'https://huggingface.co') {
+      token = process.env.HF_TOKEN?.trim();
+      if (!token && !/^(?:1|on|yes|true)$/i.test(process.env.HF_HUB_DISABLE_IMPLICIT_TOKEN ?? '')) {
+        const home = process.env.HF_HOME ??
+          join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'huggingface');
+        token = await fs.readFile(process.env.HF_TOKEN_PATH ?? join(home, 'token'), 'utf8').then((
+          text,
+        ) => text.trim()).catch((error) => {
+          if (error.code !== 'ENOENT') throw error;
+          return undefined;
+        });
+      }
+    }
+    resp = await fetch(current, {
+      redirect: 'manual',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (![301, 302, 303, 307, 308].includes(resp.status)) break;
+    await resp.body?.cancel();
+    if (redirects >= 5) throw new Error(`GET ${url}: too many redirects`);
+    const location = resp.headers.get('location');
+    if (!location) throw new Error(`GET ${url}: redirect has no location`);
+    const next = new URL(location, current);
+    if (next.protocol !== 'https:') throw new Error(`GET ${url}: insecure redirect refused`);
+    current = next;
+  }
   if (!resp.ok || resp.body === null) {
-    throw new Error(`GET ${url} -> HTTP ${resp.status}`);
+    await resp.body?.cancel();
+    throw new Error(
+      `GET ${url} -> HTTP ${resp.status}${
+        resp.status === 401 || resp.status === 403
+          ? ' - request model access, then run hf auth login or set HF_TOKEN'
+          : ''
+      }`,
+    );
   }
   let seen = 0;
   const counter = new TransformStream<Uint8Array, Uint8Array>({

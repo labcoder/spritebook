@@ -30,7 +30,12 @@
     "test:phaser": "node tools/test.mjs packages/export/phaser_smoke_test.ts",
     "test:walkthrough": "node tools/test.mjs tools/proofs/walkthrough_test.ts",
     "build:watch": "tsc -b --watch",
-    "precoverage": "npm run build"
+    "precoverage": "npm run build",
+    "build:runtime": "node tools/runtime/build.mjs",
+    "prepare:desktop": "npm run build && npm run build:runtime && npm run build:web -w spritebook-studio",
+    "dev:desktop:web": "npm run build && npm run build:runtime && npm run dev:web -w spritebook-studio",
+    "dev:desktop": "npm run dev:desktop -w spritebook-studio",
+    "build:desktop": "npm run build:desktop -w spritebook-studio"
   },
   "overrides": {
     "@jsr/std__internal": "1.0.12",

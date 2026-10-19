@@ -1,16 +1,5 @@
-// SpriteBook Studio shell (P4-T1). Three commands, all read-only projections:
-//
-//  - run_cli: spawn the core CLI (deno) and stream its stdout to the webview
-//    on a PER-JOB channel `cli:<jobId>` (D-005 rider: no global event names).
-//    The skeleton's only caller runs `doctor`; the command itself is
-//    verb-agnostic because every later screen speaks through it.
-//  - list_workspaces: every <root>/*/character.json, verbatim — the manifest
-//    IS the interface; the GUI projects it and never interprets on this side.
-//  - read_thumb: newest bake's contact gif bytes, base64 — a display artifact
-//    core already produced, not something the shell renders.
-//
-// Dev runs resolve the repo root relative to this manifest; a packaged
-// binary takes SPRITEBOOK_REPO until the packaging task pins a real story.
+// The desktop projects the core CLI and its per-job NDJSON stream.
+// Release builds launch the app-owned Node runtime; development reads compiled packages.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 #[cfg(feature = "renderer-qualification")]
@@ -23,6 +12,7 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 
+#[cfg(debug_assertions)]
 fn repo_root() -> PathBuf {
     if let Ok(p) = std::env::var("SPRITEBOOK_REPO") {
         return PathBuf::from(p);
@@ -32,6 +22,40 @@ fn repo_root() -> PathBuf {
         .join("../../..")
         .canonicalize()
         .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.."))
+}
+
+fn cli_command(app: &tauri::AppHandle) -> Result<Command, String> {
+    #[cfg(debug_assertions)]
+    {
+        let _ = app;
+        let root = repo_root();
+        let runtime = root.join(".build/runtime");
+        let mut cmd = Command::new(runtime.join(if cfg!(windows) { "node.exe" } else { "node" }));
+        cmd.arg(root.join("packages/cli/dist/entry.js"))
+            .env_remove("SPRITEBOOK_RESOURCES")
+            .env(
+                "SPRITEBOOK_UV_BIN",
+                runtime.join(if cfg!(windows) { "uv.exe" } else { "uv" }),
+            )
+            .current_dir(root);
+        Ok(cmd)
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let runtime = app
+            .path()
+            .resource_dir()
+            .map_err(|e| e.to_string())?
+            .join("runtime");
+        let mut cmd = Command::new(runtime.join(if cfg!(windows) { "node.exe" } else { "node" }));
+        cmd.arg(runtime.join("core/cli.mjs"))
+            .env("SPRITEBOOK_RESOURCES", runtime.join("assets"))
+            .env(
+                "SPRITEBOOK_UV_BIN",
+                runtime.join(if cfg!(windows) { "uv.exe" } else { "uv" }),
+            );
+        Ok(cmd)
+    }
 }
 
 /// Windows `canonicalize` returns verbatim paths (`\\?\C:\...`). Those bypass
@@ -78,16 +102,11 @@ async fn run_cli(
 ) -> Result<i32, String> {
     let jobs = jobs.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let root = repo_root();
-        let mut cmd = Command::new("deno");
-        cmd.arg("run")
-            .arg("-A")
-            .arg(root.join("packages/cli/mod.ts"))
-            .arg("--owned-start")
+        let mut cmd = cli_command(&app)?;
+        cmd.arg("--owned-start")
             .args(&args)
             .arg("--log-append")
             .arg(session_path())
-            .current_dir(&root)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::piped());
@@ -143,16 +162,11 @@ fn cancel_cli(jobs: tauri::State<'_, Arc<Jobs>>, job_id: String) {
     jobs.cancel(job_id);
 }
 
-fn core_query(args: &[&str]) -> Result<serde_json::Value, String> {
-    let root = repo_root();
-    let mut cmd = Command::new("deno");
-    cmd.arg("run")
-        .arg("-A")
-        .arg(display_path(&root.join("packages/cli/mod.ts")))
-        .arg("workspace")
+fn core_query(app: &tauri::AppHandle, args: &[&str]) -> Result<serde_json::Value, String> {
+    let mut cmd = cli_command(app)?;
+    cmd.arg("workspace")
         .args(args)
         .arg("--json")
-        .current_dir(root)
         .stdin(Stdio::null());
     #[cfg(windows)]
     {
@@ -172,22 +186,21 @@ fn core_query(args: &[&str]) -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-async fn list_workspaces(root: String) -> Result<serde_json::Value, String> {
+async fn list_workspaces(app: tauri::AppHandle, root: String) -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        core_query(&["--root", &display_path(Path::new(&root))])
+        core_query(&app, &["--root", &display_path(Path::new(&root))])
     })
     .await
     .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-async fn read_thumb(dir: String) -> Result<Option<String>, String> {
+async fn read_thumb(app: tauri::AppHandle, dir: String) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        serde_json::from_value(core_query(&[
-            "--workspace",
-            &display_path(Path::new(&dir)),
-            "--thumb",
-        ])?)
+        serde_json::from_value(core_query(
+            &app,
+            &["--workspace", &display_path(Path::new(&dir)), "--thumb"],
+        )?)
         .map_err(|e| e.to_string())
     })
     .await
@@ -235,17 +248,21 @@ fn read_rig_report(dir: String) -> Result<Option<serde_json::Value>, String> {
 /// Core selects lastBakeId and reads its artifact under the workspace recovery lock.
 #[tauri::command]
 async fn read_bake_atlas(
+    app: tauri::AppHandle,
     dir: String,
     pass: Option<String>,
 ) -> Result<Option<serde_json::Value>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let value = core_query(&[
-            "--workspace",
-            &display_path(Path::new(&dir)),
-            "--atlas",
-            "--pass",
-            pass.as_deref().unwrap_or("lit"),
-        ])?;
+        let value = core_query(
+            &app,
+            &[
+                "--workspace",
+                &display_path(Path::new(&dir)),
+                "--atlas",
+                "--pass",
+                pass.as_deref().unwrap_or("lit"),
+            ],
+        )?;
         Ok(if value.is_null() { None } else { Some(value) })
     })
     .await

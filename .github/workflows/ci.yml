@@ -52,6 +52,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: prepare the weightless sidecar test environment
         run: uv sync --project sidecar --frozen
+      - run: cargo test --locked --manifest-path packages/core/native/Cargo.toml
       - name: tests and coverage (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: npm run coverage

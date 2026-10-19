@@ -39,9 +39,9 @@ workspace install with the already-pinned Vite 8.1.4. The
 [upstream migration notes](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/CHANGELOG.md)
 describe the compatible v6 integration. No Babel compiler plugin is enabled.
 
-The shell also directly uses lock-pinned `windows-sys` 0.61.2 (MIT/Apache-2.0) for Windows job
-objects and `libc` 0.2 (MIT/Apache-2.0) for Unix process groups. Both already belonged to the Tauri
-dependency graph; F1-T3 uses them to cancel owned CLI descendants and clean up on close.
+The shared native ownership crate uses lock-pinned `windows-sys` 0.61.2 (MIT/Apache-2.0) for Windows
+job objects and `libc` 0.2 (MIT/Apache-2.0) for Unix process groups. Both already belonged to the
+Tauri dependency graph; F1-T3 uses them to cancel owned CLI descendants and clean up on close.
 
 F4's small `spritebook-lock` helper reuses **windows-sys 0.61.2** and **libc 0.2.189**
 (MIT/Apache-2.0). It preserves kernel file locks across Node process death using `LockFileEx` or
@@ -127,6 +127,11 @@ assets. Development tools and source TypeScript are excluded.
 Autodesk License and Services Agreement (no redistribution). ✓ verified. Never bundle.
 
 ## AI sidecar
+
+The installed runtime includes **uv 0.12.10** (MIT OR Apache-2.0), with the pinned official release
+archive and both license texts. It creates Python environments in user-writable application data;
+Python, wheels, model weights and backend code are provisioned on demand, never copied from a
+builder's environment. Runtime archive checksums live in `tools/runtime/downloads.json`.
 
 | Dependency             | Role                        | License                                                     | Status                                                                                                                                                              |
 | ---------------------- | --------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
