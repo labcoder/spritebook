@@ -132,6 +132,12 @@ are recorded in generation metadata. It requires a nonempty cut-out RGBA image a
 local DINOv3/NAF files. No MoGe, BRIA, multiview or Pixal retexture capability is implied. Full
 generation/hardware qualification is recorded separately in F4-T6/T7.
 
+The Pixal worker runs its owned script in the isolated interpreter and loads only the
+`spritebook_sidecar` package. It never adds the base sidecar's entire `site-packages` directory to
+the worker's import path. That would silently replace the frozen model dependencies with the base
+environment's versions. Generation metadata records the actual Python/Torch/Transformers/ NATTEN
+versions, and the self-test exercises the installed-wheel layout with a poisoned base dependency.
+
 The [runtime recipe](runtimes/trellis2-win.json) pins source archives, sizes, SHA-256 hashes,
 notices and a bounded source patch. Setup uses the owned uv and prebuilt third-party wheels; no Git,
 MSVC or local CUDA toolkit is needed. It publishes a readiness receipt in writable app data after

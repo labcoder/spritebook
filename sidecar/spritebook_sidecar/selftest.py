@@ -1365,6 +1365,7 @@ def test_trellis2_local_dependencies(tmp: Path) -> None:
 
 def test_pixal3d_boundaries(tmp: Path) -> None:
     import math
+    import shutil
     from unittest.mock import patch
     from .adapters import pixal3d
     from .adapters.pixal3d_local import local_file
@@ -1409,6 +1410,23 @@ def test_pixal3d_boundaries(tmp: Path) -> None:
         except AdapterError as err:
             ok(err.code == "backend-unavailable" and "models setup pixal3d" in err.message,
                "missing environment names repair without loading or downloading weights")
+    # A normal installed wheel sits beside incompatible dependencies in site-packages.
+    site = tmp / "base-site"
+    copied = site / "spritebook_sidecar"
+    shutil.copytree(Path(pixal3d.__file__).resolve().parents[1], copied, ignore=shutil.ignore_patterns("__pycache__"))
+    (site / "PIL.py").write_text("raise RuntimeError('base environment leaked into worker')\n", encoding="utf-8")
+    from PIL import Image
+    rgb = tmp / "rgb.png"
+    Image.new("RGB", (16, 16), "red").save(rgb)
+    with patch.object(pixal3d, "__file__", str(copied / "adapters/pixal3d.py")), patch.dict(
+        os.environ, {"SPRITEBOOK_PIXAL3D_PYTHON": sys.executable, "PYTHONPATH": ""}
+    ):
+        try:
+            pixal3d.run({**params, "imagePath": str(rgb)}, JobEmitter("pixal-isolation", lambda _: None))
+            ok(False, "RGB worker input must refuse")
+        except AdapterError as err:
+            ok(err.code == "bad-input" and "cut-out RGBA" in err.message,
+               "installed worker loads our package without leaking the base environment's dependencies")
 
 
 def test_trellis2_rembg_is_refused() -> None:

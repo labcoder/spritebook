@@ -10,9 +10,19 @@ import time
 from pathlib import Path
 from typing import Any
 
+# Load only our package, never the base environment's other site-packages.
+if __package__ is None:
+    import importlib.util
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("spritebook_sidecar", root / "__init__.py")
+    package = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = package
+    spec.loader.exec_module(package)
+    __package__ = "spritebook_sidecar.adapters"
+
 from . import Adapter, AdapterError, Emitter, validate_params
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 EXPORT_TO_CANONICAL = ((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0), (0, 0, 0, 1))
 PARAMS_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -59,6 +69,8 @@ def generate(p: dict[str, Any], emit: Emitter) -> None:
     pipeline = load_pipeline(root)
     load_seconds = round(time.perf_counter() - started, 2)
     import torch
+    import transformers
+    import natten
     from pixal3d._spritebook_export import to_glb
 
     # Never construct upstream BRIA: alpha/crop/compositing is the only prep needed here.
@@ -102,6 +114,8 @@ def generate(p: dict[str, Any], emit: Emitter) -> None:
             "candidates": entries, "pipelineType": "1024_cascade", "lowVram": True,
             "cameraMode": "manual-fov", "camera": camera, "coordinateFrame": "y-up-z-forward",
             "naf": "strict", "loadSeconds": load_seconds,
+            "runtimeVersions": {"python": sys.version.split()[0], "torch": torch.__version__,
+                                "transformers": transformers.__version__, "natten": natten.__version__},
             "runSeconds": round(sum(e["runSeconds"] for e in entries), 2), **vram_peaks()}
     path = out_dir / "gen-meta.json"
     path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
@@ -115,10 +129,9 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     python = Path(os.environ.get("SPRITEBOOK_PIXAL3D_PYTHON", ""))
     if not python.is_absolute() or not python.is_file():
         raise AdapterError("backend-unavailable", "Pixal3D runtime is missing. Run `spritebook models setup pixal3d --accept-license`.")
-    env = {**os.environ, "PYTHONUTF8": "1",
-           "PYTHONPATH": os.pathsep.join(filter(None, (str(Path(__file__).resolve().parents[2]), os.environ.get("PYTHONPATH"))))}
+    env = {**os.environ, "PYTHONUTF8": "1"}
     error = None
-    with subprocess.Popen([str(python), "-m", __spec__.name, json.dumps(p)], env=env,
+    with subprocess.Popen([str(python), str(Path(__file__).resolve()), json.dumps(p)], env=env,
                           stdout=subprocess.PIPE, stderr=sys.stderr, text=True, encoding="utf-8") as child:
         for line in child.stdout:
             if not line.startswith(MARKER):
