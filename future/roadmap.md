@@ -5,13 +5,13 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1 state-safety work, the Windows x64 F2 proof and all F4 tasks are complete. F7 release
-qualification is next.** The [conformance/platform matrix](baseline.md) records fresh Windows
-evidence, known defects and unverified targets. Closing baseline capture does not close platform,
-installed-app, model or release qualification gates. A task closes on evidence, not on a compiled
-binary or an optimistic support claim. Exact dependency pins and schema changes follow the existing
-BOM/decision process; Node/Dawn has measured Windows candidate evidence; new models remain
-unqualified.
+2026-10-19; F1 state-safety work, the Windows x64 F2 proof and F4-T1 through F4-T5 are complete. F4
+is reopened for the approved Pixal3D integration and hardware/platform model spike below.** The
+[conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
+unverified targets. Closing baseline capture does not close platform, installed-app, model or
+release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
+support claim. Exact dependency pins and schema changes follow the existing BOM/decision process;
+Node/Dawn has measured Windows candidate evidence; new models remain unqualified.
 
 ## The route
 
@@ -261,15 +261,31 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       virtualization guards pass. Private NSIS install/uninstall both exit 0. Full installer
       upgrades, signing and clean-machine qualification stay in F7.
 
+- [ ] **F4-T6 · Integrate Pixal3D through model management.** Pin the official single-view weights,
+      DINOv3 conditioner, real NAF upsampler, source and frozen Windows runtime. Keep terms gates,
+      offline loading, prebuilt native dependencies and canonical glTF at the importer border.
+      Qualify generation on the maintainer's RTX 3090 (24 GiB), including measured load/inference
+      memory, PBR output, candidate selection, sprite workflow and recoverable failure. Preserve the
+      existing TRELLIS.2 default and completed migration evidence. A duplicated-feature NAF fallback
+      does not qualify as Pixal3D integration.
+- [ ] **F4-T7 · Spike practical image-to-3D alternatives.** Investigate open models against the
+      maintainer's Windows x64 / RTX 3090 / 64 GiB RAM machine. Run realistic candidates where their
+      assets, terms and prebuilt runtime permit; record failures as well as successful outputs.
+      Finish with a sourced Windows/macOS/Linux matrix covering exact runtime variants,
+      GPU/unified-memory requirements, system RAM, disk, output texture support and licensing.
+      Distinguish local measurements, upstream claims and community ports. Native Mac/Linux
+      qualification remains F7; neither research nor a hosted build proves GPU inference there.
+
 **Acceptance:** the installed CLI and Tauri app use one TypeScript core on Node, import a mesh,
 retarget clips, bake styled/AOV atlases and export every existing target. Existing real generation
 and rigging workflows pass their applicable hardware/terms gates without undeclared downloads.
 Source, tests, hooks, CI and release execution no longer require Deno. Historical proof transcripts
 may still contain Deno commands when clearly labeled historical; executable support paths may not.
 The maintainer confirmed on 2026-10-19 that the existing model provisioning/licensing gate stays in
-F4. **That gate and the real installed workflow now pass; F4 is complete.** F7 retains the release
-and deferred native-platform checks. Carry the inspected rig's stretch/unmapped-joint advisories
-into F3-T1 quality qualification; review/acceptance and measured defaults remain intact.
+F4. **That gate and the real installed workflow pass. On 2026-10-19 the maintainer extended F4 with
+F4-T6 and F4-T7; F4 remains open until that added work is qualified.** F7 retains the release and
+deferred native-platform checks. Carry the inspected rig's stretch/unmapped-joint advisories into
+F3-T1 quality qualification; review/acceptance and measured defaults remain intact.
 
 ## F7 · Release the migrated application
 
