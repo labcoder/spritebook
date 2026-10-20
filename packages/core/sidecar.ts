@@ -3,7 +3,12 @@ import { once } from 'node:events';
 import { Readable } from 'node:stream';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { modelRuntime, readModelRuntime, sidecarEnvironmentDir } from './model-runtime.ts';
+import {
+  modelRuntime,
+  readModelRuntime,
+  runtimeDataDir,
+  sidecarEnvironmentDir,
+} from './model-runtime.ts';
 
 /**
  * Sidecar client + supervisor (P3-T2) — the core side of the wire contract
@@ -256,6 +261,7 @@ async function readListeningLine(
 export async function startSidecar(cfg: SidecarConfig): Promise<SidecarHandle> {
   const token = mintToken();
   const env: NodeJS.ProcessEnv = { ...process.env, [SIDECAR_TOKEN_ENV]: token };
+  env.TRITON_CACHE_DIR ??= join(runtimeDataDir(), 'triton-cache');
   if (env.SPRITEBOOK_RESOURCES) {
     env.PYTHONDONTWRITEBYTECODE ??= '1';
     env.PYTHONUTF8 ??= '1';

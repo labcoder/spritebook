@@ -63,7 +63,7 @@ from typing import Any
 
 from . import Adapter, AdapterError, Emitter, validate_params
 
-TRELLIS2_ADAPTER_VERSION = "0.3.0"
+TRELLIS2_ADAPTER_VERSION = "0.3.1"
 
 # A collapsed texture has NO CONTENT, and the decoder can reach that at either
 # end of its [-1, 1] range. Black was found first (generation, seed 42, mean
@@ -361,7 +361,9 @@ def _shim_dinov3() -> None:
 def _prepare_runtime() -> None:
     """Everything that must happen between importing trellis2 and loading it."""
     from .trellis2_local import install_local_loaders
+    from .trellis2_windows import install as install_windows_compat
 
+    install_windows_compat()
     _stub_rembg()
     _shim_dinov3()
     install_local_loaders()

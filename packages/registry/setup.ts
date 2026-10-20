@@ -55,6 +55,7 @@ export async function* prepareModelRuntime(
       PYTHONUTF8: '1',
       PYTHONDONTWRITEBYTECODE: '1',
       UV_PYTHON_PREFERENCE: 'only-managed',
+      TRITON_CACHE_DIR: process.env.TRITON_CACHE_DIR ?? join(runtimeDataDir(), 'triton-cache'),
     };
     if (!ready) {
       stage = await fs.mkdtemp(`${info.root}.staging-`);

@@ -3,15 +3,31 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 
 import torch
 import o_voxel_vb_ap as o_voxel
 
 from .adapters.trellis2_uv import rasterize_uv
+from .adapters.trellis2_windows import install as install_windows_compat
 
 
 def main() -> None:
+    install_windows_compat()
     assert torch.cuda.is_available(), "This explicitly requested check requires CUDA"
+    from triton import knobs
+    from flex_gemm.ops.grid_sample import grid_sample_3d
+
+    if cache := os.environ.get("TRITON_CACHE_DIR"):
+        assert knobs.cache.dir == cache, "Triton must read the Unicode environment without loss"
+    xyz = torch.cartesian_prod(torch.arange(2), torch.arange(2), torch.arange(2)).cuda().int()
+    coords = torch.cat((torch.zeros((8, 1), device="cuda", dtype=torch.int32), xyz), dim=1)
+    constant = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], device="cuda")
+    sampled = grid_sample_3d(
+        constant[None].expand(8, -1).contiguous(), coords, torch.Size([1, 6, 2, 2, 2]),
+        torch.full((1, 1, 3), 0.75, device="cuda"), mode="trilinear",
+    )
+    torch.testing.assert_close(sampled.reshape(1, 6), constant.reshape(1, 6), atol=1e-6, rtol=0)
     for name in ("nvdiffrast", "nvdiffrec_render", "o_voxel"):
         assert importlib.util.find_spec(name) is None, f"Old dependency still installed: {name}"
     vertices = torch.tensor([[0, 0, 2], [1, 0, 2], [1, 1, 2], [0, 1, 2]], device="cuda", dtype=torch.float32)
@@ -52,7 +68,8 @@ def main() -> None:
     assert indices.min() >= 0 and indices.max() < len(mesh)
     torch.cuda.synchronize()
     print(json.dumps({"gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "cuda": torch.version.cuda,
-                      "uv": "coverage/winding/orientation/chunk offsets/degenerates pass", "dualGridFaces": len(indices)}))
+                      "uv": "coverage/winding/orientation/chunk offsets/degenerates pass", "dualGridFaces": len(indices),
+                      "sparseSampling": "six PBR channels and native compilation pass"}))
 
 
 if __name__ == "__main__":

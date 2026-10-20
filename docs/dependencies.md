@@ -179,6 +179,7 @@ downloaded into the user's environment, never application resources.
 | cumesh 1.0 / flex_gemm 0.0.1      | Mesh cleanup/unwrap and sparse sampling, MIT        | Exact previously inspected community wheels at `visualbruno/ComfyUI-Trellis2@438fe4e2`; hashes retained in uv.lock                                                               |
 | TRELLIS.2 / utils3d               | Official MIT source archives                        | Full commits/archive hashes in runtime recipe; no user-side Git/compiler. Keep upstream notices.                                                                                 |
 | Adapted UV helper                 | DRTK pixel/barycentric boundary                     | [MIT attribution](../sidecar/notices/uv-rasterizer-MIT.txt); adapted from `ComfyUI-TRELLIS2@3e696f2c`                                                                            |
+| Triton Windows 3.7.1.post27       | MIT core with bundled toolchain notices             | Frozen wheel; own adapter reads Unicode environment values through Python and uses Triton's short-path helper for TinyCC arguments. No binary modification.                      |
 
 The selected extra excludes `nvdiffrast`, `nvdiffrec_render` and the old untraced `o_voxel` wheel.
 The first two carried NVIDIA evaluation-only terms; installing them outside the application did not
@@ -186,6 +187,11 @@ remove that restriction. Source preparation replaces both generation export and 
 rasterization while retaining cleanup, original-surface projection, PBR sampling and measured model
 defaults. The replacement has passed native structural checks and real generation/retexture; the
 [F4 gate](../future/model-provisioning-gate.md) records remaining installed checks.
+
+The Windows admission check compiles a real sparse trilinear sampler and verifies all six PBR
+channels with a cold Unicode-path cache. Setup and inference use a writable app-data Triton cache
+unless explicitly overridden. This catches both the upstream ANSI environment decoder and TinyCC
+include-path failure before model loading; no external compiler installation is required.
 
 DINOv3's separately gated conditioner is declared in the complete `af44b45f.local1` catalog version,
 alongside its exact agreement and an explicit acceptance gate. The authorized
