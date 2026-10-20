@@ -299,12 +299,13 @@ test('doctor --sidecar: boots, handshakes, reports the roster, exits by health',
   const ids = (report.sidecar.adapters as { id: string }[]).map((a) => a.id);
   assert(ids.length > 0, 'the roster is not empty');
   assert(ids.includes('fixture-gen'), `fixture-gen missing from roster: ${ids.join(', ')}`);
-  // exit composes render health AND sidecar health; on this machine both hold
-  assertEquals(code, 0, 'healthy exam exits 0');
-
   // and WITHOUT the flag the report must not mention the sidecar at all -
   // the section appearing unasked would mean doctor boots python on every run
   const plain: string[] = [];
-  await runCli(['doctor', '--json'], { stdout: (s) => plain.push(s), stderr: () => {} });
+  const renderCode = await runCli(['doctor', '--json'], {
+    stdout: (s) => plain.push(s),
+    stderr: () => {},
+  });
   assert(!('sidecar' in JSON.parse(plain[0])), 'no sidecar section unless asked');
+  assertEquals(code, renderCode, 'a healthy sidecar preserves the renderer health verdict');
 });
