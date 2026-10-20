@@ -76,17 +76,20 @@ see Troubleshooting below.
 
 ## What the stages need
 
-| Work                          | Needs                                                                                                     |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
-| bake, style, export           | any WebGPU adapter — NVIDIA, AMD, Intel, Apple, or Mesa lavapipe                                          |
-| AI generation (`trellis2-4b`) | NVIDIA/CUDA; config-specific catalog claims (4?18 GiB), 16.4 GB weights; manual backend/conditioner setup |
-| auto-rig (`unirig`, Track B)  | NVIDIA GPU with CUDA, 17.4 GiB VRAM, 5.8 GB disk                                                          |
-| Track A rig, `fixture-gen`    | nothing extra — no GPU, no download                                                                       |
+| Work                          | Needs                                                                                                                |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| bake, style, export           | any WebGPU adapter — NVIDIA, AMD, Intel, Apple, or Mesa lavapipe                                                     |
+| AI generation (`trellis2-4b`) | NVIDIA/CUDA; config-specific admission (4–18 GiB), 17.60 GB model files; catalog-managed setup and DINOv3 acceptance |
+| AI generation (`pixal3d`)     | NVIDIA/CUDA, 24 GiB card admission, 25.26 GB model files; 64 GiB host recommended; DINOv3 acceptance                 |
+| auto-rig (`unirig`, Track B)  | NVIDIA GPU with CUDA, 17.4 GiB VRAM, 5.8 GB disk                                                                     |
+| Track A rig, `fixture-gen`    | nothing extra — no GPU, no download                                                                                  |
 
-These are catalog admission claims from prior model measurements; this Node migration does not
-requalify real TRELLIS.2/UniRig inference. The install warns on a smaller card. The performance
-numbers later in this file come from one reference machine, an RTX 3090; treat them as that
-machine's numbers, not promises.
+These are configuration-specific catalog admission values. Installed TRELLIS.2/UniRig and Pixal3D
+workflows have Windows x64 / RTX 3090 evidence; smaller cards and other native model platforms need
+separate qualification. File sizes exclude Python/CUDA environments and caches. The install warns on
+a smaller card. See the [model platform report](../future/model-platform-spike.md) for exact
+recipes, measurements and limits. Performance figures later in this file remain reference-machine
+results, not promises.
 
 ## 4. Bake
 
@@ -128,9 +131,8 @@ here.
 ./spritebook export --bake bakes/bake-<id> --out exports --targets godot,aseprite,texturepacker,strips
 ```
 
-CAUTION: before you sell work made with a downloaded AI backend, read [Licensing](licensing.md).
-TRELLIS.2 output is not cleared for commercial use today; bakes of `fixture-gen` output and of your
-own meshes are yours.
+For downloaded AI backends, read the selected recipe's [licensing terms](licensing.md), including
+its conditioner and runtime. SpriteBook's output exception does not override third-party terms.
 
 (`bakes/bake-<id>` is the bake directory printed by step 4.)
 

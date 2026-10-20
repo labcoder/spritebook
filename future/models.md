@@ -76,10 +76,11 @@ spike is not a new installed backend.
 | Candidate                                    | Inputs and output                                                                                                 | Product fit and recommendation                                                                                                                                                    |
 | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Pixal3D, current TRELLIS.2-based release** | Single image; current upstream also has camera-conditioned multiview inference. Mesh and PBR attributes/textures. | **Leading default candidate** after benchmarking. Pixel correspondence makes identity retention promising; a faithful front does not prove a correct back or deformable topology. |
-| **TRELLIS.2-4B**                             | Image → geometry/PBR; separate shape-conditioned texturing.                                                       | **Baseline and optional alternative** through an audited engine. Existing receipts and failure evidence remain useful.                                                            |
+| **TRELLIS.2-4B**                             | Image → geometry/PBR; separate shape-conditioned texturing.                                                       | **Current default and qualified baseline.** Keep it while comparing Pixal3D identity, materials and deformation.                                                                  |
 | **Hunyuan3D 2.1**                            | Image-conditioned shape plus separate PBR painting.                                                               | **Restricted optional experiment.** Useful comparator, but not a worldwide asset default under current terms.                                                                     |
 | **Hunyuan3D 2.0 / 2mini / 2mv, Fast/Turbo**  | Smaller 2mini image-to-shape variants; 2mv multiview shape; painting separate.                                    | **Restricted optional experiment.** Name the exact shape/paint pair. A shape-only memory result does not establish textured generation.                                           |
 | **Stable Fast 3D (SF3D)**                    | Image → UV-unwrapped textured mesh and material estimates.                                                        | **Optional portability comparator.** Official experimental MPS support; needs license acceptance, packaging, and character-detail tests.                                          |
+| **SPAR3D**                                   | Image/point cloud → UV-unwrapped textured mesh and material estimates.                                            | **Next fast comparator after SF3D.** Official experimental MPS; point conditioning may improve unseen sides. Same custom-license family.                                          |
 | **TripoSR**                                  | Image → mesh; vertex colors by default, optional baked texture.                                                   | **Experimental older baseline.** Measures the benefit of larger models; not a presumed character-quality fallback.                                                                |
 | **Step1X-3D**                                | Separate image-conditioned geometry and texture generation.                                                       | **Watchlist.** Source-build installation burden remains unresolved; do not fund a third integration before comparing the leaders.                                                 |
 
@@ -117,15 +118,16 @@ establish skinnable mesh output.
 A model and inference engine should be separate catalog concepts. Their combination determines
 installation, memory, terms, and numerical behavior.
 
-| Implementation                  | Windows NVIDIA, native                              | Windows WSL                                | Linux NVIDIA                                   | Linux AMD                                            | Apple Silicon                                                                                                         | Intel Mac / CPU                                           |
-| ------------------------------- | --------------------------------------------------- | ------------------------------------------ | ---------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **TRELLIS.2 reference Python**  | SpriteBook adaptation, not upstream's tested target | Linux route to investigate; no local proof | **Upstream tested CUDA target**, source builds | No upstream route verified                           | No upstream MPS/MLX verified                                                                                          | No supported practical route verified                     |
-| **Pixal3D reference Python**    | Upstream links community recipes; untested here     | Community route; untested here             | CUDA base plus NATTEN build                    | No upstream route verified                           | No upstream route verified                                                                                            | No supported practical route verified                     |
-| **Native ComfyUI, both models** | Implementation exists; qualify GPU/precision/config | Qualify separately                         | Implementation exists                          | Generic ROCm support does not prove all 3D operators | Generic MPS support does not prove complete 3D workflow; **experimental**                                             | No acceptable latency/quality established                 |
-| **trellis.cpp, both models**    | **Actual CUDA/Vulkan release archives**             | Usually unnecessary                        | **Actual CUDA/Vulkan archives**                | **ROCm/Vulkan archives**, compatibility varies       | Current source supports Metal; maintainer reports TRELLIS.2 end-to-end. **No Mac archive in examined v0.8.1 release** | CPU backend exists; Intel Mac/throughput unverified       |
-| **Hunyuan3D 2.1 upstream**      | README names Windows; setup uses CUDA               | Linux CUDA route to validate               | CUDA-centric setup                             | No full upstream ROCm verified                       | README names macOS, but requirements include CUDA; not proof of MPS PBR                                               | No practical route verified                               |
-| **Hunyuan3D mac-rocm port**     | CUDA retained; untested here                        | Not required by native routes              | CUDA retained                                  | Maintainer reports shape/PBR                         | Maintainer reports MPS shape + **256 px PBR**                                                                         | CPU stated, very slow; Intel Mac unqualified              |
-| **SF3D upstream**               | **Official experimental**, build tools required     | Linux route to validate                    | CUDA route                                     | No full official validation found                    | **Official experimental MPS**, custom Metal baker                                                                     | Explicit CPU path; Intel Mac installation/latency unknown |
+| Implementation                  | Windows NVIDIA, native                                             | Windows WSL                                | Linux NVIDIA                                   | Linux AMD                                            | Apple Silicon                                                                                                         | Intel Mac / CPU                                           |
+| ------------------------------- | ------------------------------------------------------------------ | ------------------------------------------ | ---------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **TRELLIS.2 reference Python**  | SpriteBook's installed adaptation passes on RTX 3090               | Linux route to investigate; no local proof | **Upstream tested CUDA target**, source builds | No upstream route verified                           | No upstream MPS/MLX verified                                                                                          | No supported practical route verified                     |
+| **Pixal3D reference Python**    | SpriteBook's installed adaptation generates/rigs/bakes on RTX 3090 | Community route; untested here             | CUDA base plus NATTEN build                    | No upstream route verified                           | No upstream route verified                                                                                            | No supported practical route verified                     |
+| **Native ComfyUI, both models** | Implementation exists; qualify GPU/precision/config                | Qualify separately                         | Implementation exists                          | Generic ROCm support does not prove all 3D operators | Generic MPS support does not prove complete 3D workflow; **experimental**                                             | No acceptable latency/quality established                 |
+| **trellis.cpp, both models**    | **Actual CUDA/Vulkan release archives**                            | Usually unnecessary                        | **Actual CUDA/Vulkan archives**                | **ROCm/Vulkan archives**, compatibility varies       | Current source supports Metal; maintainer reports TRELLIS.2 end-to-end. **No Mac archive in examined v0.8.1 release** | CPU backend exists; Intel Mac/throughput unverified       |
+| **Hunyuan3D 2.1 upstream**      | README names Windows; setup uses CUDA                              | Linux CUDA route to validate               | CUDA-centric setup                             | No full upstream ROCm verified                       | README names macOS, but requirements include CUDA; not proof of MPS PBR                                               | No practical route verified                               |
+| **Hunyuan3D mac-rocm port**     | CUDA retained; untested here                                       | Not required by native routes              | CUDA retained                                  | Maintainer reports shape/PBR                         | Maintainer reports MPS shape + **256 px PBR**                                                                         | CPU stated, very slow; Intel Mac unqualified              |
+| **SF3D upstream**               | **Official experimental**, build tools required                    | Linux route to validate                    | CUDA route                                     | No full official validation found                    | **Official experimental MPS**, custom Metal baker                                                                     | Explicit CPU path; Intel Mac installation/latency unknown |
+| **SPAR3D upstream**             | **Official experimental**, build tools required                    | Linux route to validate                    | CUDA route                                     | No full official validation found                    | **Official experimental MPS**, macOS 15.2+                                                                            | CPU path; latency unqualified                             |
 
 Evidence: [Microsoft prerequisites](https://github.com/microsoft/TRELLIS.2#prerequisites),
 [Pixal3D setup](https://github.com/TencentARC/Pixal3D#installation),
@@ -170,18 +172,19 @@ Preserve imported rigs and canonical-body fitting while investigating generic-ri
 Use **GB for decimal disk bytes**, **GiB for measured memory**. Unified memory is not dedicated
 VRAM; record system pressure/swap as well as framework counters.
 
-| Path                                  | Evidence                                                                  | Interpretation                                                                                     |
-| ------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| TRELLIS.2 reference                   | Upstream requires 24 GB NVIDIA for tested setup                           | Configuration claim, not universal minimum.                                                        |
-| SpriteBook `512`, `lowVram=true`      | **Repo:** 3.01 GiB reserved / 2.68 GiB allocated, two August runs         | Adapter-specific; excludes some driver/context/system usage. Not an 8 GB-card qualification.       |
-| Same adapter, `lowVram=false`         | **Repo:** 16.53 GiB reserved                                              | One `minVramGb: 12` cannot safely describe both configurations.                                    |
-| New Pixal3D/Comfy/trellis.cpp recipes | Implementation/weights exist                                              | Memory/time unknown until each configured path is measured.                                        |
-| Hunyuan3D 2.1 reference               | Upstream: 10 GB shape, 21 GB texture, 29 GB combined                      | Gate requested stages, not shape alone.                                                            |
-| Hunyuan3D 2.0 reference               | Upstream: 6 GB shape, 16 GB combined                                      | Not measured for every 2mini/resolution/port.                                                      |
-| Hunyuan mac-rocm                      | Maintainer: M4 Pro 24 GB, 344 s shape + 512 s safe PBR                    | Reduced-resolution result; qualify quality/system pressure.                                        |
-| trellis.cpp Metal                     | Maintainer: M5 24 GB, res-512 textured output in 9:21, 5.6 GB peak RSS    | RSS is not complete unified GPU accounting. No SpriteBook rerun or Pixal3D Mac equivalence.        |
-| SF3D                                  | Upstream: default CUDA about 6 GB; MPS recommends CPU below 32 GB unified | Separate experiment with documented constraints.                                                   |
-| UniRig                                | **Repo:** 10.0 GiB flash versus 17.4 GiB non-flash at documented mesh cap | Generation progress does not remove rigging bottleneck or justify dropping correctness workaround. |
+| Path                             | Evidence                                                                  | Interpretation                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| TRELLIS.2 reference              | Upstream requires 24 GB NVIDIA for tested setup                           | Configuration claim, not universal minimum.                                                        |
+| SpriteBook `512`, `lowVram=true` | **Repo:** 3.01 GiB reserved / 2.68 GiB allocated, two August runs         | Adapter-specific; excludes some driver/context/system usage. Not an 8 GB-card qualification.       |
+| Same adapter, `lowVram=false`    | **Repo:** 16.53 GiB reserved                                              | One `minVramGb: 12` cannot safely describe both configurations.                                    |
+| SpriteBook Pixal3D, 1024 cascade | **Repo:** 17.53 GiB reserved / 14.22 GiB allocated on RTX 3090            | Stage offload, strict NAF, 12 steps; retain conservative 24 GiB card admission.                    |
+| Comfy/trellis.cpp recipes        | Implementation/weights exist                                              | SpriteBook memory/time unknown until each configured path is measured.                             |
+| Hunyuan3D 2.1 reference          | Upstream: 10 GB shape, 21 GB texture, 29 GB combined                      | Gate requested stages, not shape alone.                                                            |
+| Hunyuan3D 2.0 reference          | Upstream: 6 GB shape, 16 GB combined                                      | Not measured for every 2mini/resolution/port.                                                      |
+| Hunyuan mac-rocm                 | Maintainer: M4 Pro 24 GB, 344 s shape + 512 s safe PBR                    | Reduced-resolution result; qualify quality/system pressure.                                        |
+| trellis.cpp Metal                | Maintainer: M5 24 GB, res-512 textured output in 9:21, 5.6 GB peak RSS    | RSS is not complete unified GPU accounting. No SpriteBook rerun or Pixal3D Mac equivalence.        |
+| SF3D                             | Upstream: default CUDA about 6 GB; MPS recommends CPU below 32 GB unified | Separate experiment with documented constraints.                                                   |
+| UniRig                           | **Repo:** 10.0 GiB flash versus 17.4 GiB non-flash at documented mesh cap | Generation progress does not remove rigging bottleneck or justify dropping correctness workaround. |
 
 Sources: [backend proof](../docs/internal/proofs/backends.md),
 [measurement discipline](../.agents/skills/sidecar-vram/SKILL.md),
@@ -191,10 +194,12 @@ Sources: [backend proof](../docs/internal/proofs/backends.md),
 [trellis.cpp Apple report](https://github.com/pwilkin/trellis.cpp/blob/8e4ce11a77d35c3e3a4b3f84a29d92bf5491e64e/README.md),
 [SF3D memory](https://github.com/Stability-AI/stable-fast-3d#manual-inference).
 
-The catalog still contains TRELLIS.2 `minVramGb: 12`, while notes say memory has not been measured;
-`lowVram` description cites a different historical peak. Treat this as migration debt, not a
-trustworthy default. Configuration, input, adapter, driver and measurement method belong with each
-observation. [Catalog](../packages/registry/catalog/models.json)
+TRELLIS.2's `minVramGb: 12` is a historical install advisory. F1-T5 made the catalog's measured
+operation/configuration-specific `vramProfiles` load-bearing for job admission: 512/offload,
+512/resident, 1024 cascade and retexture have different budgets; unprofiled configurations refuse.
+Pixal3D currently offers one conservative 24 GiB recipe. These admission values do not qualify every
+smaller card, input or material outcome. Keep configuration, adapter, driver and measurement method
+with each observation. [Catalog](../packages/registry/catalog/models.json)
 
 ### Downloads
 
@@ -224,7 +229,8 @@ below; installers need per-file hashes/sizes.
 ## License re-audit
 
 These are engineering eligibility findings from primary legal files, not blanket clearance for every
-output/integration. This research installs/bundles nothing.
+output/integration. The selected Pixal3D and TRELLIS.2 stacks are separately installed, audited
+recipes; the original reference environments and alternative runners are not automatically cleared.
 
 | Component                        | Verified evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Product consequence                                                                                                                                                                                                                    |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -252,18 +258,22 @@ downloads. [Existing guard](../sidecar/spritebook_sidecar/adapters/trellis2.py),
 manifests, provenance, caching, cancellation, acceptance and canonical import. Engines execute
 models. Comfy graphs/vendor Python types should not become project formats.
 
-1. **First native spike: trellis.cpp CLI/resident server**, not its desktop app. It has
-   Windows/Linux binaries, both model families and a current Metal route. Validate releases
-   separately from newer source. Prefer controlled conversions from verified official weights over
-   trusting arbitrary converted HF repositories.
-   [Engine/server](https://github.com/pwilkin/trellis.cpp),
+1. **Keep the working model-managed Python runtimes first.** F4 has pinned prebuilt NATTEN/NAF and
+   permitted mesh/PBR export for Pixal3D. Preserve the TypeScript manifest/job boundary and
+   TRELLIS.2 default. Compare TripoSR, then SF3D/SPAR3D as described in the
+   [hardware spike](model-platform-spike.md#recommendation).
+2. **Mac: qualify one Pixal3D MLX or TRELLIS MPS/Metal recipe.** Use the exact
+   [runner/resource matrix](model-platform-spike.md#apple-silicon-exact-runners-and-resource-claims),
+   with separate generation, rigging and app gates.
+3. **Native/AMD comparator: trellis.cpp CLI/resident server.** It has Windows/Linux binaries, both
+   model families and a current Metal route. Validate releases separately from newer source. Prefer
+   controlled conversions from verified official weights over trusting arbitrary converted HF
+   repositories. [Engine/server](https://github.com/pwilkin/trellis.cpp),
    [Pixal3D implementation](https://github.com/pwilkin/trellis.cpp/blob/8e4ce11a77d35c3e3a4b3f84a29d92bf5491e64e/docs/pixal3d/README.md)
-2. **Keep the working model-managed Python runtimes first.** F4 now has pinned prebuilt NATTEN/NAF
-   and permitted mesh/PBR export for Pixal3D. Native ComfyUI remains a comparator if quantization or
-   a missing platform kernel gives a measured benefit; it is not a new mandatory desktop dependency.
-   If adopted, use one curated versioned workflow and preserve the current manifest/job boundary.
+   Native ComfyUI remains a comparator if quantization or a missing platform kernel gives a measured
+   benefit. If adopted, use one curated versioned workflow and preserve the current job boundary.
    [Official template](https://docs.comfy.org/tutorials/3d/trellis2)
-3. **Choose one supported default recipe per platform after comparison.** Supporting both engines
+4. **Choose one supported default recipe per platform after comparison.** Supporting both engines
    indefinitely doubles qualification. Keep another only if it solves a demonstrated gap.
 
 Pin engine/workflow/files, use loopback and allowlisted adapter operations, bind jobs to owned

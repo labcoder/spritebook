@@ -29,6 +29,16 @@ def prepare(root: Path) -> None:
     start = text.index("    # Setup differentiable rasterizer context\n")
     end = text.index("    # Map these positions back")
     text = text[:start] + "    mask, valid_pos = rasterize_uv(out_vertices, out_faces, out_uvs, texture_size)\n\n" + text[end:]
+    # GPU edge collapse changes geometry on identical inputs; keep remesh/UV/PBR native.
+    text = text.replace("import cumesh\n", "import cumesh\nfrom spritebook_sidecar.adapters.pixal3d_mesh import simplify_mesh, vertex_normals\n")
+    if text.count("mesh.simplify(") != 3:
+        raise ValueError("Expected three mesh reduction call sites")
+    for target in ("decimation_target * 3", "decimation_target"):
+        text = text.replace(f"mesh.simplify({target}, verbose=verbose)", f"simplify_mesh(mesh, {target})")
+    old = "    mesh.compute_vertex_normals()\n    out_normals = mesh.read_vertex_normals()[out_vmaps]"
+    if text.count(old) != 1:
+        raise ValueError("Expected one mesh normal boundary")
+    text = text.replace(old, "    out_normals = vertex_normals(mesh)[out_vmaps]")
     compile(text, "pixal3d/_spritebook_export.py", "exec")
     (root / "pixal3d/_spritebook_export.py").write_text(text, encoding="utf-8", newline="\n")
 

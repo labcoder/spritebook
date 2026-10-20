@@ -12,10 +12,10 @@ The examples below use `./characters/hero` as the workspace. A workspace is one 
 character. It holds `character.json` and everything the stages record.
 
 Installed candidates include owned Node/uv and production importer assets. For source development,
-`npm run cli -- <verb> ...` invokes the same compiled entry. Current real CUDA backends still need
-explicit external source/environments and gated assets; read [sidecar setup](../sidecar/README.md)
-and [licensing](licensing.md) before following their generation examples. `models install` verifies
-catalog weights; it does not provision those optional environments.
+`npm run cli -- <verb> ...` invokes the same compiled entry. Real CUDA backends use catalog-managed
+external source/environments and gated assets; read [sidecar setup](../sidecar/README.md) and
+[licensing](licensing.md). `models install` verifies weights and provisions a declared runtime;
+`models setup` repairs that runtime while retaining verified weights.
 
 ## gen — image to candidate meshes
 
@@ -28,8 +28,8 @@ spritebook gen --workspace ./characters/hero --character hero \
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--workspace <dir>`   | the character folder; created on first use                                                                                                                                                                         |
 | `--character <id>`    | the character id: lowercase letters, digits, dashes                                                                                                                                                                |
-| `--image <file>`      | the source image; stored content-addressed in the workspace. `trellis2-4b` needs a cut-out RGBA — run `prep` first when the image has a background                                                                 |
-| `--model <id>`        | the gen3d backend: `trellis2-4b` (real, CUDA) or `fixture-gen` (synthetic, no GPU)                                                                                                                                 |
+| `--image <file>`      | the source image; stored content-addressed in the workspace. `trellis2-4b` and `pixal3d` need cut-out RGBA — run `prep` first when the image has a background                                                      |
+| `--model <id>`        | the gen3d backend: `trellis2-4b` (default, CUDA), `pixal3d` (CUDA), or `fixture-gen` (synthetic, no GPU)                                                                                                           |
 | `--model-version <v>` | pin a backend version; the highest installed one otherwise                                                                                                                                                         |
 | `--height <metres>`   | the character's standing height. CAUTION: without it the mesh keeps the backend's own scale, and a one-unit character bakes about 30 px tall at the default 32 px/m. The job warns and states the measured height. |
 | `--seed <n>`          | reproducibility; candidate `i` runs at seed + 1000·i                                                                                                                                                               |
@@ -43,13 +43,12 @@ spritebook gen --workspace ./characters/hero --character hero \
 Each candidate becomes a result `r1`, `r2`, … with a receipt, a canonical mesh, and a front-view
 `thumb.png`. Nothing is chosen yet.
 
-CAUTION: read [Licensing](licensing.md) before you sell work made with a downloaded backend. The
-catalog badge names the MODEL license, not the whole stack; TRELLIS.2 output is not cleared for
-commercial use today.
+Read [Licensing](licensing.md) for the selected recipe's model, conditioner and runtime terms.
+TRELLIS.2/Pixal3D weights are MIT; the separately gated DINOv3 agreement still applies.
 
 Set your expectation for `fixture-gen`: it turns the image's OUTLINE into a lathe-like solid body.
 The geometry and texture depend on the image, so it exercises the whole pipeline, but it is a
-stand-in, not a likeness. A likeness needs `trellis2-4b`, which needs an NVIDIA GPU.
+stand-in, not a likeness. The real `trellis2-4b` and `pixal3d` recipes currently need NVIDIA CUDA.
 
 ### The knobs `--adjust` takes
 
@@ -69,6 +68,19 @@ Each backend declares its own. These are the ones `gen` accepts.
 | `decimationTarget`       | 200000  | 10000 to 2000000               |
 | `candidates`             | 1       | 1 to 8 (or use `--candidates`) |
 | `lowVram`                | true    | true, false                    |
+
+`pixal3d`:
+
+| Knob               | Default | Range                          |
+| ------------------ | ------- | ------------------------------ |
+| `steps`            | 12      | 1 to 50                        |
+| `fov`              | 0.2     | 0.05 to 1.5 horizontal radians |
+| `textureSize`      | 2048    | 1024, 2048, 4096               |
+| `decimationTarget` | 200000  | 10000 to 2000000               |
+| `candidates`       | 1       | 1 to 8 (or use `--candidates`) |
+
+Pixal3D uses the single-view 1024 cascade with stage offload and real NAF. Its explicit FOV controls
+camera framing; no automatic camera model, multiview or Pixal retexture stage is installed.
 
 `fixture-gen`: `tris` (2000; 64 to 20000), `textureSize` (512; 256, 512, 1024), and `candidates`.
 
@@ -191,6 +203,8 @@ spritebook models list
 spritebook models list --installed
 spritebook models install trellis2-4b --accept-license
 spritebook models setup trellis2-4b --accept-license
+spritebook models install pixal3d --accept-license
+spritebook models setup pixal3d --accept-license
 spritebook models verify trellis2-4b
 spritebook models rm trellis2-4b
 ```
@@ -206,10 +220,11 @@ the catalog's size and sha256 pin before anything lands.
 | `--installed`                           | (`list`) only what is installed                                                                  |
 | `--models-dir <dir>` `--catalog <file>` | root and catalog overrides                                                                       |
 
-The complete TRELLIS.2 version requires explicit acceptance of the recorded MIT weight and DINOv3
-conditioner terms. Request personal access to `facebook/dinov3-vitl16-pretrain-lvd1689m` on Hugging
-Face, then run `hf auth login` or supply `HF_TOKEN`. The registry downloads and verifies its
-declared local files; inference does not contact Hugging Face.
+The complete TRELLIS.2 and Pixal3D versions require explicit acceptance of their recorded terms,
+including the DINOv3 conditioner. Request personal access to
+`facebook/dinov3-vitl16-pretrain-lvd1689m` on Hugging Face, then run `hf auth login` or supply
+`HF_TOKEN`. The registry downloads and verifies its declared local files; inference does not contact
+Hugging Face.
 
 For a catalog version with a runtime recipe, `install` also prepares source and the frozen Python
 environment. A setup failure retains verified weights and names `models setup <id[@version]>` as
@@ -220,15 +235,19 @@ with NVIDIA CUDA; other native model targets remain F7 work.
 
 ## Sizes and floors
 
-| Model         | Disk    | Minimum VRAM | Needs                |
-| ------------- | ------- | ------------ | -------------------- |
-| `trellis2-4b` | 17.6 GB | 12 GiB       | NVIDIA GPU, CUDA     |
-| `unirig`      | 5.8 GB  | 17.4 GiB     | NVIDIA GPU, CUDA     |
-| `rembg-u2net` | 0.2 GB  | —            | CPU                  |
-| `fixture-gen` | none    | —            | nothing; no download |
+| Model         | Declared model files | VRAM admission                   | Needs                |
+| ------------- | -------------------- | -------------------------------- | -------------------- |
+| `trellis2-4b` | 17.60 GB             | configuration-specific; 4–18 GiB | NVIDIA GPU, CUDA     |
+| `pixal3d`     | 25.26 GB             | 24 GiB                           | NVIDIA GPU, CUDA     |
+| `unirig`      | 5.82 GB              | 17.4 GiB                         | NVIDIA GPU, CUDA     |
+| `rembg-u2net` | 0.18 GB              | —                                | CPU                  |
+| `fixture-gen` | none                 | —                                | nothing; no download |
 
-The floors are measured, not copied from READMEs. An install on a smaller card warns; the job-time
-preflight is the hard gate.
+Model-file sizes exclude runtime environments, caches, download staging and outputs. An install on a
+smaller card warns; job-time admission is the hard gate. Pixal3D's measured 17.53 GiB Torch peak on
+a 24 GiB RTX 3090 does not qualify smaller cards; budget a 64 GiB host and roughly 45–50 GB free
+disk for a fresh stack. See the [hardware/platform report](../future/model-platform-spike.md) for
+measurement limits and Mac/Linux candidates.
 
 ## Workspace queries and selected exports
 

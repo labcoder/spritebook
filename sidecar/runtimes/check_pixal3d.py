@@ -14,6 +14,11 @@ from pixal3d.trainers.flow_matching.mixins.image_conditioned_proj import DinoV3P
 from pixal3d._spritebook_export import to_glb
 from src.model.naf import NAF
 from spritebook_sidecar.trellis_native_test import main
+from spritebook_sidecar.adapters.pixal3d_mesh import simplify_mesh, vertex_normals
+from spritebook_sidecar.glb import validate_mesh
+import cumesh
+import trimesh
+import numpy as np
 
 assert natten.HAS_LIBNATTEN, "Pixal3D requires real native NATTEN, never duplicated features"
 with torch.inference_mode():
@@ -25,6 +30,21 @@ with torch.inference_mode():
     result = model(torch.rand(1, 3, 64, 64, device="cuda"), torch.ones(1, 1024, 16, 16, device="cuda"), (64, 64))
     torch.testing.assert_close(result, torch.ones_like(result), atol=1e-4, rtol=0)
     assert result.shape == (1, 1024, 64, 64)
+    source = trimesh.creation.icosphere(subdivisions=2)
+    source.vertices *= [1.0, 0.8, 0.6]
+    outputs = []
+    for _ in range(2):
+        mesh = cumesh.CuMesh()
+        mesh.init(torch.tensor(source.vertices, dtype=torch.float32, device="cuda"),
+                  torch.tensor(source.faces, dtype=torch.int32, device="cuda"))
+        simplify_mesh(mesh, 120)
+        v, f, uv, mapping = mesh.uv_unwrap(compute_charts_kwargs={"refine_iterations": 0, "global_iterations": 1}, return_vmaps=True)
+        n = vertex_normals(mesh)[mapping.long()]
+        arrays = [value.cpu().numpy() for value in (v, f, uv, n)]
+        validate_mesh(arrays[0], arrays[3], arrays[2], arrays[1].reshape(-1))
+        assert 0 < len(f) <= 120 and np.isfinite(arrays[2]).all()
+        outputs.append(arrays)
+    assert all(np.array_equal(a, b) for a, b in zip(*outputs)), "Pixal mesh reduction/UV/normal replay changed"
 main()
 print(json.dumps({"natten": natten.__version__, "sm": torch.cuda.get_device_capability(),
                   "naf": "real CUDA forward and constant-feature preservation pass"}))

@@ -14,6 +14,7 @@ dependencies = [
     "easydict==1.13",
     "opencv-python-headless==4.12.0.88",
     "trimesh==4.10.1",
+    "fast-simplification==0.2.0",
     "tqdm==4.69.0",
     "ninja==1.13.0",
     "triton-windows==3.7.1.post27",

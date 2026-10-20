@@ -27,7 +27,8 @@ headless WebGPU, tests/tooling, and executable packaging. Replacing only the tas
 switching `deno` to `node` leaves most of the problem untouched. A scoped lexical scan of non-test
 `packages/*.ts` found Deno references in **61 production-source files** (comments/types included);
 it is a coupling indicator, not an AST call count or port estimate. Configuration and helpers add
-more surface. [Workspace config](../deno.json).
+more surface. This describes the reviewed Deno baseline; F4 retired `deno.json` in favor of the
+[current Node workspace](../package.json).
 
 ## Recommended architecture choice
 

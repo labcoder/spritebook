@@ -1,8 +1,9 @@
 # Repository strategy: migrate this repository
 
 Decision approved: **2026-10-18, D-042**. Incremental migration within this repository is the
-selected strategy. The [roadmap](roadmap.md) now provides the ordered implementation plan; no
-runtime code or installed dependencies have changed in this documentation session.
+selected strategy. That decision review changed documentation only. The subsequent
+[F4 cutover](runtime-cutover.md) implements the Node path; the [roadmap](roadmap.md) records its
+qualification and remaining release gates.
 
 ## Approved direction
 
@@ -25,7 +26,7 @@ in TypeScript. That is not a reason to replace the repository or desktop toolkit
 
 1. **The selected stack is already here.** The core is TypeScript and the desktop is Tauri/React. We
    are replacing their Deno dependency, not adopting a different product language or UI stack.
-   [Workspace](../deno.json), [desktop](../apps/studio/package.json),
+   [Current workspace](../package.json), [desktop](../apps/studio/package.json),
    [shell](../apps/studio/src-tauri/src/main.rs).
 2. **The valuable behavior is implemented.** Canonical glTF import, animation retargeting and
    preview clips, pixel styling, atlas/AOV layout, game exporters, catalog installation and CLI

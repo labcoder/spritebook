@@ -100,6 +100,18 @@ wheels = [
 ]
 
 [[package]]
+name = "fast-simplification"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f3/0a/b943887803aefecd01d30cd150bd2a6f03d90b96886e3befdcc5d4276c98/fast_simplification-0.2.0.tar.gz", hash = "sha256:ed02ea6f4968ec98f963f2d3665dbafd0297ec12aea9e4d0a87c4b3c14d608a8", size = 31865, upload-time = "2026-08-12T19:53:50.49Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/d4/a5604279d507b3cb9f06868f2bb49b8d7d8fc9de197c624bc165222a8589/fast_simplification-0.2.0-cp311-cp311-win_amd64.whl", hash = "sha256:c83791c8af1db1156753a3cb723e4eeffc2bf9fc46751894c90338d6fc7f779c", size = 347395, upload-time = "2026-08-12T19:53:29.826Z" },
+]
+
+[[package]]
 name = "filelock"
 version = "4.2.4"
 source = { registry = "https://pypi.org/simple" }
@@ -390,6 +402,7 @@ dependencies = [
     { name = "drtk" },
     { name = "easydict" },
     { name = "einops" },
+    { name = "fast-simplification" },
     { name = "flex-gemm" },
     { name = "natten" },
     { name = "ninja" },
@@ -413,6 +426,7 @@ requires-dist = [
     { name = "drtk", url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/drtk-latest/drtk-0.1.0%2Bcu128torch2.8-cp311-cp311-win_amd64.whl" },
     { name = "easydict", specifier = "==1.13" },
     { name = "einops", specifier = "==0.8.1" },
+    { name = "fast-simplification", specifier = "==0.2.0" },
     { name = "flex-gemm", url = "https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" },
     { name = "natten", url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/natten-latest/natten-0.21.6%2Bcu128torch2.8-cp311-cp311-win_amd64.whl" },
     { name = "ninja", specifier = "==1.13.0" },

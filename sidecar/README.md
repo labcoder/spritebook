@@ -144,6 +144,12 @@ the worker's import path. That would silently replace the frozen model dependenc
 environment's versions. Generation metadata records the actual Python/Torch/Transformers/ NATTEN
 versions, and the self-test exercises the installed-wheel layout with a poisoned base dependency.
 
+Pixal adapter 0.2.0 preserves native remeshing, UVs and PBR projection but uses a pinned MIT CPU
+quadric reducer and CPU normal sums. The GPU reducer changed geometry on identical tensors;
+canonical mesh ordering and the two CPU boundaries make the controlled GLB replay byte-identical.
+The selected processing recipe and fast-simplification version are recorded in generation metadata,
+and native admission exercises reduction/UV/normal repeatability before publishing readiness.
+
 The [runtime recipe](runtimes/trellis2-win.json) pins source archives, sizes, SHA-256 hashes,
 notices and a bounded source patch. Setup uses the owned uv and prebuilt third-party wheels; no Git,
 MSVC or local CUDA toolkit is needed. It publishes a readiness receipt in writable app data after
