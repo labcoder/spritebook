@@ -1,5 +1,10 @@
 # SpriteBook — design system
 
+This records the ratified visual rules and intended interaction system. Current Stage/CLI behavior
+is described in [the user guide](../guide.md); remaining editor work is F5 in
+[the roadmap](../../future/roadmap.md). The desktop stays Tauri/React with a TypeScript core on
+Node.
+
 Direction locked in UX passes 01–04: **Marathon / Ghost-in-the-Shell Neo-Tokyo** — acid hues as
 functional color coding on charcoal, tiny mono annotations, everything labeled like a diagnostic
 readout. **Token values below are FINAL — ratified by the maintainer 2026-07-31** from rendered
@@ -75,7 +80,8 @@ EXPORT — used in the stage rail chips, tab accents, and progress fills. Color 
   pass) + wordmark; File / Edit / View / Character / Bake / Window / Help; right: ⌘K, theme toggle,
   GPU chip. **File ▸ Manage models… (⌘M).** Edit carries Undo/Redo (journaled patches) and Duplicate
   character (⌘D).
-- **Character tabs** across the top (browser-style, `+` to add; MVP renders one; pattern scales).
+- **Character tabs** across the top (browser-style, `+` to add; drafts and jobs scoped to the active
+  character/revision).
 - **Stage rail** left: vertical stepper `01 Gen … 06 Export` with hue chips; stages 02–06 locked
   until canonical mesh saved, unlock condition stated inline; collapsible to icons.
 - **Inspector** right: contextual, sectioned with collapse carets, scrollable; **resize grip**
@@ -97,5 +103,5 @@ download).
 
 Base UI (`@base-ui/react`, headless) supplies interaction/a11y primitives — menus, dialogs, tabs,
 slider, combobox, **number field with scrubbing** (px/m, frames, speed) — styled entirely by our
-tokens in hand-authored CSS. No styled component kits; the aesthetic is bespoke. Icons: Lucide +
+tokens in hand-authored CSS. No styled component kits; the aesthetic is bespoke. Current icons use
 custom glyphs. Viewports are framework-agnostic TS classes (see `threejs-editor-viewport` skill).

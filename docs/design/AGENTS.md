@@ -1,6 +1,6 @@
 # Design docs — agent guidance
 
-- `design-system.md` defines tokens (provisional), chrome, and the non-negotiables: semantic
+- `design-system.md` defines ratified tokens, intended chrome, and the non-negotiables: semantic
   light/dark token pairs, WCAG 2.1 AA, i18n from the first string, canvas wells stay dark in both
   themes, acid hues are fills never text-on-light, pixel-truth previews render nearest-neighbor at
   integer zoom.

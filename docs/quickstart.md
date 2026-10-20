@@ -1,8 +1,9 @@
 # Quickstart
 
 The current Node runtime is a qualification candidate. Windows x64 has local GPU evidence;
-additional native targets, model provisioning, signing and native notices remain release gates. See
-the [cutover evidence](../future/runtime-cutover.md) before treating a build as a supported release.
+additional native targets, unprovisioned clean-machine setup, signing and native notices remain
+release gates. Installed Windows model workflows have recorded F4 evidence. See the
+[cutover evidence](../future/runtime-cutover.md) before treating a build as a supported release.
 
 Bake a rigged 3D character into engine-ready 2D spritesheets, locally, in five minutes.
 
@@ -41,9 +42,10 @@ LICENSE, NOTICE               SpriteBook source/output terms
 ```
 
 Keep **all** these files together. No system Node, Deno or compiler is needed to run the CLI. Model
-workflows additionally need their separately installed weights and Python/CUDA prerequisites. Use a
-writable working/output directory; application resources are immutable. Commands below use
-`./spritebook` from a portable runtime directory. A desktop installation keeps it under `runtime/`.
+workflows additionally need their separately installed weights and Python/CUDA environments,
+provisioned through [model management](models.md). Use a writable working/output directory;
+application resources are immutable. Commands below use `./spritebook` from a portable runtime
+directory. A desktop installation keeps it under `runtime/`.
 
 ## 3. Check your GPU
 
@@ -76,13 +78,15 @@ see Troubleshooting below.
 
 ## What the stages need
 
-| Work                          | Needs                                                                                                                |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| bake, style, export           | any WebGPU adapter — NVIDIA, AMD, Intel, Apple, or Mesa lavapipe                                                     |
-| AI generation (`trellis2-4b`) | NVIDIA/CUDA; config-specific admission (4–18 GiB), 17.60 GB model files; catalog-managed setup and DINOv3 acceptance |
-| AI generation (`pixal3d`)     | NVIDIA/CUDA, 24 GiB card admission, 25.26 GB model files; 64 GiB host recommended; DINOv3 acceptance                 |
-| auto-rig (`unirig`, Track B)  | NVIDIA GPU with CUDA, 17.4 GiB VRAM, 5.8 GB disk                                                                     |
-| Track A rig, `fixture-gen`    | nothing extra — no GPU, no download                                                                                  |
+| Work                              | Needs                                                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| bake, core-rendered preview       | a WebGPU adapter; Windows Vulkan is qualified locally, other native targets remain F7 work                           |
+| style, pack, existing exports     | CPU and existing input artifacts; no neural model                                                                    |
+| image preparation (`rembg-u2net`) | CPU; 0.18 GB model files and the base sidecar environment                                                            |
+| AI generation (`trellis2-4b`)     | NVIDIA/CUDA; config-specific admission (4–18 GiB), 17.60 GB model files; catalog-managed setup and DINOv3 acceptance |
+| AI generation (`pixal3d`)         | NVIDIA/CUDA, 24 GiB card admission, 25.26 GB model files; 64 GiB host recommended; DINOv3 acceptance                 |
+| auto-rig (`unirig`, Track B)      | NVIDIA GPU with CUDA, 17.4 GiB VRAM, 5.8 GB disk                                                                     |
+| Track A rig, `fixture-gen`        | no GPU or downloaded model weights; `fixture-gen` uses the base Python sidecar                                       |
 
 These are configuration-specific catalog admission values. Installed TRELLIS.2/UniRig and Pixal3D
 workflows have Windows x64 / RTX 3090 evidence; smaller cards and other native model platforms need

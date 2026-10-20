@@ -3,7 +3,7 @@
 Studio on main now uses the owned Node runtime. Build a local Windows candidate with `npm run
 build:desktop`; see [development setup](../README.md#development) and the
 [qualification status](../future/runtime-cutover.md). Published/signed target artifacts remain F7
-work. Every action below has a CLI twin ? see [the CLI reference](cli.md).
+work. Every action below has a CLI twin — see [the CLI reference](cli.md).
 
 SpriteBook turns a character image into engine-ready 2D spritesheets. It runs on your machine.
 Nothing goes to a server.
@@ -60,14 +60,14 @@ To make a character:
 4. Select a backend. The cards come from the model catalog and show each backend's license, VRAM
    need, and install state.
 
-   CAUTION: the license badge on a card names the MODEL license, not the license of the whole stack
-   the backend runs on. The TRELLIS.2 backend needs components that block commercial use today. Read
-   [Licensing](licensing.md) before you sell work made with a downloaded backend. The `fixture-gen`
-   backend and every other stage are clear.
+   Complete TRELLIS.2 and Pixal3D recipes include a separately gated DINOv3 conditioner. Review
+   [licensing](licensing.md) and accept the declared terms before installation. The selected Windows
+   runtimes replace the historical evaluation-only rasterizers; component terms still apply.
+   [Models and local runtimes](models.md) lists each role, hardware requirement and setup.
 
    Set your expectation for `fixture-gen`. It turns the image's outline into a lathe-like stand-in
-   body. It proves the pipeline without a GPU; it does not produce a likeness. A likeness needs
-   TRELLIS.2 and an NVIDIA card.
+   body. It proves the pipeline without a GPU; it does not produce a likeness. A likeness needs a
+   real backend such as TRELLIS.2 or Pixal3D and an NVIDIA card.
 
 5. Check the **Height (m)** field. The default is 1.7. CAUTION: this is the size every later stage
    believes. Sprites frame at pixels-per-metre, so a character that keeps the backend's own scale
@@ -111,8 +111,9 @@ To rig a character:
 
 1. Select the track. Use the arrow keys to move between the two cards.
 
-2. For Track A, check the body path. Two bodies are bundled, `ubc-male` and `ubc-female`; `ubc-male`
-   is the default.
+2. For Track A, keep `ubc-male` for the portable bundled default, or enter an explicit body
+   directory. The bundled `ubc-female` is available by its directory path; its name is not a
+   portable CLI alias.
 
 3. Select **Run rig**.
 
@@ -297,5 +298,15 @@ The drawer opens by itself when a journal command fails.
 Each recorded change is a journal entry. Ctrl+Z reverts the last one for the active character.
 Ctrl+Shift+Z applies it again. The Edit menu holds the same two commands.
 
-Undo covers the recorded decisions: the pick, the rig acceptance, the clip bindings, and the look.
-It does not delete the files a bake wrote.
+Undo restores recorded decisions and the accepted canonical mesh/texture bytes for picks, rigs,
+retexturing and identity edits. It also covers clip bindings and the look. It does not delete the
+files a bake wrote. Review, thumbnails and implicit exports use the recorded `lastBakeId`, including
+after undo; they do not guess the newest bake directory.
+
+## 11. Manage or remove models
+
+Open **File > Manage models** (Ctrl+M). Install and verify operate on the selected catalog version;
+**Remove** deletes its downloaded model files and receipt. Python/runtime environments and shared
+caches remain separate. Generated results, accepted meshes and sprites remain in your workspace. See
+[storage and removal](models.md#storage-and-removal) for a full dependency reset and the CLI twins,
+including `models setup` for repairing a failed runtime installation.

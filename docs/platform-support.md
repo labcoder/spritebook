@@ -7,13 +7,20 @@ targets. The maintainer deferred native Mac, Windows ARM64 and Linux qualificati
 only the Windows x64 machine is available locally. Builds and software rendering do not close those
 gates.
 
-| Layer              | Windows x64                                                                    | Windows ARM64                                  | macOS ARM64 / Intel                               | Linux                                                             |
-| ------------------ | ------------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- |
-| Node core/CLI      | Local tests and copied payload executed                                        | Target; native addon/loader recipe unqualified | Target; native hosted build recipes, no local run | Target; source/lavapipe CI defined, no fresh remote run           |
-| GPU renderer       | NVIDIA RTX 3090, Vulkan, driver 610.88; paired image/performance checks pass   | F7 native hardware gate                        | F7 Metal gate, architectures recorded separately  | F7 hardware gate; lavapipe is software evidence only              |
-| Tauri desktop      | Windows build/integration qualification in F4                                  | F7 native installed-app gate                   | F7 native installed-app gate                      | Tier 2; F7 WebKitGTK/installed-app gate                           |
-| Base Python/uv     | Fresh writable environment and real U?-Net prep executed                       | CPU target, not run here                       | CPU target, not run here                          | CPU target, not run here                                          |
-| TRELLIS.2 / UniRig | Existing CUDA adapters; optional code/env/weight and license gates still apply | CUDA stacks unavailable                        | CUDA stacks unavailable                           | CUDA candidate recipes require their own wheels and qualification |
+| Layer              | Windows x64                                                                      | Windows ARM64                                  | macOS ARM64 / Intel                               | Linux                                                       |
+| ------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------- |
+| Node core/CLI      | Local tests and copied payload executed                                          | Target; native addon/loader recipe unqualified | Target; native hosted build recipes, no local run | Target; source/lavapipe CI defined, no fresh remote run     |
+| GPU renderer       | NVIDIA RTX 3090, Vulkan, driver 610.88; paired image/performance checks pass     | F7 native hardware gate                        | F7 Metal gate, architectures recorded separately  | F7 hardware gate; lavapipe is software evidence only        |
+| Tauri desktop      | Windows build/integration qualification in F4                                    | F7 native installed-app gate                   | F7 native installed-app gate                      | Tier 2; F7 WebKitGTK/installed-app gate                     |
+| Base Python/uv     | Fresh writable environment and real U²-Net prep executed                         | CPU target, not run here                       | CPU target, not run here                          | CPU target, not run here                                    |
+| TRELLIS.2 / UniRig | Complete managed CUDA setup and installed offline workflow qualified on RTX 3090 | Current CUDA recipes unavailable               | Current CUDA recipes unavailable                  | Historical CUDA entries; complete native setup unqualified  |
+| Pixal3D            | Optional managed CUDA setup and installed offline workflow qualified on RTX 3090 | Current CUDA recipe unavailable                | Community ports researched; no catalog runtime    | Upstream CUDA path researched; no qualified catalog runtime |
+
+The model workflows above use exact recipes and configuration-specific admission. They do not
+qualify every NVIDIA card or every upstream mode. [Model management](models.md) lists file sizes,
+memory requirements and available operations; the
+[platform spike](../future/model-platform-spike.md) separates upstream claims, experimental ports
+and local measurements. Model availability is independent of CLI/render and desktop availability.
 
 ## What CI covers
 

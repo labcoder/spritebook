@@ -1,5 +1,11 @@
 # SpriteBook — product requirements
 
+This is the product vision and acceptance criteria. The current implementation uses a TypeScript
+core on Node, a Python model sidecar and Tauri/React Studio. See [the user guide](guide.md) for
+implemented interactions, [models](models.md) for the available catalog and
+[the active roadmap](../future/roadmap.md) for completed Windows migration work and later
+model/editor/scale improvements. A journey described here is not a platform qualification claim.
+
 ## Problem
 
 2D character art scales multiplicatively: **characters × animations × directions × frames**. A cozy
@@ -46,13 +52,13 @@ exports, CLI target — renameable because identity is an immutable `characterId
 state; pose check is an advisory heuristic). Backend cards come from the registry catalog: license,
 territory, VRAM-vs-detected, install state — the model manager gate appears _in context_ when
 weights are missing, and the full **Manage models… (⌘M)** dialog lives under File. Per-backend
-options render from the adapter's `paramsSchema` (Pixal3D: quality/texture size; TripoSplat:
-gaussian count). **Default = generate one model.** Seed is a recorded receipt, not a decision;
-iteration is "More like this" and "Adjust settings", post-hoc. Results arrive **textured**
-(Pixal3D/TRELLIS.2 emit geometry+textures together; geometry-only backends insert a texture
-substage) with Textured/Clay/Wire inspection and full orbit/pan/zoom/frame controls. Optional detail
-reprojection keeps tattoos crisp. Checkpoint: **Save canonical mesh** — unlocks the rail; also a
-valid exit for 3D-game users.
+options render from the catalog's `paramsSchema` (for example, Pixal3D's camera FOV and candidate
+count). **Default = generate one model.** Seed is a recorded receipt, not a decision; iteration is
+"More like this" and "Adjust settings", post-hoc. Results arrive **textured** (Pixal3D/TRELLIS.2
+emit geometry+textures together; geometry-only backends insert a texture substage) with
+Textured/Clay/Wire inspection and full orbit/pan/zoom/frame controls. Optional detail reprojection
+keeps tattoos crisp. Checkpoint: **Save canonical mesh** — unlocks the rail; also a valid exit for
+3D-game users.
 
 **02 · Rig.** Auto-rig, then a two-tier repair model. Tier 1: click any joint in the bone overlay,
 gizmo-nudge it (mirror L↔R optional, snap-to-estimate, reset), with test-pose deformation checks.
@@ -111,7 +117,8 @@ flowchart LR
 
 ## Guided model manager (product stance)
 
-Backends are catalog entries with license text, territory restrictions (Hunyuan3D excludes EU/UK/KR
-— shown, not hidden), disk and VRAM requirements, verification state, and pinned versions per
-project. Install/verify/uninstall are CLI verbs the ⌘M dialog wraps. SpriteBook never bundles model
-weights.
+Backends are catalog entries with license text, applicable territory restrictions, disk and VRAM
+requirements, verification state, and pinned versions per project. Install/setup/verify/remove are
+CLI verbs the model dialog wraps. The current [catalog](models.md) includes TRELLIS.2, Pixal3D,
+UniRig, U²-Net and a synthetic fixture backend; proposed models stay in research until integrated
+and qualified. SpriteBook never bundles model weights.

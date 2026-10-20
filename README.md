@@ -32,7 +32,9 @@ shows its CLI twin for every action. See [`docs/prd.md`](docs/prd.md) for the pr
 | [User guide](docs/guide.md)                                                                                                                             | SpriteBook Studio, stage by stage                            |
 | [Godot](docs/engines/godot.md) · [Unity](docs/engines/unity-texturepacker.md) · [Phaser](docs/engines/phaser.md) · [Aseprite](docs/engines/aseprite.md) | importing the exported files                                 |
 | [Licensing](docs/licensing.md)                                                                                                                          | what you can ship, what installs behind gates, and the traps |
+| [Models and local runtimes](docs/models.md)                                                                                                             | available models, setup, storage and removal                 |
 | [Platform support](docs/platform-support.md)                                                                                                            | what runs where                                              |
+| [Documentation map](docs/README.md)                                                                                                                     | contributor contracts, source schemas and qualification      |
 
 ## Development
 
@@ -67,11 +69,13 @@ For iterative work, run `npm run build:watch` and `npm run test:watch` in separa
 exercise emitted modules. Browser mode uses labeled demo data; real workspaces, jobs and thumbnails
 use `dev:desktop`, whose bridge invokes the same compiled CLI.
 
-The [migration roadmap](future/roadmap.md) records the Windows evidence and remaining gates. CI uses
-Node on Linux, macOS and Windows, with a separate Linux lavapipe lane. Candidate artifacts are for
-qualification: native platform execution, fresh model provisioning, signing and native notices
-remain release gates. No Deno executable is needed for supported development, CI or application
-flows. Pinned legacy sources remain available through Git for preserved-copy rollback.
+The [migration roadmap](future/roadmap.md) records F0/F1/F2/F4 as complete within Windows x64 scope;
+F7 release qualification is next. CI uses Node on Linux, macOS and Windows, with a separate Linux
+lavapipe lane. Candidate artifacts are for qualification: additional native platform execution,
+unprovisioned clean-machine workflows, signing and native notices remain release gates. Windows
+installed TRELLIS.2/UniRig and Pixal3D workflows have recorded offline evidence. No Deno executable
+is needed for supported development, CI or application flows. Pinned legacy sources remain available
+through Git for preserved-copy rollback.
 
 ## License
 
@@ -81,4 +85,5 @@ SpriteBook source code is licensed under the **GNU Affero General Public License
 **Outputs are yours.** Spritesheets, atlases, manifests, models, and any other assets produced by
 running SpriteBook are _not_ subject to the AGPL solely because they were created with SpriteBook —
 use them in personal, commercial, open-source, or proprietary projects freely. Attribution is
-appreciated but not required; a suggested credit line is in [NOTICE](NOTICE).
+appreciated but not required; a suggested credit line is in [NOTICE](NOTICE). Model and source-asset
+terms still apply; see [licensing](docs/licensing.md).

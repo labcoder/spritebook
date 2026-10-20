@@ -122,7 +122,7 @@ minutes. `--track-a` fits a bundled rigged body instead: deterministic, no GPU, 
 | `--model <glb>`                                            | the mesh to rig. CAUTION: the skinned result is promoted back onto this path |
 | `--out <dir>`                                              | where the rig artifacts land                                                 |
 | `--track-a`                                                | canonical body fit instead of the UniRig prediction                          |
-| `--body <dir>`                                             | the body to fit (Track A); `ubc-male` and `ubc-female` are bundled           |
+| `--body <dir\|ubc-male>`                                   | Track A body; `ubc-male` is portable, other bodies take explicit directories |
 | `--height <metres>`                                        | standing height for the fit                                                  |
 | `--face-front` `--feet-ground` `--center` `--rotate <deg>` | orientation fixes; each re-runs the rig                                      |
 | `--edits <patch.json>`                                     | apply joint-position edits from the viewport's gizmo                         |
@@ -232,6 +232,10 @@ recovery. `setup` reuses those weights, checks the same license/territory/platfo
 publishes readiness only after native checks. Source code and wheels still need network access
 during setup; `--from` supplies model files only. Current native setup is qualified on Windows x64
 with NVIDIA CUDA; other native model targets remain F7 work.
+
+`rm <id>` removes every version of that model; `rm <id>@<version>` removes only that version. It
+deletes model files and the install receipt, preserving Python environments, shared caches and
+workspace assets. See [model storage and removal](models.md#storage-and-removal) for a full reset.
 
 ## Sizes and floors
 
