@@ -223,6 +223,17 @@ provenance. It does not install MoGe or BRIA matting; SpriteBook's own RGBA prep
 input boundary. The model's actual DINOv3 dependency is governed by its own agreement even though
 Pixal3D's upstream NOTICE still lists DINOv2.
 
+### TripoSR spike dependencies (not shipped)
+
+F4-T7's isolated evaluation environment uses MIT TripoSR root code/checkpoints with retained
+Apache-2.0 attention-module notices, BSD OmegaConf 2.4.0, BSD/MIT scikit-image 0.26.0, MIT xatlas
+0.0.11 and MIT ModernGL 5.12.0/glcontext 3.1.0, with the existing Torch/Transformers/rembg support
+families. All installed artifacts are prebuilt wheels. The experiment substitutes CPU scikit-image
+extraction for an unavailable torchmcubes wheel and fixes the reference texture baker's CUDA/CPU
+handoff. These are recorded evaluation changes, not a catalog integration or new bundled dependency.
+Exact resolved files remain in `.render-bench/f4/alternatives/triposr/runtime/uv.lock`; see the
+[platform spike](../future/model-platform-spike.md) for measurements and upstream pins.
+
 ## Rigging
 
 | Dependency                            | Role                                                                 | License                                                          | Status                                                                                                                                                                                                                |
