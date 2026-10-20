@@ -1,8 +1,9 @@
 import { promises as fs } from 'node:fs';
 /**
  * Project pins (D-009): thin IO over ProjectPinsSchema. The pins document
- * maps model/pack ids to exact versions and carries rendererVersion for the
- * cache key (D-011). Execution policy reads these pins before model/pack use; byte-deterministic
+ * maps model/pack ids to exact versions; rendererVersion remains reserved.
+ * Actual cache identity uses renderSignature() (D-011). Execution policy reads
+ * model/pack pins before use; byte-deterministic
  * reading and writing of the document live here.
  */
 import { canonicalJson, parseWith, type ProjectPins, ProjectPinsSchema } from '@spritebook/schema';

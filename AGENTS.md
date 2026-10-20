@@ -77,4 +77,5 @@ pixel-truth surface.
 | `npr-sprite-stylization`    | the style stack: quantize, dither, outlines, temporal stability, flicker debugging      |
 | `renderer-golden-testing`   | writing/fixing image tests, golden updates, CI-without-GPU strategy                     |
 
-Planned (authored at p3 start): `animation-retargeting`, `sidecar-vram`.
+Additional skills: `animation-retargeting` covers animation/pack work; `sidecar-vram` covers model
+adapters, provisioning and admission. Both are available under `.agents/skills/`.

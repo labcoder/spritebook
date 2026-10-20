@@ -1,8 +1,7 @@
 /**
- * Project & presets (data-models.ts v0.2).
+ * Project and preset contracts.
  *
- * Divergence from the draft, documented: `ExportTargetId` was referenced but
- * never defined there — pinned here to the four in-tree exporters
+ * `ExportTargetId` is pinned to the four in-tree exporters
  * (architecture: "no plugin system in 1.0; exporters are in-tree projections").
  */
 import { z } from 'zod';
@@ -40,11 +39,8 @@ export type CameraPreset = z.output<typeof CameraPresetSchema>;
 /**
  * A partial camera, for refining a named preset (`look.cameraOverrides`).
  *
- * DIVERGENCE from data-models.ts v0.2, documented: the draft gave `look` a
- * `stylePresetId` + `overrides` pair but only an id for the camera, which
- * cannot express the four controls the PRD's Look stage puts NEXT to the
- * elevation slider — direction count, px/m, cell size. Those are per-character
- * choices, not detents, so they need the same id+overrides shape style has.
+ * Direction count, px/m and cell size are per-character choices alongside
+ * elevation, so the camera uses the same preset-id + overrides shape as style.
  *
  * `id` is omitted deliberately: an override refines a preset, it does not
  * rename one. The resolved camera keeps the preset's id so a bake manifest can

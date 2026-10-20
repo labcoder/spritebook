@@ -1,7 +1,8 @@
 # Model and pack execution policy
 
-F1-T5 enforces the existing catalog contract at execution time. It does not install a new runtime,
-download weights automatically or qualify additional models/platforms.
+Core enforces the catalog contract at execution time. Execution refuses missing model files or
+runtime setup; installation is an explicit `models install` / `models setup` operation. See
+[model management](../models.md) for the complete Windows recipes qualified during F4.
 
 For a workspace `<root>/<character>`, core checks exactly `<root>/pins.json`. An explicit `--pins
 <file>` overrides that discovery, including for standalone `prep` and file-based bakes. This is the
@@ -31,9 +32,10 @@ Before model loading, generation, retexturing, Track B rigging and image prepara
   cross-process VRAM lease covers inference and releases on cleanup. No second scheduler is added.
 
 The fingerprint covers declared metadata, not the contents of a changing legal web page. These
-checks do not establish rights for undeclared transitive components; complete inference recipes,
-component licensing and offline provisioning remain F3/F7 qualification work. To update recorded
-consent or territory, remove and reinstall that exact model version through `models`.
+checks do not establish rights for undeclared transitive components. F4 records the selected
+TRELLIS.2, Pixal3D and UniRig recipes and their installed offline evidence; new recipes remain F3
+work and clean-machine/distribution clearance remains F7 work. To update recorded consent or
+territory, remove and reinstall that exact model version through `models`.
 
 `ModelVersion.vramProfiles` maps an operation and parameter subset to an admission claim with
 measurement evidence. If profiles are declared, an unmatched configuration refuses with
@@ -51,7 +53,8 @@ Pack execution checks the actual `pack.json` version against the project pin bef
 GPU work, including preview and direct bake jobs. Existing pack license/provenance and personal
 import rules remain intact. No new pack territory/platform restrictions are invented.
 
-`ProjectPins.rendererVersion` remains reserved: the legacy renderer signature still owns cache
-versioning. Its migration and enforcement belong to F4's renderer/cache namespace work. Character
-and BakeManifest schema versions and the sidecar protocol remain unchanged; registry additions are
-optional metadata fields.
+`ProjectPins.rendererVersion` remains reserved and unenforced. The actual Node/Dawn
+`renderSignature()` owns cache versioning, composing renderer, runtime, codec, backend and exposed
+adapter/driver identities. It does not reuse the legacy cache namespace. See
+[versioning](../versioning.md). F4 preserved the character/BakeManifest formats and sidecar
+protocol; runtime recipes and policy metadata are registry additions.

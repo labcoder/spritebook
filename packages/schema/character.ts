@@ -1,5 +1,5 @@
 /**
- * Character (data-models.ts v0.2) — the identity split is a law:
+ * Character contract — the identity split is a law:
  * `id` (CharacterId) is immutable and binds cache keys, paths and CLI targets;
  * `displayName` is the ONLY field `spritebook rename` touches.
  */

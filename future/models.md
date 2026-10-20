@@ -282,7 +282,7 @@ Pin engine/workflow/files, use loopback and allowlisted adapter operations, bind
 output directories, validate paths/artifacts, and cancel owned work without killing unrelated jobs.
 Retain the existing authenticated/versioned boundary, retryable errors, logs and artifact
 validation. Local runners execute code.
-[Existing sidecar contract](../docs/architecture/architecture.md#sidecar-contract-specified-implemented-p3-t2)
+[Existing sidecar contract](../docs/architecture/architecture.md#sidecar-contract)
 
 **Proposed provenance fields to decide during schema design:** engine revision, workflow hash, model
 hashes/revisions, precision/quantization, backend/GPU/driver, auxiliary models, requested/effective

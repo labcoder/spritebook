@@ -1,5 +1,5 @@
 /**
- * Identity (data-models.ts v0.2): immutable ids, minted at creation.
+ * Identity: immutable ids, minted at creation.
  * The identity split is a law: `characterId` binds cache keys, file paths and
  * CLI targets and never changes; `displayName` is the only rename target.
  */

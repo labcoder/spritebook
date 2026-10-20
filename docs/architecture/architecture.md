@@ -2,31 +2,33 @@
 
 ## System overview
 
-Three processes, one contract:
+Three application layers, with owned workers for expensive jobs:
 
 - **Core (TypeScript on Node 24 LTS).** Owns manifests, jobs, the importer border, animation
   retargeting, rendering/style/pack/export, caching and CLI composition. JavaScript is emitted by
   TypeScript project references; normal package exports resolve the emitted modules. Headless WebGPU
   uses pinned Dawn (`webgpu` 0.6.2), with explicit device/root disposal. F4's paired Windows
   workload matches the legacy control's pixels; old PNG bytes and renderer cache identities differ.
-- **AI sidecar (Python).** Torch-based adapters for catalog models: background removal, image→3D
-  backends, auto-rigging. Talks to core over a local contract (below). Installed per machine; never
-  bundled.
+- **AI sidecar (Python).** Adapters for background removal, image→3D and auto-rigging. Core starts
+  an authenticated loopback service; isolated model workers hold incompatible CUDA dependencies. The
+  application bundles its own Python source, frozen recipes and uv executable. uv provisions Python
+  and environments in writable machine data; weights and third-party model runtimes are separate
+  downloads behind registry gates. See [model management](../models.md).
 - **GUI shell (Tauri v2 — D-005 ratified, resolved by P0-T3).** React 19 + Vite + Base UI +
   hand-authored tokens, built by Vite in the same locked npm workspace. A projection of core: it
   invokes CLI verbs, renders the NDJSON stream, and displays core-produced pixels. Three.js
   viewports are inspection instruments only — and must be able to degrade to core-rendered PNG
-  sequences (Linux WebKitGTK caveat, see `spikes/shell/REPORT.md`). Production bridge rule from the
-  spike: per-job IPC channels, never global event names. Tauri remains the selected shell (D-041);
-  no alternative GUI port is scheduled.
+  sequences where a platform cannot provide the inspection renderer. The bridge uses per-job IPC
+  channels for stdout and stderr, with explicit cancellation and process ownership. Tauri remains
+  the selected shell (D-041); native macOS/Linux/Windows ARM64 execution remains an F7 gate.
 
 ```mermaid
 flowchart TB
   subgraph GUI [GUI shell — projection]
     UI[React + Base UI] --> VP[three.js inspection viewports]
   end
-  subgraph CORE [spritebook core — Deno/TS]
-    CLI[CLI verbs] --> Q[Job queue + NDJSON events]
+  subgraph CORE [TypeScript core — Node 24]
+    CLI[CLI verbs] --> Q[Core jobs + NDJSON events]
     Q --> IMP[Importer border → canonical glTF]
     Q --> ANIM[Retarget + clip sampling]
     Q --> REN[WebGPU render: MRT AOVs]
@@ -80,14 +82,19 @@ timestamps, and `retryable` on errors. Core keeps a session ring buffer plus an 
 the GUI's log drawer renders the stream **verbatim** — what CI sees is what users see. Errors badge
 the collapsed status bar.
 
-## Sidecar contract (specified; implemented p3-T2)
+## Sidecar contract
 
-Localhost HTTP; per-session auth token minted by core; version handshake on connect; job endpoints
-stream NDJSON back. Adapters declare `paramsSchema` (JSON Schema) that both validates
-`GenerationResult.params` and drives GUI option forms. Rig adapters accept optional **joint
-placement hints** (the re-run-with-markers escape hatch). GPL tooling (e.g. Blender/bpy used by
-upstream UniRig scripts) stays inside the sidecar process boundary; adapters return neutral data
-(skeleton/weights as npz/json) that core applies to glTF itself.
+HTTP on `127.0.0.1`; per-session bearer token minted by core; version handshake on connect; job
+endpoints stream NDJSON back. The wire contract lives in
+[`packages/schema/sidecar.ts`](../../packages/schema/sidecar.ts), mirrored by Python. Adapters
+declare `paramsSchema` (JSON Schema) that both validates `GenerationResult.params` and drives GUI
+option forms. Rig adapters accept optional **joint placement hints** (the re-run-with-markers escape
+hatch). GPL tooling (e.g. Blender/bpy used by upstream UniRig scripts) stays inside the sidecar
+process boundary; adapters return neutral data (skeleton/weights as npz/json) that core applies to
+glTF itself. Models and prepared runtime source files are verified before inference. Setup uses
+frozen wheels and native admission checks; a failed setup retains verified weights for `models
+setup`. Qualified inference uses local files without a Hub fallback. Hugging Face supplies artifacts
+and authentication; no Hugging Face desktop app is required.
 
 ## Rigging tracks
 
@@ -105,7 +112,7 @@ upstream UniRig scripts) stays inside the sidecar process boundary; adapters ret
 
 | Package            | Owns                                                                                            |
 | ------------------ | ----------------------------------------------------------------------------------------------- |
-| `schema`           | All types in `data-models.ts`, validation, `ManifestPatch`, migrations                          |
+| `schema`           | Authoritative types and Zod validation, `ManifestPatch`, document migrations                    |
 | `core`             | Queue, events, journal/undo, cache, orchestration                                               |
 | `importer`         | Border: readers (glTF-Transform, three-FBX bridge, obj2gltf), canonicalization, PreflightReport |
 | `image`            | Shared PNG codec and PNG/JPEG ndarray boundary; avoids Sharp/libvips in the runtime             |
@@ -114,16 +121,31 @@ upstream UniRig scripts) stays inside the sidecar process boundary; adapters ret
 | `anim`             | Pack ingestion, humanoid retarget profile, clip sampling, preview clip emission                 |
 | `pack`             | MaxRects atlasing, parallel-layout guarantee, contact sheets                                    |
 | `gen`              | Generation pipeline: registry → sidecar → **the border** → GenerationResult; reprojection       |
+| `rig`              | Canonical body fit, generic skeleton/weights application, repair and deform reports             |
 | `export`           | Godot / Aseprite / TexturePacker / strips — projections of BakeManifest                         |
 | `registry`         | Catalog/installed/pins, gates, verify                                                           |
 | `cli`              | Verb surface (`gen, pick, rig, anim, look, bake, export, models, clone, rename, undo…`)         |
-| `gui`              | Shell app; framework-agnostic viewport classes                                                  |
+| `apps/studio`      | Tauri/React shell; framework-agnostic inspection viewport classes                               |
 | `sidecar` (Python) | Adapters: rembg, gen backends, rig backends                                                     |
 
 ## Non-goals of the architecture
 
 No cloud services in the core path; no telemetry; no plugin system in 1.0 (exporters are in-tree
 projections); no cross-machine render determinism assumptions, ever.
+
+## Contracts and storage
+
+[`packages/schema`](../../packages/schema/mod.ts) is the source of truth; the
+[data-model index](data-models.ts) points to each contract. Character manifests are version 3;
+Project, BakeManifest and AnimPack remain version 2. Other documents have their own version gates.
+Reads migrate legacy character data in memory; the next mutation persists the current shape.
+
+A character workspace owns `character.json`, source/results, accepted canonical asset revisions,
+rig/animation data and bakes. Project model/pack pins live at the workspace's immediate parent.
+Machine-level model files and Python/runtime directories are independent of these assets; removing a
+generator does not remove accepted meshes, history or exported sprites. See
+[workspace persistence](workspace-persistence.md), [execution policy](execution-policy.md) and
+[model storage and removal](../models.md#storage-and-removal).
 
 ## F1 persistence and execution policy
 
@@ -154,3 +176,9 @@ the sidecar lock; `UV_PROJECT_ENVIRONMENT` remains an explicit override. Runtime
 seal the complete payload before publishing, and recover a previous generated payload if interrupted
 between directory renames. This builder guarantee is separate from F7's clean-machine installer
 upgrade/uninstall qualification.
+
+The Windows x64 F4 cutover, TRELLIS.2/UniRig workflow and optional Pixal3D workflow are complete
+within the recorded RTX 3090 scope. [Platform support](../platform-support.md) separates those runs
+from native targets and experimental model ports. F7 retains clean-machine, installed-app recovery,
+engine import, notices, signing and accessibility gates; current qualification candidates are not
+signed public releases.

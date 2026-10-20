@@ -1,5 +1,5 @@
 /**
- * Jobs & events — the NDJSON contract (data-models.ts v0.2). The log drawer
+ * Jobs & events — the NDJSON contract. The log drawer
  * renders this stream verbatim; CI sees exactly what users see.
  *
  * Supersedes the P1-T1 seed shape: field names are `t`/`at` per the contract

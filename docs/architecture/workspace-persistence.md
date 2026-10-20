@@ -1,9 +1,10 @@
 # Workspace persistence
 
-F1-T2 moves character creation, receipts, rename and undo/redo through
+Character creation, receipts, rename and undo/redo go through
 [`packages/core/persistence.ts`](../../packages/core/persistence.ts). CLI history operations call
-core; they do not implement their own writer. CharacterManifest and ManifestPatch schemas remain
-unchanged. D-043 records this decision.
+core; they do not implement their own writer. F1 preserved the existing manifest and patch schemas;
+D-043 records the persistence decision. Current document versions live in
+[`packages/schema/migrate.ts`](../../packages/schema/migrate.ts).
 
 The persistent `<manifest>.lock` uses an exclusive OS file lock. Ownership covers recovery, reading,
 patch/inverse construction and publication. Closing the handle or killing its process releases
@@ -26,8 +27,8 @@ malformed or unsupported pending records refuse rather than overwriting the acce
 Before the intent lands, a failed operation leaves the old state. After it lands, the next reader
 finishes the new state even if the writer died before acknowledgement. This is a process-crash
 guarantee. File syncing helps persistence, but cross-platform directory-entry durability during
-sudden power loss is not promised. Legacy direct file readers are not transaction-aware; migrate the
-remaining GUI reads through core in F1-T4. Do not run old and new writers concurrently.
+sudden power loss is not promised. Studio's workspace/bake reads now use the core projections below.
+Legacy direct file readers are not transaction-aware. Do not run old and new writers concurrently.
 
 Canonical GLB revisions, including embedded textures, live under `canonical/revisions/<sha256>.glb`.
 Before intent, the writer verifies and retains the previous selected bytes and the staged new bytes.

@@ -4,6 +4,10 @@ Local Python sidecar for SpriteBook (P3-T2). One per session, owned by core, loc
 wire contract is FROZEN in `packages/schema/sidecar.ts` (contractVersion **1**); NDJSON job events
 use the `packages/schema/jobs.ts` vocabulary with strict shapes — no extra fields, ever.
 
+For the current model catalog and dependency cleanup, see
+[models and local runtimes](../docs/models.md), including the separation between model files, Python
+environments and retained workspace assets.
+
 ## Installed candidates
 
 The Node launcher provides an absolute owned uv path. Core uses `uv run --frozen --no-editable`

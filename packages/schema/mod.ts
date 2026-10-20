@@ -1,7 +1,7 @@
 /**
  * @spritebook/schema - the single typed truth with runtime validation.
  *
- * Implements docs/architecture/data-models.ts v0.2 (P1-T2). Validation is
+ * Defines the contracts indexed by docs/architecture/data-models.ts. Validation is
  * zod 4 (see docs/dependencies.md); every persisted document serializes via
  * canonicalJson and round-trips byte-identically.
  */
