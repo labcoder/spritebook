@@ -1,0 +1,1435 @@
+{
+  "capturedAt": "2026-10-20T01:44:26.720Z",
+  "localDate": "2026-10-19",
+  "milestone": "F4-T4",
+  "status": "passed",
+  "sourceCommit": "2fbfadf8e60ff3b73c162701e51eb4ef86bab049",
+  "sourceDirty": false,
+  "host": {
+    "os": "Microsoft Windows [Version 10.0.26200.9711]",
+    "gpu": "NVIDIA GeForce RTX 3090",
+    "vramGiB": 24,
+    "driver": "610.88"
+  },
+  "runtime": {
+    "node": "24.22.0",
+    "uv": "0.12.10",
+    "python": "3.11.16",
+    "sealedFiles": 6149,
+    "productionPackages": 98,
+    "receiptSha256": "60200cc2bafae466a1ffb094876fcae7b38e42d5f788449641de1b0cc559ad2e"
+  },
+  "installer": {
+    "bytes": 64243373,
+    "sha256": "1cae80d6acb4e6d28f3c7882192638da0d1d38880a9530f79e57c99e5fa4a150",
+    "installExit": 0,
+    "previousOwnedUninstallExit": 0
+  },
+  "environment": {
+    "outsideCheckout": true,
+    "unicodePath": true,
+    "path": "empty",
+    "managedPython": "fresh",
+    "uvCache": "fresh",
+    "hfCache": "fresh",
+    "tritonCache": "fresh before native admission",
+    "torchCache": "fresh",
+    "weightsDelivery": "hash-verified --from files outside checkout; U2-Net downloaded through catalog",
+    "runtimeDelivery": "fresh pinned archive and frozen third-party wheel downloads; no Git/compiler",
+    "inference": "UV/HF/Transformers offline; Python connect/connect_ex deny non-loopback; zero attempts"
+  },
+  "runtimes": {
+    "trellis2-win-485cb171324647ca": {
+      "fingerprint": "485cb171324647ca8ecb20d0f5b39140916e4c5f694bceef454b0c4ef7a44ea9",
+      "sourceFiles": 378,
+      "receiptSha256": "65009fb36309f7e123d2c0efea0f83d6d47ce26165bba729f7e932f79db07886"
+    },
+    "unirig-win-cb2e78f159284a0d": {
+      "fingerprint": "cb2e78f159284a0d22999fa768120e471314c317ed3f7ce1259f088cc02d4b16",
+      "sourceFiles": 142,
+      "receiptSha256": "cc66f8ca0d67d700d580ca35d1113d6e6e892db11b8e095949a17e9fed7879e0"
+    }
+  },
+  "inputs": {
+    "sidecar/uv.lock": "705c08aec37d5a40ecc503206a41698de3e0721d7c044f8dcd33553703aecee3",
+    "sidecar/runtimes/unirig/uv.lock": "053c3b7caead32a9360160aaa43dee947d947f8ffb6c6025bcca8bc283610989",
+    "sidecar/runtimes/trellis2-win.json": "933b472091347fe09cefb7f5934dee4709f957a699325187de52a1ca594c6182",
+    "sidecar/runtimes/unirig-win.json": "17df90e53c6e0c77cbf203d1bba40772109f837f5069db7f3f3cf4a5ff9b75e9",
+    "sidecar/runtimes/check_trellis2.py": "6be4e4c3b433270df6c4c8319a45f2c2001bd66b26f325dd5ab41c495b60904a",
+    "sidecar/spritebook_sidecar/adapters/trellis2_windows.py": "6ba39320825064f4f92eb1ac9faae8eb7c09a67e6fa7525efae45a0ac1607eed",
+    "sidecar/spritebook_sidecar/adapters/unirig_opt/config.json": "89e628a989b50b5521aabe3b79e73a53270a24bbbf7ab043545aef2978dc57bf"
+  },
+  "proofs": {
+    "setup-interrupted": {
+      "label": "setup-interrupted",
+      "args": [
+        "models",
+        "install",
+        "trellis2-4b",
+        "--accept-license",
+        "--from",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\seed\\trellis2-4b"
+      ],
+      "code": 1,
+      "seconds": 48.412
+    },
+    "setup-recovery": {
+      "label": "setup-recovery",
+      "args": [
+        "models",
+        "setup",
+        "trellis2-4b",
+        "--accept-license"
+      ],
+      "code": 0,
+      "seconds": 122.453
+    },
+    "setup-unirig": {
+      "label": "setup-unirig",
+      "args": [
+        "models",
+        "install",
+        "unirig",
+        "--from",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\seed\\unirig"
+      ],
+      "code": 0,
+      "seconds": 161.515
+    },
+    "setup-u2net": {
+      "label": "setup-u2net",
+      "args": [
+        "models",
+        "install",
+        "rembg-u2net"
+      ],
+      "code": 0,
+      "seconds": 2.904
+    },
+    "doctor-offline": {
+      "label": "doctor-offline",
+      "args": [
+        "doctor",
+        "--sidecar"
+      ],
+      "code": 0,
+      "seconds": 2.358
+    },
+    "prep": {
+      "label": "prep",
+      "args": [
+        "prep",
+        "--image",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\prep-input.png",
+        "--out",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\prep"
+      ],
+      "code": 0,
+      "seconds": 47.424
+    },
+    "gen": {
+      "label": "gen",
+      "args": [
+        "gen",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--character",
+        "hero",
+        "--image",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\reference.png",
+        "--model",
+        "trellis2-4b",
+        "--seed",
+        "1234",
+        "--height",
+        "1.7"
+      ],
+      "code": 0,
+      "seconds": 221.183
+    },
+    "pick": {
+      "label": "pick",
+      "args": [
+        "pick",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--result",
+        "r1"
+      ],
+      "code": 0,
+      "seconds": 4.474
+    },
+    "retexture": {
+      "label": "retexture",
+      "args": [
+        "retexture",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--result",
+        "r1",
+        "--seed",
+        "1236"
+      ],
+      "code": 0,
+      "seconds": 110.056
+    },
+    "pick-retexture": {
+      "label": "pick-retexture",
+      "args": [
+        "pick",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--result",
+        "r2"
+      ],
+      "code": 0,
+      "seconds": 5.069
+    },
+    "rig": {
+      "label": "rig",
+      "args": [
+        "rig",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--model",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\canonical\\model.glb",
+        "--out",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\rig"
+      ],
+      "code": 0,
+      "seconds": 145.03
+    },
+    "preview": {
+      "label": "preview",
+      "args": [
+        "anim",
+        "--preview",
+        "idle-loop",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero"
+      ],
+      "code": 0,
+      "seconds": 0.984
+    },
+    "rig-accept": {
+      "label": "rig-accept",
+      "args": [
+        "rig",
+        "--accept",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero"
+      ],
+      "code": 0,
+      "seconds": 1.186
+    },
+    "clips": {
+      "label": "clips",
+      "args": [
+        "anim",
+        "--enable",
+        "idle-loop:6,walk-loop:6,punch-jab:6",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero"
+      ],
+      "code": 0,
+      "seconds": 1.207
+    },
+    "look": {
+      "label": "look",
+      "args": [
+        "look",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--style",
+        "pixel",
+        "--cell",
+        "100x128"
+      ],
+      "code": 0,
+      "seconds": 1.211
+    },
+    "bake": {
+      "label": "bake",
+      "args": [
+        "bake",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--cache",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\render-cache",
+        "--only-invalidated"
+      ],
+      "code": 0,
+      "seconds": 21.705
+    },
+    "export": {
+      "label": "export",
+      "args": [
+        "export",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--out",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\exports",
+        "--targets",
+        "godot,aseprite,texturepacker,strips"
+      ],
+      "code": 0,
+      "seconds": 0.607
+    },
+    "bake-warm": {
+      "label": "bake-warm",
+      "args": [
+        "bake",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--cache",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\render-cache",
+        "--only-invalidated"
+      ],
+      "code": 0,
+      "seconds": 6.661
+    },
+    "model-worker-killed": {
+      "label": "model-worker-killed",
+      "args": [
+        "retexture",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--result",
+        "r1",
+        "--seed",
+        "1236"
+      ],
+      "code": 1,
+      "seconds": 83.478
+    },
+    "model-worker-retry": {
+      "label": "model-worker-retry",
+      "args": [
+        "retexture",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--result",
+        "r1",
+        "--seed",
+        "1236"
+      ],
+      "code": 0,
+      "seconds": 106.416
+    },
+    "runtime-source-refusal": {
+      "label": "runtime-source-refusal",
+      "args": [
+        "retexture",
+        "--workspace",
+        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "--result",
+        "r1",
+        "--seed",
+        "1236"
+      ],
+      "code": 1,
+      "seconds": 34.754
+    },
+    "runtime-source-repair": {
+      "label": "runtime-source-repair",
+      "args": [
+        "models",
+        "setup",
+        "trellis2-4b",
+        "--accept-license"
+      ],
+      "code": 0,
+      "seconds": 42.828
+    },
+    "doctor-after-repair": {
+      "label": "doctor-after-repair",
+      "args": [
+        "doctor",
+        "--sidecar"
+      ],
+      "code": 0,
+      "seconds": 2.097
+    }
+  },
+  "workflow": {
+    "prep": {
+      "opaque": 280655,
+      "clear": 1246681
+    },
+    "generation": {
+      "vertices": 142415,
+      "triangles": 193775,
+      "textures": {
+        "0": {
+          "width": 2048,
+          "height": 2048,
+          "channels": [
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 35.61030411720276
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 28.886943340301514
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 42.42269945144653
+            },
+            {
+              "min": 199,
+              "max": 255,
+              "mean": 254.5233771800995
+            }
+          ]
+        },
+        "1": {
+          "width": 2048,
+          "height": 2048,
+          "channels": [
+            {
+              "min": 0,
+              "max": 0,
+              "mean": 0
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 252.69321250915527
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 1.6726667881011963
+            }
+          ]
+        }
+      },
+      "skins": 0,
+      "maxWeightError": 0
+    },
+    "retexture": {
+      "vertices": 581303,
+      "triangles": 193775,
+      "textures": {
+        "0": {
+          "width": 2048,
+          "height": 2048,
+          "channels": [
+            {
+              "min": 0,
+              "max": 252,
+              "mean": 80.7833263874054
+            },
+            {
+              "min": 0,
+              "max": 225,
+              "mean": 57.058343172073364
+            },
+            {
+              "min": 0,
+              "max": 217,
+              "mean": 68.82146120071411
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 237.26356148719788
+            }
+          ]
+        },
+        "1": {
+          "width": 2048,
+          "height": 2048,
+          "channels": [
+            {
+              "min": 0,
+              "max": 0,
+              "mean": 0
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 254.6742458343506
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 40.93271780014038
+            }
+          ]
+        }
+      },
+      "skins": 0,
+      "maxWeightError": 0
+    },
+    "rig": {
+      "vertices": 581303,
+      "triangles": 193775,
+      "textures": {
+        "0": {
+          "width": 2048,
+          "height": 2048,
+          "channels": [
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 136.3857021331787
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 129.57379579544067
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 142.7907407283783
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 240.52916359901428
+            }
+          ]
+        },
+        "1": {
+          "width": 2048,
+          "height": 2048,
+          "channels": [
+            {
+              "min": 0,
+              "max": 0,
+              "mean": 0
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 254.6742458343506
+            },
+            {
+              "min": 0,
+              "max": 255,
+              "mean": 40.93271780014038
+            }
+          ]
+        }
+      },
+      "skins": 1,
+      "maxWeightError": 4.842877388000488e-8,
+      "joints": [
+        "pelvis",
+        "spine_02",
+        "spine_03",
+        "clavicle_l",
+        "head",
+        "head_leaf",
+        "clavicle_r",
+        "upperarm_l",
+        "lowerarm_l",
+        "bone_9",
+        "ring_02_l",
+        "middle_02_l",
+        "thumb_04_leaf_l",
+        "pinky_01_l",
+        "thumb_03_l",
+        "index_02_l",
+        "thumb_01_l",
+        "thumb_02_l",
+        "index_01_l",
+        "hand_l",
+        "middle_01_l",
+        "ring_01_l",
+        "neck_01",
+        "upperarm_r",
+        "lowerarm_r",
+        "bone_25",
+        "ring_02_r",
+        "middle_02_r",
+        "thumb_03_r",
+        "thumb_04_leaf_r",
+        "thumb_02_r",
+        "index_02_r",
+        "thumb_01_r",
+        "middle_01_r",
+        "index_01_r",
+        "hand_r",
+        "pinky_01_r",
+        "ring_01_r",
+        "thigh_l",
+        "calf_l",
+        "foot_l",
+        "ball_l",
+        "thigh_r",
+        "calf_r",
+        "foot_r",
+        "ball_r"
+      ]
+    },
+    "rigAcceptedBeforeReview": false,
+    "frames": 144,
+    "pages": {
+      "lit": 1,
+      "albedo": 1,
+      "normal": 1,
+      "depth": 1,
+      "mask": 1
+    },
+    "coverage": 0.040546875,
+    "flags": [],
+    "cold": {
+      "flickerPct": 0.59375,
+      "cacheHitPct": 0,
+      "wallTimeS": 20.256652000000003,
+      "framesTotal": 144
+    },
+    "warm": {
+      "cacheHitPct": 100,
+      "flickerPct": 0.59375,
+      "framesTotal": 144,
+      "wallTimeS": 6.102842
+    },
+    "outboundAttempts": 0,
+    "meta": [
+      {
+        "backend": {
+          "modelId": "trellis2-4b",
+          "version": "af44b45f.local1"
+        },
+        "discarded": false,
+        "id": "r1",
+        "output": {
+          "bodies": 1,
+          "gltfSha256": "e124ad276a67cb6a38b75d23edf0dce5cd0bd45e096b1cf34b68bddc1dc7c6b4",
+          "kind": "mesh",
+          "textureRes": 2048,
+          "tris": 193775
+        },
+        "params": {
+          "guidanceStrength": 7.5,
+          "lowVram": true,
+          "pipelineType": "512",
+          "seed": 1234,
+          "steps": 12,
+          "textureGuidance": 3.5,
+          "textureGuidanceRescale": 0.2,
+          "textureRetries": 2
+        },
+        "seed": 1236,
+        "startedAt": "2026-10-20T01:26:55.633Z",
+        "wallTimeS": 217.778
+      },
+      {
+        "backend": {
+          "modelId": "trellis2-4b",
+          "version": "af44b45f.local1"
+        },
+        "derivedFrom": "r1",
+        "discarded": false,
+        "id": "r2",
+        "output": {
+          "gltfSha256": "79bc877cfe9ce6144cd1057ccecd79c88cee0c10bab453e350efd04652364fa2",
+          "kind": "mesh",
+          "textureRes": 2048,
+          "tris": 193775
+        },
+        "params": {
+          "lowVram": true,
+          "resolution": 512,
+          "seed": 1236,
+          "textureGuidance": 3.5,
+          "textureGuidanceRescale": 0.2,
+          "textureRetries": 5
+        },
+        "seed": 1236,
+        "startedAt": "2026-10-20T01:30:41.797Z",
+        "wallTimeS": 107.437
+      }
+    ]
+  },
+  "generation": {
+    "adapter": "trellis2",
+    "adapterVersion": "0.3.1",
+    "requestedSeed": 1234,
+    "effectiveSeed": 1236,
+    "seedsTried": [
+      1234,
+      1235,
+      1236
+    ],
+    "candidates": [
+      {
+        "index": 0,
+        "requestedSeed": 1234,
+        "effectiveSeed": 1236,
+        "seedsTried": [
+          1234,
+          1235,
+          1236
+        ],
+        "runSeconds": 72.56
+      }
+    ],
+    "pipelineType": "512",
+    "loadSeconds": 89.99,
+    "runSeconds": 72.56,
+    "peakVramReservedGb": 3.01,
+    "peakVramAllocatedGb": 2.68
+  },
+  "retexture": {
+    "adapter": "trellis2-retexture",
+    "adapterVersion": "0.4.1",
+    "requestedSeed": 1236,
+    "effectiveSeed": 1236,
+    "seedsTried": [
+      1236
+    ],
+    "resolution": 512,
+    "textureGuidance": 3.5,
+    "topologyPreserved": true,
+    "frameShift": 0,
+    "frameRestore": {
+      "scale": 1.700017,
+      "translation": [
+        -0.000266,
+        0.85,
+        0.007326
+      ]
+    },
+    "loadSeconds": 42.73,
+    "runSeconds": 21.45,
+    "peakVramReservedGb": 3.58,
+    "peakVramAllocatedGb": 2.75
+  },
+  "rigDeform": {
+    "schemaVersion": 2,
+    "at": "2026-10-20T01:35:00.710Z",
+    "poses": [
+      "bend+30deg",
+      "bend-30deg"
+    ],
+    "joints": [
+      {
+        "joint": "pelvis",
+        "influencedVertices": 166238,
+        "influencedEdges": 165689,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.07428403943457944,
+        "maxDisplacementM": 0.15143956223818855,
+        "maxEdgeStretch": 1.0000865946423523,
+        "flags": []
+      },
+      {
+        "joint": "spine_02",
+        "influencedVertices": 68670,
+        "influencedEdges": 67875,
+        "stretchedEdges": 99,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.0294570411559659,
+        "maxDisplacementM": 0.09029505212159503,
+        "maxEdgeStretch": 4.007356493591716,
+        "flags": []
+      },
+      {
+        "joint": "spine_03",
+        "influencedVertices": 28772,
+        "influencedEdges": 28302,
+        "stretchedEdges": 72,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.023437878756495573,
+        "maxDisplacementM": 0.07510632648249714,
+        "maxEdgeStretch": 4.068496309089649,
+        "flags": []
+      },
+      {
+        "joint": "clavicle_l",
+        "influencedVertices": 112202,
+        "influencedEdges": 111256,
+        "stretchedEdges": 310,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.0507598132677075,
+        "maxDisplacementM": 0.11330579792537945,
+        "maxEdgeStretch": 5.588098502325755,
+        "flags": []
+      },
+      {
+        "joint": "head",
+        "influencedVertices": 64989,
+        "influencedEdges": 64013,
+        "stretchedEdges": 91,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.045276859780489544,
+        "maxDisplacementM": 0.12985427611260258,
+        "maxEdgeStretch": 3.9196271039906807,
+        "flags": []
+      },
+      {
+        "joint": "head_leaf",
+        "influencedVertices": 121641,
+        "influencedEdges": 121270,
+        "stretchedEdges": 13,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.07225820283234403,
+        "maxDisplacementM": 0.1668644181860895,
+        "maxEdgeStretch": 2.7298694300239794,
+        "flags": []
+      },
+      {
+        "joint": "clavicle_r",
+        "influencedVertices": 32413,
+        "influencedEdges": 31823,
+        "stretchedEdges": 121,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.051138032198439286,
+        "maxDisplacementM": 0.13517100340140206,
+        "maxEdgeStretch": 4.818938435691632,
+        "flags": []
+      },
+      {
+        "joint": "upperarm_l",
+        "influencedVertices": 38191,
+        "influencedEdges": 37906,
+        "stretchedEdges": 21,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.05432461841251334,
+        "maxDisplacementM": 0.1513768514261713,
+        "maxEdgeStretch": 2.9101677067055896,
+        "flags": []
+      },
+      {
+        "joint": "lowerarm_l",
+        "influencedVertices": 14805,
+        "influencedEdges": 14604,
+        "stretchedEdges": 2,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.050140221467048954,
+        "maxDisplacementM": 0.1302832352022369,
+        "maxEdgeStretch": 2.0825730216227405,
+        "flags": []
+      },
+      {
+        "joint": "bone_9",
+        "influencedVertices": 7439,
+        "influencedEdges": 7248,
+        "stretchedEdges": 1,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.027085398913043367,
+        "maxDisplacementM": 0.07219424666713159,
+        "maxEdgeStretch": 2.094088510977878,
+        "flags": []
+      },
+      {
+        "joint": "ring_02_l",
+        "influencedVertices": 1628,
+        "influencedEdges": 1541,
+        "stretchedEdges": 26,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.00972538752141996,
+        "maxDisplacementM": 0.035151293419709594,
+        "maxEdgeStretch": 3.031729402025371,
+        "flags": [
+          "excessive-stretch"
+        ]
+      },
+      {
+        "joint": "middle_02_l",
+        "influencedVertices": 1476,
+        "influencedEdges": 1445,
+        "stretchedEdges": 2,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.010368687604231,
+        "maxDisplacementM": 0.03148155100963578,
+        "maxEdgeStretch": 2.097862317061308,
+        "flags": []
+      },
+      {
+        "joint": "thumb_04_leaf_l",
+        "influencedVertices": 719,
+        "influencedEdges": 683,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.0016983382747241286,
+        "maxDisplacementM": 0.0044451585794904715,
+        "maxEdgeStretch": 1.1222060233148363,
+        "flags": []
+      },
+      {
+        "joint": "pinky_01_l",
+        "influencedVertices": 766,
+        "influencedEdges": 714,
+        "stretchedEdges": 1,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.003898195042442951,
+        "maxDisplacementM": 0.014615400554341575,
+        "maxEdgeStretch": 2.037635997356696,
+        "flags": []
+      },
+      {
+        "joint": "thumb_03_l",
+        "influencedVertices": 695,
+        "influencedEdges": 668,
+        "stretchedEdges": 3,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.007889097434358852,
+        "maxDisplacementM": 0.025758544704361362,
+        "maxEdgeStretch": 2.224071574509004,
+        "flags": []
+      },
+      {
+        "joint": "index_02_l",
+        "influencedVertices": 247,
+        "influencedEdges": 241,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.004974683347786752,
+        "maxDisplacementM": 0.008089099132005598,
+        "maxEdgeStretch": 1.309246402540271,
+        "flags": []
+      },
+      {
+        "joint": "thumb_01_l",
+        "influencedVertices": 1654,
+        "influencedEdges": 1574,
+        "stretchedEdges": 4,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.012522529545693405,
+        "maxDisplacementM": 0.04371634550050741,
+        "maxEdgeStretch": 2.532137168766715,
+        "flags": []
+      },
+      {
+        "joint": "thumb_02_l",
+        "influencedVertices": 1523,
+        "influencedEdges": 1489,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.01205232204187343,
+        "maxDisplacementM": 0.03695953530824366,
+        "maxEdgeStretch": 1.9113358738059762,
+        "flags": []
+      },
+      {
+        "joint": "index_01_l",
+        "influencedVertices": 369,
+        "influencedEdges": 360,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.00790337460293977,
+        "maxDisplacementM": 0.014005894672718648,
+        "maxEdgeStretch": 1.276873926915629,
+        "flags": []
+      },
+      {
+        "joint": "hand_l",
+        "influencedVertices": 749,
+        "influencedEdges": 707,
+        "stretchedEdges": 2,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.011137610670528183,
+        "maxDisplacementM": 0.03346152798711007,
+        "maxEdgeStretch": 2.340940564122361,
+        "flags": []
+      },
+      {
+        "joint": "middle_01_l",
+        "influencedVertices": 811,
+        "influencedEdges": 803,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.008359094147299061,
+        "maxDisplacementM": 0.026923579472325043,
+        "maxEdgeStretch": 1.3179256595578628,
+        "flags": []
+      },
+      {
+        "joint": "ring_01_l",
+        "influencedVertices": 237,
+        "influencedEdges": 230,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.0017363809549456892,
+        "maxDisplacementM": 0.002685885823368437,
+        "maxEdgeStretch": 1.0642767739261312,
+        "flags": []
+      },
+      {
+        "joint": "neck_01",
+        "influencedVertices": 25493,
+        "influencedEdges": 24957,
+        "stretchedEdges": 292,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.061732672774703054,
+        "maxDisplacementM": 0.14469867344521287,
+        "maxEdgeStretch": 3.9332506333988766,
+        "flags": [
+          "excessive-stretch"
+        ]
+      },
+      {
+        "joint": "upperarm_r",
+        "influencedVertices": 35701,
+        "influencedEdges": 35427,
+        "stretchedEdges": 26,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.059533208624116485,
+        "maxDisplacementM": 0.15612144519761403,
+        "maxEdgeStretch": 3.110615386490193,
+        "flags": []
+      },
+      {
+        "joint": "lowerarm_r",
+        "influencedVertices": 13613,
+        "influencedEdges": 13424,
+        "stretchedEdges": 1,
+        "spannedComponents": 3,
+        "meanDisplacementM": 0.04699372058972732,
+        "maxDisplacementM": 0.13993026268529907,
+        "maxEdgeStretch": 2.0364428131622745,
+        "flags": []
+      },
+      {
+        "joint": "bone_25",
+        "influencedVertices": 5502,
+        "influencedEdges": 5317,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.029005858920747925,
+        "maxDisplacementM": 0.0724069501958286,
+        "maxEdgeStretch": 1.8026082973805846,
+        "flags": []
+      },
+      {
+        "joint": "ring_02_r",
+        "influencedVertices": 811,
+        "influencedEdges": 714,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.006883081712623291,
+        "maxDisplacementM": 0.029440532587367473,
+        "maxEdgeStretch": 1.8442599797063528,
+        "flags": []
+      },
+      {
+        "joint": "middle_02_r",
+        "influencedVertices": 1765,
+        "influencedEdges": 1673,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.007992462525323929,
+        "maxDisplacementM": 0.024532064938684053,
+        "maxEdgeStretch": 1.5428918898476331,
+        "flags": []
+      },
+      {
+        "joint": "thumb_03_r",
+        "influencedVertices": 1207,
+        "influencedEdges": 1175,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.005330417043263502,
+        "maxDisplacementM": 0.019513404462699634,
+        "maxEdgeStretch": 1.570623465777816,
+        "flags": []
+      },
+      {
+        "joint": "thumb_04_leaf_r",
+        "influencedVertices": 394,
+        "influencedEdges": 332,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.009508816421021112,
+        "maxDisplacementM": 0.021454441408159563,
+        "maxEdgeStretch": 1.6670216148304926,
+        "flags": []
+      },
+      {
+        "joint": "thumb_02_r",
+        "influencedVertices": 1704,
+        "influencedEdges": 1654,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.007957003239020889,
+        "maxDisplacementM": 0.029708767043736456,
+        "maxEdgeStretch": 1.9422890366297663,
+        "flags": []
+      },
+      {
+        "joint": "index_02_r",
+        "influencedVertices": 19,
+        "influencedEdges": 7,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.0009424446118690384,
+        "maxDisplacementM": 0.0012100808385623275,
+        "maxEdgeStretch": 1.0026394144284827,
+        "flags": []
+      },
+      {
+        "joint": "thumb_01_r",
+        "influencedVertices": 1482,
+        "influencedEdges": 1368,
+        "stretchedEdges": 2,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.00574945113186788,
+        "maxDisplacementM": 0.03413971723178206,
+        "maxEdgeStretch": 2.226036037280985,
+        "flags": []
+      },
+      {
+        "joint": "middle_01_r",
+        "influencedVertices": 1669,
+        "influencedEdges": 1578,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.008991457832706067,
+        "maxDisplacementM": 0.03534710103080662,
+        "maxEdgeStretch": 1.7556897322365963,
+        "flags": []
+      },
+      {
+        "joint": "index_01_r",
+        "influencedVertices": 448,
+        "influencedEdges": 431,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.005309885441171115,
+        "maxDisplacementM": 0.011433894981727668,
+        "maxEdgeStretch": 1.3199789635617072,
+        "flags": []
+      },
+      {
+        "joint": "hand_r",
+        "influencedVertices": 726,
+        "influencedEdges": 623,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.0048633839857919955,
+        "maxDisplacementM": 0.029690405717068397,
+        "maxEdgeStretch": 1.7613693131306016,
+        "flags": []
+      },
+      {
+        "joint": "pinky_01_r",
+        "influencedVertices": 473,
+        "influencedEdges": 459,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.013987357731043128,
+        "maxDisplacementM": 0.029480841499809358,
+        "maxEdgeStretch": 1.9747107902146543,
+        "flags": []
+      },
+      {
+        "joint": "ring_01_r",
+        "influencedVertices": 360,
+        "influencedEdges": 342,
+        "stretchedEdges": 0,
+        "spannedComponents": 2,
+        "meanDisplacementM": 0.006267836558173824,
+        "maxDisplacementM": 0.013023215063650026,
+        "maxEdgeStretch": 1.254556716869311,
+        "flags": []
+      },
+      {
+        "joint": "thigh_l",
+        "influencedVertices": 64261,
+        "influencedEdges": 63521,
+        "stretchedEdges": 511,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.05799710199080743,
+        "maxDisplacementM": 0.24989558919960847,
+        "maxEdgeStretch": 6.370959025293256,
+        "flags": []
+      },
+      {
+        "joint": "calf_l",
+        "influencedVertices": 37980,
+        "influencedEdges": 37772,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.10595167089593074,
+        "maxDisplacementM": 0.20764334626454006,
+        "maxEdgeStretch": 1.3946233103690666,
+        "flags": []
+      },
+      {
+        "joint": "foot_l",
+        "influencedVertices": 39175,
+        "influencedEdges": 39096,
+        "stretchedEdges": 2,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.03581840142234759,
+        "maxDisplacementM": 0.11995433141746874,
+        "maxEdgeStretch": 2.312617062711936,
+        "flags": []
+      },
+      {
+        "joint": "ball_l",
+        "influencedVertices": 8707,
+        "influencedEdges": 8594,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.006775595382026098,
+        "maxDisplacementM": 0.019904101055674008,
+        "maxEdgeStretch": 1.2857236202029965,
+        "flags": []
+      },
+      {
+        "joint": "thigh_r",
+        "influencedVertices": 62567,
+        "influencedEdges": 61834,
+        "stretchedEdges": 470,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.05658797474440431,
+        "maxDisplacementM": 0.24199514105342315,
+        "maxEdgeStretch": 6.368914324267483,
+        "flags": []
+      },
+      {
+        "joint": "calf_r",
+        "influencedVertices": 37208,
+        "influencedEdges": 36916,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.10753228845155326,
+        "maxDisplacementM": 0.21116579731757945,
+        "maxEdgeStretch": 1.6480640673219515,
+        "flags": []
+      },
+      {
+        "joint": "foot_r",
+        "influencedVertices": 37719,
+        "influencedEdges": 37621,
+        "stretchedEdges": 3,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.034020860952012816,
+        "maxDisplacementM": 0.11725213766578362,
+        "maxEdgeStretch": 2.1744159172633197,
+        "flags": []
+      },
+      {
+        "joint": "ball_r",
+        "influencedVertices": 8995,
+        "influencedEdges": 8880,
+        "stretchedEdges": 0,
+        "spannedComponents": 1,
+        "meanDisplacementM": 0.007094913143774836,
+        "maxDisplacementM": 0.021201661788949902,
+        "maxEdgeStretch": 1.5152623752935535,
+        "flags": []
+      }
+    ],
+    "flaggedJoints": [
+      "ring_02_l",
+      "neck_01"
+    ]
+  },
+  "inspection": {
+    "rows": [
+      "idle 0",
+      "idle 3",
+      "walk 0",
+      "walk 3",
+      "punch 0",
+      "punch 3"
+    ],
+    "columns": "directions 0 through 7",
+    "distinctFramesPerDirection": {
+      "idle-loop": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "walk-loop": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "punch-jab": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    "all144FramesNonempty": true
+  },
+  "recovery": {
+    "killedWorker": 48624,
+    "error": "backend-failed",
+    "retryable": true,
+    "retry": "passed",
+    "sourceCorruption": "refused and repaired from pinned archives",
+    "weightReceipt": "unchanged",
+    "acceptedAssets": "unchanged",
+    "outboundAttempts": 0
+  },
+  "desktop": {
+    "doctor": {
+      "spritebook": "0.9.0",
+      "node": "24.22.0",
+      "v8": "13.6.233.17-node.57",
+      "platform": "windows-x64",
+      "vramGb": 24,
+      "models": {
+        "root": "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\models",
+        "virtualization": {
+          "virtualized": false
+        }
+      },
+      "version": "spritebook-render@0.6.0",
+      "backendEnv": "vulkan",
+      "available": true,
+      "signature": "spritebook-render@0.6.0#9a231c45",
+      "adapter": {
+        "subgroupMatrixConfigs": [],
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "nvidia-geforce-rtx-3090",
+        "description": "NVIDIA: 610.88 610.88.0.0",
+        "subgroupMinSize": 32,
+        "subgroupMaxSize": 32,
+        "isFallbackAdapter": false
+      },
+      "features": [
+        "core-features-and-limits"
+      ],
+      "limits": {
+        "maxColorAttachments": 8,
+        "maxColorAttachmentBytesPerSample": 32,
+        "maxTextureDimension2D": 8192,
+        "maxBufferSize": 268435456
+      },
+      "probe": {
+        "ok": true,
+        "checksum": "5f70bf18a0860070"
+      },
+      "sidecar": {
+        "ok": true,
+        "dir": "\\\\?\\C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\application\\runtime\\assets\\sidecar",
+        "contractVersion": 1,
+        "sidecarVersion": "0.1.0",
+        "python": "3.11.16",
+        "adapters": [
+          {
+            "id": "echo",
+            "kind": "test",
+            "version": "1.0.0"
+          },
+          {
+            "id": "rembg",
+            "kind": "imageprep",
+            "version": "2.0.77"
+          },
+          {
+            "id": "pose-check",
+            "kind": "imageprep",
+            "version": "1.0.0"
+          },
+          {
+            "id": "fixture-gen",
+            "kind": "gen3d",
+            "version": "1.0.0"
+          },
+          {
+            "id": "fixture-retexture",
+            "kind": "retexture",
+            "version": "0.1.0"
+          },
+          {
+            "id": "trellis2",
+            "kind": "gen3d",
+            "version": "0.3.1"
+          },
+          {
+            "id": "trellis2-retexture",
+            "kind": "retexture",
+            "version": "0.4.1"
+          },
+          {
+            "id": "texture-substage",
+            "kind": "gen3d",
+            "version": "1.0.0"
+          },
+          {
+            "id": "unirig",
+            "kind": "rig",
+            "version": "1.1.0"
+          }
+        ]
+      }
+    },
+    "workspaces": 1,
+    "thumbBytes": 18082,
+    "atlasKeys": [
+      "manifest",
+      "png"
+    ],
+    "meshBytes": 44364376,
+    "body": "SPRITEBOOK\nFile\nEdit\n⌘K\nlang: en\ntheme: dark\ngpu: unexamined\nGallery\n+\nProjects root\nLoad\nRUN HEALTH EXAM\nhero\nhero · 1.70 m · pick r2\npixel\nrig B · 46j · accepted\nbaked a6907f1f\nhealth: not yet examined\n1 characters\nbridge: tauri\n▴ log"
+  },
+  "tests": {
+    "distinctTotal": 903,
+    "passed": 896,
+    "skipped": 7,
+    "unresolvedFailures": 0,
+    "fullRun": {
+      "passed": 873,
+      "failed": 23,
+      "skipped": 7,
+      "reason": "Older source sidecar held its executable open; uv could not refresh that development environment"
+    },
+    "isolatedRecheck": {
+      "total": 32,
+      "passed": 31,
+      "skipped": 1,
+      "failed": 0,
+      "coveredAll23Failures": true
+    },
+    "pythonSelftest": 516,
+    "nativeColdSampling": "six PBR channels, DRTK coverage/winding/orientation/chunks/degenerates, O-Voxel finite conversion",
+    "types": "pass",
+    "lint": "pass; existing informational exponentiation suggestion",
+    "goldens": "passed; unchanged; no automatic retry"
+  },
+  "controls": {
+    ".render-bench/f0/f0-windows-x64-vulkan.zip": "a1efcb0956fd52c415eefb1efa6ce467d854defa18b7b1fc5ab12bec3e8dd9f3",
+    ".render-bench/f4/legacy-F1.zip": "eb51889ff4e3df1ea109b28dce2de4e7b420d2922aca259abef42492a941b785"
+  },
+  "evidence": {
+    "setup-summary.json": "81e061ec98c8f723f10e2ce0bf5ed5a6f021cc297890ad6986cf2a248eb825ab",
+    "workflow-summary.json": "8603658b2197ef8a7c4b640a6bf56b21924c816414ce67b09e2fce00d2aad3ac",
+    "inspection.json": "bbd9fe5b60038c394a2e00823ae2024d090aa9f62db7a0194b2bf859783025f1",
+    "recovery-summary.json": "8860a430ab9b94337ac12e4bf8a6345a127077e541468a93e2eff16805b4a124",
+    "desktop/report.json": "b3cd35c40623c401e4206edb6a53fca31b6656d0a7496f541a4e27e7136f8cbe",
+    "desktop/desktop.png": "215c833f22e7d9749afd7821c0564eb8d9bcad6877245afbda74e7b134ae7b0f",
+    "review.png": "a4e9192daf23db2f7a6ff8140fd3762e59cd3c546304cee5ac8ee539e41ae159",
+    "recovery-snapshot.json": "a9267b2dacbc0649c420a406642b6c528bd70e2ae19b266ea726bdff7a1291b1"
+  },
+  "localEvidence": ".render-bench/f4/installed-model-proof",
+  "limitations": [
+    "Fresh profile on this developer machine; not clean-machine/signing/upgrade qualification",
+    "Rig sample retains ring_02_l/neck_01 stretch advisories; root/spine_01 held at rest by retargeting; manual review/acceptance retained",
+    "Single observed workflow; no new model default or cross-machine equality claim",
+    "Native Mac, Windows ARM64 and Linux; engine imports; assistive technology and soak remain F7",
+    "DINOv3 custom terms still apply; native model environments are user-installed and not app-bundled"
+  ]
+}

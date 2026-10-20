@@ -157,7 +157,7 @@ planning-era and described MODELS; the rows now describe STACKS, which is what s
 
 | Backend          | License (model)           | Status                                                                                                                                                             |
 | ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **TRELLIS.2 4B** | MIT (weights)             | Windows DRTK replacement under F4 qualification; see exact component terms below. Measured **3.01 GiB** at shipped defaults, 16.53 GiB at `lowVram=false`          |
+| **TRELLIS.2 4B** | MIT (weights)             | Windows DRTK path passes installed F4 qualification; see exact component terms below. Measured **3.01 GiB** at shipped defaults, 16.53 GiB at `lowVram=false`      |
 | Pixal3D          | MIT                       | ✗ **not viable**: requires the TRELLIS.2 base env (inherits everything below) **and** compiles NATTEN from source — wheels-only gate                               |
 | TripoSplat       | MIT                       | ✗ **not applicable**: emits gaussians, not a mesh (invariant 4)                                                                                                    |
 | Hunyuan3D 2.x    | Tencent Community License | ✗ **excludes EU/UK/KR** — territory carve-out; only ever a user-installed gated extra, never a default                                                             |
@@ -185,8 +185,9 @@ The selected extra excludes `nvdiffrast`, `nvdiffrec_render` and the old untrace
 The first two carried NVIDIA evaluation-only terms; installing them outside the application did not
 remove that restriction. Source preparation replaces both generation export and retexture UV
 rasterization while retaining cleanup, original-surface projection, PBR sampling and measured model
-defaults. The replacement has passed native structural checks and real generation/retexture; the
-[F4 gate](../future/model-provisioning-gate.md) records remaining installed checks.
+defaults. The replacement passes native structural checks and real installed generation/retexture;
+the [completed F4 gate](../future/model-provisioning-gate.md) records exact qualification and
+remaining F7 release checks.
 
 The Windows admission check compiles a real sparse trilinear sampler and verifies all six PBR
 channels with a cold Unicode-path cache. Setup and inference use a writable app-data Triton cache
@@ -231,6 +232,12 @@ The original catalog's Meta OPT config carried noncommercial/production restrict
 `36842e2b.local1` omits that download, retains the two identical verified UniRig checkpoints and
 uses the packaged owned architecture description. Existing historical files/receipts are preserved;
 the adapter always selects the owned configuration.
+
+Fresh-profile installed setup and real checkpoint inference pass on Windows x64/RTX 3090, including
+normalized skin weights and animated sprite exports. The
+[F4 receipt](../future/qualification/model-workflow-windows-x64.json) retains the sample's
+rig/retarget advisories; it does not certify a new model default, additional hardware or a public
+release.
 
 ## Animation
 

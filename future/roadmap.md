@@ -5,13 +5,13 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1 state-safety work and the Windows x64 F2 proof are complete. F4-T1/T2/T3/T5 are
-complete; F4-T4 remains open for real model setup.** The [conformance/platform matrix](baseline.md)
-records fresh Windows evidence, known defects and unverified targets. Closing baseline capture does
-not close platform, installed-app, model or release qualification gates. A task closes on evidence,
-not on a compiled binary or an optimistic support claim. Exact dependency pins and schema changes
-follow the existing BOM/decision process; Node/Dawn has measured Windows candidate evidence; new
-models remain unqualified.
+2026-10-19; F1 state-safety work, the Windows x64 F2 proof and all F4 tasks are complete. F7 release
+qualification is next.** The [conformance/platform matrix](baseline.md) records fresh Windows
+evidence, known defects and unverified targets. Closing baseline capture does not close platform,
+installed-app, model or release qualification gates. A task closes on evidence, not on a compiled
+binary or an optimistic support claim. Exact dependency pins and schema changes follow the existing
+BOM/decision process; Node/Dawn has measured Windows candidate evidence; new models remain
+unqualified.
 
 ## The route
 
@@ -198,7 +198,7 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       transactions and subprocess ownership; no permanent global Deno shim. Preserve canonical
       glTF/FBX behavior, retarget-once, palettes/temporal ordering, deterministic packing and CLI
       twins. **Recorded package exit:** all 13 packages compile to JavaScript and declarations, with
-      a separate source/test type check. The Windows Vulkan suite passes **892 of 899 checks**, with
+      a separate source/test type check. The final Windows checks pass **896 of 903 cases**, with
       **7 explicit skips** for real-engine, real-model, weight-gated and desktop lanes. This
       includes the GUI logic/parity suite, crash/concurrent-writer recovery, asset undo,
       independent-process VRAM admission, synthetic sidecar inference and sidecar death/retry. The
@@ -219,27 +219,33 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       cache identity. The [paired production replay](runtime-cutover.md) passes 40/40 pixel-exact
       atlas pages and 15/15 F0 comparisons, with cold medians 12-15% faster. Old bakes remain
       readable and the original control stays sealed.
-- [~] **F4-T4 · Switch application, tooling and release execution.** Make Tauri invoke bundled
-  runtime/core entry points rather than `deno run -A` against a checkout. Switch web build hooks,
-  CLI commands, test/lint/format/type-check tasks, CI guards, proof helpers, hooks and release
-  builds. Close the observed Vite optimizer stall and Rust-target watcher failure; the F1 desktop
-  proof used a temporary watch exclusion, not a delivery fix. Preserve scoped args/artifact access,
-  per-job streams and owned worker cleanup. Ship the importer and required native assets; retain
-  qualified Windows loader layout, Unicode-path handling and failure diagnostics. Retire the
-  lean-tree importer omission. Preserve current Python/uv adapters and handshake compatibility, with
-  a clear installed-environment path. Make current adapters' declared assets and authentication work
-  from a fresh install. Minimum provisioning fixes needed by existing models belong here; they
-  cannot be deferred merely because F3 includes broader model-management improvements. **Progress:**
-  the owned runtime/uv/package tree, Tauri bridge/hooks, portable body ID, Vite optimizer/watch fix,
-  frozen writable base environment, Hub auth and Node CI/candidate workflows are implemented. The
-  final 6,130-file Windows NSIS payload passes outside-checkout Unicode/empty-PATH import, synthetic
-  generation, Track A rigging, core preview, styled/AOV bake and all four exporters. Fresh Python
-  3.11.16/base setup, native Tauri projections/health, cancellation/retry and real U2-Net prep pass.
-  Installed Python uses normal wheels to avoid the editable Unicode-path bug. **Open:** pinned
-  TRELLIS.2/UniRig source/env provisioning and verified local decoder/conditioner resolution; stack
-  license/provenance gaps are explicit. The [model gate](model-provisioning-gate.md) records exact
-  requirements, primary license evidence and the order of work. See also
-  [cutover evidence](runtime-cutover.md).
+- [x] **F4-T4 · Switch application, tooling and release execution.** Make Tauri invoke bundled
+      runtime/core entry points rather than `deno run -A` against a checkout. Switch web build
+      hooks, CLI commands, test/lint/format/type-check tasks, CI guards, proof helpers, hooks and
+      release builds. Close the observed Vite optimizer stall and Rust-target watcher failure; the
+      F1 desktop proof used a temporary watch exclusion, not a delivery fix. Preserve scoped
+      args/artifact access, per-job streams and owned worker cleanup. Ship the importer and required
+      native assets; retain qualified Windows loader layout, Unicode-path handling and failure
+      diagnostics. Retire the lean-tree importer omission. Preserve current Python/uv adapters and
+      handshake compatibility, with a clear installed-environment path. Make current adapters'
+      declared assets and authentication work from a fresh install. Minimum provisioning fixes
+      needed by existing models belong here; they cannot be deferred merely because F3 includes
+      broader model-management improvements. **Progress:** the owned runtime/uv/package tree, Tauri
+      bridge/hooks, portable body ID, Vite optimizer/watch fix, frozen writable environments, Hub
+      auth and Node CI/candidate workflows are implemented. The final 6,149-file Windows NSIS
+      payload passes outside-checkout Unicode/empty-PATH import, synthetic generation, Track A
+      rigging, core preview, styled/AOV bake and all four exporters. Fresh Python 3.11.16 setup,
+      native Tauri projections/health, cancellation/retry and real U²-Net prep pass. Installed
+      Python uses normal wheels; the bounded Triton/TinyCC compatibility fix passes cold Unicode
+      native compilation. Complete catalog versions provision pinned TRELLIS.2/UniRig sources and
+      separate frozen environments. Decoder/conditioner loading is local-only. Restricted NVIDIA
+      rasterizers and the historical OPT config are replaced without a license exception; custom
+      DINOv3 terms remain explicit. The real installed generation/pick → retexture → UniRig → core
+      preview → 144-frame styled/AOV bake → four exporters passes offline, with 100% warm-cache
+      hits. Worker death/retry and source corruption/repair preserve accepted assets and prior
+      bakes. The [completed model gate](model-provisioning-gate.md) records exact artifacts, review
+      advisories and [qualification evidence](qualification/model-workflow-windows-x64.json). See
+      also [cutover evidence](runtime-cutover.md).
 - [x] **F4-T5 · Prove conversion, rollback and legacy retirement.** Validate a preserved workspace
       copy before changing it. Preserve IDs, source/assets/history and readable exports; reject
       future schemas honestly. Test interrupted installs, corrupt receipts, disk-full commits,
@@ -261,7 +267,9 @@ and rigging workflows pass their applicable hardware/terms gates without undecla
 Source, tests, hooks, CI and release execution no longer require Deno. Historical proof transcripts
 may still contain Deno commands when clearly labeled historical; executable support paths may not.
 The maintainer confirmed on 2026-10-19 that the existing model provisioning/licensing gate stays in
-F4. **F4 remains open at F4-T4** until that gate and the real workflow proof pass.
+F4. **That gate and the real installed workflow now pass; F4 is complete.** F7 retains the release
+and deferred native-platform checks. Carry the inspected rig's stretch/unmapped-joint advisories
+into F3-T1 quality qualification; review/acceptance and measured defaults remain intact.
 
 ## F7 · Release the migrated application
 
@@ -351,12 +359,14 @@ successfully is not evidence that the complete character workflow is ready.
    reads and execution policy are recorded in [state safety](state-safety.md).
 3. **Completed — F2:** the Windows Node/Dawn slice and installed proof pass. Additional native
    targets are deferred to F7, as confirmed above.
-4. **In progress — F4:** package, renderer, application/tooling and Windows installed proofs pass.
-   Resolve F4-T4's existing model provisioning/licensing gate, then run F7's release gates. Put
-   unrelated model, editor, dependency and performance work in the later tasks above.
+4. **Completed — F4:** package, renderer, application/tooling and Windows installed proofs pass,
+   including existing-model provisioning/licensing, real offline inference and recovery.
+5. **Next — F7:** qualify release artifacts, additional native platforms, clean-machine
+   prerequisites, signing and upgrades. Put unrelated model, editor, dependency and performance work
+   in the later tasks above.
 
 Use these task IDs in implementation changes, include the relevant original P-task IDs where
 behavior is carried forward, and update the progress log with actual measurements and remaining
 gates. F0 records the legacy implementation; F1 and the Windows F2 proof are complete. Main now uses
-Node; the remaining F4 model gate and F7 release gates stay explicit in the
+Node; the completed F4 model gate and remaining F7 release gates are recorded in the
 [cutover report](runtime-cutover.md).

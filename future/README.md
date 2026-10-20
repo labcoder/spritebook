@@ -6,7 +6,7 @@ vision. Research date: **2026-10-18**. Repository base: `42be3bbebfc783edb42fb64
 **Confirmed by the maintainer:** keep Tauri as the desktop shell, keep TypeScript as the main
 product core and CLI, and replace Deno. These choices are settled for this migration; GPUI, separate
 native shells, and a full Rust core are not active tracks. Existing product contracts, dependency
-policy and implementation remain in force while the migration is planned.
+policy and implementation remain in force during the migration.
 
 **Repository strategy approved:** migrate this repository incrementally, preserving its packages,
 tests, fixtures and history. See the [accepted strategy](migration-strategy.md) and
@@ -16,10 +16,11 @@ complete; [the evidence and preservation matrix](baseline.md) records the curren
 known failures and unverified targets. [F1 safety repairs are complete](state-safety.md).
 [F2's Windows renderer and installer proof is complete](renderer-qualification.md), with the
 additional native platforms deferred to F7 and release notice/prerequisite/signing gates explicit.
-**F4 runtime cutover is implemented:** main now runs the compiled TypeScript core/CLI on Node
-24.22.0. [Windows parity and installed proofs pass](runtime-cutover.md). F4 remains open at F4-T4
-for the [existing model provisioning/licensing gate](model-provisioning-gate.md), as confirmed by
-the maintainer. F7 retains release and deferred native-platform qualification.
+**F4 is complete:** main runs the compiled TypeScript core/CLI on Node 24.22.0.
+[Windows parity and installed proofs pass](runtime-cutover.md), including the
+[existing model provisioning/licensing gate](model-provisioning-gate.md), real offline generation,
+retexture, UniRig, sprites and recovery. F7 release and deferred native-platform qualification is
+next; no public release is claimed.
 
 ## Recommendation in one paragraph
 
@@ -47,7 +48,7 @@ migration problems either.
 | [F1 state-safety completion](state-safety.md)            | What changed in state, process ownership, queries and execution policy; what passed and what remains unqualified?            |
 | [F2 renderer qualification](renderer-qualification.md)   | Does the actual Node/Dawn pipeline preserve pixels and performance, and which installed/platform gates remain open?          |
 | [F4 Node cutover](runtime-cutover.md)                    | What migrated, what passed in the installed Windows app, and what remains open?                                              |
-| [F4 model setup gate](model-provisioning-gate.md)        | Which source, environment, auxiliary-model and permission gaps prevent closing F4?                                           |
+| [F4 model setup gate](model-provisioning-gate.md)        | How are existing models provisioned, which exact terms apply, and what evidence closed the gate?                             |
 
 ## Findings that change the decision
 
@@ -80,7 +81,7 @@ Upstream branches and terms are moving targets; pin/review them again when imple
 F0 subsequently ran the Windows suite/control and source build checks; its
 [baseline report](baseline.md) distinguishes passes, setup-dependent failures, diagnostic failures
 and unverified platforms. F1, Windows F2 and the Node cutover now have separate execution receipts.
-The next implementation work is **F4-T4's model setup gate**. Follow the
+The next implementation work is **F7 release qualification**. Follow the
 [roadmap's ordered changes](roadmap.md#first-implementation-changes).
 [D-041 and D-042](../docs/internal/decisions.md) record the stack and repository decisions. Model
 selection and hardware support remain qualification work, not newly certified by this plan.
