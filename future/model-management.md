@@ -1,7 +1,7 @@
 # Hugging Face and local model management
 
-Research date: **2026-10-18**. HF recommendations remain proposals; no credential, installation or
-runtime implementation changed. The maintainer has confirmed Tauri, TypeScript core/CLI and
+Updated **2026-10-19** for the implemented F4 model setup and Pixal3D work. Remaining F3
+recommendations are marked below. The maintainer has confirmed Tauri, TypeScript core/CLI and
 replacing Deno; see [technology decisions](technology-options.md). Model provisioning remains
 independent of those settled choices. Findings below distinguish the actual repository integration
 from unverified interpretations of “Hugging Face Desktop”.
@@ -36,21 +36,27 @@ outside this repo, its identity remains unresolved and no keep/remove verdict is
 
 The [installer](../packages/registry/install.ts) stages files, checks byte counts and SHA-256, then
 writes receipts. It also accepts local files via `--from`; this is already the right seam for
-air-gapped installation or reusing HF downloads. Its network fetcher currently calls `fetch(url)`
-without an authentication path. Do not assume setting `HF_TOKEN` authenticates that fetcher.
+air-gapped installation or reusing HF downloads. Its downloader now reads `HF_TOKEN`,
+`HF_TOKEN_PATH` and the user's Hub token file, honors disabled implicit authentication and strips
+credentials on CDN redirects. Tokens are never recorded in model receipts or logs.
 
 The [UniRig adapter](../sidecar/spritebook_sidecar/adapters/unirig.py) routes checkpoints to
-absolute installed paths, disables HF network access and telemetry for its stage processes, and
-prefers a registry-installed OPT architecture config. It retains a warned cache fallback for older
-installs. F1 now verifies every catalog file before model execution, so an incomplete older receipt
-refuses before reaching that fallback. Existing accepted assets can still be used without re-running
-the model. [Execution policy and verification](state-safety.md).
+absolute installed paths, disables HF network access and telemetry for its stage processes, and uses
+the owned architecture description with the unchanged MIT checkpoints. The new catalog version omits
+the restricted historical OPT config. Every declared file is verified before execution, so an
+incomplete receipt refuses before loading. Existing accepted assets can still be used without
+re-running the model. [Execution policy and verification](state-safety.md).
 
 The [TRELLIS.2 adapter](../sidecar/spritebook_sidecar/adapters/trellis2.py) loads from the model
-directory, but DINOv3 still requires a per-user gate and external HF state. The adapter also stubs
-upstream BiRefNet construction to prevent an unwanted gated download and `trust_remote_code` path.
-These are findings about transitive loader behavior, not reasons to remove the Hub. They show that a
-root-model receipt does not yet describe the entire executable/model environment.
+directory with a complete decoder/DINOv3 closure. The
+[Pixal3D adapter](../sidecar/spritebook_sidecar/adapters/pixal3d.py) also declares its NAF
+checkpoint and uses a separate frozen runtime. DINOv3 access remains a per-user installation gate;
+inference uses verified local files with no Hub fallback. Both paths avoid BRIA construction and
+remote model code. Pixal's explicit manual camera avoids an implicit MoGe download. Pinned source
+archives, wheel locks, native checks and readiness receipts describe the runtime separately from
+weight receipts. The worker loads only the owned SpriteBook package into its isolated interpreter;
+base-environment dependencies must not leak into it. Owned wheel cache keys track Python/JSON
+sources so a same-version app update refreshes adapter code.
 
 ### Proposed model-management contract
 

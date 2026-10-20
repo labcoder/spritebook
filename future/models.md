@@ -1,7 +1,9 @@
 # Models and local generation
 
-Research snapshot: **2026-10-18**. These are remake proposals; no current catalog entry or
-hardware-support claim is changed.
+Research updated **2026-10-19**. The [hardware/platform spike](model-platform-spike.md) adds actual
+RTX 3090 experiments, pinned Mac ports and exact memory/download distinctions. Pixal3D is now
+integrated through the catalog and isolated Python runtime; final installed workflow qualification
+is F4-T6. Broader model coverage below remains proposed until separately qualified.
 
 **Implementation scope:** retain Tauri and the TypeScript core while replacing Deno, as confirmed by
 the maintainer. Python/C++ model runners remain external components, not a proposal to port product
@@ -9,11 +11,13 @@ behavior. [Approved repository strategy](migration-strategy.md). New model integ
 required runtime migration; retaining existing supported generation/rigging behavior is a release
 gate.
 
-**Recommendation:** benchmark **Pixal3D against TRELLIS.2**, using their newer implementations
-alongside the existing adapter. Give **trellis.cpp** the first portability spike and **native
-ComfyUI** the first Python runner spike. Preserve mesh import as a complete product path. Hunyuan3D
-should not be the worldwide default under its examined terms. App support, generation support, and
-auto-rigging support need separate promises.
+**Recommendation:** retain the existing model-managed Python boundary for **Pixal3D and TRELLIS.2**.
+Keep the TRELLIS.2 default while comparing sprite identity, deformation and materials. Use
+**TripoSR** as the permissive low-memory comparator, then **SF3D/SPAR3D** after their gates.
+Prioritize **Pixal3D MLX / TRELLIS Metal** for Mac qualification; keep GGML as the AMD/native
+alternative. Preserve mesh import as a complete product path. Hunyuan3D should not be the worldwide
+default under its examined terms. App support, generation support, and auto-rigging support need
+separate promises.
 
 The main change since the [August backend audit](../docs/internal/proofs/backends.md) is the
 implementation landscape. Comfy Org announced native TRELLIS.2/Pixal3D in ComfyUI 0.34.0 on August
@@ -24,12 +28,12 @@ establishes an alternative to investigate, not SpriteBook validation or complete
 
 ## Evidence and confidence
 
-| Label                | Meaning                                                                                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Upstream fact**    | A primary repository, legal file, release, model card, or API documents it. Performance can still be an unverified upstream claim.       |
-| **Repo measurement** | A checked-in SpriteBook proof records a run. Its configuration and hardware matter. No new generation benchmark was run for this review. |
-| **Proposal**         | A recommendation to decide and validate.                                                                                                 |
-| **Unknown**          | Adequate evidence or a SpriteBook test is missing. Do not turn this into a support badge or measured memory floor.                       |
+| Label                | Meaning                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Upstream fact**    | A primary repository, legal file, release, model card, or API documents it. Performance can still be an unverified upstream claim.                               |
+| **Repo measurement** | A SpriteBook proof records the exact configuration and hardware. New F4 experiments are in the linked platform spike; older figures retain their original scope. |
+| **Proposal**         | A recommendation to decide and validate.                                                                                                                         |
+| **Unknown**          | Adequate evidence or a SpriteBook test is missing. Do not turn this into a support badge or measured memory floor.                                               |
 
 Confidence is high in examined release contents and legal-text differences; medium in the best
 long-term runner; unknown in comparative sprite quality until a benchmark exists. Code, weights,
@@ -66,7 +70,8 @@ the original decoder/rasterization stack. [Original TRELLIS](https://github.com/
 
 ## Model shortlist
 
-Recommendations describe future eligibility, not features already implemented.
+The catalog implements TRELLIS.2 and Pixal3D. Other rows describe future eligibility; the TripoSR
+spike is not a new installed backend.
 
 | Candidate                                    | Inputs and output                                                                                                 | Product fit and recommendation                                                                                                                                                    |
 | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,6 +89,7 @@ Sources:
 [texturing example](https://github.com/microsoft/TRELLIS.2/blob/75fbf0183001ed9876c8dbb35de6b68552ee08bd/example_texturing.py),
 [Hunyuan 2.0 model zoo](https://github.com/Tencent-Hunyuan/Hunyuan3D-2),
 [SF3D](https://github.com/Stability-AI/stable-fast-3d),
+[SPAR3D](https://github.com/Stability-AI/stable-point-aware-3d),
 [TripoSR](https://github.com/VAST-AI-Research/TripoSR),
 [Step1X-3D](https://github.com/stepfun-ai/Step1X-3D).
 
@@ -132,8 +138,10 @@ Evidence: [Microsoft prerequisites](https://github.com/microsoft/TRELLIS.2#prere
 [SF3D instructions](https://github.com/Stability-AI/stable-fast-3d#support-for-mps-for-mac-silicon-experimental).
 
 **Metal, MPS, and MLX are different claims.** trellis.cpp uses GGML Metal; Python ports use PyTorch
-MPS. No MLX implementation is recommended here for complete selected pipelines. A Rust desktop
-rewrite does not port CUDA kernels.
+MPS. Complete community Pixal3D and Hunyuan MLX runners now exist, alongside native MPS/Metal ports.
+Their lower-memory claims, guide-size differences and actual test hosts need separate qualification;
+see the [exact Mac matrix](model-platform-spike.md#apple-silicon-exact-runners-and-resource-claims).
+A Rust desktop rewrite does not port CUDA kernels.
 
 The separate **trellis-mac** port reports textured MPS output on an M4 Pro with 24 GB unified
 memory. Use it as a comparison if trellis.cpp fails on Apple Silicon, rather than maintaining two
@@ -250,9 +258,10 @@ models. Comfy graphs/vendor Python types should not become project formats.
    trusting arbitrary converted HF repositories.
    [Engine/server](https://github.com/pwilkin/trellis.cpp),
    [Pixal3D implementation](https://github.com/pwilkin/trellis.cpp/blob/8e4ce11a77d35c3e3a4b3f84a29d92bf5491e64e/docs/pixal3d/README.md)
-2. **First Python spike: native ComfyUI**, explicitly versioned/separately installed, with one
-   curated API workflow. Allow connecting an existing installation. Do not require a graph UI,
-   arbitrary custom nodes or marketplace for SpriteBook's main journey.
+2. **Keep the working model-managed Python runtimes first.** F4 now has pinned prebuilt NATTEN/NAF
+   and permitted mesh/PBR export for Pixal3D. Native ComfyUI remains a comparator if quantization or
+   a missing platform kernel gives a measured benefit; it is not a new mandatory desktop dependency.
+   If adopted, use one curated versioned workflow and preserve the current manifest/job boundary.
    [Official template](https://docs.comfy.org/tutorials/3d/trellis2)
 3. **Choose one supported default recipe per platform after comparison.** Supporting both engines
    indefinitely doubles qualification. Keep another only if it solves a demonstrated gap.
