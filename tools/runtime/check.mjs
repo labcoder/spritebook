@@ -15,6 +15,7 @@ assert(
   'usage: node tools/runtime/check.mjs <runtime> <new-report-directory> [--gpu]',
 );
 const source = resolve(sourceArg), report = resolve(reportArg);
+await mkdir(dirname(report), { recursive: true });
 await mkdir(report);
 const root = await mkdtemp(join(tmpdir(), 'SpriteBook é 空 '));
 const runtime = join(root, 'runtime');
