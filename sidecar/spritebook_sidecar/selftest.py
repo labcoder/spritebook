@@ -145,7 +145,7 @@ def test_handshake(port: int) -> None:
     ids = [a["id"] for a in hs["adapters"]]
     ok(
         ids == ["echo", "rembg", "pose-check", "fixture-gen", "fixture-retexture",
-                "trellis2", "trellis2-retexture", "texture-substage", "unirig"],
+                "pixal3d", "trellis2", "trellis2-retexture", "texture-substage", "unirig"],
         f"every adapter announced, in registration order: {ids}",
     )
     for a in hs["adapters"]:
@@ -1363,6 +1363,46 @@ def test_trellis2_local_dependencies(tmp: Path) -> None:
             ok(err.code == "model-missing" and len(requests) == 1, "missing DINO never reaches model loading")
 
 
+def test_pixal3d_boundaries(tmp: Path) -> None:
+    import math
+    from unittest.mock import patch
+    from .adapters import pixal3d
+    from .adapters.pixal3d_local import local_file
+
+    ok(abs(pixal3d.camera_params(math.pi / 3)["distance"] - math.sqrt(3)) < 1e-12,
+       "manual camera projects the unit box to the image at a 60-degree FOV")
+    for value in (float("nan"), float("inf"), 0, 1.6):
+        try:
+            pixal3d.camera_params(value)
+            ok(False, "invalid camera must refuse")
+        except AdapterError as err:
+            ok(err.code == "bad-params", "invalid FOV refuses before model loading")
+    params = {"imagePath": "cutout.png", "outDir": str(tmp), "modelDir": str(tmp), "seed": 0}
+    for extra in ({"steps": 0}, {"fov": 2}, {"lowVram": False}, {"pipelineType": "1536_cascade"}):
+        try:
+            validate_params(pixal3d.PARAMS_SCHEMA, {**params, **extra}, pixal3d.DEFAULTS)
+            ok(False, "unqualified Pixal recipe must refuse")
+        except AdapterError as err:
+            ok(err.code == "bad-params", "unqualified recipe is not silently accepted")
+    outside = tmp / "outside-model.txt"
+    outside.write_text("not a declared weight", encoding="utf-8")
+    model = tmp / "pixal3d"
+    model.mkdir()
+    for name in ("missing.safetensors", "../outside-model.txt"):
+        try:
+            local_file(model, name)
+            ok(False, "missing or escaped weight must refuse")
+        except AdapterError as err:
+            ok(err.code == "model-missing", "model dependency refusal is actionable")
+    with patch.dict(os.environ, {"SPRITEBOOK_PIXAL3D_PYTHON": str(tmp / "absent-python.exe")}):
+        try:
+            pixal3d.run(params, JobEmitter("pixal-test", lambda _: None))
+            ok(False, "missing Pixal environment must refuse")
+        except AdapterError as err:
+            ok(err.code == "backend-unavailable" and "models setup pixal3d" in err.message,
+               "missing environment names repair without loading or downloading weights")
+
+
 def test_trellis2_rembg_is_refused() -> None:
     from .adapters import trellis2 as t2
 
@@ -1666,6 +1706,7 @@ def main() -> int:
             test_trellis2_params_and_input(tmp)
             test_trellis2_code_dir(tmp)
             test_trellis2_local_dependencies(tmp)
+            test_pixal3d_boundaries(tmp)
             test_trellis2_rembg_is_refused()
             test_trellis2_registered()
             test_retexture_collapse_and_ladder()

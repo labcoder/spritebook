@@ -158,7 +158,7 @@ planning-era and described MODELS; the rows now describe STACKS, which is what s
 | Backend          | License (model)           | Status                                                                                                                                                             |
 | ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **TRELLIS.2 4B** | MIT (weights)             | Windows DRTK path passes installed F4 qualification; see exact component terms below. Measured **3.01 GiB** at shipped defaults, 16.53 GiB at `lowVram=false`      |
-| Pixal3D          | MIT                       | ✗ **not viable**: requires the TRELLIS.2 base env (inherits everything below) **and** compiles NATTEN from source — wheels-only gate                               |
+| Pixal3D          | MIT plus DINOv3 terms     | Pinned cp311/Torch 2.8/cu128 SM86 NATTEN wheel and real NAF/native admission pass. Model-managed setup passes; full generation/workflow qualification is F4-T6.    |
 | TripoSplat       | MIT                       | ✗ **not applicable**: emits gaussians, not a mesh (invariant 4)                                                                                                    |
 | Hunyuan3D 2.x    | Tencent Community License | ✗ **excludes EU/UK/KR** — territory carve-out; only ever a user-installed gated extra, never a default                                                             |
 | TripoSG          | MIT (repo only)           | ✗ `NOTICE` discloses HunyuanDiT + FlashVDM (Tencent community licences) and BRIA RMBG-1.4; shape-only                                                              |
@@ -216,7 +216,7 @@ additional platform support is implied.
 | NATTEN 0.21.6                                      | MIT native neighborhood attention              | cp311 / Torch 2.8 / CUDA 12.8 wheel; `cuda-wheels@ff5b37255bf073887f42c58fec49254699b3c8f6`, job 76701762292; native SM86 dispatch must pass  |
 | CUTLASS                                            | BSD-3-Clause kernels used by NATTEN            | Source `6b3e607b852f1543dc21323155a2ad71473c8642`; preserve its additional notice omitted from the wheel                                      |
 | Torch 2.8 / torchvision 0.23 / Transformers 4.57.3 | BSD-3 / Apache-2.0 plus bundled native notices | Isolated frozen environment; upstream SDPA path, no FlashAttention source build                                                               |
-| DRTK / CuMesh / flex-GEMM / O-Voxel / utils3d      | Existing audited export/native dependencies    | Reuse the selected external TRELLIS stack and complete notices, including Eigen MPL-2.0; no evaluation-only NVIDIA rasterizers                |
+| DRTK / CuMesh / flex-GEMM / O-Voxel                | Existing audited export/native dependencies    | Reuse the selected external TRELLIS stack and complete notices, including Eigen MPL-2.0; no evaluation-only NVIDIA rasterizers                |
 
 The initial camera recipe uses upstream's explicit manual field of view, with its value recorded in
 provenance. It does not install MoGe or BRIA matting; SpriteBook's own RGBA preparation remains the

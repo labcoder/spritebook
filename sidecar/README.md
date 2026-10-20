@@ -29,14 +29,14 @@ the incumbent adapters, set absolute paths outside the checkout:
   at CDN redirects. It never records token values. See the
   [Hub environment contract](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables).
 
-**Open model gate:** the existing TRELLIS.2 CUDA stack has evaluation-only NVIDIA components and an
-unverified O-Voxel wheel provenance/notice gap listed in the BOM. The `af44b45f.local1` catalog
-version now includes the exact DINOv3 config, weights and agreement; access remains manually gated
-and installation requires explicit acceptance. The adapter maps the declared decoder and conditioner
-to verified local files without Hub fallback. Fresh optional runtime and UniRig environment
-provisioning still require qualification. They remain explicit roadmap gates, rather than an
-implicit dependency on an old HF cache or a builder's deleted environment. See the
-[F4 model gate investigation](../future/model-provisioning-gate.md) for the exact artifacts, local
+**Existing model gate qualified:** the selected TRELLIS.2 runtime replaces evaluation-only NVIDIA
+components with DRTK and a traced O-Voxel build, retaining complete notices. Fresh installed
+provisioning and offline TRELLIS.2/UniRig generation-to-sprite workflows pass on Windows x64/RTX
+3090. The `af44b45f.local1` catalog version includes the exact DINOv3 config, weights and agreement;
+access remains manually gated and installation requires explicit acceptance. Decoder/conditioner
+loading is local-only. F4 is extended for Pixal3D integration and a platform/model spike; their
+qualification is separate from the completed incumbent proof. See the
+[F4 model gate record](../future/model-provisioning-gate.md) for the exact artifacts, local
 dependency resolution defects, frozen setup requirements and closure checks.
 
 ## How core launches it
@@ -76,9 +76,10 @@ SPRITEBOOK_SIDECAR_TOKEN=<per-session token>  uv run --frozen --project sidecar 
 
 The rest of the roster, in announcement order after those three: `fixture-gen` (`gen3d`) and
 `fixture-retexture` (`retexture`) — deterministic, weightless stand-ins the test suite runs on;
-`trellis2` (`gen3d`) and `trellis2-retexture` (`retexture`) — the real backend, which needs the
-optional stack below; `texture-substage` (`imageprep`); and `unirig` (`rig`). `GET /handshake` is
-always the authoritative list.
+`pixal3d` (`gen3d`) — official single-view PBR generation in its isolated environment; `trellis2`
+(`gen3d`) and `trellis2-retexture` (`retexture`) — the real backend, which needs the optional stack
+below; `texture-substage` (`imageprep`); and `unirig` (`rig`). `GET /handshake` is always the
+authoritative list.
 
 Pose heuristic v1 constants (documented in `spritebook_sidecar/adapters/pose_check.py`): arm band
 rows `[0.20, 0.45)` of the alpha bbox height, torso band `[0.45, 0.70)`, spread ratio `1.35` (widest
@@ -110,12 +111,23 @@ spritebook models install trellis2-4b --accept-license
 spritebook models setup trellis2-4b --accept-license  # repair/reuse existing weights
 spritebook models install unirig
 spritebook models setup unirig
+spritebook models install pixal3d --accept-license
+spritebook models setup pixal3d --accept-license
 ```
 
 TRELLIS.2 uses the optional `trellis2` group in the committed `uv.lock`: Torch 2.8.0+cu128,
 torchvision 0.23.0, xformers 0.0.32.post2 and transformers 5.14.1. The base sidecar remains usable
 without this group. Python is pinned to 3.11.16; the CUDA wheels require cp311. Linux, Mac and
 Windows ARM64 native model setup remain unqualified and are deferred to F7.
+
+Pixal3D uses a separate [frozen environment](runtimes/pixal3d/pyproject.toml) and
+[source/native recipe](runtimes/pixal3d-win.json): Torch 2.8/cu128, Transformers 4.57.3, NATTEN
+0.21.6, actual NAF and the existing permitted DRTK export boundary. Setup exercises native SM86
+attention, NAF and mesh/PBR kernels before readiness. The initial recipe is single-view 1024 cascade
+with stage offload, 12 steps and an explicit horizontal `fov=0.2` radians. The camera value and
+strict NAF use are recorded in generation metadata. It requires a nonempty cut-out RGBA image and
+its declared local DINOv3/NAF files. No MoGe, BRIA, multiview or Pixal retexture capability is
+implied. Full generation/hardware qualification is recorded separately in F4-T6/T7.
 
 The [runtime recipe](runtimes/trellis2-win.json) pins source archives, sizes, SHA-256 hashes,
 notices and a bounded source patch. Setup uses the owned uv and prebuilt third-party wheels; no Git,

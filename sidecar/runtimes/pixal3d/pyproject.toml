@@ -1,0 +1,38 @@
+[project]
+name = "spritebook-pixal3d-runtime"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "torch==2.8.0+cu128",
+    "torchvision==0.23.0+cu128",
+    "numpy==2.2.6",
+    "pillow==12.3.0",
+    "transformers==4.57.3",
+    "safetensors==0.8.0",
+    "scipy==1.17.1",
+    "einops==0.8.1",
+    "easydict==1.13",
+    "opencv-python-headless==4.12.0.88",
+    "trimesh==4.10.1",
+    "tqdm==4.69.0",
+    "ninja==1.13.0",
+    "triton-windows==3.7.1.post27",
+    "cumesh @ https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/cumesh-1.0-cp311-cp311-win_amd64.whl",
+    "flex-gemm @ https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl",
+    "drtk @ https://github.com/PozzettiAndrea/cuda-wheels/releases/download/drtk-latest/drtk-0.1.0%2Bcu128torch2.8-cp311-cp311-win_amd64.whl#sha256=e8b254a02c2cf27b05e29630580d8a4604e51a2526b025d878101c790f219120",
+    "o-voxel-vb-ap @ https://github.com/PozzettiAndrea/cuda-wheels/releases/download/o_voxel_vb_ap-latest/o_voxel_vb_ap-0.0.1%2Bcu128torch2.8-cp311-cp311-win_amd64.whl#sha256=98ce8f3121a667ccbe0a261ea0b8b6c71ee15e6894ecb742dfa3108a8974c630",
+    "natten @ https://github.com/PozzettiAndrea/cuda-wheels/releases/download/natten-latest/natten-0.21.6%2Bcu128torch2.8-cp311-cp311-win_amd64.whl#sha256=8db5f35d4c44dd0e7b832025ea6484f96b810faeed508cfec3671e5b8191f18a",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[tool.uv]
+no-build = true
+environments = ["sys_platform == 'win32'"]

@@ -1,0 +1,60 @@
+{
+  "id": "pixal3d-win",
+  "platform": "win32-x64",
+  "project": "runtimes/pixal3d",
+  "sources": [
+    {
+      "url": "https://codeload.github.com/TencentARC/Pixal3D/zip/f7cf38429b0bd264f1995f0f8743a88b1c728b94",
+      "bytes": 82028644,
+      "sha256": "f9f1e9790c59c51e777918e886ef6e50f44365592481c2674d9b55d4041c5590",
+      "path": "pixal3d",
+      "zip": true
+    },
+    {
+      "url": "https://codeload.github.com/microsoft/TRELLIS.2/zip/75fbf0183001ed9876c8dbb35de6b68552ee08bd",
+      "bytes": 18222787,
+      "sha256": "d7abd456f75585c5b4ce112a4abdb9bd3cc3e72b6074470a65e0bf3a89b3e06f",
+      "path": "export",
+      "zip": true
+    },
+    {
+      "url": "https://codeload.github.com/valeoai/NAF/zip/37f2dfc180f2de53d98bd601109c0da0dd6b0f43",
+      "bytes": 25213210,
+      "sha256": "3294f9437fc3529a2fff02da862e24bde2f10d8976c3183f34b8e6ba4fa4bfa7",
+      "path": "naf",
+      "zip": true
+    },
+    {
+      "url": "https://raw.githubusercontent.com/PozzettiAndrea/Trellis.2.drtk/200ba8cb5a4039db8acde3c09edc43a0031b4098/LICENSE",
+      "bytes": 1140,
+      "sha256": "d9a1b1e30d633d5732ea18e3cba9538d293ebc53e1a9e4e96ab739e0c5c4f1cb",
+      "path": "notices/o-voxel-MIT.txt",
+      "zip": false
+    },
+    {
+      "url": "https://gitlab.com/libeigen/eigen/-/raw/21e4582d1739107337a03460c81412981130373e/COPYING.MPL2",
+      "bytes": 16727,
+      "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+      "path": "notices/Eigen-MPL2.txt",
+      "zip": false
+    },
+    {
+      "url": "https://raw.githubusercontent.com/NVIDIA/cutlass/6b3e607b852f1543dc21323155a2ad71473c8642/LICENSE.txt",
+      "bytes": 1854,
+      "sha256": "7bc733829f16663593865344541c6dcc433beb6b6b555c8f86a43e9b399993cf",
+      "path": "notices/CUTLASS-BSD3.txt",
+      "zip": false
+    }
+  ],
+  "prepare": {
+    "script": "runtimes/prepare_pixal3d.py",
+    "source": "pixal3d"
+  },
+  "check": "runtimes/check_pixal3d.py",
+  "environment": {
+    "SPRITEBOOK_PIXAL3D_CODE": "pixal3d",
+    "SPRITEBOOK_NAF_CODE": "naf",
+    "SPRITEBOOK_PIXAL3D_PYTHON": ".venv/Scripts/python.exe"
+  },
+  "notes": "Official single-view Pixal3D f7cf3842, SDPA and real NAF 37f2dfc1; no duplicate-feature fallback. NATTEN 0.21.6 source 4472b95f46f55a8ba2c5f9869eba252bbf5a22f5, cuda-wheels build ff5b37255bf073887f42c58fec49254699b3c8f6 run 26086762193/job 76701762292 targets SM86. CUTLASS source 6b3e607b852f1543dc21323155a2ad71473c8642 BSD3 notice retained. DRTK/O-Voxel build/source provenance is unchanged from trellis2-win.json; Eigen source https://gitlab.com/libeigen/eigen/-/tree/21e4582d1739107337a03460c81412981130373e. Frozen wheels, full upstream source notices and external MPL components remain outside app resources. DINOv3 agreement is separately gated in the model catalog. Explicit manual FOV avoids MoGe; cut-out RGBA avoids BRIA. 1024 cascade/low-VRAM only; other recipes require separate qualification."
+}

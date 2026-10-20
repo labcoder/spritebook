@@ -16,11 +16,12 @@ complete; [the evidence and preservation matrix](baseline.md) records the curren
 known failures and unverified targets. [F1 safety repairs are complete](state-safety.md).
 [F2's Windows renderer and installer proof is complete](renderer-qualification.md), with the
 additional native platforms deferred to F7 and release notice/prerequisite/signing gates explicit.
-**F4 is complete:** main runs the compiled TypeScript core/CLI on Node 24.22.0.
+**F4-T1 through F4-T5 are complete:** main runs the compiled TypeScript core/CLI on Node 24.22.0.
 [Windows parity and installed proofs pass](runtime-cutover.md), including the
 [existing model provisioning/licensing gate](model-provisioning-gate.md), real offline generation,
-retexture, UniRig, sprites and recovery. F7 release and deferred native-platform qualification is
-next; no public release is claimed.
+retexture, UniRig, sprites and recovery. The maintainer extended F4 with Pixal3D integration and a
+practical model/platform spike (F4-T6/T7); F4 remains open for that work. F7 retains release and
+deferred native-platform qualification; no public release is claimed.
 
 ## Recommendation in one paragraph
 
@@ -81,7 +82,7 @@ Upstream branches and terms are moving targets; pin/review them again when imple
 F0 subsequently ran the Windows suite/control and source build checks; its
 [baseline report](baseline.md) distinguishes passes, setup-dependent failures, diagnostic failures
 and unverified platforms. F1, Windows F2 and the Node cutover now have separate execution receipts.
-The next implementation work is **F7 release qualification**. Follow the
+The next implementation work is **F4-T6/T7**, followed by F7 release qualification. Follow the
 [roadmap's ordered changes](roadmap.md#first-implementation-changes).
 [D-041 and D-042](../docs/internal/decisions.md) record the stack and repository decisions. Model
 selection and hardware support remain qualification work, not newly certified by this plan.
