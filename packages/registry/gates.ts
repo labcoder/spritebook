@@ -18,6 +18,17 @@ export type GateResult = { ok: true } | { ok: false; code: string; message: stri
 
 const OK: GateResult = { ok: true };
 
+export function gateRuntimePlatform(
+  required: string,
+  detected = `${process.platform}-${process.arch}`,
+): GateResult {
+  return required === detected ? OK : {
+    ok: false,
+    code: 'platform-unsupported',
+    message: `This model runtime needs ${required}; this machine is ${detected}.`,
+  };
+}
+
 /** Licenses that require acceptance need the user's explicit --accept-license. */
 export function gateLicense(
   entry: ModelEntry,

@@ -14,6 +14,7 @@ import {
   detectVramGb,
   gateLicense,
   gatePlatform,
+  gateRuntimePlatform,
   gateTerritory,
   gateVram,
 } from './dist/gates.js';
@@ -26,6 +27,16 @@ const RAIL = toyEntry({
     url: 'https://models.invalid/license',
     requiresAcceptance: true,
   },
+});
+
+test('runtime platform includes architecture before a Windows wheel download', () => {
+  assertEquals(gateRuntimePlatform('win32-x64', 'win32-x64'), { ok: true });
+  for (const platform of ['win32-arm64', 'darwin-arm64', 'linux-x64']) {
+    const gate = gateRuntimePlatform('win32-x64', platform);
+    assert(!gate.ok);
+    assertEquals(gate.code, 'platform-unsupported');
+    assertStringIncludes(gate.message, platform);
+  }
 });
 
 const EXCLUDING = toyEntry({

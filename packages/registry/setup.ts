@@ -10,7 +10,13 @@ import {
   sidecarEnvironmentDir,
 } from '@spritebook/core';
 import { canonicalJson, type JobEvent, type ModelCatalog } from '@spritebook/schema';
-import { detectPlatform, gateLicense, gatePlatform, gateTerritory } from './gates.ts';
+import {
+  detectPlatform,
+  gateLicense,
+  gatePlatform,
+  gateRuntimePlatform,
+  gateTerritory,
+} from './gates.ts';
 import { type Fetcher, fetchToFile } from './install.ts';
 import { hashFile } from './hash.ts';
 import { resolveInstalled } from './installed.ts';
@@ -35,11 +41,8 @@ export async function* prepareModelRuntime(
   opts: { sidecarDir?: string; fetcher?: Fetcher } = {},
 ): AsyncIterable<JobEvent> {
   const info = await modelRuntime(id, opts.sidecarDir);
-  if (`${process.platform}-${process.arch}` !== info.recipe.platform) {
-    throw new Error(
-      `${id} setup is qualified only on ${info.recipe.platform}; see platform-support.md`,
-    );
-  }
+  const gate = gateRuntimePlatform(info.recipe.platform);
+  if (!gate.ok) throw Object.assign(new Error(gate.message), { code: gate.code, retryable: false });
   await fs.mkdir(runtimeDataDir(), { recursive: true });
   const lock = await acquireFileLock(`${info.root}.lock`);
   let stage: string | undefined;

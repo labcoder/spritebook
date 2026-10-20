@@ -5,6 +5,7 @@ import { prepareModelRuntime } from './setup.ts';
 import type { Stats } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { modelRuntime } from '@spritebook/core';
 /**
  * Install / verify / rm jobs (D-009), speaking the runBakeJob event
  * discipline: queued -> started -> per-file progress -> artifact -> done,
@@ -40,6 +41,7 @@ import {
   detectVramGb,
   gateLicense,
   gatePlatform,
+  gateRuntimePlatform,
   gateTerritory,
   gateVram,
 } from './gates.ts';
@@ -200,6 +202,18 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
       gateTerritory(entry, { territory: opts.territory }),
     ];
     for (const gate of gates) {
+      if (!gate.ok) throw new JobFail(gate.code, gate.message);
+    }
+    if (version.runtime) {
+      const info = await modelRuntime(version.runtime).catch((error) => {
+        throw new JobFail(
+          'invalid-runtime',
+          `Cannot read runtime recipe ${version.runtime}. Update SpriteBook or correct the catalog: ${
+            message(error)
+          }`,
+        );
+      });
+      const gate = gateRuntimePlatform(info.recipe.platform);
       if (!gate.ok) throw new JobFail(gate.code, gate.message);
     }
     const vramGb = opts.detected?.vramGb !== undefined

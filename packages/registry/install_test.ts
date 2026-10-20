@@ -39,28 +39,21 @@ const DETECTED = {
   virtualization: { virtualized: false },
 };
 
-test('failed runtime setup retains verified weights and names setup recovery', async () => {
+test('an absent runtime recipe refuses before downloading any weights', async () => {
   const rig = await installRig();
   try {
     rig.catalog.models[0].versions[0].runtime = 'missing-test-runtime';
-    const events = await collect(install(rig));
+    let downloads = 0;
+    const events = await collect(install(rig, {
+      fetcher: async () => {
+        downloads++;
+      },
+    }));
     const error = ofType(events, 'error')[0];
-    assertEquals(error.code, 'model-setup-failed');
-    assertEquals(error.retryable, true);
-    assertStringIncludes(error.message, 'models setup toy-rig@1.0');
-    assert((await resolveInstalled(rig.root, 'toy-rig')) !== null);
-    assertEquals(
-      ofType(
-        await collect(runVerifyJob({
-          jobId: 'verify-kept',
-          catalog: rig.catalog,
-          root: rig.root,
-          modelId: 'toy-rig',
-        })),
-        'error',
-      ).length,
-      0,
-    );
+    assertEquals(error.code, 'invalid-runtime');
+    assertEquals(error.retryable, false);
+    assertEquals(downloads, 0);
+    assertEquals(await resolveInstalled(rig.root, 'toy-rig'), null);
   } finally {
     await fs.rm(rig.tmp, { recursive: true, force: true });
   }

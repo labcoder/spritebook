@@ -57,15 +57,21 @@ test('docs/cli.md: the retexture-only knob is never listed as a gen knob', async
 
 test('docs/cli.md: every command it prints is a verb the CLI answers', async () => {
   const md = await page();
-  const { VERB_FLAGS } = await import('./dist/mod.js');
+  const { VERB_FLAGS, runCli } = await import('./dist/mod.js');
   const verbs = new Set(Object.keys(VERB_FLAGS));
-  // the subcommands `models` accepts, from its own refusal message
-  const modelsSubs = new Set(['list', 'install', 'verify', 'rm']);
   for (const cmd of commandsIn(md)) {
     const [verb, sub] = cmd.split(' ');
     assert(verbs.has(verb), `docs/cli.md runs \`spritebook ${verb}\`, which is not a verb`);
     if (verb === 'models' && sub) {
-      assert(modelsSubs.has(sub), `docs/cli.md runs \`models ${sub}\`, which models refuses`);
+      const lines: string[] = [];
+      const code = await runCli(['models', sub], {
+        stdout: (s) => lines.push(s),
+        stderr: (s) => lines.push(s),
+      });
+      assert(
+        sub === 'list' ? code === 0 : lines.some((s) => s.includes(`models ${sub} <id`)),
+        `docs/cli.md runs \`models ${sub}\`, which models refuses`,
+      );
     }
   }
 });
@@ -73,7 +79,14 @@ test('docs/cli.md: every command it prints is a verb the CLI answers', async () 
 test('the CLI still refuses the subcommand the docs used to print', async () => {
   // pinning the refusal itself: if `models catalog` is ever implemented, this
   // test fails and the docs get their word back
-  const { VERB_FLAGS } = await import('./dist/mod.js');
-  assertEquals(typeof VERB_FLAGS.models, 'object');
-  assert(!('catalog' in VERB_FLAGS), 'catalog is not a verb');
+  const { runCli } = await import('./dist/mod.js');
+  const lines: string[] = [];
+  assertEquals(
+    await runCli(['models', 'catalog'], {
+      stdout: (s) => lines.push(s),
+      stderr: (s) => lines.push(s),
+    }),
+    1,
+  );
+  assert(lines.some((s) => s.includes('models needs a subcommand')));
 });
