@@ -56,6 +56,7 @@ test('real sidecar: spawn via uv, handshake roster, echo end-to-end', async (t) 
         'echo',
         'fixture-gen',
         'fixture-retexture',
+        'pixal3d',
         'pose-check',
         'rembg',
         'texture-substage',
