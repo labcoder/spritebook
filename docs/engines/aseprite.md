@@ -1,7 +1,9 @@
 # Aseprite import
 
-The `aseprite` target writes the Aseprite "JSON (array)" format. Aseprite reads it, and so do the
-many tools that consume Aseprite sheets.
+The `aseprite` target writes the Aseprite "JSON (array)" format for tools that consume Aseprite
+sheets. Aseprite itself imports the PNG grid; use the JSON as the record of tags and timing when
+setting up that imported sheet. See [export validation](../export-validation.md) for consumer
+checks.
 
 ## What SpriteBook writes
 
@@ -16,8 +18,8 @@ The files land in `exports/aseprite/`:
 | `<characterId>.ase.json` | the frame array and the frame tags for one lit spritesheet page |
 | `atlas_lit_<page>.png`   | the lit spritesheet page, copied unchanged from the bake        |
 
-The extension is `.ase.json`, not `.json`. The `texturepacker` target writes `<characterId>.tp.json`
-into the same folder, and two bare `<characterId>.json` files would collide.
+The extension is `.ase.json`; the sibling `texturepacker` export uses `.tp.json`. Distinct suffixes
+also keep those metadata files identifiable when copied into a common asset folder.
 
 A bake with more than one page writes one JSON for each page, with a `_p<n>` name suffix. Each JSON
 holds only the frames of its own page, and its frame tags index into that page. A tag therefore
@@ -51,9 +53,8 @@ carry the loop flag directly.
 
 4. Set **Type** to **By Rows**.
 
-5. Set the cell width and the cell height. The shipped default is 112 by 112 pixels. The exact value
-   is `meta.size` divided by the grid, and each frame's `frame` rectangle in the JSON gives it
-   directly.
+5. Set the cell width and the cell height. The shipped default is 112 by 112 pixels; each frame's
+   `frame.w` and `frame.h` in the JSON give the exact values, including non-square cells.
 
 6. Select **Import**. Aseprite lays the cells out as frames.
 
@@ -84,7 +85,8 @@ format carries a normalized pivot for each frame.
 - One tag holds one clip in one direction. A default bake has 8 directions, so one clip gives 8
   tags, such as `idle_d00` to `idle_d07`.
 
-- Each frame's `duration` carries the rate. Aseprite plays the tag at that rate.
+- Each frame's `duration` records the intended rate. Apply those durations to the imported PNG
+  frames; importing the grid alone does not read the JSON timing.
 
 - Set the loop state yourself, from `clips[].loop` in the bake manifest.
 

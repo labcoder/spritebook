@@ -1,8 +1,12 @@
 # SpriteBook — dependencies (bill of materials)
 
 **Rule: check this file before adding any dependency; new deps get a row here in the same PR.**
-Status marks: **✓** license verified during the 2026-07 design cycle · **std** well-established,
-re-confirm at pin time · **⚠** gate open — verify before integration.
+Status marks: **✓** license checked for the stated component/version · **std** established choice,
+re-confirm at pin time · **⚠** gate open — verify before integration. Rows include selected
+dependencies, historical investigations and proposed candidates; presence here is not evidence that
+a model or package ships. Current JavaScript resolution lives in `package-lock.json`, Rust in the
+Cargo locks, and model Python dependencies in the frozen sidecar locks. The
+[model inventory](models.md) identifies the integrated catalog choices.
 
 **License posture:** everything _bundled_ is MIT / Apache-2.0 / BSD / ISC / OFL / CC0. AI model
 weights are never bundled — catalog entries installed on demand behind license/territory/VRAM gates.
@@ -94,7 +98,7 @@ dependency notices; an internal renderer experiment is not clearance to distribu
 | ndarray           | Strided glTF image arrays                                       | MIT          | 1.0.19, retained legacy pin         |
 | `@types/ndarray`  | Development declarations only                                   | MIT          | 1.0.14                              |
 | pixelmatch        | golden diffs                                                    | ISC          | std                                 |
-| OKLab math        | perceptual quantize                                             | ours (tiny)  | implement                           |
+| OKLab math        | perceptual quantize                                             | ours (TS)    | implemented in core/style           |
 | maxrects-packer   | atlasing                                                        | MIT          | std                                 |
 | gifenc            | contact-sheet artifacts only (player is interactive, never GIF) | MIT          | std                                 |
 | Mesa lavapipe     | CI software Vulkan                                              | MIT          | std, CI-only                        |
@@ -283,12 +287,12 @@ release.
 
 ## Animation
 
-| Dependency                                                  | Role                                                                                    | License              | Status                                                                                                                                               |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Quaternius Universal Animation Library 1+2 — free tiers** | bundled starter pack (~120–130 clips incl. **8-direction locomotion with root motion**) | CC0                  | **✓** · one universal humanoid rig = one retarget profile; glTF exports available. Bundle free tiers only; paid Source packs = one-click user import |
-| Mesh2Motion assets                                          | alternate + creature clips (Track B future); app = reference implementation             | art CC0, code MIT    | **✓** explicitly free for personal/commercial                                                                                                        |
-| Retargeter                                                  | humanoid profile retarget, once, in core                                                | ours (TS)            | three SkeletonUtils (MIT) as reference only                                                                                                          |
-| Test-pose pack                                              | rig deform checks                                                                       | CC0-derived from UAL | bundled asset                                                                                                                                        |
+| Dependency                                                       | Role                                                                            | License              | Status                                                                                                                                                      |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Quaternius Universal Animation Library — selected free clips** | bundled `ual` pack (86 clips incl. **8-direction locomotion with root motion**) | CC0                  | **✓** · one universal humanoid rig = one retarget profile; bundled subset declared in `packages/anim/packs/ual/pack.json`; personal imports remain separate |
+| Mesh2Motion assets                                               | alternate + creature clips (Track B future); app = reference implementation     | art CC0, code MIT    | **✓** explicitly free for personal/commercial                                                                                                               |
+| Retargeter                                                       | humanoid profile retarget, once, in core                                        | ours (TS)            | three SkeletonUtils (MIT) as reference only                                                                                                                 |
+| Test-pose pack                                                   | rig deform checks                                                               | CC0-derived from UAL | bundled asset                                                                                                                                               |
 
 **Traps (do not use):** Mixamo — usable in projects, **not redistributable** (personal user-import
 only). AMASS / SMPL-family — research-only. Ubisoft LAFAN1 — non-commercial research. Bandai Namco
@@ -300,20 +304,20 @@ the bundled starter.
 | Dependency                                              | Role                                                                                                                                                    | License     | Status                                                                                             |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
 | React 19 + Vite                                         | framework + build                                                                                                                                       | MIT         | std                                                                                                |
-| **Base UI** `@base-ui/react`                            | headless a11y primitives (35 comps incl. number-field scrubbing)                                                                                        | MIT         | **✓** v1.0 stable Dec 2025; full-time MUI team incl. Radix authors; WCAG out of the box            |
+| **Base UI** `@base-ui/react`                            | headless interaction and accessibility primitives                                                                                                       | MIT         | 1.6.0; native accessibility qualification remains F7 work                                          |
 | three.js (pinned) + camera-controls + TransformControls | inspection viewports — in use since P4-T2: three 0.185.1, camera-controls 3.1.2, @types/three 0.185.2, all EXACT-pinned (three moves addon APIs freely) | MIT         | std                                                                                                |
-| Lingui                                                  | ICU i18n — runtime wired P4-T1, pinned 6.6.0; extraction pass later                                                                                     | MIT         | std                                                                                                |
-| zustand                                                 | GUI-local state                                                                                                                                         | MIT         | std                                                                                                |
+| Lingui                                                  | ICU i18n, literal English IDs, Spanish/pseudo catalogs and extraction gate                                                                              | MIT         | 6.6.0; `npm run i18n:extract -w spritebook-studio`                                                 |
 | Chakra Petch, IBM Plex Sans/Mono                        | type                                                                                                                                                    | SIL OFL 1.1 | std                                                                                                |
 | axe-core (dev only)                                     | a11y audit against the dev app (never bundled)                                                                                                          | MPL-2.0     | std; devDependency only — MPL is file-level copyleft, acceptable for a dev tool that ships nothing |
-| Lucide                                                  | icons                                                                                                                                                   | ISC         | std                                                                                                |
 
-## Open gates
+## Remaining gates and historical decisions
 
-1. ~~Make-It-Animatable license~~ — resolved 2026-07-18 (D-026): NOT cleanly verified; Track A ships
-   on fit + UniRig-humanoid.
-2. rembg per-weight licenses — u2net **✓ closed 2026-07-19** (Apache-2.0, catalog-pinned); re-opens
-   per additional weight.
+1. F7 distribution clearance: complete native/static dependency notices, runtime prerequisites and
+   the recorded `pako` Zlib allowlist mismatch remain open. Windows functional qualification does
+   not close these distribution gates.
+2. New model/weight recipes need their own complete component and agreement review. U²-Net's current
+   Apache-2.0 weight is catalog-pinned; that review does not extend to other rembg weights.
+3. Make-It-Animatable was not cleanly verified (D-026); it is not a current model integration.
 
-Resolved 2026-07-11: ~~deno desktop vs Tauri~~ → **Tauri v2** by P0-T3 (D-005; `deno desktop`
-revisit trigger recorded there).
+Tauri v2 remains the selected desktop shell (D-005/D-041); TypeScript on Node is the current core.
+The runtime migration adds no alternative shell or core-language port.

@@ -8,9 +8,10 @@ move together.
 
 ## Product versioning
 
-Semver, pre-1.0. Releases are `0.x.y` with alpha pre-release numbers (`0.1.0-alpha.1`,
-`0.1.0-alpha.2`, ...). The single source of the product version is `SPRITEBOOK_VERSION` in
-`packages/cli/version.ts`; `spritebook --version` prints it.
+Semver, pre-1.0; the current product version is `0.9.0`. Prerelease tags may use suffixes such as
+`-alpha.1`. The CLI version is `SPRITEBOOK_VERSION` in `packages/cli/version.ts`; `spritebook
+--version` prints it. Keep root/Studio package metadata and Tauri's version in sync when advancing
+the product version; the candidate workflow checks the tag against the CLI value.
 
 Pre-1.0 rules:
 
@@ -21,9 +22,9 @@ Pre-1.0 rules:
 ## rendererVersion and the render signature (D-023)
 
 The render package owns the pipeline version: `RENDERER_VERSION` in `packages/render/contracts.ts`,
-currently `spritebook-render@0.5.0`. It moves on its own schedule: it tracks PIXELS, not the
+currently `spritebook-render@0.6.0`. It moves on its own schedule: it tracks PIXELS, not the
 product, so a product release never bumps it and a pixel change always does. The 0.9.0 product
-version and the 0.5.0 render version are both correct and unrelated.
+version and the 0.6.0 render version are both correct and unrelated.
 
 **Bump it on any pixel-affecting change anywhere in the bake pipeline** — shaders, camera framing,
 the pose driver, AOV encoding, style algorithms, packing — not only changes inside the render
@@ -44,6 +45,13 @@ adapter description. Other platforms may expose less: diagnostics retain what is
 driver-only updates without an exposed change still require a cold bake. The signature is recorded
 in every BakeManifest (`inputs.rendererVersion`) and printed by `doctor`. The F4 namespace does not
 reuse Deno-rendered cache entries; old bakes/exports remain readable.
+
+`ProjectPins.rendererVersion` is currently a reserved, unenforced field; it does not select or
+freeze the render executable. The actual signature above owns cache identity. CharacterManifest has
+its own schema version, currently 3; Project, BakeManifest and AnimPack remain at 2. Other schemas
+version independently. See [the source contract index](architecture/data-models.ts) and
+[`packages/schema/migrate.ts`](../packages/schema/migrate.ts). Product, renderer, document and
+model/runtime recipe versions are separate identities.
 
 ## Golden-refresh workflow
 
@@ -85,5 +93,5 @@ uses the same core. Weights and Python/CUDA environments are separate, gated ins
 public distribution remains itch.io / the maintainer's website per D-017; no npm launcher is added
 by the runtime migration.
 
-Outputs are never distribution-encumbered: assets baked with SpriteBook are exempt from the AGPL via
-the output exception in `NOTICE`.
+SpriteBook's output exception in `NOTICE` means generating an asset does not subject it to the
+application's AGPL. Model and imported asset terms still apply; see [licensing](licensing.md).

@@ -3,6 +3,10 @@
 Unity has no dedicated SpriteBook exporter. Use the `texturepacker` target. It writes the "JSON
 Hash" format. The TexturePacker Importer for Unity reads that format.
 
+The native Unity/importer lane remains unverified in the current migration evidence. Follow
+[export validation](../export-validation.md) to run it with your editor and importer before relying
+on a release's Unity support claim.
+
 ## What SpriteBook writes
 
 ```
@@ -16,8 +20,8 @@ The files land in `exports/texturepacker/`:
 | `<characterId>.tp.json` | the frame hash for one lit spritesheet page              |
 | `atlas_lit_<page>.png`  | the lit spritesheet page, copied unchanged from the bake |
 
-The extension is `.tp.json`, not `.json`. The `aseprite` target writes `<characterId>.ase.json` into
-the same folder, and two bare `<characterId>.json` files would collide.
+The extension is `.tp.json`; the sibling `aseprite` export uses `.ase.json`. Distinct suffixes keep
+the formats identifiable when copied into a common asset folder.
 
 A bake with more than one page writes one JSON for each page. The extra pages get a `_p<n>` name
 suffix, such as `<characterId>_p1.tp.json`. Each JSON holds only the frames of its own page. An
@@ -36,7 +40,7 @@ Cells are packed as full rectangles. There is no trim and no rotation. Each fram
 
 ## Import procedure
 
-You need the TexturePacker Importer package from the Unity Asset Store. It is free.
+You need a user-supplied TexturePacker Importer package for Unity. SpriteBook does not bundle it.
 
 1. Install the TexturePacker Importer package in your Unity project.
 

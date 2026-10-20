@@ -325,11 +325,16 @@ integration or UI feature first. F3/F5/F6 improvements follow it.
       coverage; native VoiceOver/NVDA and any claimed Linux assistive-technology path need actual
       tests. Test viewport lifecycle and an 8-hour soak on the migrated baseline before making scale
       claims.
-- [ ] **F7-T3 · Synchronize the public and contributor contracts.** Update README, setup/quickstart,
-      CLI guide, platform matrix, BOM, architecture, versioning, active roadmap and affected agent
-      skills with the implemented Node path. Append decisions, preserve old proof logs as
-      historical, and publish measured limitations. Runtime changes do not silently change
-      model/output terms.
+- [~] **F7-T3 · Synchronize the public and contributor contracts.** Update README, setup/quickstart,
+  CLI guide, platform matrix, BOM, architecture, versioning, active roadmap and affected agent
+  skills with the implemented Node path. Append decisions, preserve old proof logs as historical,
+  and publish measured limitations. Runtime changes do not silently change model/output terms.
+
+  **Current documentation pass (2026-10-19):** architecture, source schema references, model
+  setup/storage/removal, usage guides, platform claims, dependency/version records and consumer
+  checks are aligned with the implemented Windows baseline. The PRD/design system retain future
+  product goals separately from current behavior. Reconcile the final guides and candidate payload
+  docs with F7-T1/T2 results before public release; those qualification gates remain open.
 
 **Release gate:** required target artifacts are executed, data recovery and engine outputs pass,
 mandatory suites are green, and no advertised support rests on a skipped check. Retain original PRD
