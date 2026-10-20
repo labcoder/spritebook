@@ -69,6 +69,32 @@ async function manifestOf(ws: string): Promise<Record<string, unknown>> {
   return JSON.parse(await fs.readFile(`${ws}/character.json`, 'utf8'));
 }
 
+test('model runtime repair twin rechecks consent and preserves the install receipt', async () => {
+  const tmp = await fs.mkdtemp(join(tmpdir(), 'sb-repair-twin-'));
+  try {
+    const catalog = JSON.parse(
+      await fs.readFile(`${REPO}packages/registry/catalog/models.json`, 'utf8'),
+    );
+    catalog.models = catalog.models.filter((m: { id: string }) => m.id === 'fixture-gen');
+    catalog.models[0].license.requiresAcceptance = true;
+    const catalogPath = join(tmp, 'catalog.json');
+    await fs.writeFile(catalogPath, JSON.stringify(catalog));
+    const flags = ['--models-dir', tmp, '--catalog', catalogPath];
+    const ref = 'fixture-gen@1.0.0';
+    await twin([...modelsArgs('install', ref, true), ...flags], 'install gated fixture');
+    const receiptPath = join(tmp, 'fixture-gen/1.0.0/receipt.json');
+    const before = await fs.readFile(receiptPath, 'utf8');
+
+    const denied = io();
+    assertEquals(await runCli([...modelsArgs('setup', ref, false), ...flags, '--json'], denied), 1);
+    assert(denied.out.some((line) => JSON.parse(line).code === 'license-acceptance-required'));
+    await twin([...modelsArgs('setup', ref, true), ...flags], 'repair with explicit consent');
+    assertEquals(await fs.readFile(receiptPath, 'utf8'), before);
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test('CLI-twin parity: the GUI actions execute verbatim', async () => {
   const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const ws = `${tmp}/parity`;

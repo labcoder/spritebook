@@ -90,12 +90,12 @@ export function journalArgs(workspace: string, verb: 'undo' | 'redo'): string[] 
 }
 
 export function modelsArgs(
-  action: 'list' | 'install' | 'verify' | 'rm',
+  action: 'list' | 'install' | 'setup' | 'verify' | 'rm',
   ref?: string,
   acceptLicense = false,
 ): string[] {
   if (action === 'list') return ['models', 'list'];
   const a = ['models', action, ref ?? ''];
-  if (action === 'install' && acceptLicense) a.push('--accept-license');
+  if ((action === 'install' || action === 'setup') && acceptLicense) a.push('--accept-license');
   return a;
 }

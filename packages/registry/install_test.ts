@@ -123,6 +123,12 @@ test('install: happy path - verified files land, canonical receipt, events in or
       paramsSchema: {},
       defaults: {},
     }]);
+    // An app update can add a runtime to already installed weights. Listing must expose
+    // its repair capability without trying to provision it during a catalog read.
+    rig.catalog.models[0].versions[0].runtime = 'repairable-test-runtime';
+    const [updated] = await runListQuery({ catalog: rig.catalog, root: rig.root });
+    assertEquals(updated.versions[0].runtime, 'repairable-test-runtime');
+    assertEquals(await fs.readFile(art.path, 'utf8'), text);
   } finally {
     await fs.rm(rig.tmp, { recursive: true });
   }

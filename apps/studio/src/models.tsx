@@ -15,6 +15,7 @@ import { modelsArgs } from './args';
 
 interface ModelVersion {
   version: string;
+  runtime?: string;
   diskBytes: number;
   platforms: string[];
   minVramGb?: number;
@@ -40,7 +41,7 @@ function gb(bytes: number): string {
 }
 
 export function cliTwin(
-  action: 'install' | 'verify' | 'rm',
+  action: 'install' | 'setup' | 'verify' | 'rm',
   ref: string,
   acceptLicense: boolean,
 ): string {
@@ -58,19 +59,18 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
   const ref = `${model.id}@${v.version}`;
   const needsAcceptance = model.license.requiresAcceptance === true;
   const [accepted, setAccepted] = useState(false);
-  const [confirming, setConfirming] = useState<'install' | 'rm' | null>(null);
+  const [confirming, setConfirming] = useState<'install' | 'setup' | 'rm' | null>(null);
   const [lastExit, setLastExit] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [progress, setProgress] = useState<
     { label: string; done: number; total: number } | null
   >(null);
 
-  const runAction = useCallback(async (action: 'install' | 'verify' | 'rm') => {
+  const runAction = useCallback(async (action: 'install' | 'setup' | 'verify' | 'rm') => {
     setBusy(ref);
     setConfirming(null);
     setProgress(null);
-    const args = ['models', action, ref, '--json'];
-    if (action === 'install' && accepted) args.push('--accept-license');
+    const args = [...modelsArgs(action, ref, accepted), '--json'];
     // the install streams one progress event per file (step download:<name>);
     // a 22-file 16 GB run must read as MOTION, not a frozen dialog - the UX
     // pass installed blind and had only the raw drawer to guess from
@@ -119,6 +119,16 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
             onClick={() => runAction('verify')}
           >
             {isBusy ? t('Working…') : t('Verify')}
+          </button>
+        )}
+        {v.installed && v.runtime && (
+          <button
+            type='button'
+            className='btn mbtn'
+            disabled={busy !== null || (confirming === 'setup' && needsAcceptance && !accepted)}
+            onClick={() => confirming === 'setup' ? runAction('setup') : setConfirming('setup')}
+          >
+            {confirming === 'setup' ? t('Confirm runtime setup') : t('Repair runtime')}
           </button>
         )}
         {v.installed && (confirming === 'rm'
@@ -179,7 +189,7 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
           </span>
         </span>
       )}
-      {confirming === 'install' && needsAcceptance && (
+      {(confirming === 'install' || confirming === 'setup') && needsAcceptance && (
         <label className='mv-accept'>
           <input
             type='checkbox'
@@ -188,6 +198,11 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
           />
           {t('I accept the license')}: {model.license.name}
         </label>
+      )}
+      {confirming === 'setup' && (
+        <span className='mono dimtext'>
+          {t('Runtime setup keeps model files and may download code and dependencies.')}
+        </span>
       )}
       {confirming && (
         <span className='mv-twin mono'>

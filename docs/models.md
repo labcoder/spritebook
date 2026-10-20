@@ -62,6 +62,11 @@ spritebook models verify pixal3d
 spritebook models setup pixal3d@b0cb2e1b.local1 --accept-license
 ```
 
+For an installed version with a declared runtime recipe, Studio offers **Repair runtime**. Review
+the CLI twin, accept the declared terms when required, then choose **Confirm runtime setup**. This
+runs `models setup`, retaining model files while repairing source/dependencies. It can download code
+and wheels; **Verify** remains a separate model-file check.
+
 TRELLIS.2 and Pixal3D require personal Hugging Face approval for the declared DINOv3 conditioner,
 authentication through `hf auth login` or `HF_TOKEN`, and explicit acceptance of the catalog terms.
 Hugging Face supplies artifacts and authentication; SpriteBook has no Hugging Face desktop-app

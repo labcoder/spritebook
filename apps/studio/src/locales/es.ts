@@ -116,6 +116,10 @@ export const es: Record<string, string> = {
   'not installed': 'no instalado',
   'platforms': 'plataformas',
   'Verify': 'Verificar',
+  'Repair runtime': 'Reparar entorno del modelo',
+  'Confirm runtime setup': 'Confirmar preparación del entorno',
+  'Runtime setup keeps model files and may download code and dependencies.':
+    'La preparación conserva los archivos del modelo y puede descargar código y dependencias.',
   'Remove': 'Quitar',
   'Confirm remove': 'Confirmar quitar',
   'Install': 'Instalar',

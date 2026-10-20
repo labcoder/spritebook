@@ -567,6 +567,7 @@ export async function* runRmJob(opts: RmJobOpts): AsyncIterable<JobEvent> {
 
 export interface ListedVersion {
   version: string;
+  runtime?: string;
   diskBytes: number;
   platforms: Platform[];
   minVramGb?: number;
@@ -619,6 +620,7 @@ export async function runListQuery(
     },
     versions: m.versions.map((v) => ({
       version: v.version,
+      ...(v.runtime ? { runtime: v.runtime } : {}),
       diskBytes: versionDiskBytes(v),
       platforms: v.platforms,
       ...(v.minVramGb !== undefined ? { minVramGb: v.minVramGb } : {}),
