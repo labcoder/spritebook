@@ -8,8 +8,8 @@ GPL boundary is drawn (bpy is upstream's exporter, not ours).
 
 ## Why every stage is a subprocess
 
-The sidecar's own environment is deliberately light — no torch, no bpy, and it
-must stay that way so ``/handshake`` is instant on a machine with no GPU. The
+The sidecar imports adapters lazily so ``/handshake`` stays instant without a GPU.
+Its optional TRELLIS.2 Torch 2.8 environment is incompatible with UniRig. The
 UniRig stack (torch 2.7+cu128, flash-attn, spconv, bpy 4.2, ~9 GB) lives in its
 OWN uv environment, and this adapter drives it with explicit argument lists.
 That also buys the process discipline the sidecar-vram skill demands for free:
@@ -17,10 +17,10 @@ bpy stages routinely crash 0xC0000005 at interpreter teardown AFTER writing
 their output, so every stage here is validated by ITS ARTIFACTS and its exit
 code is only ever reported, never trusted.
 
-Configure the environment with (all optional; the defaults are repo-relative):
+Core supplies prepared source/interpreter paths from the runtime receipt. Developer overrides:
 
-    SPRITEBOOK_UNIRIG_HOME     the UniRig clone            spikes/autorig/UniRig
-    SPRITEBOOK_UNIRIG_PYTHON   the interpreter to drive    spikes/autorig/.venv/...
+    SPRITEBOOK_UNIRIG_HOME     the prepared UniRig source tree
+    SPRITEBOOK_UNIRIG_PYTHON   the qualified interpreter to drive
     SPRITEBOOK_UNIRIG_KEEP     '1' keeps the scratch dir of a successful run
 
 A missing environment is an actionable ``backend-missing`` error naming both the
@@ -37,10 +37,10 @@ upstream patch. ``HF_HUB_OFFLINE=1`` is set on every stage as a second lock: an
 adapter that silently re-downloads a 5.8 GB checkpoint it was handed is a bug,
 and this way it cannot.
 
-The registry also installs ``opt-350m/config.json``: architecture hyperparameters
-for ``AutoConfig.from_pretrained``, not OPT weights. The adapter prefers that
-verified local file; a legacy install may use the local HF cache with a warning,
-and refuses if neither is present. No config is fetched during inference.
+The sidecar supplies an owned architecture description derived from MIT fairseq/
+UniRig and Apache Transformers defaults. No Meta OPT config, weights or tokenizer
+is fetched or read. The local1 catalog version omits that restricted historical
+config; old installed files/receipts remain intact. See notices/unirig-opt-architecture.md.
 
 ## Upstream configuration this adapter supplies
 
@@ -103,7 +103,7 @@ from . import Adapter, AdapterError, Emitter, validate_params
 from ..glb import read_scene_geometry
 from .unirig_humanoid_ref import HUMANOID_REFERENCE, HUMANOID_REFERENCE_SOURCE
 
-UNIRIG_ADAPTER_VERSION = "1.0.0"
+UNIRIG_ADAPTER_VERSION = "1.1.0"
 
 # --- mirrors packages/schema/rig.ts (FROZEN) ----------------------------------
 RIG_SKELETON_FILE = "rig.json"
@@ -118,10 +118,10 @@ INFLUENCES_PER_VERTEX = 4
 ENV_HOME = "SPRITEBOOK_UNIRIG_HOME"
 ENV_PYTHON = "SPRITEBOOK_UNIRIG_PYTHON"
 ENV_KEEP = "SPRITEBOOK_UNIRIG_KEEP"
-#: repo-relative defaults (this file is sidecar/spritebook_sidecar/adapters/)
-DEFAULT_HOME = Path("spikes") / "autorig" / "UniRig"
-DEFAULT_PYTHON = Path("spikes") / "autorig" / ".venv" / "Scripts" / "python.exe"
-DEFAULT_PYTHON_POSIX = Path("spikes") / "autorig" / ".venv" / "bin" / "python"
+#: Compatibility fallback; normal launches receive receipt-backed paths from core.
+DEFAULT_HOME = Path(".deps") / "unirig"
+DEFAULT_PYTHON = Path(".deps") / "unirig-env" / "Scripts" / "python.exe"
+DEFAULT_PYTHON_POSIX = Path(".deps") / "unirig-env" / "bin" / "python"
 
 #: checkpoint layout inside modelDir — the registry catalog's `files[].path`
 SKELETON_CKPT = Path("skeleton") / "articulation-xl_quantization_256" / "model.ckpt"
@@ -229,9 +229,9 @@ def resolve_backend(home: Path, python: Path) -> None:
     if not (home / "run.py").is_file():
         raise AdapterError(
             "backend-missing",
-            f"UniRig is not installed at '{home}' (no run.py). Clone "
-            "https://github.com/VAST-AI-Research/UniRig there, or point "
-            f"{ENV_HOME} at an existing clone.",
+            f"UniRig is not prepared at '{home}' (no run.py). Run "
+            "`spritebook models setup unirig`, or point "
+            f"{ENV_HOME} at an existing prepared source tree.",
             False,
         )
     if not (home / SKIN_TASK).is_file():
@@ -243,10 +243,9 @@ def resolve_backend(home: Path, python: Path) -> None:
     if not python.is_file():
         raise AdapterError(
             "backend-missing",
-            f"The UniRig Python environment is not installed at '{python}'. Create it with the "
-            "uv with prebuilt wheels matching your Torch/CUDA versions, or point "
-            f"{ENV_PYTHON} at an existing interpreter. The sidecar's own environment "
-            "deliberately has no torch and cannot run UniRig in-process.",
+            f"The UniRig Python environment is missing at '{python}'. Run "
+            "`spritebook models setup unirig`, or point "
+            f"{ENV_PYTHON} at an existing qualified interpreter.",
             False,
         )
 
@@ -286,38 +285,12 @@ def backend_version(model_dir: Path) -> str:
     return name or UNIRIG_ADAPTER_VERSION
 
 
-def llm_config_source(model_dir: Path) -> tuple[str, str | None]:
-    """Where ``AutoConfig.from_pretrained`` should look for opt-350m.
+def llm_config_source() -> str:
+    """Architecture facts from MIT fairseq/UniRig and Apache Transformers defaults.
 
-    Returns (value for the yaml, warning message or None).
+    See notices/unirig-opt-architecture.md. No Meta model config/weights/tokenizer.
     """
-    local = model_dir / "opt-350m"
-    if (local / "config.json").is_file():
-        return local.resolve().as_posix(), None
-
-    hub = os.environ.get("HF_HUB_CACHE")
-    hf_home = os.environ.get("HF_HOME")
-    if hub:
-        cache = Path(hub)
-    elif hf_home:
-        cache = Path(hf_home) / "hub"
-    else:
-        cache = Path.home() / ".cache" / "huggingface" / "hub"
-    if (cache / "models--facebook--opt-350m").is_dir():
-        return "facebook/opt-350m", (
-            "The registry does not ship UniRig's opt-350m architecture config, so it is being "
-            f"read from the local Hugging Face cache at '{cache}'. Nothing is downloaded "
-            "(HF_HUB_OFFLINE=1), but this machine happens to have it cached and another "
-            "machine may not."
-        )
-    raise AdapterError(
-        "model-missing",
-        "UniRig's AR model needs the 'facebook/opt-350m' architecture config (a few KB of "
-        f"JSON, no weights) and it is neither at '{local}' nor in the Hugging Face cache at "
-        f"'{cache}'. Downloading is disabled on purpose. Place config.json (and its tokenizer "
-        f"files) under '{local}', or pre-populate the HF cache on a machine with network.",
-        False,
-    )
+    return Path(__file__).with_name("unirig_opt").resolve().as_posix()
 
 
 # --- VRAM sampling ------------------------------------------------------------
@@ -341,9 +314,11 @@ class VramSampler:
         self._thread: threading.Thread | None = None
 
     def _sample_once(self) -> None:
+        root = os.environ.get("SystemRoot")
+        driver = Path(root) / "System32" / "nvidia-smi.exe" if os.name == "nt" and root else None
         out = subprocess.run(
             [
-                "nvidia-smi",
+                str(driver) if driver and driver.is_file() else "nvidia-smi",
                 "--query-gpu=memory.used,memory.total",
                 "--format=csv,noheader,nounits",
             ],
@@ -1076,9 +1051,7 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
     python = unirig_python()
     resolve_backend(home, python)
     skeleton_ckpt, skin_ckpt = resolve_checkpoints(model_dir)
-    llm_config, llm_warning = llm_config_source(model_dir)
-    if llm_warning:
-        emit.warn("llm-config-from-cache", llm_warning)
+    llm_config = llm_config_source()
     if not mesh_path.is_file():
         raise AdapterError("input-missing", f"Mesh not found: {mesh_path}", False)
 

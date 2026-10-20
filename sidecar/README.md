@@ -87,13 +87,13 @@ side `512 px`.
 
 ## Pinned versions (uv-resolved 2026-07-19, exact `==` pins in `pyproject.toml`)
 
-| package     | version                                   |
-| ----------- | ----------------------------------------- |
-| Python      | 3.11 (`.python-version`; runs on 3.11.15) |
-| rembg       | 2.0.77 (no `cli`/`gpu` extras)            |
-| onnxruntime | 1.27.0 (CPU build)                        |
-| numpy       | 2.4.6                                     |
-| pillow      | 12.3.0                                    |
+| package     | version                        |
+| ----------- | ------------------------------ |
+| Python      | 3.11.16 (`.python-version`)    |
+| rembg       | 2.0.77 (no `cli`/`gpu` extras) |
+| onnxruntime | 1.27.0 (CPU build)             |
+| numpy       | 2.4.6                          |
+| pillow      | 12.3.0                         |
 
 `uv.lock` is committed. `[tool.uv] constraint-dependencies = ["numba>=0.60"]` pins rembg's
 transitive `pymatting → numba` edge to a wheel-bearing release: without the floor, the resolver
@@ -101,44 +101,49 @@ walks numba back to 0.53.x, a 3.6–3.9-era sdist that cannot build on 3.11 (and
 the sidecar-vram "prebuilt wheels only" law). The HTTP server itself is Python stdlib only — no
 FastAPI/uvicorn/requests.
 
-## The `trellis2` extra (optional, ~4 GB, Windows + CUDA)
+## Optional model setup on Windows x64 + NVIDIA CUDA
 
-The TRELLIS.2 image-to-3D stack is an **optional dependency group**, so a machine with no GPU
-installs the base project and still gets a fully working sidecar — every adapter except `trellis2`
-and `trellis2-retexture`, including the `fixture-*` pair the whole test suite runs on. That is
-verified, not assumed: a base-only sync passes all self-test checks with no torch installed.
+Use the CLI to provision backend code and dependencies as well as weights:
 
-```
-python sidecar/fetch_wheels.py                  # fetch missing wheels and verify the pins
-python sidecar/fetch_wheels.py --verify         # verify only, never download
-uv sync --project sidecar --extra trellis2
+```sh
+spritebook models install trellis2-4b --accept-license
+spritebook models setup trellis2-4b --accept-license  # repair/reuse existing weights
+spritebook models install unirig
+spritebook models setup unirig
 ```
 
-Verify the wheels first and mean it. The five CUDA extensions (`cumesh`, `flex_gemm`, `nvdiffrast`,
-`nvdiffrec_render`, `o_voxel`) are community builds by a single maintainer, fetched from a
-`raw.githubusercontent` URL that can move at any time. They are vendored under `sidecar/wheels/` and
-pinned by sha256 in `wheels.lock.json`; `uv` installs them from those verified bytes by path.
+TRELLIS.2 uses the optional `trellis2` group in the committed `uv.lock`: Torch 2.8.0+cu128,
+torchvision 0.23.0, xformers 0.0.32.post2 and transformers 5.14.1. The base sidecar remains usable
+without this group. Python is pinned to 3.11.16; the CUDA wheels require cp311. Linux, Mac and
+Windows ARM64 native model setup remain unqualified and are deferred to F7.
 
-Two more things this stack needs, neither of which `uv` can supply:
+The [runtime recipe](runtimes/trellis2-win.json) pins source archives, sizes, SHA-256 hashes,
+notices and a bounded source patch. Setup uses the owned uv and prebuilt third-party wheels; no Git,
+MSVC or local CUDA toolkit is needed. It publishes a readiness receipt in writable app data after
+native kernel checks. Core reads that receipt and supplies absolute source/environment paths. A
+failed setup retains verified weights; rerun `models setup` to recover.
 
-- **The `trellis2` package itself has no packaging metadata upstream** — it is imported from a
-  source checkout, not installed. Clone it and point the adapter at it: `git clone --depth 1
-  https://github.com/microsoft/TRELLIS.2.git sidecar/.deps/trellis2`, or set
-  `SPRITEBOOK_TRELLIS2_CODE` to wherever it lives.
-- **DINOv3 is a manual gate.** `facebook/dinov3-vitl16-pretrain-lvd1689m` is the image conditioner
-  and access is granted per person by Meta, so it cannot be installed through the registry. Request
-  it on the model's page, then `hf auth login`. Meta's licence permits commercial use and
-  redistribution; the price is an attribution — **"Built with DINOv3"** must appear in the product's
-  UI, docs or about page.
+UV rasterization uses MIT DRTK instead of NVIDIA's evaluation-only nvdiffrast. The O-Voxel
+replacement has traced MIT source and Eigen MPL-2.0 notices. These packages remain external
+downloads, excluded from application resources. Both real generation and retexture have passed with
+the restricted packages absent, an empty HF cache and outbound connections blocked; final installed
+workflow qualification is tracked in [the F4 gate](../future/model-provisioning-gate.md).
 
-Pins are the combination measured in the retired TRELLIS.2 spike (available in Git history), not the
-newest compatible set: torch 2.8.0+cu128, torchvision 0.23.0, xformers 0.0.32.post2, transformers
-5.14.1. `xformers` is not optional — sparse attention supports only xformers and flash-attn, and
-flash-attn needs a compiler. `transformers` is pinned because 5.x moved the DINOv3 encoder blocks
-and the adapter shims the move; an unpinned upgrade would walk away from the shim silently.
+DINOv3 access remains personal: request access on its Hugging Face page, then `hf auth login`. The
+complete `af44b45f.local1` catalog version declares its exact config, weights and August 19, 2025
+agreement. `--accept-license` records explicit acceptance. The pinned agreement has custom use/trade
+and redistribution terms; consult that exact text. The loader uses only the declared local files and
+refuses upstream's BRIA background remover and Hub fallback.
 
-`requires-python` is `>=3.11,<3.12` because of this extra: the extension wheels are cp311-only and
-`uv` solves the lock across the whole declared range.
+Developer overrides `SPRITEBOOK_TRELLIS2_CODE` and `SPRITEBOOK_UTILS3D_CODE` remain available for
+prepared source trees. They are unnecessary for ordinary installs. The original source's
+visualization/training helpers are outside the supported inference path and may still reference
+dependencies we deliberately omit.
+
+UniRig uses a [separate frozen recipe](runtimes/unirig-win.json), Torch 2.7+cu128 and NumPy 1.26.4.
+Its app-owned architecture description preserves active model settings without downloading the
+restricted Meta OPT config. Keep the PTv3 standard-attention workaround and 17.4 GiB admission
+floor. GPL components stay in the external subprocess environment.
 
 ## rembg model-path mechanism (verified against the pinned 2.0.77 source)
 

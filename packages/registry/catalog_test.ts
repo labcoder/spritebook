@@ -9,7 +9,7 @@ import { join } from 'node:path';
  */
 import { assert, assertEquals, assertRejects } from '@std/assert';
 import { canonicalJson, ModelCatalogSchema, SchemaError } from '@spritebook/schema';
-import { loadCatalog } from './dist/mod.js';
+import { compareVersions, loadCatalog } from './dist/mod.js';
 import { toyEntry, toyVersion } from './_testutil.ts';
 
 // same resolution dance as loadCatalog's default (decode AFTER the drive strip)
@@ -88,23 +88,14 @@ test('loadCatalog: missing file and broken JSON throw actionably', async () => {
   }
 });
 
-test('unirig ships the opt-350m config, so `rig` needs no ambient HF cache', async () => {
-  // The P3 exit measurement caught this: `rig` warned that it was reading
-  // UniRig's architecture config from THIS machine's Hugging Face cache. The
-  // exit criterion is measured "on a fresh machine", where there is no such
-  // cache and the verb refuses outright — so the 5.6-minute run was real for
-  // one box and unproven for the one the criterion names.
+test('default UniRig retains verified checkpoints without the restricted OPT download', async () => {
   const cat = await loadCatalog();
-  const v = cat.models.find((m) => m.id === 'unirig')!.versions[0];
-  const cfg = v.files.find((f) => f.path === 'opt-350m/config.json');
-  assert(cfg, `unirig must ship the config: ${v.files.map((f) => f.path).join(', ')}`);
-  // pinned to a REVISION, not a branch: `main` would let the bytes move out
-  // from under the hash and turn every install into a verify failure
-  assert(
-    /\/resolve\/[0-9a-f]{40}\//.test(cfg.sha256 ? cfg.url : ''),
-    `pin the revision, not a branch: ${cfg.url}`,
-  );
-  assertEquals(cfg.bytes, 644, 'architecture hyperparameters only - no weights');
-  // and it must land where the adapter looks (llm_config_source: modelDir/opt-350m)
-  assert(cfg.path.startsWith('opt-350m/'), cfg.path);
+  const versions = cat.models.find((m) => m.id === 'unirig')!.versions;
+  const current = [...versions].sort((a, b) => compareVersions(a.version, b.version)).at(-1)!;
+  const original = versions.find((v) => v.version === '36842e2b')!;
+  assertEquals(current.files, original.files.filter((f) => f.path.endsWith('.ckpt')));
+  assertEquals(current.files.length, 2);
+  assert(current.runtime, 'complete setup must provide the external runtime');
+  assert(!current.files.some((f) => f.url.includes('facebook/opt-350m')));
+  assert(original.files.some((f) => f.path === 'opt-350m/config.json'), 'preserve historical pins');
 });

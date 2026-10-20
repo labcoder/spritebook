@@ -30,3 +30,5 @@ export {
 
 export * from './queries.ts';
 export { resourcePath } from './resources.ts';
+export * from './model-runtime.ts';
+export { acquireFileLock } from './lock.ts';

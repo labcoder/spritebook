@@ -1,0 +1,10 @@
+{
+  "model_type": "opt",
+  "hidden_size": 1024,
+  "ffn_dim": 4096,
+  "num_attention_heads": 16,
+  "num_hidden_layers": 24,
+  "word_embed_proj_dim": 1024,
+  "max_position_embeddings": 3076,
+  "do_layer_norm_before": true
+}

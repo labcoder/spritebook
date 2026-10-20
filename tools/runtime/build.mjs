@@ -182,9 +182,9 @@ try {
       'uv.lock',
       '.python-version',
       'spritebook_sidecar',
-      'fetch_wheels.py',
-      'wheels/wheels.lock.json',
+      'runtimes',
       'README.md',
+      'notices',
     ]
   ) {
     await cp(join(repo, 'sidecar', path), join(stage, 'assets/sidecar', path), {

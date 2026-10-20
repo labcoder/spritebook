@@ -72,6 +72,7 @@ export interface ModelVersion {
   version: string; // "1.2"
   files: WeightFile[]; // disk size = sum(bytes), derived
   platforms: Platform[];
+  runtime?: string; // app-owned pinned source/wheel recipe; no backend code in manifests
   minVramGb?: number; // install advisory / single configured path
   vramProfiles?: {
     operation: 'gen3d' | 'rig' | 'imageprep' | 'retexture';

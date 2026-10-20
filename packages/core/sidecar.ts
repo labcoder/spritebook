@@ -1,10 +1,9 @@
 import { type ChildProcessByStdio, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { Readable } from 'node:stream';
-import { readFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
-import { homedir } from 'node:os';
+import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { modelRuntime, readModelRuntime, sidecarEnvironmentDir } from './model-runtime.ts';
 
 /**
  * Sidecar client + supervisor (P3-T2) — the core side of the wire contract
@@ -262,14 +261,20 @@ export async function startSidecar(cfg: SidecarConfig): Promise<SidecarHandle> {
     env.PYTHONUTF8 ??= '1';
   }
   if (env.SPRITEBOOK_RESOURCES && !env.UV_PROJECT_ENVIRONMENT) {
-    const data = process.platform === 'win32'
-      ? env.LOCALAPPDATA ?? join(homedir(), 'AppData/Local')
-      : process.platform === 'darwin'
-      ? join(homedir(), 'Library/Application Support')
-      : env.XDG_DATA_HOME ?? join(homedir(), '.local/share');
-    const lock = createHash('sha256').update(await readFile(join(cfg.sidecarDir, 'uv.lock')))
-      .digest('hex');
-    env.UV_PROJECT_ENVIRONMENT = join(data, 'spritebook/runtime', `sidecar-${lock.slice(0, 16)}`);
+    env.UV_PROJECT_ENVIRONMENT = await sidecarEnvironmentDir(cfg.sidecarDir);
+  }
+  const recipes = await readdir(join(cfg.sidecarDir, 'runtimes')).catch((error) => {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  });
+  for (const name of recipes) {
+    if (!name.endsWith('.json')) continue;
+    const info = await modelRuntime(name.slice(0, -5), cfg.sidecarDir);
+    if (!await readModelRuntime(info)) continue;
+    if (info.recipe.project === '.') env.UV_PROJECT_ENVIRONMENT ??= info.environment;
+    for (const [key, path] of Object.entries(info.recipe.environment)) {
+      env[key] ??= join(info.root, path);
+    }
   }
   const proc = spawn(cfg.uvBin ?? env.SPRITEBOOK_UV_BIN ?? 'uv', [
     'run',

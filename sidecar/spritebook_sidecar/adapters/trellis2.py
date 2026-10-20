@@ -63,7 +63,7 @@ from typing import Any
 
 from . import Adapter, AdapterError, Emitter, validate_params
 
-TRELLIS2_ADAPTER_VERSION = "0.2.0"
+TRELLIS2_ADAPTER_VERSION = "0.3.0"
 
 # A collapsed texture has NO CONTENT, and the decoder can reach that at either
 # end of its [-1, 1] range. Black was found first (generation, seed 42, mean
@@ -249,16 +249,7 @@ CODE_DIR_ENV = "SPRITEBOOK_TRELLIS2_CODE"
 
 
 def _code_dir() -> Path:
-    """Where the `trellis2` SOURCE lives, since it cannot be installed.
-
-    Upstream ships no packaging metadata — no `pyproject.toml`, no `setup.py` —
-    so the extra installs the dependencies and this finds the package itself.
-    `SPRITEBOOK_TRELLIS2_CODE` wins; otherwise the repo's own checkout path.
-
-    INTERIM. The registry manages weights by hash and should manage backend code
-    the same way; until it does, this is a documented path rather than a
-    surprise. Nothing else in the sidecar reaches outside its own directory.
-    """
+    """Core supplies the prepared source; retain the old development fallback."""
     override = os.environ.get(CODE_DIR_ENV)
     if override:
         return Path(override)
@@ -283,20 +274,21 @@ def _ensure_importable() -> None:
     os.environ.setdefault("ATTN_BACKEND", "xformers")
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
-    if importlib.util.find_spec("trellis2") is not None:
-        return
-    code = _code_dir()
-    if not (code / "trellis2").is_dir():
-        raise AdapterError(
-            "backend-unavailable",
-            f"The TRELLIS.2 source is not at '{code}'. It ships no packaging metadata, so it is "
-            f"used from a checkout: `git clone --depth 1 "
-            f"https://github.com/microsoft/TRELLIS.2.git {code}`, or set {CODE_DIR_ENV} to where "
-            f"it already is. The Python dependencies are separate: "
-            f"`uv sync --project sidecar --extra trellis2`.",
-        )
-    if str(code) not in sys.path:
-        sys.path.insert(0, str(code))
+    for package, code in (
+        ("trellis2", _code_dir()),
+        ("utils3d", Path(os.environ.get("SPRITEBOOK_UTILS3D_CODE", ""))),
+    ):
+        if importlib.util.find_spec(package) is not None:
+            continue
+        if not code.is_absolute() or not (code / package).is_dir():
+            raise AdapterError(
+                "backend-unavailable",
+                f"The prepared {package} source is missing at '{code}'. Run "
+                "`spritebook models setup trellis2-4b --accept-license` to install the "
+                "pinned source and dependency environment.",
+            )
+        if str(code) not in sys.path:
+            sys.path.insert(0, str(code))
 
 
 class _RefusedRembg:
@@ -473,10 +465,10 @@ def _load_pipeline(model_dir: Path, low_vram: bool) -> Any:
 
 
 def _export_glb(mesh: Any, out_path: Path, texture_size: int, decimation: int) -> None:
-    import o_voxel
+    from trellis2._spritebook_export import to_glb
 
-    mesh.simplify(16777216)  # nvdiffrast's index limit
-    glb = o_voxel.postprocess.to_glb(
+    mesh.simplify(16777216)  # retain the qualified upstream export pre-pass
+    glb = to_glb(
         vertices=mesh.vertices,
         faces=mesh.faces,
         attr_volume=mesh.attrs,

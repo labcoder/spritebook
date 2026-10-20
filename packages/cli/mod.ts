@@ -2506,7 +2506,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         }
         return 0;
       }
-      if (sub === 'install' || sub === 'verify' || sub === 'rm') {
+      if (sub === 'install' || sub === 'setup' || sub === 'verify' || sub === 'rm') {
         const ref = args[2];
         if (!ref || ref.startsWith('--')) {
           return fail(
@@ -2516,6 +2516,20 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           );
         }
         const [modelId, version] = ref.split('@', 2);
+        if (sub === 'setup') {
+          return await pump(
+            registry.runSetupJob({
+              jobId: 'models' as JobEvent['jobId'],
+              catalog: await registry.loadCatalog(flag(args, 'catalog')),
+              root,
+              modelId,
+              version,
+              acceptLicense: args.includes('--accept-license'),
+              territory: flag(args, 'territory'),
+            }),
+            emit,
+          );
+        }
         if (sub === 'install') {
           const catalog = await registry.loadCatalog(flag(args, 'catalog'));
           // --from <dir>: take the bytes from disk instead of the network.
@@ -2572,7 +2586,8 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         'models' as JobEvent['jobId'],
         'missing-arg',
         'models needs a subcommand: list [--installed] | install <id[@version]> ' +
-          '[--accept-license] [--territory CC] | verify <id[@version]> | rm <id[@version]>',
+          '[--accept-license] [--territory CC] | setup <id[@version]> [--accept-license] ' +
+          '| verify <id[@version]> | rm <id[@version]>',
       );
     } catch (err) {
       return fail(

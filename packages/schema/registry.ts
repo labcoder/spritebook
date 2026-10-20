@@ -69,6 +69,8 @@ export const ModelVersionSchema = z.strictObject({
    * Installing one is just the receipt. */
   files: z.array(WeightFileSchema),
   platforms: z.array(PlatformSchema).min(1),
+  /** App-owned, hash-pinned source and wheel setup recipe; weights remain separate. */
+  runtime: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
   /** MEASURED peak for the configured path, never README claims (sidecar-vram) */
   minVramGb: z.number().positive().optional(),
   /** Conservative admission claims tied to measured operation/configuration paths. */

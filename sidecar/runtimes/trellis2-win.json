@@ -1,0 +1,43 @@
+{
+  "id": "trellis2-win",
+  "platform": "win32-x64",
+  "project": ".",
+  "extra": "trellis2",
+  "sources": [
+    {
+      "url": "https://codeload.github.com/microsoft/TRELLIS.2/zip/75fbf0183001ed9876c8dbb35de6b68552ee08bd",
+      "bytes": 18222787,
+      "sha256": "d7abd456f75585c5b4ce112a4abdb9bd3cc3e72b6074470a65e0bf3a89b3e06f",
+      "path": "trellis2",
+      "zip": true
+    },
+    {
+      "url": "https://codeload.github.com/EasternJournalist/utils3d/zip/9a4eb15e4021b67b12c460c7057d642626897ec8",
+      "bytes": 152598,
+      "sha256": "e11843922c771f8900926bbcc2f37efdbf3adfb5282b4db0f9973069923e43d0",
+      "path": "utils3d",
+      "zip": true
+    },
+    {
+      "url": "https://raw.githubusercontent.com/PozzettiAndrea/Trellis.2.drtk/200ba8cb5a4039db8acde3c09edc43a0031b4098/LICENSE",
+      "bytes": 1140,
+      "sha256": "d9a1b1e30d633d5732ea18e3cba9538d293ebc53e1a9e4e96ab739e0c5c4f1cb",
+      "path": "notices/o-voxel-MIT.txt",
+      "zip": false
+    },
+    {
+      "url": "https://gitlab.com/libeigen/eigen/-/raw/21e4582d1739107337a03460c81412981130373e/COPYING.MPL2",
+      "bytes": 16727,
+      "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+      "path": "notices/Eigen-MPL2.txt",
+      "zip": false
+    }
+  ],
+  "prepare": { "script": "runtimes/prepare_trellis2.py", "source": "trellis2" },
+  "check": "runtimes/check_trellis2.py",
+  "environment": {
+    "SPRITEBOOK_TRELLIS2_CODE": "trellis2",
+    "SPRITEBOOK_UTILS3D_CODE": "utils3d"
+  },
+  "notes": "Official MIT inference with a bounded DRTK UV substitution. DRTK: facebookresearch/DRTK@c5a3e523435b4daa37572c0653d6686531c787b2, cuda-wheels build 1b9490ad12df07a30594fa57f593e9b02423c387, job 66761030740. O-Voxel: Trellis.2.drtk@200ba8cb5a4039db8acde3c09edc43a0031b4098, cuda-wheels build 7bc41ac7b0b6596777da7a83c7933477a46b00ca, job 73822567578. Eigen source: https://gitlab.com/libeigen/eigen/-/tree/21e4582d1739107337a03460c81412981130373e. Wheel bytes are pinned in uv.lock; native packages and MPL components remain external and are never app-bundled. Retain upstream source notices and sidecar/notices/uv-rasterizer-MIT.txt. Model weights/conditioner terms are separately declared by the model catalog."
+}

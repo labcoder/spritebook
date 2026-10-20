@@ -1,6 +1,7 @@
 import { createWriteStream } from 'node:fs';
 import { Writable } from 'node:stream';
 import { promises as fs } from 'node:fs';
+import { prepareModelRuntime } from './setup.ts';
 import type { Stats } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -357,6 +358,21 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
     await fs.writeFile(receiptPath, canonicalJson(receipt));
 
     yield { t: 'artifact', jobId, at: at(), kind: 'install-receipt', path: receiptPath };
+    if (version.runtime) {
+      try {
+        yield* prepareModelRuntime(version.runtime, jobId);
+      } catch (error) {
+        throw new JobFail(
+          'model-setup-failed',
+          `${
+            message(error)
+          } Weights and their receipt are retained. Run spritebook models setup ${entry.id}@${version.version}${
+            opts.acceptLicense ? ' --accept-license' : ''
+          } to retry setup.`,
+          true,
+        );
+      }
+    }
     yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
   } catch (err) {
     if (staging) await fs.rm(staging, { recursive: true }).catch(() => {});

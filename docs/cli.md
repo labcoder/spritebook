@@ -184,12 +184,13 @@ spritebook prep --image photo.png --out ./prep
 The cut-out lands there as `cutout.png`, beside a small preflight report. Feed that `cutout.png` to
 `gen --image`. A clean PNG with transparency needs no prep; `gen` takes it directly.
 
-## models — install, verify, remove
+## models — install, set up, verify, remove
 
 ```
 spritebook models list
 spritebook models list --installed
-spritebook models install trellis2-4b
+spritebook models install trellis2-4b --accept-license
+spritebook models setup trellis2-4b --accept-license
 spritebook models verify trellis2-4b
 spritebook models rm trellis2-4b
 ```
@@ -205,20 +206,23 @@ the catalog's size and sha256 pin before anything lands.
 | `--installed`                           | (`list`) only what is installed                                                                  |
 | `--models-dir <dir>` `--catalog <file>` | root and catalog overrides                                                                       |
 
-No current catalog entry requires acceptance or excludes a territory, so the two gate flags stay
-unused today. The gates exist so a future entry can carry them; the install stops and names the flag
-when one does.
+The complete TRELLIS.2 version requires explicit acceptance of the recorded MIT weight and DINOv3
+conditioner terms. Request personal access to `facebook/dinov3-vitl16-pretrain-lvd1689m` on Hugging
+Face, then run `hf auth login` or supply `HF_TOKEN`. The registry downloads and verifies its
+declared local files; inference does not contact Hugging Face.
 
-One backend has a gate OUTSIDE the catalog: TRELLIS.2's image conditioner is Meta's gated
-`facebook/dinov3-vitl16-pretrain-lvd1689m` repository. Request access on that model's Hugging Face
-page. Then authenticate with `huggingface-cli login`, or set the `HF_TOKEN` environment variable.
-The sidecar's download uses that authentication.
+For a catalog version with a runtime recipe, `install` also prepares source and the frozen Python
+environment. A setup failure retains verified weights and names `models setup <id[@version]>` as
+recovery. `setup` reuses those weights, checks the same license/territory/platform gates and
+publishes readiness only after native checks. Source code and wheels still need network access
+during setup; `--from` supplies model files only. Current native setup is qualified on Windows x64
+with NVIDIA CUDA; other native model targets remain F7 work.
 
 ## Sizes and floors
 
 | Model         | Disk    | Minimum VRAM | Needs                |
 | ------------- | ------- | ------------ | -------------------- |
-| `trellis2-4b` | 16.4 GB | 12 GiB       | NVIDIA GPU, CUDA     |
+| `trellis2-4b` | 17.6 GB | 12 GiB       | NVIDIA GPU, CUDA     |
 | `unirig`      | 5.8 GB  | 17.4 GiB     | NVIDIA GPU, CUDA     |
 | `rembg-u2net` | 0.2 GB  | —            | CPU                  |
 | `fixture-gen` | none    | —            | nothing; no download |

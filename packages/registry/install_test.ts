@@ -39,6 +39,33 @@ const DETECTED = {
   virtualization: { virtualized: false },
 };
 
+test('failed runtime setup retains verified weights and names setup recovery', async () => {
+  const rig = await installRig();
+  try {
+    rig.catalog.models[0].versions[0].runtime = 'missing-test-runtime';
+    const events = await collect(install(rig));
+    const error = ofType(events, 'error')[0];
+    assertEquals(error.code, 'model-setup-failed');
+    assertEquals(error.retryable, true);
+    assertStringIncludes(error.message, 'models setup toy-rig@1.0');
+    assert((await resolveInstalled(rig.root, 'toy-rig')) !== null);
+    assertEquals(
+      ofType(
+        await collect(runVerifyJob({
+          jobId: 'verify-kept',
+          catalog: rig.catalog,
+          root: rig.root,
+          modelId: 'toy-rig',
+        })),
+        'error',
+      ).length,
+      0,
+    );
+  } finally {
+    await fs.rm(rig.tmp, { recursive: true, force: true });
+  }
+});
+
 function install(rig: InstallRig, over: Partial<InstallJobOpts> = {}) {
   return runInstallJob({
     jobId: 'job-install',

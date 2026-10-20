@@ -1286,17 +1286,15 @@ def test_trellis2_code_dir(tmp: Path) -> None:
        f"defaults into the repo checkout: {default}")
     ok(default.is_absolute(), "absolute, so the cwd cannot move it")
 
-    # a missing checkout refuses with BOTH fixes named: the clone and the extra.
-    # They are different problems and a user hitting one should not be told
-    # about the other alone.
+    # Source and environment recovery use the same shipped setup command.
     os.environ[t2.CODE_DIR_ENV] = str(tmp / "nothing-here")
     try:
         t2._ensure_importable()
         ok(False, "a missing checkout must refuse")
     except AdapterError as err:
         ok(err.code == "backend-unavailable", f"backend-unavailable, got {err.code}")
-        ok("git clone" in err.message, "names the clone")
-        ok("--extra trellis2" in err.message, "and the dependency extra")
+        ok("models setup trellis2-4b" in err.message, "names the reproducible setup command")
+        ok("--accept-license" in err.message, "keeps explicit term acceptance")
     finally:
         os.environ.pop(t2.CODE_DIR_ENV, None)
 

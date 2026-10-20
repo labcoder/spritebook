@@ -153,7 +153,7 @@ planning-era and described MODELS; the rows now describe STACKS, which is what s
 
 | Backend          | License (model)           | Status                                                                                                                                                             |
 | ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **TRELLIS.2 4B** | MIT (weights)             | **⚠ shipping, stack encumbered** — see the CUDA-extension rows below. Measured **3.01 GiB** at shipped defaults, 16.53 GiB at `lowVram=false`                      |
+| **TRELLIS.2 4B** | MIT (weights)             | Windows DRTK replacement under F4 qualification; see exact component terms below. Measured **3.01 GiB** at shipped defaults, 16.53 GiB at `lowVram=false`          |
 | Pixal3D          | MIT                       | ✗ **not viable**: requires the TRELLIS.2 base env (inherits everything below) **and** compiles NATTEN from source — wheels-only gate                               |
 | TripoSplat       | MIT                       | ✗ **not applicable**: emits gaussians, not a mesh (invariant 4)                                                                                                    |
 | Hunyuan3D 2.x    | Tencent Community License | ✗ **excludes EU/UK/KR** — territory carve-out; only ever a user-installed gated extra, never a default                                                             |
@@ -162,26 +162,26 @@ planning-era and described MODELS; the rows now describe STACKS, which is what s
 | Direct3D-S2      | MIT                       | ✗ `torchsparse` builds from source; shape-only                                                                                                                     |
 | `fixture-gen`    | MIT (ours)                | ✓ weightless, CPU, all platforms — the reason macOS/win-arm64 degrade rather than break                                                                            |
 
-### TRELLIS.2 CUDA extension wheels (the runtime stack)
+### Selected TRELLIS.2 Windows runtime
 
-Not bundled — `sidecar/wheels/*.whl` is gitignored, only the sha256 pins are committed and the
-user's machine fetches them, as with model weights. Licences below were read from each installed
-`dist-info/`, not from a project page.
+The optional environment is frozen in [sidecar/uv.lock](../sidecar/uv.lock), with
+[source/archive and notice pins](../sidecar/runtimes/trellis2-win.json). Third-party CUDA wheels are
+downloaded into the user's environment, never application resources.
 
-| Wheel                    | License                                                                                                           | Status                                                                                                                                  |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `nvdiffrast` 0.4.0       | **Nvidia Source Code License (1-Way Commercial)** — §3.3 non-commercial, _"research or evaluation purposes only"_ | **⚠ blocks commercial use.** On the happy path: `o_voxel.postprocess.to_glb` calls `dr.rasterize`/`dr.interpolate` for the texture bake |
-| `nvdiffrec_render` 0.0.0 | **NVIDIA Source Code License for nvdiffrec** — §3.3 same non-commercial limitation                                | **⚠ blocks commercial use**                                                                                                             |
-| `o_voxel` 0.0.1          | Wheel has no license text/metadata; official Microsoft source is MIT                                              | **⚠ exact artifact unverified**: Windows changes/native build origin and required notices remain unresolved; see the F4 model gate      |
-| `cumesh` 1.0             | MIT                                                                                                               | ✓                                                                                                                                       |
-| `flex_gemm` 0.0.1        | MIT                                                                                                               | ✓                                                                                                                                       |
-| `utils3d`                | pinned to a git commit (no PyPI release)                                                                          | imports `nvdiffrast` in `torch/rasterization.py`                                                                                        |
+| Artifact                          | Role and terms                                      | Evidence/delivery                                                                                                                                                                |
+| --------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DRTK 0.1.0+cu128torch2.8          | UV rasterization, MIT (Meta)                        | Wheel includes MIT notice; source `facebookresearch/DRTK@c5a3e523`; build `cuda-wheels@1b9490ad`, job 66761030740                                                                |
+| o-voxel-vb-ap 0.0.1+cu128torch2.8 | Dual-grid conversion, MIT source plus Eigen MPL-2.0 | Source `Trellis.2.drtk@200ba8cb`; build `cuda-wheels@7bc41ac7`, job 73822567578. Setup retains the omitted source notice, Eigen terms and source URL. External environment only. |
+| cumesh 1.0 / flex_gemm 0.0.1      | Mesh cleanup/unwrap and sparse sampling, MIT        | Exact previously inspected community wheels at `visualbruno/ComfyUI-Trellis2@438fe4e2`; hashes retained in uv.lock                                                               |
+| TRELLIS.2 / utils3d               | Official MIT source archives                        | Full commits/archive hashes in runtime recipe; no user-side Git/compiler. Keep upstream notices.                                                                                 |
+| Adapted UV helper                 | DRTK pixel/barycentric boundary                     | [MIT attribution](../sidecar/notices/uv-rasterizer-MIT.txt); adapted from `ComfyUI-TRELLIS2@3e696f2c`                                                                            |
 
-**Trap:** an MIT badge on a generative-3D repo does not clear its whole stack. TRELLIS.2's current
-textured GLB export calls the restricted rasterizer, so disabling visualization is insufficient.
-Check exact artifact notices and source/build provenance. The
-[F4 model gate](../future/model-provisioning-gate.md) records current primary license evidence and
-distinguishes private evaluation, user-installed model terms and commercial product claims.
+The selected extra excludes `nvdiffrast`, `nvdiffrec_render` and the old untraced `o_voxel` wheel.
+The first two carried NVIDIA evaluation-only terms; installing them outside the application did not
+remove that restriction. Source preparation replaces both generation export and retexture UV
+rasterization while retaining cleanup, original-surface projection, PBR sampling and measured model
+defaults. The replacement has passed native structural checks and real generation/retexture; the
+[F4 gate](../future/model-provisioning-gate.md) records remaining installed checks.
 
 DINOv3's separately gated conditioner is declared in the complete `af44b45f.local1` catalog version,
 alongside its exact agreement and an explicit acceptance gate. The authorized
@@ -199,6 +199,28 @@ not substitute a blanket attribution or output-rights claim.
 | Make-It-Animatable                    | Track A humanoid accelerator (<1 s; meshes & splats; arbitrary pose) | **⚠ unverified**                                                 | Confirm repo LICENSE before p3 integration; training pulls Mixamo data. Fallbacks: UniRig humanoid, canonical-body fit                                                                                                |
 | Canonical Track A body                | roster-fit rig                                                       | ours, seeded from CC0 **Universal Base Characters** (Quaternius) | **✓ CC0 re-verified 2026-07-20** from the downloaded pack's License_Standard.txt; both bodies bundled at `packages/rig/bodies/` (65-joint UAL skeleton, full core, byte-stable builds via tools/roster/build-body.ts) |
 | Blender/bpy (upstream UniRig tooling) | conversions inside sidecar only                                      | GPL                                                              | isolated subprocess; adapters return neutral npz/json; never shipped                                                                                                                                                  |
+
+### Frozen UniRig Windows environment
+
+[Recipe](../sidecar/runtimes/unirig-win.json) and [lock](../sidecar/runtimes/unirig/uv.lock) pin an
+external, wheels-only environment. No third-party model source, Python environment or CUDA wheel is
+app-bundled.
+
+| Components                                                                                   | Role/terms                                                              | Delivery and evidence                                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Torch 2.7+cu128, torchvision 0.22                                                            | BSD-3 plus bundled CUDA runtime notices                                 | Exact official wheel/index hashes in lock; separate from TRELLIS.2 Torch 2.8                                                                                                             |
+| flash-attn 2.8.3, PyG scatter/cluster                                                        | BSD-3 / MIT                                                             | Exact cp311/Torch 2.7/CUDA 12.8 community/official PyG wheels; all bytes pinned. PTv3 varlen remains disabled.                                                                           |
+| spconv-cu124 2.3.8, cumm-cu124 0.7.11                                                        | MIT sparse CUDA kernels                                                 | PyPI prebuilt Windows wheels; native admission checks exercise finite outputs                                                                                                            |
+| Triton Windows 3.3.1.post21                                                                  | MIT core with bundled toolchain notices                                 | External matched Torch 2.7 runtime; retain its included notices; no user MSVC/CUDA-toolkit installation                                                                                  |
+| UniRig/Michelangelo/bpy 4.2.0                                                                | MIT weights/root source; GPL Michelangelo/bpy components                | User-downloaded source and isolated subprocesses; retain source notices. Neutral rig JSON/NPZ boundary remains.                                                                          |
+| pyrender 0.1.45 / PyOpenGL 3.1.0                                                             | MIT / BSD and historical OpenGL component notices                       | PyOpenGL universal piwheels wheel: all 2131 Python files match official sdist, no DLL/native payload; setup preserves the complete 11,117-byte source notice. Native pyrender exercised. |
+| Lightning 2.5.1, transformers 4.51.3, open3d 0.19, trimesh 4.6.8, fast-simplification 0.1.11 | Apache-2.0 / MIT                                                        | Frozen prebuilt wheels. Unused OmegaConf/wandb omitted; selected simplifier permits NumPy 1.26.4.                                                                                        |
+| Owned OPT architecture description                                                           | MIT fairseq/UniRig architecture facts plus Apache Transformers defaults | [Provenance and notice](../sidecar/notices/unirig-opt-architecture.md); all active settings match. No Meta OPT config, weights or tokenizer in the new version.                          |
+
+The original catalog's Meta OPT config carried noncommercial/production restrictions.
+`36842e2b.local1` omits that download, retains the two identical verified UniRig checkpoints and
+uses the packaged owned architecture description. Existing historical files/receipts are preserved;
+the adapter always selects the owned configuration.
 
 ## Animation
 

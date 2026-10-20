@@ -8,6 +8,7 @@
 export * from './canonical.ts';
 export * from './identity.ts';
 export * from './registry.ts';
+export * from './model-runtime.ts';
 export * from './sidecar.ts';
 export * from './gen.ts';
 export * from './rig.ts';

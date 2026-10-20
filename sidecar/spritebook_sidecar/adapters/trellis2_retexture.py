@@ -65,7 +65,7 @@ from .trellis2 import (
     vram_peaks,
 )
 
-RETEXTURE_ADAPTER_VERSION = "0.3.0"
+RETEXTURE_ADAPTER_VERSION = "0.4.0"
 
 # How far the output frame may move before we refuse. The spike measured 0.1% of
 # extent across seeds, so 2% is far above the noise while still catching the two

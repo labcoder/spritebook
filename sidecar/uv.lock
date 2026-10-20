@@ -86,7 +86,7 @@ name = "click"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/d4/81420972a676e8ffea40450d8c8c92943e7218a78fe9b64359836cc9876b/click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6", size = 338000, upload-time = "2026-06-24T17:45:15.148Z" }
 wheels = [
@@ -105,19 +105,41 @@ wheels = [
 [[package]]
 name = "cumesh"
 version = "1.0"
-source = { path = "wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" }
+source = { url = "https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/cumesh-1.0-cp311-cp311-win_amd64.whl" }
 dependencies = [
     { name = "torch" },
     { name = "tqdm" },
 ]
 wheels = [
-    { filename = "cumesh-1.0-cp311-cp311-win_amd64.whl", hash = "sha256:d1ed72dfb2815776812bd634c175885bf373ae585306a5b819dc191041c1f024" },
+    { url = "https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/cumesh-1.0-cp311-cp311-win_amd64.whl", hash = "sha256:d1ed72dfb2815776812bd634c175885bf373ae585306a5b819dc191041c1f024" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "torch", specifier = ">=2.4.0" },
     { name = "tqdm" },
+]
+
+[[package]]
+name = "drtk"
+version = "0.1.0+cu128torch2.8"
+source = { url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/drtk-latest/drtk-0.1.0%2Bcu128torch2.8-cp311-cp311-win_amd64.whl" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "torch" },
+    { name = "torchvision" },
+]
+wheels = [
+    { url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/drtk-latest/drtk-0.1.0%2Bcu128torch2.8-cp311-cp311-win_amd64.whl", hash = "sha256:e8b254a02c2cf27b05e29630580d8a4604e51a2526b025d878101c790f219120" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "torch" },
+    { name = "torchvision" },
 ]
 
 [[package]]
@@ -149,7 +171,7 @@ wheels = [
 [[package]]
 name = "flex-gemm"
 version = "0.0.1"
-source = { path = "wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" }
+source = { url = "https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" }
 dependencies = [
     { name = "filelock" },
     { name = "numpy" },
@@ -157,7 +179,7 @@ dependencies = [
     { name = "triton-windows" },
 ]
 wheels = [
-    { filename = "flex_gemm-0.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:71658a676bfc8e7d7b15550a4a502c759e6f315a064cb990a0235d1d1dd2d9ad" },
+    { url = "https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:71658a676bfc8e7d7b15550a4a502c759e6f315a064cb990a0235d1d1dd2d9ad" },
 ]
 
 [package.metadata]
@@ -175,16 +197,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/00/78/f34251dadb8f3921264a1d9b8946f5e542014ee2614b285261b4e40e6775/fsspec-2026.7.0.tar.gz", hash = "sha256:c803c40f4cf860b49dea58ee3e1c33cb9c790520e233537e1340049f89b82a88", size = 317040, upload-time = "2026-07-28T16:34:51.052Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/3c/6a2bf344106328fd04963664a60b9bb6496fc25df8e962fcdc1367285fb9/fsspec-2026.7.0-py3-none-any.whl", hash = "sha256:b57ddbafedfaef7018c1ecab32aa200a9d7ca26b77965f64e48b70061249d279", size = 206583, upload-time = "2026-07-28T16:34:49.538Z" },
-]
-
-[[package]]
-name = "glcontext"
-version = "3.0.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3a/80/8238a0e6e972292061176141c1028b5e670aa8c94cf4c2f819bd730d314e/glcontext-3.0.0.tar.gz", hash = "sha256:57168edcd38df2fc0d70c318edf6f7e59091fba1cd3dadb289d0aa50449211ef", size = 16422, upload-time = "2024-08-10T20:01:20.004Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b5/fd/4f59118e5067a3c88217862d8672463aff29f29c1ea9f47971f8ca67e83c/glcontext-3.0.0-cp311-cp311-win32.whl", hash = "sha256:b31808ca2517fedcac8ca5b296ff46c8af012911eaa2080889a1f244d329ef9a", size = 12222, upload-time = "2024-08-10T20:00:18.108Z" },
-    { url = "https://files.pythonhosted.org/packages/20/1b/f402574ae4644e7fb389b9534de9d1be575b8a4da901a9023d1cec72c4aa/glcontext-3.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:ef4b4ec35e2b720f4cd250bb92cf6417add445490bf780345596da5a796a0e6f", size = 12975, upload-time = "2024-08-10T20:00:19.236Z" },
 ]
 
 [[package]]
@@ -443,19 +455,6 @@ wheels = [
 ]
 
 [[package]]
-name = "moderngl"
-version = "5.12.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "glcontext" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/da/52/540e2f8c45060bb2709f56eb5a44ae828dfcc97ccecb342c1a7deb467889/moderngl-5.12.0.tar.gz", hash = "sha256:52936a98ccb2f2e1d6e3cb18528b2919f6831e7e3f924e788b5873badce5129b", size = 193232, upload-time = "2024-10-17T12:36:28.002Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/dd/74d300275fe4834e63b8d70450801f206d005f2047898d4eb2a30efc3913/moderngl-5.12.0-cp311-cp311-win32.whl", hash = "sha256:9fdb76f1fd890db67727c8cdee4db2ee6319068c7ce92be0308366f8745e28ab", size = 101043, upload-time = "2024-10-17T12:36:58.281Z" },
-    { url = "https://files.pythonhosted.org/packages/7f/08/5f615a4605d343cd5c1112d2b175270e6a5586008bc10a85b822c340cf86/moderngl-5.12.0-cp311-cp311-win_amd64.whl", hash = "sha256:0c210e8d52a60025f6586ca015c39feb1e57e6dc792c3ff44800f6493a541b1a", size = 108279, upload-time = "2024-10-17T12:37:01.125Z" },
-]
-
-[[package]]
 name = "mpmath"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -527,31 +526,9 @@ wheels = [
 ]
 
 [[package]]
-name = "nvdiffrast"
-version = "0.4.0"
-source = { path = "wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" }
-dependencies = [
-    { name = "numpy" },
-]
-wheels = [
-    { filename = "nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl", hash = "sha256:7362a491d8012f3cd4b9097b029fc97161dbdf965a0658be313fbb8a64dfa3f0" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "numpy" }]
-
-[[package]]
-name = "nvdiffrec-render"
-version = "0.0.0"
-source = { path = "wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" }
-wheels = [
-    { filename = "nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:2bc74423d15cce8dc7ee2db3741e6cc71e700f485cb51fd86f26c53b2755cab1" },
-]
-
-[[package]]
-name = "o-voxel"
-version = "0.0.1"
-source = { path = "wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" }
+name = "o-voxel-vb-ap"
+version = "0.0.1+cu128torch2.8"
+source = { url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/o_voxel_vb_ap-latest/o_voxel_vb_ap-0.0.1%2Bcu128torch2.8-cp311-cp311-win_amd64.whl" }
 dependencies = [
     { name = "easydict" },
     { name = "numpy" },
@@ -562,7 +539,7 @@ dependencies = [
     { name = "zstandard" },
 ]
 wheels = [
-    { filename = "o_voxel-0.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:531e370e7768d32a438ca7ebbdc5d7644cb3b9c4838f2539c6768dc464cb3145" },
+    { url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/o_voxel_vb_ap-latest/o_voxel_vb_ap-0.0.1%2Bcu128torch2.8-cp311-cp311-win_amd64.whl", hash = "sha256:98ce8f3121a667ccbe0a261ea0b8b6c71ee15e6894ecb742dfa3108a8974c630" },
 ]
 
 [package.metadata]
@@ -623,7 +600,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "python-dateutil" },
-    { name = "tzdata", marker = "sys_platform == 'emscripten' or sys_platform == 'win32'" },
+    { name = "tzdata" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/be/4f/5f3422a2afec5ffc46308b79e53291365a93748b498ac2e58bead0197916/pandas-3.0.5.tar.gz", hash = "sha256:dca3734d6ab7c906e6730f0788b0a1dbb9f2467731f9711f77995c8e9d62d712", size = 4658219, upload-time = "2026-07-22T22:19:28.819Z" }
 wheels = [
@@ -955,6 +932,7 @@ dependencies = [
 [package.optional-dependencies]
 trellis2 = [
     { name = "cumesh", marker = "sys_platform == 'win32'" },
+    { name = "drtk", marker = "sys_platform == 'win32'" },
     { name = "easydict", marker = "sys_platform == 'win32'" },
     { name = "flex-gemm", marker = "sys_platform == 'win32'" },
     { name = "imageio", marker = "sys_platform == 'win32'" },
@@ -962,9 +940,7 @@ trellis2 = [
     { name = "kornia", marker = "sys_platform == 'win32'" },
     { name = "lpips", marker = "sys_platform == 'win32'" },
     { name = "ninja", marker = "sys_platform == 'win32'" },
-    { name = "nvdiffrast", marker = "sys_platform == 'win32'" },
-    { name = "nvdiffrec-render", marker = "sys_platform == 'win32'" },
-    { name = "o-voxel", marker = "sys_platform == 'win32'" },
+    { name = "o-voxel-vb-ap", marker = "sys_platform == 'win32'" },
     { name = "opencv-python-headless", marker = "sys_platform == 'win32'" },
     { name = "pandas", marker = "sys_platform == 'win32'" },
     { name = "safetensors", marker = "sys_platform == 'win32'" },
@@ -974,25 +950,23 @@ trellis2 = [
     { name = "torchvision", marker = "sys_platform == 'win32'" },
     { name = "transformers", marker = "sys_platform == 'win32'" },
     { name = "trimesh", marker = "sys_platform == 'win32'" },
-    { name = "utils3d", marker = "sys_platform == 'win32'" },
     { name = "xformers", marker = "sys_platform == 'win32'" },
     { name = "zstandard", marker = "sys_platform == 'win32'" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "cumesh", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" },
+    { name = "cumesh", marker = "sys_platform == 'win32' and extra == 'trellis2'", url = "https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/cumesh-1.0-cp311-cp311-win_amd64.whl" },
+    { name = "drtk", marker = "sys_platform == 'win32' and extra == 'trellis2'", url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/drtk-latest/drtk-0.1.0%2Bcu128torch2.8-cp311-cp311-win_amd64.whl" },
     { name = "easydict", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
-    { name = "flex-gemm", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" },
+    { name = "flex-gemm", marker = "sys_platform == 'win32' and extra == 'trellis2'", url = "https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" },
     { name = "imageio", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "imageio-ffmpeg", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "kornia", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "lpips", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "ninja", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "numpy", specifier = "==2.4.6" },
-    { name = "nvdiffrast", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" },
-    { name = "nvdiffrec-render", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" },
-    { name = "o-voxel", marker = "sys_platform == 'win32' and extra == 'trellis2'", path = "wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" },
+    { name = "o-voxel-vb-ap", marker = "sys_platform == 'win32' and extra == 'trellis2'", url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/o_voxel_vb_ap-latest/o_voxel_vb_ap-0.0.1%2Bcu128torch2.8-cp311-cp311-win_amd64.whl" },
     { name = "onnxruntime", specifier = "==1.27.0" },
     { name = "opencv-python-headless", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
     { name = "pandas", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
@@ -1005,7 +979,6 @@ requires-dist = [
     { name = "torchvision", marker = "sys_platform == 'win32' and extra == 'trellis2'", specifier = "==0.23.0", index = "https://download.pytorch.org/whl/cu128" },
     { name = "transformers", marker = "sys_platform == 'win32' and extra == 'trellis2'", specifier = "==5.14.1" },
     { name = "trimesh", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
-    { name = "utils3d", marker = "sys_platform == 'win32' and extra == 'trellis2'", git = "https://github.com/EasternJournalist/utils3d.git?rev=9a4eb15e4021b67b12c460c7057d642626897ec8" },
     { name = "xformers", marker = "sys_platform == 'win32' and extra == 'trellis2'", specifier = "==0.0.32.post2", index = "https://download.pytorch.org/whl/cu128" },
     { name = "zstandard", marker = "sys_platform == 'win32' and extra == 'trellis2'" },
 ]
@@ -1180,7 +1153,7 @@ version = "0.27.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama" },
     { name = "rich" },
     { name = "shellingham" },
 ]
@@ -1214,17 +1187,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
-]
-
-[[package]]
-name = "utils3d"
-version = "0.0.2"
-source = { git = "https://github.com/EasternJournalist/utils3d.git?rev=9a4eb15e4021b67b12c460c7057d642626897ec8#9a4eb15e4021b67b12c460c7057d642626897ec8" }
-dependencies = [
-    { name = "moderngl" },
-    { name = "numpy" },
-    { name = "plyfile" },
-    { name = "scipy" },
 ]
 
 [[package]]

@@ -1,0 +1,27 @@
+{
+  "id": "unirig-win",
+  "platform": "win32-x64",
+  "project": "runtimes/unirig",
+  "sources": [
+    {
+      "url": "https://codeload.github.com/VAST-AI-Research/UniRig/zip/6793c6640ff01c8fb389f3993434124bb43d2933",
+      "bytes": 22897461,
+      "sha256": "a8a59be5b7afa9be2da47fc0ac01423c9288cbb1f614eb63a2343d798a569ba3",
+      "path": "unirig",
+      "zip": true
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mcfletch/pyopengl/release-3.1.0/license.txt",
+      "bytes": 11117,
+      "sha256": "2755e9eea3c914a1549fa824bd466bed408d3fe347337476e87f42a2c4986d93",
+      "path": "notices/PyOpenGL.txt",
+      "zip": false
+    }
+  ],
+  "check": "runtimes/check_unirig.py",
+  "environment": {
+    "SPRITEBOOK_UNIRIG_HOME": "unirig",
+    "SPRITEBOOK_UNIRIG_PYTHON": ".venv/Scripts/python.exe"
+  },
+  "notes": "External Windows cp311 environment: Torch 2.7/cu128, NumPy 1.26.4, exact flash/PyG/spconv wheels in unirig/uv.lock. Keep PTv3 standard attention and 17.4 GiB admission floor. UniRig weights are MIT; its source archive contains GPL Michelangelo code and bpy is GPL, confined to external subprocesses. No model wheel/source is app-bundled. PyOpenGL's prebuilt universal piwheels wheel has 2131 Python files matching the official 3.1.0 sdist (SHA 9b47c5c3a094fa518ca88aeed35ae75834d53e4285512c61879f67a48c94ddaf), no native/DLL payload; retain its complete notice. Unused OmegaConf/wandb are omitted. The sidecar supplies its own architecture facts from MIT fairseq/UniRig plus Apache Transformers defaults; no restricted Meta OPT config, weights or tokenizer are downloaded for the local1 version."
+}

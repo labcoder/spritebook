@@ -2,7 +2,7 @@
 name = "spritebook-sidecar"
 version = "0.1.0"
 description = "SpriteBook local Python sidecar: model adapters over localhost NDJSON (P3-T2)"
-# Upper bound because of the `trellis2` extra: its five CUDA extension wheels
+# Upper bound because of the `trellis2` extra: its CUDA extension wheels
 # are cp311-only, and uv solves the lock for the WHOLE requires-python range —
 # so `>=3.11` would ask it to find cp312/cp313 builds that do not exist. The
 # app already pins 3.11 in .python-version; this makes the lock agree.
@@ -38,14 +38,11 @@ trellis2 = [
     # needs a compiler (the wheels-only law) — so this is not optional
     "xformers==0.0.32.post2 ; sys_platform == 'win32'",
     "transformers==5.14.1 ; sys_platform == 'win32'",
-    # the five prebuilt CUDA extensions, sha256-pinned in
-    # sidecar/wheels/wheels.lock.json and resolved from disk below
+    # the permitted prebuilt CUDA extensions, byte-pinned by uv.lock
     "cumesh==1.0 ; sys_platform == 'win32'",
     "flex-gemm==0.0.1 ; sys_platform == 'win32'",
-    "nvdiffrast==0.4.0 ; sys_platform == 'win32'",
-    "nvdiffrec-render==0.0.0 ; sys_platform == 'win32'",
-    "o-voxel==0.0.1 ; sys_platform == 'win32'",
-    "utils3d ; sys_platform == 'win32'",
+    "drtk==0.1.0+cu128torch2.8 ; sys_platform == 'win32'",
+    "o-voxel-vb-ap==0.0.1+cu128torch2.8 ; sys_platform == 'win32'",
     # upstream's support set (setup.sh). `opencv-python-headless` is not
     # decoration: o_voxel imports cv2 at module scope.
     "easydict ; sys_platform == 'win32'",
@@ -75,17 +72,12 @@ explicit = true
 torch = { index = "pytorch-cu128" }
 torchvision = { index = "pytorch-cu128" }
 xformers = { index = "pytorch-cu128" }
-# Vendored, and verified before install: these are community builds from a
-# single maintainer's raw.githubusercontent URL that can move under us, so the
-# bytes are pinned by sha256 and checked with
-# `python sidecar/fetch_wheels.py --verify` BEFORE `uv sync`.
-cumesh = { path = "wheels/cumesh-1.0-cp311-cp311-win_amd64.whl" }
-flex-gemm = { path = "wheels/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" }
-nvdiffrast = { path = "wheels/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl" }
-nvdiffrec-render = { path = "wheels/nvdiffrec_render-0.0.0-cp311-cp311-win_amd64.whl" }
-o-voxel = { path = "wheels/o_voxel-0.0.1-cp311-cp311-win_amd64.whl" }
-# no PyPI release; the pin is the commit
-utils3d = { git = "https://github.com/EasternJournalist/utils3d.git", rev = "9a4eb15e4021b67b12c460c7057d642626897ec8" }
+# Optional Windows artifacts are fetched into uv's cache, never copied into app resources.
+# Their complete bytes are pinned in uv.lock; source/build provenance and notices live in runtimes/.
+cumesh = { url = "https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/cumesh-1.0-cp311-cp311-win_amd64.whl" }
+flex-gemm = { url = "https://raw.githubusercontent.com/visualbruno/ComfyUI-Trellis2/438fe4e2a15bd29620a1cedad0a87c5afad6f81d/wheels/Windows/Torch280/flex_gemm-0.0.1-cp311-cp311-win_amd64.whl" }
+drtk = { url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/drtk-latest/drtk-0.1.0%2Bcu128torch2.8-cp311-cp311-win_amd64.whl" }
+o-voxel-vb-ap = { url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/o_voxel_vb_ap-latest/o_voxel_vb_ap-0.0.1%2Bcu128torch2.8-cp311-cp311-win_amd64.whl" }
 
 [tool.uv]
 # rembg -> pymatting -> numba: without this floor the resolver walks numba back
