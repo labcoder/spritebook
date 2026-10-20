@@ -12,7 +12,8 @@ from typing import Any
 
 from . import Adapter, AdapterError, Emitter, validate_params
 
-VERSION = "0.1.0"
+VERSION = "0.1.2"
+EXPORT_TO_CANONICAL = ((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0), (0, 0, 0, 1))
 PARAMS_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": ["imagePath", "outDir", "seed", "modelDir"],
@@ -37,7 +38,7 @@ def camera_params(fov: float) -> dict[str, float]:
     if not math.isfinite(fov) or not 0.05 <= fov <= 1.5:
         raise AdapterError("bad-params", "Pixal3D fov must be finite and between 0.05 and 1.5 radians.")
     # Official manual-FOV distance_from_fov at mesh_scale=1, zero extended pixels.
-    return {"camera_angle_x": fov, "distance": 1 / math.tan(fov / 2), "mesh_scale": 1.0}
+    return {"camera_angle_x": fov, "distance": 0.5 / math.tan(fov / 2), "mesh_scale": 1.0}
 
 
 def generate(p: dict[str, Any], emit: Emitter) -> None:
@@ -85,8 +86,8 @@ def generate(p: dict[str, Any], emit: Emitter) -> None:
                      coords=mesh.coords, attr_layout=mesh.layout, voxel_size=mesh.voxel_size,
                      aabb=[[-0.5] * 3, [0.5] * 3], decimation_target=int(p["decimationTarget"]),
                      texture_size=int(p["textureSize"]), remesh=True, remesh_band=1, remesh_project=0)
-        # Official Pixal inference.py orientation after the upstream exporter conversion.
-        glb.apply_transform([[-1, 0, 0, 0], [0, 0, -1, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
+        # Pixal's projection is already Y-up/+Z-front; undo the TRELLIS exporter's Z-up conversion.
+        glb.apply_transform(EXPORT_TO_CANONICAL)
         validate_mesh(glb.vertices, glb.vertex_normals, glb.visual.uv, glb.faces.reshape(-1))
         path = out_dir / ("raw.glb" if index == 0 else f"raw-{index}.glb")
         glb.export(str(path))
@@ -99,7 +100,8 @@ def generate(p: dict[str, Any], emit: Emitter) -> None:
     meta = {"adapter": "pixal3d", "adapterVersion": VERSION, "requestedSeed": entries[0]["requestedSeed"],
             "effectiveSeed": entries[0]["effectiveSeed"], "seedsTried": entries[0]["seedsTried"],
             "candidates": entries, "pipelineType": "1024_cascade", "lowVram": True,
-            "cameraMode": "manual-fov", "camera": camera, "naf": "strict", "loadSeconds": load_seconds,
+            "cameraMode": "manual-fov", "camera": camera, "coordinateFrame": "y-up-z-forward",
+            "naf": "strict", "loadSeconds": load_seconds,
             "runSeconds": round(sum(e["runSeconds"] for e in entries), 2), **vram_peaks()}
     path = out_dir / "gen-meta.json"
     path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")

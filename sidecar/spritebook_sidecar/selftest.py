@@ -1369,8 +1369,16 @@ def test_pixal3d_boundaries(tmp: Path) -> None:
     from .adapters import pixal3d
     from .adapters.pixal3d_local import local_file
 
-    ok(abs(pixal3d.camera_params(math.pi / 3)["distance"] - math.sqrt(3)) < 1e-12,
-       "manual camera projects the unit box to the image at a 60-degree FOV")
+    camera = pixal3d.camera_params(math.pi / 3)
+    focal_pixels = 256 / math.tan(math.pi / 6)
+    left_edge = 256 - focal_pixels * 0.5 / camera["distance"]
+    right_edge = 256 + focal_pixels * 0.5 / camera["distance"]
+    ok(abs(left_edge) < 1e-10 and abs(right_edge - 512) < 1e-10,
+       "upstream unit cube [-0.5, 0.5] projects to both image edges, not the middle half")
+    exporter = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
+    canonical = np.asarray(pixal3d.EXPORT_TO_CANONICAL) @ exporter
+    ok(np.array_equal(canonical @ [0, 1, 0, 0], [0, 1, 0, 0]), "Pixal's image vertical remains canonical +Y")
+    ok(np.array_equal(canonical @ [0, 0, 1, 0], [0, 0, 1, 0]), "Pixal's observed face remains canonical +Z, not the back")
     for value in (float("nan"), float("inf"), 0, 1.6):
         try:
             pixal3d.camera_params(value)
