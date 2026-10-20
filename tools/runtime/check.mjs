@@ -260,7 +260,11 @@ if (gpuArg === '--gpu') {
   ) {
     prior[path] = createHash('sha256').update(await readFile(path)).digest('hex');
   }
-  const addon = join(runtime, 'node_modules/webgpu/dist', `${process.platform}-${process.arch}`);
+  const addon = join(
+    runtime,
+    'node_modules/webgpu/dist',
+    process.platform === 'darwin' ? 'darwin-universal' : `${process.platform}-${process.arch}`,
+  );
   for (const file of ['dawn.node', ...(process.platform === 'win32' ? ['vulkan-1.dll'] : [])]) {
     const path = join(addon, file);
     await rename(path, `${path}.missing`);

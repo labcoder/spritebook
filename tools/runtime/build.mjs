@@ -141,7 +141,8 @@ try {
         }
       }
     } else if (name === 'webgpu') {
-      for (const path of ['package.json', 'index.js', 'LICENSE.md', `dist/${target}/dawn.node`]) {
+      const addon = process.platform === 'darwin' ? 'darwin-universal' : target;
+      for (const path of ['package.json', 'index.js', 'LICENSE.md', `dist/${addon}/dawn.node`]) {
         await copy(join(source, path), join(to, path));
       }
       if (process.platform === 'win32') await installVulkan(join(to, 'dist', target));
