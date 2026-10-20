@@ -50,7 +50,12 @@ export async function* prepareModelRuntime(
   try {
     const ready = await readModelRuntime(info).catch(() => undefined);
     const uv = process.env.SPRITEBOOK_UV_BIN ?? 'uv';
-    const env = { ...process.env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' };
+    const env = {
+      ...process.env,
+      PYTHONUTF8: '1',
+      PYTHONDONTWRITEBYTECODE: '1',
+      UV_PYTHON_PREFERENCE: 'only-managed',
+    };
     if (!ready) {
       stage = await fs.mkdtemp(`${info.root}.staging-`);
       await fs.mkdir(join(stage, 'downloads'));
@@ -74,7 +79,6 @@ export async function* prepareModelRuntime(
         '--no-project',
         '--python',
         '3.11.16',
-        '--managed-python',
         join(info.sidecarDir, 'runtimes/unpack.py'),
         info.recipePath,
         stage,
