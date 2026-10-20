@@ -4,6 +4,37 @@
 pass. The [qualification receipt](qualification/model-workflow-windows-x64.json) records exact
 artifacts and results. No model default, app-bundling rule or platform scope was waived.
 
+## Pixal3D extension — F4-T6/T7
+
+The approved extension is complete on the same Windows x64 / RTX 3090 host. The
+[Pixal3D qualification receipt](qualification/pixal3d-windows-x64.json) pins functional commit
+`767a698`, its private NSIS installer, all **6,157 runtime file seals**, complete model/source
+receipts and raw proof hashes. The [hardware/platform spike](model-platform-spike.md) records the
+model comparison, inspected images and exact Mac/Linux candidates.
+
+Pixal3D is an optional catalog-managed single-view PBR generator, with real NAF, local-only DINOv3,
+manual camera FOV and a separate frozen runtime. Native admission, empty-PATH Unicode installation,
+generation/pick, UniRig, core preview, 144-frame styled/AOV bake, all four exporters and actual
+Tauri model-manager/read projections pass. The two-candidate job takes **295.12 s**, with **17.53
+GiB Torch reserved / 14.22 GiB allocated** and a sampled worker peak of **24.15 GiB working set /
+46.87 GiB private commit**. Keep 24 GiB card admission and the 64 GiB qualification host.
+
+The controlled repeat exposed non-repeatable GPU mesh reduction. Adapter 0.2.0 preserves native
+remesh/UV/PBR processing, using canonical mesh ordering plus pinned CPU reduction/normal sums. Both
+candidates' raw and canonical GLBs repeat byte-for-byte after an actual killed-worker retry.
+Prepared-source corruption refuses execution; setup repairs it while preserving weights and accepted
+assets. Offline inference records zero outbound attempts. Warm baking reuses 100% of frames and
+preserves all five AOV pages after rig acceptance. Existing F4 accepted assets/bakes also retain
+their original hashes.
+
+The 52-joint rig and all sprite directions/clips were reviewed and explicitly accepted for this
+bounded functional proof. Eight deformation advisories and unmapped `root`/`thigh_r` remain F3-T1
+quality work; 0.545% idle flicker is measured on this fixture. TRELLIS.2 remains the default. The
+latest affected suites pass **68/69 Node cases** with one existing weight-gated skip, plus **534
+Python checks**, types/lint and native admission. The earlier 903-case migration suite remains its
+own evidence and was not rerun wholesale. Native other-platform, clean-machine, signing,
+distribution-notice, engine-import and soak gates remain F7 work.
+
 ## Current evidence
 
 - [x] Complete TRELLIS.2 `af44b45f.local1` catalog version: all original weights, local sparse

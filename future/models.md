@@ -1,9 +1,11 @@
 # Models and local generation
 
 Research updated **2026-10-19**. The [hardware/platform spike](model-platform-spike.md) adds actual
-RTX 3090 experiments, pinned Mac ports and exact memory/download distinctions. Pixal3D is now
-integrated through the catalog and isolated Python runtime; final installed workflow qualification
-is F4-T6. Broader model coverage below remains proposed until separately qualified.
+RTX 3090 experiments, pinned Mac ports and exact memory/download distinctions. Pixal3D is integrated
+through the catalog and isolated Python runtime, with
+[installed Windows x64 qualification](qualification/pixal3d-windows-x64.json). Broader model
+coverage below remains proposed until separately qualified; TripoSR has a measured evaluation
+variant.
 
 **Implementation scope:** retain Tauri and the TypeScript core while replacing Deno, as confirmed by
 the maintainer. Python/C++ model runners remain external components, not a proposal to port product

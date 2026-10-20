@@ -136,7 +136,9 @@ because Pixal's projection is already Y-up/+Z-front; the standalone upstream vie
 rotation would show the back as SpriteBook's front. The camera, canonical frame and strict NAF use
 are recorded in generation metadata. It requires a nonempty cut-out RGBA image and its declared
 local DINOv3/NAF files. No MoGe, BRIA, multiview or Pixal retexture capability is implied. Full
-generation/hardware qualification is recorded separately in F4-T6/T7.
+generation/hardware qualification is recorded in
+[the F4 receipt](../future/qualification/pixal3d-windows-x64.json) and
+[platform spike](../future/model-platform-spike.md).
 
 The Pixal worker runs its owned script in the isolated interpreter and loads only the
 `spritebook_sidecar` package. It never adds the base sidecar's entire `site-packages` directory to

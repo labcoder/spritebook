@@ -1,7 +1,8 @@
 # SpriteBook's next version
 
 **Start here.** This is a decision set for a substantial remake that preserves SpriteBook's product
-vision. Research date: **2026-10-18**. Repository base: `42be3bbebfc783edb42fb64001aa9b2e3d638c98`.
+vision. Original research date: **2026-10-18**; model/platform investigation updated **2026-10-19**.
+Repository review base: `42be3bbebfc783edb42fb64001aa9b2e3d638c98`.
 
 **Confirmed by the maintainer:** keep Tauri as the desktop shell, keep TypeScript as the main
 product core and CLI, and replace Deno. These choices are settled for this migration; GPUI, separate
@@ -16,12 +17,15 @@ complete; [the evidence and preservation matrix](baseline.md) records the curren
 known failures and unverified targets. [F1 safety repairs are complete](state-safety.md).
 [F2's Windows renderer and installer proof is complete](renderer-qualification.md), with the
 additional native platforms deferred to F7 and release notice/prerequisite/signing gates explicit.
-**F4-T1 through F4-T5 are complete:** main runs the compiled TypeScript core/CLI on Node 24.22.0.
-[Windows parity and installed proofs pass](runtime-cutover.md), including the
+**F4 is complete within its Windows x64 scope:** main runs the compiled TypeScript core/CLI on Node
+24.22.0. [Windows parity and installed proofs pass](runtime-cutover.md), including the
 [existing model provisioning/licensing gate](model-provisioning-gate.md), real offline generation,
-retexture, UniRig, sprites and recovery. The maintainer extended F4 with Pixal3D integration and a
-practical model/platform spike (F4-T6/T7); F4 remains open for that work. F7 retains release and
-deferred native-platform qualification; no public release is claimed.
+retexture, UniRig, sprites and recovery. The approved Pixal3D extension also passes installed
+generation/rig/sprites, offline operation, exact fresh-worker replay and repair:
+[qualification](qualification/pixal3d-windows-x64.json). The
+[hardware/platform spike](model-platform-spike.md) adds measured TripoSR experiments and sourced
+Mac/Linux requirements. F7 retains release and deferred native-platform qualification; no public
+release is claimed. TRELLIS.2 remains the default.
 
 ## Recommendation in one paragraph
 
@@ -42,6 +46,7 @@ migration problems either.
 | [Architecture review](architecture-review.md)            | What actually runs today; what is worth keeping; what safety, CLI, UI, cache and delivery gaps need repair?                  |
 | [Deno replacement](runtime-migration.md)                 | What must move, which GPU/runtime paths are credible, and how do we preserve data and output behavior?                       |
 | [Model landscape](models.md)                             | Which text/image-to-3D models and implementations deserve trials on Windows, Mac and Linux, under which terms and resources? |
+| [Model hardware/platform spike](model-platform-spike.md) | What ran on the RTX 3090, which Mac/Linux runners are credible, and what memory, disk, terms and quality limits apply?       |
 | [Desktop and language decisions](technology-options.md)  | What is settled about Tauri and TypeScript, what still needs validation, and which alternatives are now historical research? |
 | [Hugging Face and model management](model-management.md) | What HF integration exists, should we retain it, and how should authentication, caches, pins and offline inference work?     |
 | [Migration roadmap](roadmap.md)                          | What is the required execution order, what evidence closes each task, and which model/UX improvements come later?            |
@@ -62,8 +67,9 @@ migration problems either.
 - **The desktop and core language decision is made.** Keep Tauri and TypeScript; the GPUI and
   separate-native-app investigations are retained as historical context, with no planned UI or
   core-language replacement. [Decision boundaries](technology-options.md).
-- **There is no identified HF Desktop app dependency.** Actual usage is Hub artifacts and Python
-  client/cache behavior, with a hidden provisioning gap. [HF review](model-management.md).
+- **There is no identified HF Desktop app dependency.** Retain Hub artifacts and explicit personal
+  access/terms gates behind owned, pinned runner profiles. The F4 provisioning gap is repaired.
+  [HF review](model-management.md).
 - **F1 repairs the reproduced state-consistency defects.** Undo now restores canonical bytes;
   transactions recover under one writer; desktop jobs and core reads share clear ownership.
   [Implemented behavior and verification](state-safety.md).
@@ -82,7 +88,7 @@ Upstream branches and terms are moving targets; pin/review them again when imple
 F0 subsequently ran the Windows suite/control and source build checks; its
 [baseline report](baseline.md) distinguishes passes, setup-dependent failures, diagnostic failures
 and unverified platforms. F1, Windows F2 and the Node cutover now have separate execution receipts.
-The next implementation work is **F4-T6/T7**, followed by F7 release qualification. Follow the
+The next implementation work is **F7 release qualification**. Follow the
 [roadmap's ordered changes](roadmap.md#first-implementation-changes).
 [D-041 and D-042](../docs/internal/decisions.md) record the stack and repository decisions. Model
 selection and hardware support remain qualification work, not newly certified by this plan.

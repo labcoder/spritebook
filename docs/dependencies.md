@@ -155,16 +155,16 @@ runtime dependencies still install from frozen prebuilt wheels; no user compiler
 [`docs/internal/proofs/backends.md`](internal/proofs/backends.md). The ✓ marks below were
 planning-era and described MODELS; the rows now describe STACKS, which is what ships.**
 
-| Backend          | License (model)           | Status                                                                                                                                                             |
-| ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **TRELLIS.2 4B** | MIT (weights)             | Windows DRTK path passes installed F4 qualification; see exact component terms below. Measured **3.01 GiB** at shipped defaults, 16.53 GiB at `lowVram=false`      |
-| Pixal3D          | MIT plus DINOv3 terms     | Pinned cp311/Torch 2.8/cu128 SM86 NATTEN wheel and real NAF/native admission pass. Model-managed setup passes; full generation/workflow qualification is F4-T6.    |
-| TripoSplat       | MIT                       | ✗ **not applicable**: emits gaussians, not a mesh (invariant 4)                                                                                                    |
-| Hunyuan3D 2.x    | Tencent Community License | ✗ **excludes EU/UK/KR** — territory carve-out; only ever a user-installed gated extra, never a default                                                             |
-| TripoSG          | MIT (repo only)           | ✗ `NOTICE` discloses HunyuanDiT + FlashVDM (Tencent community licences) and BRIA RMBG-1.4; shape-only                                                              |
-| Step1X-3D        | Apache-2.0                | ✗ source builds (`custom_rasterizer`, `differentiable_renderer`, PyTorch3D-from-git); Linux-only. **Best-licensed candidate — revisit if it ships Windows wheels** |
-| Direct3D-S2      | MIT                       | ✗ `torchsparse` builds from source; shape-only                                                                                                                     |
-| `fixture-gen`    | MIT (ours)                | ✓ weightless, CPU, all platforms — the reason macOS/win-arm64 degrade rather than break                                                                            |
+| Backend          | License (model)           | Status                                                                                                                                                                                        |
+| ---------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **TRELLIS.2 4B** | MIT (weights)             | Windows DRTK path passes installed F4 qualification; see exact component terms below. Measured **3.01 GiB** at shipped defaults, 16.53 GiB at `lowVram=false`                                 |
+| Pixal3D          | MIT plus DINOv3 terms     | Pinned cp311/Torch 2.8/cu128 SM86 NATTEN wheel and real NAF/native admission pass. Installed generation/rig/sprites, offline recovery and exact fresh-worker replay pass; see F4-T6 evidence. |
+| TripoSplat       | MIT                       | ✗ **not applicable**: emits gaussians, not a mesh (invariant 4)                                                                                                                               |
+| Hunyuan3D 2.x    | Tencent Community License | ✗ **excludes EU/UK/KR** — territory carve-out; only ever a user-installed gated extra, never a default                                                                                        |
+| TripoSG          | MIT (repo only)           | ✗ `NOTICE` discloses HunyuanDiT + FlashVDM (Tencent community licences) and BRIA RMBG-1.4; shape-only                                                                                         |
+| Step1X-3D        | Apache-2.0                | ✗ source builds (`custom_rasterizer`, `differentiable_renderer`, PyTorch3D-from-git); Linux-only. **Best-licensed candidate — revisit if it ships Windows wheels**                            |
+| Direct3D-S2      | MIT                       | ✗ `torchsparse` builds from source; shape-only                                                                                                                                                |
+| `fixture-gen`    | MIT (ours)                | ✓ weightless, CPU, all platforms — the reason macOS/win-arm64 degrade rather than break                                                                                                       |
 
 ### Selected TRELLIS.2 Windows runtime
 
@@ -202,27 +202,36 @@ and redistribution terms; it is not MIT. Its exact license SHA-256 is
 website's “Built with DINOv3” clause. Preserve the applicable agreement and explicit acceptance; do
 not substitute a blanket attribution or output-rights claim.
 
-### Pixal3D Windows integration under qualification
+### Pixal3D Windows integration ? RTX 3090 qualified
 
 F4-T6 uses official TencentARC/Pixal3D source and MIT single-view checkpoints, with the same
 separately gated DINOv3 snapshot/agreement described above. It is an optional user-provisioned
-runtime, never an application-bundled model stack. Qualification is in progress; no default or
-additional platform support is implied.
+runtime, never an application-bundled model stack. The
+[installed Windows qualification](../future/qualification/pixal3d-windows-x64.json) passes; no
+default or additional platform support is implied.
 
-| Component                                          | Role and terms                                 | Selected path                                                                                                                                                                                                               |
-| -------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pixal3D                                            | MIT code/checkpoints; retain upstream NOTICE   | Official source `f7cf38429b0bd264f1995f0f8743a88b1c728b94`; model snapshot `b0cb2e1b794cab9aa0ac38a95d794a4d9337437f`; single-view files only                                                                               |
-| NAF                                                | Apache-2.0 source/checkpoint                   | `valeoai/NAF@37f2dfc180f2de53d98bd601109c0da0dd6b0f43`; local strict checkpoint loading, no unpinned Torch Hub                                                                                                              |
-| NATTEN 0.21.6                                      | MIT native neighborhood attention              | cp311 / Torch 2.8 / CUDA 12.8 wheel; `cuda-wheels@ff5b37255bf073887f42c58fec49254699b3c8f6`, job 76701762292; native SM86 dispatch must pass                                                                                |
-| CUTLASS                                            | BSD-3-Clause kernels used by NATTEN            | Source `6b3e607b852f1543dc21323155a2ad71473c8642`; preserve its additional notice omitted from the wheel                                                                                                                    |
-| Torch 2.8 / torchvision 0.23 / Transformers 4.57.3 | BSD-3 / Apache-2.0 plus bundled native notices | Isolated frozen environment; upstream SDPA path, no FlashAttention source build                                                                                                                                             |
-| DRTK / CuMesh / flex-GEMM / O-Voxel                | Existing audited export/native dependencies    | Reuse the selected external TRELLIS stack and complete notices, including Eigen MPL-2.0; no evaluation-only NVIDIA rasterizers                                                                                              |
-| fast-simplification 0.2.0                          | MIT native CPU quadric reduction               | Prebuilt cp311 Windows wheel, SHA-256 `c83791c8af1db1156753a3cb723e4eeffc2bf9fc46751894c90338d6fc7f779c`; wheel retains MIT license. CPU reduction/normals remove measured CuMesh replay drift; remesh/UV/PBR remain native |
+| Component                                          | Role and terms                                    | Selected path                                                                                                                                                                                                                       |
+| -------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pixal3D                                            | MIT code/checkpoints; retain upstream NOTICE      | Official source `f7cf38429b0bd264f1995f0f8743a88b1c728b94`; model snapshot `b0cb2e1b794cab9aa0ac38a95d794a4d9337437f`; single-view files only                                                                                       |
+| NAF                                                | Apache-2.0 source/checkpoint                      | `valeoai/NAF@37f2dfc180f2de53d98bd601109c0da0dd6b0f43`; local strict checkpoint loading, no unpinned Torch Hub                                                                                                                      |
+| NATTEN 0.21.6                                      | MIT native neighborhood attention                 | cp311 / Torch 2.8 / CUDA 12.8 wheel; `cuda-wheels@ff5b37255bf073887f42c58fec49254699b3c8f6`, job 76701762292; native SM86 dispatch must pass                                                                                        |
+| CUTLASS                                            | BSD-3-Clause kernels used by NATTEN               | Source `6b3e607b852f1543dc21323155a2ad71473c8642`; preserve its additional notice omitted from the wheel                                                                                                                            |
+| Torch 2.8 / torchvision 0.23 / Transformers 4.57.3 | BSD-3 / Apache-2.0 plus bundled native notices    | Isolated frozen environment; upstream SDPA path, no FlashAttention source build                                                                                                                                                     |
+| DRTK / CuMesh / flex-GEMM / O-Voxel                | Existing audited export/native dependencies       | Reuse the selected external TRELLIS stack and complete notices, including Eigen MPL-2.0; no evaluation-only NVIDIA rasterizers                                                                                                      |
+| fast-simplification 0.2.0                          | MIT CPU quadric reduction; BSD-3 nanobind binding | Prebuilt cp311 Windows wheel, SHA-256 `c83791c8af1db1156753a3cb723e4eeffc2bf9fc46751894c90338d6fc7f779c`; wheel retains PyVista MIT license. CPU reduction/normals remove measured CuMesh replay drift; remesh/UV/PBR remain native |
 
 The initial camera recipe uses upstream's explicit manual field of view, with its value recorded in
 provenance. It does not install MoGe or BRIA matting; SpriteBook's own RGBA preparation remains the
 input boundary. The model's actual DINOv3 dependency is governed by its own agreement even though
 Pixal3D's upstream NOTICE still lists DINOv2.
+
+The fast-simplification 0.2.0 source archive in the lock has SHA-256
+`ed02ea6f4968ec98f963f2d3665dbafd0297ec12aea9e4d0a87c4b3c14d608a8`. Its `Simplify.h` retains Sven
+Forstmann's 2014 MIT attribution; the wrapper license credits the PyVista developers (2017?2021).
+The native binding uses
+[nanobind's BSD-3-Clause terms](https://github.com/wjakob/nanobind/blob/master/LICENSE). These are
+external runtime components; F7's binary-distribution notice review covers their complete upstream
+notices as well as the wheel's root license.
 
 ### TripoSR spike dependencies (not shipped)
 

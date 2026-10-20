@@ -3,8 +3,10 @@
 F4 migrates this repository in place. The TypeScript core/CLI, Tauri/React editor, manifest formats,
 WGSL and feature boundaries are retained. Main now builds and runs on Node **24.22.0**, with pinned
 Dawn **0.6.2**. No supported development, test, CI or application entrypoint requires Deno. **F4 is
-complete**, including its retained real-model provisioning/licensing and installed-workflow gate. F7
-release qualification is next.
+complete**, including its retained real-model provisioning/licensing gate and the approved Pixal3D
+extension. [Pixal3D qualification](qualification/pixal3d-windows-x64.json) and the
+[hardware/platform spike](model-platform-spike.md) record the added work. F7 release qualification
+is next.
 
 ## Implemented path
 

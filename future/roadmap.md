@@ -5,13 +5,14 @@ Tauri, the existing React UI, and the TypeScript product core/CLI. Replace Deno.
 repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
-2026-10-19; F1 state-safety work, the Windows x64 F2 proof and F4-T1 through F4-T5 are complete. F4
-is reopened for the approved Pixal3D integration and hardware/platform model spike below.** The
-[conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
+2026-10-19; F1 state-safety work, the Windows x64 F2 proof and all F4 tasks are complete, including
+the approved Pixal3D integration and hardware/platform spike. F7 release qualification is next.**
+The [conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
 unverified targets. Closing baseline capture does not close platform, installed-app, model or
 release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
 support claim. Exact dependency pins and schema changes follow the existing BOM/decision process;
-Node/Dawn has measured Windows candidate evidence; new models remain unqualified.
+Node/Dawn and the selected Pixal3D recipe have installed Windows x64 / RTX 3090 evidence; other
+model/runtime/platform combinations require their own qualification.
 
 ## The route
 
@@ -261,20 +262,34 @@ Avoid dependency upgrades that are unrelated to the runtime move.
       virtualization guards pass. Private NSIS install/uninstall both exit 0. Full installer
       upgrades, signing and clean-machine qualification stay in F7.
 
-- [ ] **F4-T6 · Integrate Pixal3D through model management.** Pin the official single-view weights,
+- [x] **F4-T6 · Integrate Pixal3D through model management.** Pin the official single-view weights,
       DINOv3 conditioner, real NAF upsampler, source and frozen Windows runtime. Keep terms gates,
       offline loading, prebuilt native dependencies and canonical glTF at the importer border.
       Qualify generation on the maintainer's RTX 3090 (24 GiB), including measured load/inference
       memory, PBR output, candidate selection, sprite workflow and recoverable failure. Preserve the
       existing TRELLIS.2 default and completed migration evidence. A duplicated-feature NAF fallback
-      does not qualify as Pixal3D integration.
-- [ ] **F4-T7 · Spike practical image-to-3D alternatives.** Investigate open models against the
+      does not qualify as Pixal3D integration. **Recorded exit:**
+      [installed qualification](qualification/pixal3d-windows-x64.json) and
+      [hardware/review report](model-platform-spike.md). The 6,157-file NSIS runtime passes
+      Unicode/empty-PATH setup, real single-view PBR generation, pick, UniRig, core preview,
+      144-frame styled/AOV bake, four exporters and native Tauri model-manager/read projections.
+      Warm hits are 100%; all five AOV pages remain byte-identical after rig acceptance. Worker
+      death/retry and source corruption/repair preserve accepted assets. Both candidates' raw and
+      canonical GLBs repeat byte-for-byte in fresh workers after replacing non-repeatable GPU
+      reduction/normal sums with bounded CPU processing. No default or terms gate was relaxed.
+- [x] **F4-T7 · Spike practical image-to-3D alternatives.** Investigate open models against the
       maintainer's Windows x64 / RTX 3090 / 64 GiB RAM machine. Run realistic candidates where their
       assets, terms and prebuilt runtime permit; record failures as well as successful outputs.
       Finish with a sourced Windows/macOS/Linux matrix covering exact runtime variants,
       GPU/unified-memory requirements, system RAM, disk, output texture support and licensing.
       Distinguish local measurements, upstream claims and community ports. Native Mac/Linux
       qualification remains F7; neither research nor a hosted build proves GPU inference there.
+      **Recorded exit:** the [hardware/platform spike](model-platform-spike.md) measures Pixal3D and
+      two TripoSR inputs on the RTX 3090, with reviewed core renders and explicit evaluation
+      changes. It records named Mac MPS/MLX/Metal and Linux CUDA/AMD runners, GPU/unified-memory
+      claims, system-RAM/disk gaps, exact downloads and code/weight/output terms. TripoSR remains a
+      spike, not a catalog backend. Prioritize it, then SF3D/SPAR3D, for F3's lightweight
+      comparison.
 
 **Acceptance:** the installed CLI and Tauri app use one TypeScript core on Node, import a mesh,
 retarget clips, bake styled/AOV atlases and export every existing target. Existing real generation
@@ -282,10 +297,10 @@ and rigging workflows pass their applicable hardware/terms gates without undecla
 Source, tests, hooks, CI and release execution no longer require Deno. Historical proof transcripts
 may still contain Deno commands when clearly labeled historical; executable support paths may not.
 The maintainer confirmed on 2026-10-19 that the existing model provisioning/licensing gate stays in
-F4. **That gate and the real installed workflow pass. On 2026-10-19 the maintainer extended F4 with
-F4-T6 and F4-T7; F4 remains open until that added work is qualified.** F7 retains the release and
-deferred native-platform checks. Carry the inspected rig's stretch/unmapped-joint advisories into
-F3-T1 quality qualification; review/acceptance and measured defaults remain intact.
+F4. **That gate, the Pixal3D extension and the model spike now pass; F4 is complete within the
+approved Windows x64 scope.** F7 retains the release and deferred native-platform checks. Carry the
+inspected rig's stretch/unmapped-joint advisories into F3-T1 quality qualification;
+review/acceptance and measured defaults remain intact.
 
 ## F7 · Release the migrated application
 
@@ -328,20 +343,20 @@ These tasks preserve the broader product vision. They are not conditions for com
 migration. Minimum fixes required by current workflows or the clean-install release gates remain
 F4/F7 migration work, even when they touch the same modules as these later improvements.
 
-| Tasks            | Deliverable                                                                                                             | Acceptance                                                                                                                                                                    |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **F3-T1**        | Benchmark current TRELLIS.2/Pixal3D native and Python recipes; assess Hunyuan variants by exact availability and terms  | Sprite-sized identity/deformation/material quality plus config-specific memory/time, clean installation and license eligibility; no new default before qualification          |
-| **F3-T2**        | Complete Hub/auxiliary-model provisioning, gated auth, resume, disk planning, hash receipts and existing offline import | Full chosen workflow runs with outbound network blocked and an unrelated/empty HF cache; removal touches only owned files                                                     |
-| **F3-T3**        | Warm worker reuse, visible eviction and bounded environment profiles                                                    | Retained weights keep their memory claim; cancel/death/retry and 10/100-character runs remain correct                                                                         |
-| **F3-T4**        | Preserve universal mesh/imported-rig/body-fit paths and expand Apple Silicon/AMD inference where proven                 | Exact model + runner + hardware passes canonical import, rigging and sprites; fixtures remain clearly synthetic                                                               |
-| **F3-T5**        | Optional text → approved reference → 3D with a separately audited image model                                           | Record prompt, models, seeds and image hash; retain image input and avoid silent cloud fallback                                                                               |
-| **F5-T1**        | Roster overview, character-scoped six-stage layout, early pixel strip and source comparison                             | Preserve the current Tauri/React implementation, design/accessibility contracts and every core/CLI capability                                                                 |
-| **F5-T2**        | Remaining CC0 clip-library/player/QA/identity improvements, keyboard joint adjustment and baked-sprite sandbox          | Per-clip frames/speed/hold-last, mirroring opt-in, source details, undo, flags and CLI twins work end-to-end; personal clip imports remain non-redistributable where required |
-| **F5-T3**        | Full interaction polish, localization expansion and viewport lifecycle verification                                     | Keyboard, real assistive technologies, IME, reduced motion, themes, drag/drop and +40% copy expansion pass                                                                    |
-| **F5-T4**        | Further installer/updater and platform integration improvements                                                         | Clean upgrade/rollback and safe paths on claimed targets; required migration delivery is already covered by F4/F7                                                             |
-| **F6-T1, F6-T2** | Expanded identity, motion and pixel-style qualification                                                                 | Asymmetric marks/prosthetics, root/feet, thin features, palettes, alpha, outline, all directions and aligned AOVs survive actual sprite-size review                           |
-| **F6-T3**        | Higher roster throughput and resource efficiency                                                                        | Cold/warm/single-edit/style-pivot predictions and 8-hour soak pass; preserve palette scope and temporal frame order while profiling before parallelism                        |
-| **F6-T4**        | End-to-end production workflow qualification                                                                            | Props, asymmetric animated characters, roster recovery and engine playback pass with setup/inference/bake costs reported separately                                           |
+| Tasks            | Deliverable                                                                                                                      | Acceptance                                                                                                                                                                    |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F3-T1**        | Compare current TRELLIS.2/Pixal3D, then TripoSR and gated SF3D/SPAR3D; assess native/Mac/Hunyuan recipes from the hardware spike | Sprite-sized identity/deformation/material quality, fresh-regeneration repeatability, memory/time, clean setup and exact terms; preserve defaults until qualified             |
+| **F3-T2**        | Complete Hub/auxiliary-model provisioning, gated auth, resume, disk planning, hash receipts and existing offline import          | Full chosen workflow runs with outbound network blocked and an unrelated/empty HF cache; removal touches only owned files                                                     |
+| **F3-T3**        | Warm worker reuse, visible eviction and bounded environment profiles                                                             | Retained weights keep their memory claim; cancel/death/retry and 10/100-character runs remain correct                                                                         |
+| **F3-T4**        | Preserve universal mesh/imported-rig/body-fit paths and expand Apple Silicon/AMD inference where proven                          | Exact model + runner + hardware passes canonical import, rigging and sprites; fixtures remain clearly synthetic                                                               |
+| **F3-T5**        | Optional text → approved reference → 3D with a separately audited image model                                                    | Record prompt, models, seeds and image hash; retain image input and avoid silent cloud fallback                                                                               |
+| **F5-T1**        | Roster overview, character-scoped six-stage layout, early pixel strip and source comparison                                      | Preserve the current Tauri/React implementation, design/accessibility contracts and every core/CLI capability                                                                 |
+| **F5-T2**        | Remaining CC0 clip-library/player/QA/identity improvements, keyboard joint adjustment and baked-sprite sandbox                   | Per-clip frames/speed/hold-last, mirroring opt-in, source details, undo, flags and CLI twins work end-to-end; personal clip imports remain non-redistributable where required |
+| **F5-T3**        | Full interaction polish, localization expansion and viewport lifecycle verification                                              | Keyboard, real assistive technologies, IME, reduced motion, themes, drag/drop and +40% copy expansion pass                                                                    |
+| **F5-T4**        | Further installer/updater and platform integration improvements                                                                  | Clean upgrade/rollback and safe paths on claimed targets; required migration delivery is already covered by F4/F7                                                             |
+| **F6-T1, F6-T2** | Expanded identity, motion and pixel-style qualification                                                                          | Asymmetric marks/prosthetics, root/feet, thin features, palettes, alpha, outline, all directions and aligned AOVs survive actual sprite-size review                           |
+| **F6-T3**        | Higher roster throughput and resource efficiency                                                                                 | Cold/warm/single-edit/style-pivot predictions and 8-hour soak pass; preserve palette scope and temporal frame order while profiling before parallelism                        |
+| **F6-T4**        | End-to-end production workflow qualification                                                                                     | Props, asymmetric animated characters, roster recovery and engine playback pass with setup/inference/bake costs reported separately                                           |
 
 ### Workflow qualification
 
@@ -376,7 +391,8 @@ successfully is not evidence that the complete character workflow is ready.
 3. **Completed — F2:** the Windows Node/Dawn slice and installed proof pass. Additional native
    targets are deferred to F7, as confirmed above.
 4. **Completed — F4:** package, renderer, application/tooling and Windows installed proofs pass,
-   including existing-model provisioning/licensing, real offline inference and recovery.
+   including existing-model provisioning/licensing, Pixal3D integration, real offline inference,
+   byte-exact fresh-worker replay, recovery and the model hardware/platform spike.
 5. **Next — F7:** qualify release artifacts, additional native platforms, clean-machine
    prerequisites, signing and upgrades. Put unrelated model, editor, dependency and performance work
    in the later tasks above.

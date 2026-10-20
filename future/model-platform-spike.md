@@ -11,26 +11,37 @@ The complete Pixal3D single-view catalog install verifies **22 files / 25,260,11
 including the separately gated official DINOv3 snapshot/agreement and NAF checkpoint. The normal
 model-install command provisions the isolated Windows runtime with no compiler. Native admission
 executes SM86 NATTEN, actual NAF with 1,024-channel features, sparse PBR sampling, DRTK UV coverage
-and finite mesh conversion. The final installed run takes **88.40 s to load**, then **53.30 s and
-41.05 s to generate two candidates**; the full CLI job takes **274.13 s**, including file
+and finite mesh conversion. The final installed run takes **88.16 s to load**, then **51.89 s and
+41.25 s to generate two candidates**; the full CLI job takes **295.12 s**, including file
 verification, loading, PBR export, canonical import and thumbnails. It measures **17.53 GiB Torch
-reserved / 14.22 GiB allocated**. Sampled worker peaks are **22.43 GiB working set / 45.33 GiB
+reserved / 14.22 GiB allocated**. Sampled worker peaks are **24.15 GiB working set / 46.87 GiB
 private commit**; commit is not resident RAM or actual pagefile I/O. Keep the 24 GiB GPU / 64 GiB
 RAM qualification host and budget about 45–50 GB free disk for a fresh stack. These are conservative
 planning allowances, not proven smaller-machine minima.
 
 Installed generation, candidate selection, UniRig, core preview, 144-frame styled/AOV bake and all
 four exporters pass. The warm bake has 100% cache hits and preserves all five AOV pages after
-recording rig review. Recovery and native desktop checks are still being completed. Image review
-caught and corrected a camera scale mistake before accepting any output. It also identified the
-standalone viewer's opposite front convention: the adapter preserves SpriteBook's Y-up/+Z-front
-frame. The isolated worker records Python 3.11.16, Torch 2.8/cu128, Transformers 4.57.3 and NATTEN
-0.21.6, preventing the base sidecar's newer Transformers from silently replacing model dependencies.
+recording rig review. Worker interruption/retry, source corruption/refusal/repair and native Tauri
+model-manager/core-read checks pass with accepted assets unchanged and zero inference network
+attempts. The [qualification receipt](qualification/pixal3d-windows-x64.json) seals the installer,
+runtime/source/model hashes, measurements and checks. Image review caught and corrected a camera
+scale mistake before accepting any output. It also identified the standalone viewer's opposite front
+convention: the adapter preserves SpriteBook's Y-up/+Z-front frame. The isolated worker records
+Python 3.11.16, Torch 2.8/cu128, Transformers 4.57.3 and NATTEN 0.21.6, preventing the base
+sidecar's newer Transformers from silently replacing model dependencies.
 
-This one 52-joint test rig still reports stretch on both clavicles/right lower arm and no influence
-on `index_01_r`; retargeting holds `root` and `thigh_l` at rest. The sprites are usable for the
-bounded integration proof, with 0.475% measured idle flicker, but this is not approval of a new
-production default or general character quality. Carry the advisories into F3-T1's broader cohort.
+A same-seed replay exposed non-repeatable CuMesh edge collapse even when all sampling tensors
+matched. Adapter 0.2.0 canonicalizes mesh enumeration and uses pinned MIT fast-simplification plus
+CPU normal sums, preserving native remesh/UV/PBR stages. The real-tensor control exports identical
+GLBs twice (28.87/23.85 s), and the installed fresh-worker output matches that control exactly. The
+final interrupted-job retry reproduces both installed candidates' raw and canonical GLBs
+byte-for-byte in fresh workers. No regeneration cache or relaxed comparison hides that check.
+
+This one 52-joint test rig reports eight advisories: stretch on `spine_03`, both clavicles, `pelvis`
+and `spine_01`; no influence on both `middle_01` joints and `thumb_04_leaf_r`. Retargeting holds
+`root` and `thigh_r` at rest. The sprites are usable for the bounded integration proof, with
+**0.545% measured idle flicker**, but this is not approval of a new production default or general
+character quality. Carry the advisories into F3-T1's broader cohort.
 
 ### Run the integrated Pixal3D recipe
 
@@ -73,16 +84,35 @@ export uses explicit matte material factors. Rigging, anatomy and sprite readabi
 their own review. Raw results and pinned runtime/source files are retained under
 `.render-bench/f4/alternatives/triposr/`.
 
+### Reviewed output comparison
+
+![Eight-direction model comparison](qualification/model-platform-review.png)
+
+Rows: **TRELLIS.2 generation plus the prior accepted retexture**, **Pixal3D generation**, **TripoSR
+character**, **TripoSR chair**. Columns are directions 0–7. All use the same core renderer, raw
+lighting/style, 1.7 m declared height and 100×128 px cells at 56 px/m. This compares the actual
+materials as well as geometry; the first row includes an additional texture stage. One character and
+one prop are not a quality ranking or default-selection cohort.
+
+![Pixal3D animation review](qualification/pixal3d-sprite-review.png)
+
+The animation sheet is the installed Pixal3D → UniRig → core-retargeted styled export. Row pairs
+show idle, walk and punch at frames 0/3; columns show directions 0–7. All 144 exported frames
+contain the subject, with six distinct frames per clip/direction. Full provenance and numeric checks
+are sealed in the [Windows qualification receipt](qualification/pixal3d-windows-x64.json).
+
+![Pixal3D installed model-manager entry](qualification/pixal3d-model-manager.png)
+
 ## Recommendation
 
 For the maintainer's **RTX 3090 24 GiB, i9-10900K, 64 GiB RAM**, keep TRELLIS.2 as the qualified
-baseline, integrate the current **TRELLIS.2-based Pixal3D**, keep **TripoSR** as the permissive
-lightweight comparator, then prioritize **Stable Fast 3D** and **SPAR3D** as faster/lower-VRAM
-textured comparators once their terms and prebuilt dependencies are admitted. Evaluate **TripoSG**
-only as a geometry comparator with a separate texture stage and a third-party license audit. Hunyuan
-2.0/2mini fit the hardware more comfortably than the stock full 2.1 pipeline, but their model/output
-terms prevent recommending them as a worldwide default. This ranking is an engineering inference
-from the evidence below, not a measured quality ranking.
+baseline, offer the qualified **TRELLIS.2-based Pixal3D** recipe as an optional generator, keep
+**TripoSR** as the permissive lightweight comparator, then prioritize **Stable Fast 3D** and
+**SPAR3D** as faster/lower-VRAM textured comparators once their terms and prebuilt dependencies are
+admitted. Evaluate **TripoSG** only as a geometry comparator with a separate texture stage and a
+third-party license audit. Hunyuan 2.0/2mini fit the hardware more comfortably than the stock full
+2.1 pipeline, but their model/output terms prevent recommending them as a worldwide default. This
+ranking is an engineering inference from the evidence below, not a measured quality ranking.
 
 For Mac, the strongest shortlist is **Pixal3D via MLX**, **TRELLIS.2 via MPS/Metal or GGML Metal**,
 and the official experimental **SF3D/SPAR3D MPS** paths. There are now complete Hunyuan MLX and
@@ -113,19 +143,19 @@ existing 64 GiB host for the spike and measure process peak/commit, pagefile use
 memory during loading as well as sampling. A suggested future 32/64 GiB purchase tier must be
 labelled a recommendation until measured.
 
-| Exact model/path                                             | Native Windows x64 NVIDIA                                                                                             | Linux x64 NVIDIA                                                | Published GPU requirement                                                                                                        | Output and SpriteBook fit                                                                                                | Decision for 3090                                                                                                                                          |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **TRELLIS.2-4B**, Microsoft reference                        | Current SpriteBook adaptation, not Microsoft's tested OS                                                              | Official tested target, A100/H100                               | Official reference asks **24 GB**. SpriteBook's qualified low-VRAM 512 recipe is a different configuration                       | Geometry with base color, roughness, metallic and opacity; GLB; separate shape-conditioned texture pipeline              | Keep baseline; preserve current source/terms receipts                                                                                                      |
-| **Pixal3D current TRELLIS.2-based release**, official Python | SpriteBook's pinned NATTEN/NAF native admission and model-managed setup pass; full workflow qualification in progress | CUDA base from TRELLIS.2; NATTEN source build in official setup | No numeric upstream minimum. Pinned Python pipeline supports **1024/1536 cascade**; 512 claims concern different implementations | Pixel-aligned image-conditioned mesh/PBR GLB. Current multiview uses distinct `_mv` weights plus known camera transforms | First addition, low-VRAM/single-view 1024 with real NAF and explicit camera; keep 24 GiB card admission during qualification                               |
-| **Stable Fast 3D / SF3D**, official runner                   | Official **experimental**, VS 2022/native extension build                                                             | Official CUDA route                                             | About **6 GB** default single image                                                                                              | UV-unwrapped textured GLB, delighting, object-level roughness/metallic estimates, optional triangle/quad remesh          | Best first fast comparator; gated custom license                                                                                                           |
-| **SPAR3D**, official runner                                  | Official **experimental**, VS 2022/native extension build                                                             | Official CUDA route                                             | **10.5 GB default**, about **7 GB low-VRAM**                                                                                     | SF3D-like GLB/materials, added point-cloud diffusion/conditioning improves unseen sides; editable points                 | Strong second fast comparator; same custom-license family                                                                                                  |
-| **TripoSR**, official runner                                 | CUDA/CPU implementation; no native Windows qualification table                                                        | CUDA/CPU implementation                                         | About **6 GB** default single image                                                                                              | Mesh with vertex colors; optional UV texture bake; no learned PBR material stage                                         | Small, permissive older baseline; compare sprite readability rather than expect TRELLIS detail                                                             |
-| **TripoSG 1.5B**, official runner                            | No official native-Windows installation proof located; Python/DISO stack must be qualified                            | Official CUDA setup                                             | README **at least 8 GB**, model card says **greater than 8 GB**                                                                  | Shape-only SDF mesh exported as GLB; missing texture is a separate stage                                                 | Geometry-only comparator after dependency/license cleanup                                                                                                  |
-| **Hunyuan3D-DiT-v2-0/Fast/Turbo + Paint-v2-0/Turbo**         | Official README names Windows                                                                                         | Official CUDA installation                                      | Family-level **6 GB shape / 16 GB shape+texture**                                                                                | Shape and separate RGB painting; trimesh GLB/OBJ, not full 2.1 PBR                                                       | Fits card on published figures; restricted optional evaluation                                                                                             |
-| **Hunyuan3D-DiT-v2-mini/Fast/Turbo (0.6B)**                  | Same official family                                                                                                  | Same official family                                            | No separately measured mini minimum supplied. Do not turn the family's 6 GB shape figure into a certified mini floor             | Smaller shape model; paint must be added separately                                                                      | Best Hunyuan low-memory shape candidate; same legal gate                                                                                                   |
-| **Hunyuan3D-Shape-v2-1 (3.3B) + Paint-v2-1 (2B)**            | Official README names Windows; CUDA build instructions                                                                | Official CUDA setup, Python 3.10/PyTorch 2.5.1 cu124            | **10 GB shape**, **21 GB paint**, **29 GB combined**                                                                             | Separate shape and PBR texture synthesis                                                                                 | Shape or isolated paint plausible; stock combined requirement exceeds 24 GiB. Investigate sequential unloading/low-VRAM only as a distinct measured recipe |
-| **Step1X-3D Geometry-1300m + Texture**                       | No official Windows qualification located                                                                             | CUDA 12.4 reference environment                                 | Published combined **27G**, label variant **29G**                                                                                | Untextured GLB then separate texture synthesis                                                                           | Defer full pipeline on 3090; shape-only/offload need an independent measured budget                                                                        |
-| **Direct3D-S2 v1.1**                                         | Community Windows guides linked by upstream                                                                           | Official **Ubuntu 22.04/CUDA 12.1** tested                      | **10 GB at 512**, around **24 GB at 1024**                                                                                       | Shape-only sparse-SDF mesh; upstream discourages 512 quality                                                             | Lower priority: 1024 leaves no card headroom and adds another texture/build stack                                                                          |
+| Exact model/path                                             | Native Windows x64 NVIDIA                                                                  | Linux x64 NVIDIA                                                | Published GPU requirement                                                                                                        | Output and SpriteBook fit                                                                                                | Decision for 3090                                                                                                                                          |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **TRELLIS.2-4B**, Microsoft reference                        | Current SpriteBook adaptation, not Microsoft's tested OS                                   | Official tested target, A100/H100                               | Official reference asks **24 GB**. SpriteBook's qualified low-VRAM 512 recipe is a different configuration                       | Geometry with base color, roughness, metallic and opacity; GLB; separate shape-conditioned texture pipeline              | Keep baseline; preserve current source/terms receipts                                                                                                      |
+| **Pixal3D current TRELLIS.2-based release**, official Python | SpriteBook's installed RTX 3090 generation/rig/sprite/recovery workflow passes             | CUDA base from TRELLIS.2; NATTEN source build in official setup | No numeric upstream minimum. Pinned Python pipeline supports **1024/1536 cascade**; 512 claims concern different implementations | Pixel-aligned image-conditioned mesh/PBR GLB. Current multiview uses distinct `_mv` weights plus known camera transforms | First addition, low-VRAM/single-view 1024 with real NAF and explicit camera; keep 24 GiB card admission; smaller cards unqualified                         |
+| **Stable Fast 3D / SF3D**, official runner                   | Official **experimental**, VS 2022/native extension build                                  | Official CUDA route                                             | About **6 GB** default single image                                                                                              | UV-unwrapped textured GLB, delighting, object-level roughness/metallic estimates, optional triangle/quad remesh          | Best first fast comparator; gated custom license                                                                                                           |
+| **SPAR3D**, official runner                                  | Official **experimental**, VS 2022/native extension build                                  | Official CUDA route                                             | **10.5 GB default**, about **7 GB low-VRAM**                                                                                     | SF3D-like GLB/materials, added point-cloud diffusion/conditioning improves unseen sides; editable points                 | Strong second fast comparator; same custom-license family                                                                                                  |
+| **TripoSR**, official runner                                 | CUDA/CPU implementation; no native Windows qualification table                             | CUDA/CPU implementation                                         | About **6 GB** default single image                                                                                              | Mesh with vertex colors; optional UV texture bake; no learned PBR material stage                                         | Small, permissive older baseline; compare sprite readability rather than expect TRELLIS detail                                                             |
+| **TripoSG 1.5B**, official runner                            | No official native-Windows installation proof located; Python/DISO stack must be qualified | Official CUDA setup                                             | README **at least 8 GB**, model card says **greater than 8 GB**                                                                  | Shape-only SDF mesh exported as GLB; missing texture is a separate stage                                                 | Geometry-only comparator after dependency/license cleanup                                                                                                  |
+| **Hunyuan3D-DiT-v2-0/Fast/Turbo + Paint-v2-0/Turbo**         | Official README names Windows                                                              | Official CUDA installation                                      | Family-level **6 GB shape / 16 GB shape+texture**                                                                                | Shape and separate RGB painting; trimesh GLB/OBJ, not full 2.1 PBR                                                       | Fits card on published figures; restricted optional evaluation                                                                                             |
+| **Hunyuan3D-DiT-v2-mini/Fast/Turbo (0.6B)**                  | Same official family                                                                       | Same official family                                            | No separately measured mini minimum supplied. Do not turn the family's 6 GB shape figure into a certified mini floor             | Smaller shape model; paint must be added separately                                                                      | Best Hunyuan low-memory shape candidate; same legal gate                                                                                                   |
+| **Hunyuan3D-Shape-v2-1 (3.3B) + Paint-v2-1 (2B)**            | Official README names Windows; CUDA build instructions                                     | Official CUDA setup, Python 3.10/PyTorch 2.5.1 cu124            | **10 GB shape**, **21 GB paint**, **29 GB combined**                                                                             | Separate shape and PBR texture synthesis                                                                                 | Shape or isolated paint plausible; stock combined requirement exceeds 24 GiB. Investigate sequential unloading/low-VRAM only as a distinct measured recipe |
+| **Step1X-3D Geometry-1300m + Texture**                       | No official Windows qualification located                                                  | CUDA 12.4 reference environment                                 | Published combined **27G**, label variant **29G**                                                                                | Untextured GLB then separate texture synthesis                                                                           | Defer full pipeline on 3090; shape-only/offload need an independent measured budget                                                                        |
+| **Direct3D-S2 v1.1**                                         | Community Windows guides linked by upstream                                                | Official **Ubuntu 22.04/CUDA 12.1** tested                      | **10 GB at 512**, around **24 GB at 1024**                                                                                       | Shape-only sparse-SDF mesh; upstream discourages 512 quality                                                             | Lower priority: 1024 leaves no card headroom and adds another texture/build stack                                                                          |
 
 Sources: [Microsoft reference][trellis], [Pixal3D setup/inference][pixal], [SF3D][sf3d],
 [SPAR3D][spar3d], [TripoSR][triposr], [TripoSG][triposg], [TripoSG model card][triposg-card],
