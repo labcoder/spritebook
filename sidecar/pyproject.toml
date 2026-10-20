@@ -80,6 +80,8 @@ drtk = { url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/
 o-voxel-vb-ap = { url = "https://github.com/PozzettiAndrea/cuda-wheels/releases/download/o_voxel_vb_ap-latest/o_voxel_vb_ap-0.0.1%2Bcu128torch2.8-cp311-cp311-win_amd64.whl" }
 
 [tool.uv]
+# Normal installed wheels must refresh when owned code/data changes at the same version.
+cache-keys = [{ file = "pyproject.toml" }, { file = "spritebook_sidecar/**/*.py" }, { file = "spritebook_sidecar/**/*.json" }]
 # rembg -> pymatting -> numba: without this floor the resolver walks numba back
 # to 0.53.x (a 3.6-3.9-era sdist that cannot build on 3.11). Prebuilt wheels
 # only (sidecar-vram law) — numba >=0.60 ships cp311 wheels and caps numpy.

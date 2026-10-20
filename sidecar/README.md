@@ -15,6 +15,12 @@ installed resources. Normal wheel installation avoids Python 3.11's locale-decod
 paths, which break when the application path contains Unicode on Windows. Source development keeps
 uv's editable default. No virtual environment or weights are copied from the builder.
 
+The owned package's uv cache keys include its Python and JSON files as well as `pyproject.toml`. An
+app update therefore refreshes the normal wheel even when its package version and dependencies stay
+unchanged. The same-version update regression exercises this with an unchanged project file; no user
+cache purge is required. See
+[uv's cache-key contract](https://docs.astral.sh/uv/concepts/cache/#dynamic-metadata).
+
 F4's fresh-profile base sync, handshake and shutdown pass with an empty PATH; real
 registry-installed U2-Net prep also passes. This does **not** install optional CUDA backends. For
 the incumbent adapters, set absolute paths outside the checkout:

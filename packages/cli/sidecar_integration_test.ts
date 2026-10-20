@@ -83,6 +83,63 @@ test('real sidecar: spawn via uv, handshake roster, echo end-to-end', async (t) 
   }
 });
 
+test('installed sidecar wheel refreshes owned code without a package-version change', async (t) => {
+  if (!(await sidecarAvailable())) {
+    t.skip('uv or sidecar/ not available');
+    return;
+  }
+  const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-owned-wheel-'));
+  try {
+    for (const name of ['pyproject.toml', 'uv.lock', '.python-version', 'spritebook_sidecar']) {
+      await fs.cp(join(SIDECAR_DIR, name), join(dir, name), {
+        recursive: true,
+        filter: (path) => !path.includes('__pycache__'),
+      });
+    }
+    const metadata = await fs.readFile(join(dir, 'pyproject.toml'), 'utf8');
+    const env = {
+      ...process.env,
+      UV_PROJECT_ENVIRONMENT: join(dir, '.venv'),
+      PYTHONDONTWRITEBYTECODE: '1',
+    };
+    const run = () =>
+      runProcess('uv', [
+        'run',
+        '--frozen',
+        '--no-editable',
+        '--project',
+        dir,
+        'python',
+        '-c',
+        'from spritebook_sidecar import SIDECAR_VERSION; print(SIDECAR_VERSION)',
+      ], { env });
+    const decoder = new TextDecoder();
+    const first = await run();
+    assert(first.success, decoder.decode(first.stderr));
+    const version = decoder.decode(first.stdout).trim();
+    const source = join(dir, 'spritebook_sidecar', '__init__.py');
+    await fs.writeFile(
+      source,
+      (await fs.readFile(source, 'utf8')).replace(
+        `SIDECAR_VERSION = "${version}"`,
+        `SIDECAR_VERSION = "${version}-cache-probe"`,
+      ),
+    );
+    const changed = new Date(Date.now() + 2000);
+    await fs.utimes(source, changed, changed);
+    assertEquals(await fs.readFile(join(dir, 'pyproject.toml'), 'utf8'), metadata);
+    const second = await run();
+    assert(second.success, decoder.decode(second.stderr));
+    assertEquals(
+      decoder.decode(second.stdout).trim(),
+      `${version}-cache-probe`,
+      'same-version update must load new owned code',
+    );
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('ACCEPTANCE: kill sidecar mid-job -> retryable error; retry recovers', async (t) => {
   if (!(await sidecarAvailable())) {
     t.skip('uv or sidecar/ not available');
