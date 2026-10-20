@@ -336,6 +336,13 @@ integration or UI feature first. F3/F5/F6 improvements follow it.
   product goals separately from current behavior. Reconcile the final guides and candidate payload
   docs with F7-T1/T2 results before public release; those qualification gates remain open.
 
+  **Remote-history reconciliation:** the [25-commit review](remote-main-review.md) selects this
+  TypeScript/Node history as main and preserves the independent remote implementation in a verified
+  local recovery bundle. Useful behavior is adapted through current contracts. Studio now exposes
+  the existing `models setup` runtime repair action with explicit consent; broader inventory and
+  editor cases remain in the later tasks below. Publishing and hosted CI must validate the
+  consolidated head; they do not close native release gates.
+
 **Release gate:** required target artifacts are executed, data recovery and engine outputs pass,
 mandatory suites are green, and no advertised support rests on a skipped check. Retain original PRD
 performance budgets on the same reference workload: ≤10 min mesh → sheet, ≤30 min image → engine
@@ -362,6 +369,28 @@ F4/F7 migration work, even when they touch the same modules as these later impro
 | **F6-T1, F6-T2** | Expanded identity, motion and pixel-style qualification                                                                          | Asymmetric marks/prosthetics, root/feet, thin features, palettes, alpha, outline, all directions and aligned AOVs survive actual sprite-size review                           |
 | **F6-T3**        | Higher roster throughput and resource efficiency                                                                                 | Cold/warm/single-edit/style-pivot predictions and 8-hour soak pass; preserve palette scope and temporal frame order while profiling before parallelism                        |
 | **F6-T4**        | End-to-end production workflow qualification                                                                                     | Props, asymmetric animated characters, roster recovery and engine playback pass with setup/inference/bake costs reported separately                                           |
+
+### Retained model and editor cases
+
+The [remote-history review](remote-main-review.md) carries useful requirements into these tasks
+without adopting another core, project format, renderer or provisioning stack:
+
+- **F3-T1 / F5-T2:** compare dense sources and budgeted working meshes, manual proportion/weight
+  fitting and Make-It-Animatable as an unqualified rigging candidate. Audit exact terms and measure
+  hardware before any catalog addition. Include upright asymmetric clothing, tilted/turned bind
+  frames, folded knees and source-informed knee guidance; preserve geometry/UVs and reversible
+  edits.
+- **F3-T2 / F5-T1:** distinguish installed weights from runtime readiness and partial/unreadable
+  inventory. Runtime repair is exposed now; resume, disk reporting and shared-dependency removal
+  need their own ownership/recovery evidence.
+- **F5-T1/T2 / F7-T2:** review candidate idle/walk/action before acceptance, restore exact rest or
+  playback state, and preserve successful candidates through later failures and project moves. Keep
+  visible batch progress/cancel/retry tied to core jobs and the current project.
+- **F5-T2:** add explicit current/selected/all library batch controls through core/CLI. “All” means
+  the full library and chosen directions, regardless of search/checkbox filters. An FPS change must
+  invalidate incompatible frame-index exclusions and duration overrides before enqueue.
+- **F6-T1/T2:** compare deformation, linear-light/material/light/shadow behavior and transparent
+  edges at sprite size using the existing renderer and structural/golden checks.
 
 ### Workflow qualification
 
