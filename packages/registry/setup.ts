@@ -2,7 +2,13 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { promises as fs } from 'node:fs';
 import { join, relative } from 'node:path';
-import { acquireFileLock, modelRuntime, readModelRuntime, runtimeDataDir } from '@spritebook/core';
+import {
+  acquireFileLock,
+  modelRuntime,
+  readModelRuntime,
+  runtimeDataDir,
+  sidecarEnvironmentDir,
+} from '@spritebook/core';
 import { canonicalJson, type JobEvent, type ModelCatalog } from '@spritebook/schema';
 import { detectPlatform, gateLicense, gatePlatform, gateTerritory } from './gates.ts';
 import { type Fetcher, fetchToFile } from './install.ts';
@@ -88,6 +94,21 @@ export async function* prepareModelRuntime(
       info.project,
       ...(info.recipe.extra ? ['--extra', info.recipe.extra] : []),
     ], { ...env, UV_PROJECT_ENVIRONMENT: info.environment });
+    // Prepare our own non-editable package while setup still has network access.
+    await run(uv, [
+      'run',
+      '--frozen',
+      '--no-editable',
+      '--project',
+      info.sidecarDir,
+      'python',
+      '-c',
+      'import spritebook_sidecar',
+    ], {
+      ...env,
+      PYTHONPATH: '',
+      UV_PROJECT_ENVIRONMENT: await sidecarEnvironmentDir(info.sidecarDir),
+    });
     const python = join(info.environment, 'Scripts/python.exe');
     const bindings = Object.fromEntries(
       Object.entries(info.recipe.environment).map(([key, path]) => [key, join(info.root, path)]),
@@ -95,7 +116,7 @@ export async function* prepareModelRuntime(
     await run(python, [join(info.sidecarDir, info.recipe.check)], {
       ...env,
       ...bindings,
-      PYTHONPATH: info.sidecarDir,
+      PYTHONPATH: '',
       HF_HUB_OFFLINE: '1',
       TRANSFORMERS_OFFLINE: '1',
       HF_HUB_DISABLE_TELEMETRY: '1',

@@ -135,6 +135,10 @@ archive and both license texts. It creates Python environments in user-writable 
 Python, wheels, model weights and backend code are provisioned on demand, never copied from a
 builder's environment. Runtime archive checksums live in `tools/runtime/downloads.json`.
 
+Hatchling **1.32.4** (MIT) builds only SpriteBook's own non-editable Python wheel. Model setup
+prepares that package before publishing readiness, so inference can run with uv offline. Third-party
+runtime dependencies still install from frozen prebuilt wheels; no user compiler is required.
+
 | Dependency             | Role                              | License                                                     | Status                                                                                                                                                              |
 | ---------------------- | --------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | uv                     | Owned Python environment launcher | MIT OR Apache-2.0                                           | 0.12.10; official archive and license hashes pinned                                                                                                                 |
