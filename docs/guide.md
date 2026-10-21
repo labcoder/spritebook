@@ -16,6 +16,10 @@ button shows the exact command it runs. To work in the terminal instead, read
 This guide is about the app. Read the quickstart first if you want the shortest path to a
 spritesheet.
 
+The images show the current Imprint UI in browser-demo mode. The Look comparison replays the
+preserved Pixal3D bake `acc25412` and its original source; it is not a new model run. Other examples
+use synthetic demo data. See the [dark theme](img/stage-04-look-dark.png) as well.
+
 ## 1. Open a project
 
 ![The gallery](img/gallery.png)
@@ -43,8 +47,6 @@ To check your machine, select **Run health exam**. It reports the GPU, the sidec
 helper process that runs the AI models), and the installed models.
 
 ## 2. Stage 01 — Generate
-
-![Stage 01 - Generate](img/stage-01-generate.png)
 
 Generate makes a 3D mesh from one image. It then saves one result as the **canonical mesh**.
 
@@ -99,8 +101,6 @@ Both are on by default.
 
 ## 3. Stage 02 — Rig
 
-![Stage 02 - Rig](img/stage-02-rig.png)
-
 Rig gives the mesh a skeleton, so the animation clips can move it.
 
 There are two tracks:
@@ -137,8 +137,6 @@ To repair a rig, use **Auto-hint from this report and re-run**, or supply a join
 **The CLI twin:** `spritebook rig`.
 
 ## 4. Stage 03 — Animate
-
-![Stage 03 - Animate](img/stage-03-anim.png)
 
 Animate selects the clips to bake. The bundled library has 86 clips, with 8-direction locomotion.
 
@@ -202,8 +200,6 @@ Select **Record look** to save the change. Select **Reset to recorded** to drop 
 
 ## 6. Stage 05 — Bake
 
-![Stage 05 - Bake](img/stage-05-bake.png)
-
 Bake renders every frame and packs them into spritesheet pages.
 
 1. Select **Bake sheet**.
@@ -242,8 +238,6 @@ with every vertex still at or above the ground. The flag states the contact widt
 **The CLI twin:** `spritebook bake`.
 
 ## 7. Stage 06 — Export
-
-![Stage 06 - Export](img/stage-06-export.png)
 
 Export writes the files your engine reads. One bake can feed every target.
 

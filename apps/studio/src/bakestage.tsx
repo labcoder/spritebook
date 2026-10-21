@@ -26,18 +26,21 @@ const PASSES = ['lit', 'albedo', 'normal', 'depth', 'mask'] as const;
 
 /* ---------------- the sprite player ---------------- */
 
-export function Player({ summary, atlasPng, pass, dir, clip, playing, fps, zoom, frame }: {
-  summary: BakeSummary;
-  atlasPng: string;
-  pass: string;
-  dir: number;
-  clip: string;
-  playing: boolean;
-  fps: number;
-  zoom: number;
-  /** Look's comparison shares one clock across its directions. */
-  frame?: number;
-}) {
+export function Player(
+  { summary, atlasPng, pass, dir, clip, playing, fps, zoom, frame, focusPivot }: {
+    summary: BakeSummary;
+    atlasPng: string;
+    pass: string;
+    dir: number;
+    clip: string;
+    playing: boolean;
+    fps: number;
+    zoom: number;
+    /** Look's comparison shares one clock across its directions. */
+    frame?: number;
+    focusPivot?: boolean;
+  },
+) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [at, setAt] = useState(0);
@@ -93,9 +96,25 @@ export function Player({ summary, atlasPng, pass, dir, clip, playing, fps, zoom,
     );
   }, [current, frames, zoom, pass, img]);
 
+  useEffect(() => {
+    if (!focusPivot || !img) return;
+    const well = ref.current?.parentElement;
+    const first = frames[0];
+    if (!well || !first) return;
+    const pivot = first.pivotPx ?? { x: first.atlas.w / 2, y: first.atlas.h * 0.85 };
+    well.scrollLeft = pivot.x * zoom - well.clientWidth / 2;
+    well.scrollTop = pivot.y * zoom - well.clientHeight * 0.9;
+    // Reposition only when the view changes; playback must leave user panning alone.
+  }, [focusPivot, img, zoom, clip, dir]);
+
   return (
     <div className='player'>
-      <div className='playerwell'>
+      <div
+        className='playerwell'
+        tabIndex={focusPivot ? 0 : undefined}
+        role={focusPivot ? 'region' : undefined}
+        aria-label={focusPivot ? `${clip} ${t('direction')} ${dir}` : undefined}
+      >
         <canvas
           ref={ref}
           className='stripcanvas'

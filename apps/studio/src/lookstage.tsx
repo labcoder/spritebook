@@ -43,7 +43,7 @@ export function LookStage({ bridge, dir, manifest, onChanged, heading, inspector
   const [defaults, setDefaults] = useState({ camera: 'standard-30', style: 'pixel' });
   const [error, setError] = useState<string | null>(null);
   const [atlas, setAtlas] = useState<{ manifest: unknown; png: string } | null>(null);
-  const [zoom, setZoom] = useState(2);
+  const [zoom, setZoom] = useState(4);
   const [clip, setClip] = useState('');
   const [playing, setPlaying] = useState(false);
   const [frame, setFrame] = useState(0);
@@ -316,6 +316,7 @@ export function LookStage({ bridge, dir, manifest, onChanged, heading, inspector
                         clip={savedClip}
                         playing={false}
                         frame={frame}
+                        focusPivot
                         fps={8}
                         zoom={zoom}
                       />

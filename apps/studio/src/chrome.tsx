@@ -223,7 +223,9 @@ export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
                   onClose(tab.id);
                 }}
               >
-                ×
+                <svg viewBox='0 0 20 20' aria-hidden='true'>
+                  <path d='m5 5 10 10M5 15 15 5' />
+                </svg>
               </span>
             )}
           </button>
@@ -450,7 +452,10 @@ export function StatusBar({ exam, counts, drawerOpen, onToggleDrawer }: {
           aria-controls='log-drawer'
           onClick={onToggleDrawer}
         >
-          {drawerOpen ? '▾' : '▴'} {t('log')}
+          <svg viewBox='0 0 20 20' aria-hidden='true'>
+            <path d={drawerOpen ? 'm5 8 5 5 5-5' : 'm5 12 5-5 5 5'} />
+          </svg>
+          {t('log')}
           {unseenErrors > 0 && (
             <span className='logbadge'>
               {unseenErrors} {unseenErrors === 1 ? t('error') : t('errors')}

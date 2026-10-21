@@ -74,11 +74,13 @@ content; the Tauri window still has a 960×600 minimum.
 
 Look shows the actual source image beside saved sprites, followed by a horizontal recipe. The
 comparison reuses Bake's atlas player with one clock for its directions. Clip and 1×/2×/4×/6× zoom
-are view controls, not manifest changes. The bridge currently supplies page 1 of the saved atlas;
-only frames on that page are shown. Large integer zoom scrolls within the well rather than
-resampling pixels. Missing sources and absent bakes have explicit empty states. Extra camera
-controls remain under "Camera and style details"; stale-frame cost and the exact CLI twin stay
-beside "Record look". A recipe edit leaves saved sprites unchanged until another bake.
+are view controls, not manifest changes. Look opens at 4x, positioning each scrollable full cell
+around its recorded pivot. Subsequent user panning is preserved during playback. The bridge
+currently supplies page 1 of the saved atlas; only frames on that page are shown. Large integer zoom
+scrolls within the well rather than resampling pixels. Missing sources and absent bakes have
+explicit empty states. Extra camera controls remain under "Camera and style details"; stale-frame
+cost and the exact CLI twin stay beside "Record look". A recipe edit leaves saved sprites unchanged
+until another bake.
 
 Base UI supplies existing headless menu and dialog behavior. Hand-authored CSS supplies the
 identity: square fields, restrained rules, solid action fills and consistent hover/focus states. Do
@@ -88,3 +90,17 @@ Verbs name outcomes: "Generate model", "Save canonical mesh", "Accept rig", "Rec
 selected". Show stale-frame cost before recording a changed look. Display license, territory and
 VRAM gates before download or execution. Running actions stay focusable with `aria-busy`; errors
 preserve the CLI reason and recovery path.
+
+## Implementation verification
+
+The implementation passes 65 Studio tests, TypeScript checks and the production web build. Browser
+checks cover the six stages, gallery, models, command palette, logs, locked/error states and locale
+growth. Automated WCAG A/AA scans found no violations in those checked states. Final light/dark Look
+captures fit 1440, 1280, 960 and 390px browser widths without horizontal page overflow; playback,
+integer zoom, recipe/reset behavior and theme-invariant canvas pixels were checked separately.
+
+The guide includes current [light](../img/stage-04-look.png) and
+[dark](../img/stage-04-look-dark.png) captures replaying the preserved `acc25412` bake, not new
+model inference. Native Tauri packaging, platform accessibility and hardware qualification were not
+rerun; F7 remains open. This is the F5-T1 visual slice, not completion of the full F5 editor
+roadmap.

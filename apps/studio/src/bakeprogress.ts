@@ -44,6 +44,7 @@ export interface BakeFrame {
   clipId: string;
   direction: number;
   frame: number;
+  pivotPx?: { x: number; y: number };
   cacheHit?: boolean;
   atlas: { x: number; y: number; w: number; h: number; pageIndex: number };
 }
