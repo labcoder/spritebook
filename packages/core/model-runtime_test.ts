@@ -49,6 +49,14 @@ test('prepared runtime refuses incomplete/corrupt source and follows lock change
     await assertRejects(() => readModelRuntime(info), Error, 'environment is missing');
     await fs.mkdir(info.environment, { recursive: true });
     await fs.writeFile(join(info.environment, 'pyvenv.cfg'), 'home = owned Python');
+    assertEquals(
+      await readModelRuntime(info),
+      undefined,
+      'an empty venv left by cleanup is not ready',
+    );
+    await fs.mkdir(join(info.environment, 'Lib/site-packages/test-package.dist-info'), {
+      recursive: true,
+    });
     assertEquals((await readModelRuntime(info))?.files, files);
     await fs.writeFile(join(info.root, 'source.py'), 'changed source');
     await assertRejects(() => readModelRuntime(info), Error, 'source changed');

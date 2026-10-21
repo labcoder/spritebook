@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { ModelRuntimeReceiptSchema, ModelRuntimeRecipeSchema, parseWith } from '@spritebook/schema';
@@ -60,6 +60,14 @@ export async function readModelRuntime(info: Awaited<ReturnType<typeof modelRunt
   if (!await stat(join(info.environment, 'pyvenv.cfg')).catch(() => null)) {
     throw new Error('Model environment is missing. Run spritebook models setup again.');
   }
+  // Cleanup can retain the venv scaffolding and source receipt after uninstalling every package.
+  const packages = await readdir(join(info.environment, 'Lib/site-packages'), {
+    withFileTypes: true,
+  }).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  if (!packages.some((p) => p.isDirectory() && p.name.endsWith('.dist-info'))) return;
   for (const [path, expected] of Object.entries(receipt.files)) {
     const actual = createHash('sha256').update(await readFile(join(info.root, path))).digest('hex');
     if (actual !== expected) {

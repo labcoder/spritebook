@@ -11,6 +11,7 @@ import type { Platform } from '@spritebook/schema';
 import { canonicalJson, InstallReceiptSchema, parseWith } from '@spritebook/schema';
 import { listInstalled, resolveInstalled } from './dist/installed.js';
 import { hashFile } from './dist/hash.js';
+import { runSetupJob } from './dist/setup.js';
 import {
   type Fetcher,
   type InstallJobOpts,
@@ -131,6 +132,30 @@ test('install: happy path - verified files land, canonical receipt, events in or
     assertEquals(await fs.readFile(art.path, 'utf8'), text);
   } finally {
     await fs.rm(rig.tmp, { recursive: true });
+  }
+});
+
+test('setup refuses a historical weights-only version and names its managed replacement', async () => {
+  const rig = await installRig();
+  try {
+    await collect(install(rig));
+    const entry = rig.catalog.models[0];
+    entry.versions.push({ ...entry.versions[0], version: '2.0', runtime: 'unirig-win' });
+    const receipt = await fs.readFile(`${rig.root}/toy-rig/1.0/receipt.json`, 'utf8');
+    const events = await collect(runSetupJob({
+      jobId: 'setup-old',
+      catalog: rig.catalog,
+      root: rig.root,
+      modelId: 'toy-rig',
+      version: '1.0',
+    }));
+    const error = ofType(events, 'error')[0];
+    assertEquals(error.code, 'runtime-unmanaged');
+    assertEquals(error.retryable, false);
+    assertStringIncludes(error.message, 'models install toy-rig@2.0');
+    assertEquals(await fs.readFile(`${rig.root}/toy-rig/1.0/receipt.json`, 'utf8'), receipt);
+  } finally {
+    await fs.rm(rig.tmp, { recursive: true, force: true });
   }
 });
 

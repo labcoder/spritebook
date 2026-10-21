@@ -84,9 +84,20 @@ Windows recipes use managed Python 3.11.16; the installed application supplies u
 
 An interrupted setup retains verified model files. `models setup` repairs the runtime and repeats
 readiness checks. `models verify` checks model files; an installed weight receipt alone does not
-prove runtime readiness. `--from <dir>` supplies model files offline; source and wheel provisioning
-still need network access unless separately cached. Once prepared, the qualified workflows run with
-inference networking blocked.
+prove runtime readiness. An empty Python environment left after dependency cleanup is not treated as
+prepared, even when its old source receipt remains. UniRig setup validates Blender in a disposable
+process by checking a real mesh artifact, alongside its CUDA and rendering checks.
+
+Historical weights-only versions do not have managed setup. Install the current complete version;
+for UniRig, the existing checkpoints can supply it without downloading those files again:
+
+```sh
+spritebook models install unirig@36842e2b.local1 --from <models-root>/unirig/36842e2b
+```
+
+`--from <dir>` supplies model files offline; source and wheel provisioning still need network access
+unless separately cached. Once prepared, the qualified workflows run with inference networking
+blocked.
 
 Before a model job, core resolves exact project pins and rechecks consent, territory, platform,
 files and configuration-specific VRAM admission. Native runtime loading also verifies prepared

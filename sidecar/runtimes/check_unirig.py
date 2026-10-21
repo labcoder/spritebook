@@ -1,7 +1,23 @@
 """Native admission checks; real bpy stages are also validated by their artifacts."""
 import json
 import os
+import subprocess
 import sys
+import tempfile
+from pathlib import Path
+
+# bpy can crash at teardown; a valid mesh artifact proves the isolated stage completed.
+with tempfile.TemporaryDirectory(prefix="spritebook-unirig-bpy-") as temp:
+    artifact = Path(temp) / "mesh.json"
+    probe = subprocess.run([
+        sys.executable, "-I", "-c",
+        "import bpy,json,sys; m=bpy.data.meshes.new('probe'); "
+        "m.from_pydata([(0,0,0),(1,0,0),(0,1,0)],[],[(0,1,2)]); "
+        "open(sys.argv[1],'w').write(json.dumps([len(m.vertices),len(m.polygons)]))",
+        str(artifact),
+    ], capture_output=True, text=True, timeout=120)
+    if not artifact.is_file() or json.loads(artifact.read_text()) != [3, 1]:
+        raise RuntimeError(f"UniRig Blender check failed ({probe.returncode}): {probe.stderr[-2000:]}")
 
 import numpy as np
 import torch
@@ -41,4 +57,4 @@ try:
 finally:
     renderer.delete()
 print(json.dumps({"torch": torch.__version__, "gpu": torch.cuda.get_device_name(),
-                  "checks": "PyG/spconv/standard attention/pyrender pass"}))
+                  "checks": "bpy mesh artifact/PyG/spconv/standard attention/pyrender pass"}))

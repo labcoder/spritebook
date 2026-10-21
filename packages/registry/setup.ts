@@ -19,7 +19,7 @@ import {
 } from './gates.ts';
 import { type Fetcher, fetchToFile } from './install.ts';
 import { hashFile } from './hash.ts';
-import { resolveInstalled } from './installed.ts';
+import { compareVersions, resolveInstalled } from './installed.ts';
 
 async function run(command: string, args: string[], env: NodeJS.ProcessEnv): Promise<void> {
   const child = spawn(command, args, {
@@ -178,16 +178,30 @@ export async function* runSetupJob(opts: {
     const entry = opts.catalog.models.find((m) => m.id === opts.modelId);
     const version = entry?.versions.find((v) => v.version === installed.version);
     if (!entry || !version) throw new Error('Installed model version is absent from the catalog');
+    const platform = await detectPlatform();
     for (
       const gate of [
         gateLicense(entry, { acceptLicense: opts.acceptLicense ?? false }),
         gateTerritory(entry, { territory: opts.territory ?? installed.receipt.territoryDeclared }),
-        gatePlatform(version, await detectPlatform()),
+        gatePlatform(version, platform),
       ]
     ) {
       if (!gate.ok) {
         throw Object.assign(new Error(gate.message), { code: gate.code, retryable: false });
       }
+    }
+    if (!version.runtime && entry.versions.some((v) => v.runtime)) {
+      const current = entry.versions.filter((v) => v.runtime && gatePlatform(v, platform).ok)
+        .sort((a, b) => compareVersions(a.version, b.version)).at(-1);
+      throw Object.assign(
+        new Error(
+          `${entry.id}@${version.version} is a historical weights-only version with no managed runtime. ` +
+            (current
+              ? `Install the complete version with spritebook models install ${entry.id}@${current.version}.`
+              : 'Choose a supported managed version from spritebook models list, or configure its runtime manually.'),
+        ),
+        { code: 'runtime-unmanaged', retryable: false },
+      );
     }
     if (version.runtime) yield* prepareModelRuntime(version.runtime, jobId);
     yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - start) / 1000 };
