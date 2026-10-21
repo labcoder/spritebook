@@ -381,6 +381,15 @@ same identity. Browser replay evidence uses prior bake `acc25412`; it is not new
 release qualification. F5-T1 remains open for the broader roster and early preview work; F5-T2/T3
 and F7 keep their interaction, lifecycle and native accessibility gates.
 
+**F5-T1 generation follow-through, 2026-10-20:** opaque sources now run the existing gated U²-Net
+preparation job inside core generation. Original references remain intact; the journal records the
+prepared PNG hash, model version and parameters, and retries reuse verified cutouts. Both Studio and
+the CLI use that path. Keep source/prepared-mask inspection in the remaining editor work: the
+reported green-screen reference shows U²-Net residue between the legs and soft hand edges. A Windows
+RTX 3090 replay of that opaque RGB reference completed both 16-step, 800,000-polygon candidates in
+390.02 seconds; the one-body second candidate ranked ahead of the two-body first. This verifies the
+core generation flow, with native UI/release qualification still open.
+
 The [remote-history review](remote-main-review.md) carries useful requirements into these tasks
 without adopting another core, project format, renderer or provisioning stack:
 

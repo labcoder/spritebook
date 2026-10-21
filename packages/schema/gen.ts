@@ -4,7 +4,7 @@
  *
  * ## The chain, and where truth lives
  *
- *   source image
+ *   source image -> [imageprep when opaque] cut-out RGBA
  *     -> [gen3d adapter in the sidecar]  raw.glb   (backend output, unblessed)
  *     -> [texture substage, only when outputs.texture === false]
  *     -> [THE P1 BORDER: importToCanonical]        model.glb (canonical, D-012)
@@ -23,6 +23,7 @@
  *     character.json.journal.ndjson   ManifestPatch lines (the P1-T3 journal —
  *     character.json.journal.cursor   so `undo` works on generation for free)
  *     source/<sha256>.<ext>           the source image, content-addressed
+ *     source/<prepared.sha256>.png   optional recorded cutout; original retained
  *     results/<resultId>/raw.glb      what the backend emitted
  *     results/<resultId>/model.glb    canonical; gltfSha256 pins THIS
  *     results/<resultId>/preflight.json
@@ -87,7 +88,7 @@ export const GenJobSpecSchema = z.strictObject({
   characterId: CharacterIdSchema,
   /** the workspace dir (created if absent) */
   workspace: z.string().min(1),
-  /** cut-out RGBA source image — `spritebook prep` produces one */
+  /** Reference image; opaque sources are prepared before generation. */
   imagePath: z.string().min(1),
   modelId: z.string().min(1),
   /** omitted -> the highest installed version */

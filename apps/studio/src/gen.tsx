@@ -735,8 +735,7 @@ interface ResultEntry {
   params?: { candidates?: number };
 }
 
-/** Where `gen` stored the source image: content-addressed under source/.
- * Mirrors core's sourceImagePath - dot>0, so a dotfile keeps no extension. */
+/** Display the original reference; core's sourceImagePath prefers the prepared cutout. */
 export function storedSourcePath(dir: string, m: Record<string, unknown>): string | null {
   const src = m.source as { sha256?: string; originalFilename?: string } | undefined;
   if (!src?.sha256 || !src.originalFilename) return null;

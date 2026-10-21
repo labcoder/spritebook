@@ -48,7 +48,7 @@ import {
   SOURCE_DIR,
 } from '@spritebook/schema';
 
-import { initializeManifest, readManifest } from './persistence.ts';
+import { initializeManifest, readManifest, writeAtomic } from './persistence.ts';
 
 /** `r1`, `r2`, ... — creation order, never reused (ResultIdSchema). */
 export type ResultId = string;
@@ -186,9 +186,8 @@ export interface StoredSource {
  * Copy a source image into `source/<sha256><ext>`.
  *
  * Content-addressed, so re-importing the same bytes is a no-op: the path is a
- * function of the content, and an existing file at that path already holds
- * exactly those bytes. Two different images therefore always land on two
- * paths, and the same image never rewrites the file it already occupies.
+ * function of the content. Verify existing bytes before reuse; interrupted or
+ * corrupt copies are repaired atomically. Different images land on different paths.
  */
 export async function storeSourceImage(
   workspace: string,
@@ -205,7 +204,10 @@ export async function storeSourceImage(
   const { sourceDir } = workspacePaths(workspace);
   const storedPath = `${sourceDir}/${sha256}${extName(originalFilename)}`;
   await fs.mkdir(sourceDir, { recursive: true });
-  if (!(await pathExists(storedPath))) await fs.writeFile(storedPath, bytes);
+  if (
+    !(await pathExists(storedPath)) ||
+    await sha256OfBytes(await fs.readFile(storedPath)) !== sha256
+  ) await writeAtomic(storedPath, bytes);
   return { sha256, storedPath, originalFilename };
 }
 
@@ -249,6 +251,7 @@ function extName(name: string): string {
  */
 export function sourceImagePath(workspace: string, manifest: CharacterManifest): string {
   const { sourceDir } = workspacePaths(workspace);
+  if (manifest.source.prepared) return `${sourceDir}/${manifest.source.prepared.sha256}.png`;
   return `${sourceDir}/${manifest.source.sha256}${extName(manifest.source.originalFilename)}`;
 }
 

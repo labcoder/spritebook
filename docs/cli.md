@@ -28,7 +28,7 @@ spritebook gen --workspace ./characters/hero --character hero \
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--workspace <dir>`   | the character folder; created on first use                                                                                                                                                                         |
 | `--character <id>`    | the character id: lowercase letters, digits, dashes                                                                                                                                                                |
-| `--image <file>`      | the source image; stored content-addressed in the workspace. `trellis2-4b` and `pixal3d` need cut-out RGBA — run `prep` first when the image has a background                                                      |
+| `--image <file>`      | the source image; retained content-addressed. Opaque sources are prepared automatically through installed `rembg-u2net`; valid RGBA cutouts pass through unchanged                                                 |
 | `--model <id>`        | the gen3d backend: `trellis2-4b` (default, CUDA), `pixal3d` (CUDA), or `fixture-gen` (synthetic, no GPU)                                                                                                           |
 | `--model-version <v>` | pin a backend version; the highest installed one otherwise                                                                                                                                                         |
 | `--height <metres>`   | the character's standing height. CAUTION: without it the mesh keeps the backend's own scale, and a one-unit character bakes about 30 px tall at the default 32 px/m. The job warns and states the measured height. |
@@ -193,8 +193,11 @@ spritebook prep --image photo.png --out ./prep
 ```
 
 `prep` removes the background with the `rembg-u2net` model (0.2 GB, CPU). `--out` names a folder.
-The cut-out lands there as `cutout.png`, beside a small preflight report. Feed that `cutout.png` to
-`gen --image`. A clean PNG with transparency needs no prep; `gen` takes it directly.
+The cut-out lands there as `cutout.png`, beside a small preflight report and `prep-meta.json`
+recording the exact model and parameters. This command is useful for inspecting a cutout separately;
+`gen --image` also prepares opaque images automatically. A clean 8-bit RGBA PNG with transparency
+needs no prep. Both paths require an installed `rembg-u2net` when background removal is needed and
+retain the registry's execution gates.
 
 ## models — install, set up, verify, remove
 

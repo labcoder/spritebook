@@ -17,7 +17,7 @@ application.
 | `trellis2-4b` | Default image → textured/PBR mesh; mesh retexturing | `af44b45f.local1`        | 17.60 GB    | NVIDIA/CUDA; measured configurations require 4–18 GiB |
 | `pixal3d`     | Optional single-image → PBR mesh                    | `b0cb2e1b.local1`        | 25.26 GB    | NVIDIA/CUDA; 24 GiB card admission                    |
 | `unirig`      | Track B skeleton prediction and skin weights        | `36842e2b.local1`        | 5.82 GB     | NVIDIA/CUDA; 17.4 GiB                                 |
-| `rembg-u2net` | CPU background removal for `prep`                   | `1.0.0`                  | 0.18 GB     | None                                                  |
+| `rembg-u2net` | CPU background removal for `gen` and `prep`         | `1.0.0`                  | 0.18 GB     | None                                                  |
 | `fixture-gen` | Synthetic stand-in for exercising the pipeline      | `1.0.0`                  | None        | None                                                  |
 
 Sizes are decimal GB for declared model files, excluding Python, native wheels, caches, staging and
@@ -48,6 +48,11 @@ requirements; TripoSR, Hunyuan3D, SF3D and SPAR3D are not integrated catalog cho
 Pixal3D currently exposes single-view generation, manual camera FOV and one to eight candidates. It
 does not expose a separate retexturing or multi-view path. There is no current text-to-image or
 text-to-3D catalog entry. `fixture-gen` proves the workflow; it is not a likeness generator.
+
+Generation prepares opaque references automatically through the installed U²-Net model. A valid
+transparent 8-bit RGBA PNG needs no preparation model. The source reference remains unchanged; core
+records the cutout hash, exact preparation model and parameters and reuses that verified artifact on
+retry. Missing weights are an actionable model gate, never a silent download.
 
 ## Install and repair
 

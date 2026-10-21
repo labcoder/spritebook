@@ -8,10 +8,18 @@ import { BakeIdSchema, CharacterIdSchema, IsoTimeSchema, Sha256Schema } from './
 import { CameraOverridesSchema, StyleOverridesSchema } from './project.ts';
 import { CHARACTER_SCHEMA_VERSION } from './migrate.ts';
 
+export const PreparedImageSchema = z.strictObject({
+  sha256: Sha256Schema,
+  backend: z.strictObject({ modelId: z.string().min(1), version: z.string().min(1) }),
+  params: z.record(z.string(), z.unknown()),
+});
+
 export const SourceRecordSchema = z.strictObject({
   kind: z.enum(['image', 'mesh']),
   originalFilename: z.string().min(1),
   sha256: Sha256Schema,
+  /** PNG cutout used by generation/reprojection; original reference stays intact. */
+  prepared: PreparedImageSchema.optional(),
   importedVia: z.strictObject({
     // 'three-fbx' is the D-020 interim FBX converter; 'ufbx' reserved for the
     // wasm binding once one exists upstream

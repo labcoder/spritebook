@@ -27,13 +27,16 @@ import {
   type GenJobSpec,
   type JobEvent,
   preflightVram,
+  PreparedImageSchema,
 } from '@spritebook/schema';
 import {
   appendGenerationResult,
+  commitManifest,
   createWorkspace,
   nextResultId,
   readWorkspace,
   resultPaths,
+  sourceImagePath,
   storeSourceImage,
   workspacePaths,
 } from '@spritebook/core';
@@ -57,6 +60,7 @@ import { heightOf } from './pick.ts';
 import { writeResultThumb } from './thumb.ts';
 import { rankCandidates, rankingMessage } from './candidates.ts';
 import { checkOpParams } from './opparams.ts';
+import { isCutoutImage, runPrepJob } from './prep.ts';
 
 export interface GenJobOptions extends GenJobSpec {
   /** N candidates in ONE sidecar job (the model loads once); every candidate
@@ -206,18 +210,6 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
       platform,
     });
 
-    // 2b. the machine-wide lease. The preflight above asks "could this card
-    // ever run this model"; the lease asks "is the card free RIGHT NOW", which
-    // is a different question the moment a second SpriteBook process exists —
-    // and the Studio spawns one per job. Held for the whole sidecar run and
-    // released in the `finally` below, on every exit path.
-    lease = yield* acquireVramLeaseEvents({
-      gb: claimGb ?? 0,
-      jobId,
-      budgetGb: detectedVramGb,
-      ...(opts.vramLeaseDir !== undefined ? { dir: opts.vramLeaseDir } : {}),
-    }, at);
-
     // 4. workspace + content-addressed source
     const paths = workspacePaths(opts.workspace);
     // store first: it is content-addressed and creates source/ itself, so the
@@ -236,6 +228,74 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
         },
       });
     }
+    let imagePath = stored.storedPath;
+    if (!(await isCutoutImage(imagePath))) {
+      const cached = manifest.source.sha256 === stored.sha256
+        ? manifest.source.prepared
+        : undefined;
+      if (cached) {
+        const path = sourceImagePath(opts.workspace, manifest);
+        const bytes = await fs.readFile(path).catch(() => null);
+        if (bytes && await sha256Hex(bytes) === cached.sha256 && await isCutoutImage(path)) {
+          imagePath = path;
+        }
+      }
+      if (imagePath === stored.storedPath) {
+        yield { t: 'progress', jobId, at: at(), step: 'prepare image', done: 0, total: 1 };
+        let cutout: string | undefined;
+        let meta: string | undefined;
+        for await (
+          const e of runPrepJob({
+            ...opts,
+            jobId,
+            imagePath,
+            outDir: `${paths.sourceDir}/prep-${stored.sha256}`,
+          })
+        ) {
+          if (e.t === 'error') throw new GenFail(e.code, e.message, e.retryable);
+          if (e.t === 'artifact') {
+            if (e.kind === 'cutout') cutout = e.path;
+            if (e.kind === 'prep-meta') meta = e.path;
+            yield { ...e, kind: `source-${e.kind}` };
+          } else if (e.t === 'progress') {
+            yield { ...e, step: `prepare image:${e.step}` };
+          } else if (e.t === 'warn') yield e;
+        }
+        if (!cutout || !meta || !(await isCutoutImage(cutout))) {
+          throw new GenFail(
+            'invalid-cutout',
+            'Background removal did not produce a cut-out RGBA image with a visible subject. ' +
+              'Use a transparent PNG or a source with a clearer background.',
+          );
+        }
+        const prepared = await storeSourceImage(opts.workspace, cutout);
+        const record = PreparedImageSchema.parse({
+          ...JSON.parse(await fs.readFile(meta, 'utf8')),
+          sha256: prepared.sha256,
+        });
+        manifest = await commitManifest(paths.manifest, () => ({
+          op: [{
+            op: 'add',
+            path: '/source',
+            value: {
+              kind: 'image',
+              originalFilename: stored.originalFilename,
+              sha256: stored.sha256,
+              prepared: record,
+            },
+          }],
+          label: 'Prepare source image',
+        }));
+        imagePath = prepared.storedPath;
+      }
+    }
+    // Preparation finishes before the generation lease; GPU prep must not queue behind itself.
+    lease = yield* acquireVramLeaseEvents({
+      gb: claimGb ?? 0,
+      jobId,
+      budgetGb: detectedVramGb,
+      ...(opts.vramLeaseDir !== undefined ? { dir: opts.vramLeaseDir } : {}),
+    }, at);
     const resultId = nextResultId(manifest);
     const rp = resultPaths(opts.workspace, resultId);
     await fs.mkdir(rp.dir, { recursive: true });
@@ -254,7 +314,7 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
         kind: adapterFor(entry.id, version, 'gen3d'),
         params: {
           ...params,
-          imagePath: stored.storedPath,
+          imagePath,
           outDir: rp.dir,
           seed: opts.seed,
           modelDir: versionDir(root, entry.id, installed.version),
@@ -458,7 +518,7 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
 
     // 8. candidates only: rank what was made and SUGGEST - the user picks
     if (made.length > 1) {
-      const ranked = await rankCandidates(made, stored.storedPath);
+      const ranked = await rankCandidates(made, imagePath);
       yield {
         t: 'warn',
         jobId,

@@ -29,15 +29,12 @@ function bodyDirectory(value: string): string {
  *   <manifest>.journal.cursor     how many patches are currently applied
  */
 import {
-  adapterFor,
   BakeManifestSchema,
   canonicalJson,
-  defaultsFor,
   type ExportTargetId,
   ExportTargetIdSchema,
   type JobEvent,
   parseWith,
-  preflightVram,
   SCHEMA_VERSION,
 } from '@spritebook/schema';
 import type {
@@ -52,7 +49,6 @@ import type {
   StylePreset,
 } from '@spritebook/schema';
 import {
-  acquireVramLeaseEvents,
   CAMERA_PRESETS,
   DEFAULT_CAMERA_PRESET_ID,
   encodeEvent,
@@ -1875,7 +1871,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         return fail(
           'gen' as JobEvent['jobId'],
           'missing-arg',
-          '--image <cutout.png> is required (run `spritebook prep` to make one)',
+          '--image <file> is required; opaque sources are prepared automatically',
         );
       }
 
@@ -2350,114 +2346,29 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
   }
 
   if (verb === 'prep') {
-    // image prep (P3-T2): rembg cutout + pose preflight through the sidecar.
-    // The weight comes from the registry (never auto-downloaded by the
-    // adapter); the sidecar dir defaults to the repo checkout and is
-    // overridable for installed layouts.
-    const image = flag(args, 'image');
-    const out = flag(args, 'out');
-    if (!image || !out) {
+    const imagePath = flag(args, 'image');
+    const outDir = flag(args, 'out');
+    if (!imagePath || !outDir) {
       return fail(
         'prep' as JobEvent['jobId'],
         'missing-arg',
         '--image <file> and --out <dir> are required',
       );
     }
-    const registry = await import('@spritebook/registry');
-    const { SidecarSession } = await import('@spritebook/core');
-    try {
-      const root = flag(args, 'models-dir') ?? registry.defaultModelsRoot();
-      const installed = await registry.resolvePinnedInstalled(root, 'rembg-u2net', undefined, {
+    const { runPrepJob } = await import('@spritebook/gen');
+    return await pump(
+      runPrepJob({
+        jobId: 'prep',
+        imagePath,
+        outDir,
+        sidecarDir: flag(args, 'sidecar') ?? process.env['SPRITEBOOK_SIDECAR_DIR'] ??
+          resourcePath('sidecar'),
+        modelsRoot: flag(args, 'models-dir'),
+        catalogPath: flag(args, 'catalog'),
         pinsPath: flag(args, 'pins'),
-      });
-      if (!installed) {
-        return fail(
-          'prep' as JobEvent['jobId'],
-          'model-missing',
-          'rembg-u2net is not installed - run `spritebook models install rembg-u2net` first ' +
-            `(models root: ${root})`,
-        );
-      }
-      const modelDir = registry.versionDir(root, 'rembg-u2net', installed.version);
-      // the adapter name came from the catalog once `gen`'s copy of this
-      // assumption turned out to be wrong; `prep` only worked because it
-      // hardcoded the right answer
-      const prepCatalog = await registry.loadCatalog(flag(args, 'catalog'));
-      const prepEntry = prepCatalog.models.find((m) => m.id === 'rembg-u2net');
-      const prepVersion = prepEntry?.versions.find((v) => v.version === installed.version);
-      if (!prepEntry || !prepVersion) {
-        return fail(
-          'prep' as JobEvent['jobId'],
-          'unknown-model',
-          'Installed image-prep version is not in the catalog',
-        );
-      }
-      await registry.verifyExecutionModel({
-        root,
-        catalog: prepCatalog,
-        entry: prepEntry,
-        version: prepVersion,
-        receipt: installed.receipt,
-      });
-      const prepParams = defaultsFor(prepVersion, 'imageprep');
-      const prepClaim = registry.executionVram(prepVersion, 'imageprep', prepParams);
-      const prepBudget = await registry.detectVramGb();
-      const memory = preflightVram(prepClaim, prepBudget);
-      if (!memory.ok) return fail('prep' as JobEvent['jobId'], memory.code, memory.message);
-      if (memory.warn) {
-        emit({
-          t: 'warn',
-          jobId: 'prep' as JobEvent['jobId'],
-          at: now(),
-          code: `vram-${memory.status}`,
-          message: memory.warn,
-        }, memory.warn);
-      }
-      const prepAdapter = adapterFor('rembg-u2net', prepVersion, 'imageprep');
-      let sidecarDir = flag(args, 'sidecar') ?? process.env['SPRITEBOOK_SIDECAR_DIR'];
-      if (!sidecarDir) {
-        const repoSidecar = resourcePath('sidecar');
-        try {
-          await fs.stat(`${repoSidecar}/pyproject.toml`);
-          sidecarDir = repoSidecar;
-        } catch {
-          return fail(
-            'prep' as JobEvent['jobId'],
-            'sidecar-missing',
-            'cannot find the sidecar project - pass --sidecar <dir> or set SPRITEBOOK_SIDECAR_DIR',
-          );
-        }
-      }
-      await fs.mkdir(out, { recursive: true });
-      const session = new SidecarSession({ sidecarDir });
-      const events = async function* (): AsyncIterable<JobEvent> {
-        const lease = yield* acquireVramLeaseEvents({
-          gb: prepClaim ?? 0,
-          budgetGb: prepBudget,
-          jobId: 'prep' as JobEvent['jobId'],
-        }, now);
-        try {
-          yield* session.run({
-            jobId: 'prep' as JobEvent['jobId'],
-            kind: prepAdapter,
-            params: { ...prepParams, imagePath: image, outDir: out, modelDir },
-          });
-        } finally {
-          await lease.release();
-        }
-      };
-      try {
-        return await pump(events(), emit);
-      } finally {
-        await session.dispose();
-      }
-    } catch (err) {
-      return fail(
-        'prep' as JobEvent['jobId'],
-        (err as { code?: string }).code ?? 'prep-failed',
-        err instanceof Error ? err.message : String(err),
-      );
-    }
+      }),
+      emit,
+    );
   }
 
   if (verb === 'models') {

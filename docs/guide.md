@@ -84,6 +84,12 @@ To make a character:
 
 7. Select **Generate model**.
 
+Generate removes the background automatically when the source is opaque, before loading the 3D
+model. This uses the installed **U²-Net** (`rembg-u2net`) model; if it is missing, the error offers
+**Manage models**. Transparent 8-bit RGBA PNGs pass through unchanged. Preparation appears in the
+job progress and runs once for the candidate batch; retries reuse the verified cutout. Your original
+reference is retained, and preparation is recorded as an undoable source edit.
+
 The button stays disabled until the form is complete. The text beside it names what is missing.
 
 The run writes one or more candidates. Each card shows the seed, the triangle count, the texture

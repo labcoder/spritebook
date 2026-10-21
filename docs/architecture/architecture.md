@@ -147,6 +147,14 @@ generator does not remove accepted meshes, history or exported sprites. See
 [workspace persistence](workspace-persistence.md), [execution policy](execution-policy.md) and
 [model storage and removal](../models.md#storage-and-removal).
 
+Generation prepares opaque references in core through the same `runPrepJob` used by the `prep` verb.
+The original source remains content-addressed; optional `source.prepared` records the PNG cutout
+hash, exact backend version and parameters. That pointer is journaled. Core generation, reprojection
+and retexturing use the cutout, while Studio's source comparison shows the original. Retries reuse a
+hash-verified cutout; missing or invalid files are prepared again. Preparation finishes and releases
+its worker/VRAM lease before the generator claims memory. Missing prep weights return
+`model-missing`, with no automatic download or bypass of project pins and execution policy.
+
 ## F1 persistence and execution policy
 
 The [workspace persistence protocol](workspace-persistence.md) defines the recoverable writer,
