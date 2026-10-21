@@ -4,6 +4,8 @@
 The [approved light/dark study](../../future/ui-concepts/imprint/README.md) establishes the visual
 direction. Studio remains Tauri/React with a TypeScript core on Node. The [guide](../guide.md)
 describes current behavior; remaining editor capabilities belong to [F5](../../future/roadmap.md).
+The [app-level design record](../../apps/studio/DESIGN.md) extracts implemented tokens and component
+patterns for subsequent UI work.
 
 ## Commitments
 

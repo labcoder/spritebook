@@ -1,0 +1,359 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21T03:43:00Z",
+  "title": "Design System: SpriteBook Studio",
+  "extensions": {
+    "colorMeta": {
+      "dark-bg": {
+        "displayName": "Dark · Workspace",
+        "role": "neutral"
+      },
+      "dark-panel": {
+        "displayName": "Dark · Panel / field",
+        "role": "neutral"
+      },
+      "dark-chrome": {
+        "displayName": "Dark · Title / index chrome",
+        "role": "neutral"
+      },
+      "dark-raise": {
+        "displayName": "Dark · Hover / raised",
+        "role": "neutral"
+      },
+      "dark-footer": {
+        "displayName": "Dark · Status footer",
+        "role": "neutral"
+      },
+      "dark-line": {
+        "displayName": "Dark · Separator",
+        "role": "neutral"
+      },
+      "dark-line-strong": {
+        "displayName": "Dark · Control border",
+        "role": "neutral"
+      },
+      "dark-text": {
+        "displayName": "Dark · Primary text",
+        "role": "neutral"
+      },
+      "dark-dim": {
+        "displayName": "Dark · Secondary text",
+        "role": "neutral"
+      },
+      "dark-accent": {
+        "displayName": "Dark · Indigo accent",
+        "role": "primary"
+      },
+      "dark-action": {
+        "displayName": "Dark · Primary action",
+        "role": "primary"
+      },
+      "dark-action-hover": {
+        "displayName": "Dark · Primary action hover",
+        "role": "primary"
+      },
+      "dark-on-action": {
+        "displayName": "Dark · Primary action text",
+        "role": "primary"
+      },
+      "dark-select-bg": {
+        "displayName": "Dark · Selection fill",
+        "role": "primary"
+      },
+      "dark-select-text": {
+        "displayName": "Dark · Selection text",
+        "role": "primary"
+      },
+      "dark-current": {
+        "displayName": "Dark · Current stage",
+        "role": "primary"
+      },
+      "dark-on-current": {
+        "displayName": "Dark · Current stage text",
+        "role": "primary"
+      },
+      "dark-focus": {
+        "displayName": "Dark · Keyboard focus",
+        "role": "primary"
+      },
+      "dark-ok": {
+        "displayName": "Dark · Success"
+      },
+      "dark-warning": {
+        "displayName": "Dark · Warning"
+      },
+      "dark-danger": {
+        "displayName": "Dark · Error"
+      },
+      "dark-on-danger": {
+        "displayName": "Dark · Error badge text"
+      },
+      "light-bg": {
+        "displayName": "Light · Workspace",
+        "role": "neutral"
+      },
+      "light-panel": {
+        "displayName": "Light · Panel / field",
+        "role": "neutral"
+      },
+      "light-chrome": {
+        "displayName": "Light · Title / index chrome",
+        "role": "neutral"
+      },
+      "light-raise": {
+        "displayName": "Light · Hover / raised",
+        "role": "neutral"
+      },
+      "light-footer": {
+        "displayName": "Light · Status footer",
+        "role": "neutral"
+      },
+      "light-line": {
+        "displayName": "Light · Separator",
+        "role": "neutral"
+      },
+      "light-line-strong": {
+        "displayName": "Light · Control border",
+        "role": "neutral"
+      },
+      "light-text": {
+        "displayName": "Light · Primary text",
+        "role": "neutral"
+      },
+      "light-dim": {
+        "displayName": "Light · Secondary text",
+        "role": "neutral"
+      },
+      "light-accent": {
+        "displayName": "Light · Indigo accent",
+        "role": "primary"
+      },
+      "light-action": {
+        "displayName": "Light · Primary action",
+        "role": "primary"
+      },
+      "light-action-hover": {
+        "displayName": "Light · Primary action hover",
+        "role": "primary"
+      },
+      "light-on-action": {
+        "displayName": "Light · Primary action text",
+        "role": "primary"
+      },
+      "light-select-bg": {
+        "displayName": "Light · Selection fill",
+        "role": "primary"
+      },
+      "light-select-text": {
+        "displayName": "Light · Selection text",
+        "role": "primary"
+      },
+      "light-current": {
+        "displayName": "Light · Current stage",
+        "role": "primary"
+      },
+      "light-on-current": {
+        "displayName": "Light · Current stage text",
+        "role": "primary"
+      },
+      "light-focus": {
+        "displayName": "Light · Keyboard focus",
+        "role": "primary"
+      },
+      "light-ok": {
+        "displayName": "Light · Success"
+      },
+      "light-warning": {
+        "displayName": "Light · Warning"
+      },
+      "light-danger": {
+        "displayName": "Light · Error"
+      },
+      "light-on-danger": {
+        "displayName": "Light · Error badge text"
+      },
+      "check-a": {
+        "displayName": "Shared · Canvas checker A",
+        "role": "neutral"
+      },
+      "check-b": {
+        "displayName": "Shared · Canvas checker B",
+        "role": "neutral"
+      },
+      "well-text": {
+        "displayName": "Shared · Canvas caption",
+        "role": "neutral"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Stage heading",
+        "purpose": "The current stage name."
+      },
+      "headline": {
+        "displayName": "Wordmark",
+        "purpose": "Compact SpriteBook title."
+      },
+      "title": {
+        "displayName": "Character title",
+        "purpose": "Character names in the index and gallery."
+      },
+      "body": {
+        "displayName": "UI body",
+        "purpose": "Controls, paths, measurements and CLI/log output."
+      },
+      "label": {
+        "displayName": "Compact label",
+        "purpose": "Tags, chips and compact metadata."
+      }
+    },
+    "shadows": [
+      {
+        "name": "menu",
+        "value": "0 8px 24px rgb(0 0 0 / 35%)",
+        "purpose": "Menu popup elevation."
+      },
+      {
+        "name": "dialog",
+        "value": "0 18px 50px rgb(0 0 0 / 40%)",
+        "purpose": "Command palette and model dialog elevation."
+      }
+    ],
+    "motion": [
+      {
+        "name": "running-action",
+        "value": "sb-spin 0.8s linear infinite",
+        "purpose": "Running-action ring rotates to 360deg; prefers-reduced-motion removes animation."
+      },
+      {
+        "name": "model-progress",
+        "value": "width 200ms linear",
+        "purpose": "Model progress width transition; prefers-reduced-motion removes transitions."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "rig-stack",
+        "value": "1560px"
+      },
+      {
+        "name": "inspector-stack",
+        "value": "1100px"
+      },
+      {
+        "name": "browser-preview-stack",
+        "value": "760px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary-dark",
+      "description": "Theme-bound primary action, with hover, focus and disabled states.",
+      "html": "<button type=\"button\" class=\"ds-primary\">Record look</button>",
+      "css": ".ds-primary { font: 400 12px/1.5 'Geist Mono', system-ui, sans-serif; font-weight: 500; background: var(--sb-action); color: var(--sb-on-action); border: 1px solid var(--sb-action); border-radius: 0; padding: 10px 18px; cursor: pointer; } .ds-primary:hover { background: var(--sb-action-hover); border-color: var(--sb-action-hover); } .ds-primary:focus-visible { outline: 2px solid var(--sb-focus); outline-offset: 2px; } .ds-primary:disabled { opacity: 0.55; cursor: default; }"
+    },
+    {
+      "name": "Bordered action",
+      "kind": "button",
+      "refersTo": "button-bordered-dark",
+      "description": "Secondary action using the panel fill and raised hover surface.",
+      "html": "<button type=\"button\" class=\"ds-bordered\">Reset to recorded</button>",
+      "css": ".ds-bordered { font: 400 12px/1.5 'Geist Mono', system-ui, sans-serif; background: var(--sb-panel); color: var(--sb-text); border: 1px solid var(--sb-line-strong); border-radius: 0; padding: 8px 14px; cursor: pointer; } .ds-bordered:hover { border-color: var(--sb-dim); background: var(--sb-raise); } .ds-bordered:focus-visible { outline: 2px solid var(--sb-focus); outline-offset: 2px; } .ds-bordered:disabled { opacity: 0.55; cursor: default; }"
+    },
+    {
+      "name": "Menu action",
+      "kind": "button",
+      "description": "Compact unfilled chrome trigger; Base UI owns its popup behavior.",
+      "html": "<button type=\"button\" class=\"ds-menu\">File</button>",
+      "css": ".ds-menu { font: 400 13px/1.5 'Geist Mono', system-ui, sans-serif; color: var(--sb-dim); background: none; border: none; padding: 6px 8px; border-radius: 2px; cursor: pointer; } .ds-menu:hover, .ds-menu[data-popup-open] { color: var(--sb-text); background: var(--sb-raise); } .ds-menu:focus-visible { outline: 2px solid var(--sb-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Workspace field",
+      "kind": "input",
+      "refersTo": "input-dark",
+      "description": "The compact toolbar text field with the shared focus and caret treatments.",
+      "html": "<input type=\"text\" class=\"ds-field\" aria-label=\"Workspace\" />",
+      "css": ".ds-field { flex: 1; max-width: 560px; background: var(--sb-panel); color: var(--sb-text); border: 1px solid var(--sb-line-strong); border-radius: 0; padding: 7px 10px; font: 400 12px/1 'Geist Mono', monospace; accent-color: var(--sb-accent); caret-color: var(--sb-accent); } .ds-field:focus-visible { outline: 2px solid var(--sb-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Stage navigation",
+      "kind": "nav",
+      "refersTo": "stage-current-dark",
+      "description": "Current and idle stage states; labels and marks accompany color. The snippet is a visual sample of the CLI-backed navigation.",
+      "html": "<nav class=\"ds-rail\" aria-label=\"Pipeline stages\"><button type=\"button\" class=\"ds-stage\" aria-current=\"step\"><span class=\"ds-number\">04</span><span class=\"ds-name\">Look</span><i class=\"ds-dot\" aria-hidden=\"true\"></i></button><button type=\"button\" class=\"ds-stage\"><span class=\"ds-number\">05</span><span class=\"ds-name\">Bake</span><i class=\"ds-dot\" aria-hidden=\"true\"></i></button></nav>",
+      "css": ".ds-rail { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--sb-line); } .ds-stage { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1; min-width: 112px; min-height: 52px; padding: 12px 10px; background: none; border: none; text-align: left; font: 400 13px/1.5 'Geist Mono', system-ui, sans-serif; color: var(--sb-dim); cursor: pointer; } .ds-number { font-size: 12px; font-variant-numeric: tabular-nums; } .ds-name { font-weight: 500; } .ds-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--sb-line); flex: none; } .ds-locked { border-style: dotted; } .ds-stage[aria-disabled='true'] { cursor: default; } .ds-stage[aria-current='step'] { color: var(--sb-on-current); background: var(--sb-current); } .ds-stage[aria-current='step']::before { content: ''; position: absolute; left: calc(50% - 12px); bottom: 7px; width: 24px; height: 1px; background: currentColor; } .ds-stage:hover:not([aria-current='step']) { color: var(--sb-text); background: var(--sb-raise); } .ds-stage:focus-visible { outline: 2px solid var(--sb-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Command chip",
+      "kind": "chip",
+      "refersTo": "chip-dark",
+      "description": "The command-palette chip in title chrome.",
+      "html": "<button type=\"button\" class=\"ds-chip\" aria-label=\"Command palette\">Ctrl+K</button>",
+      "css": ".ds-chip { font: 400 12px/1 'Geist Mono', monospace; color: var(--sb-dim); background: var(--sb-panel); border: 1px solid var(--sb-line-strong); border-radius: 0; padding: 8px; cursor: pointer; } .ds-chip:hover { background: var(--sb-raise); } .ds-chip:focus-visible { outline: 2px solid var(--sb-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Status tag",
+      "kind": "chip",
+      "refersTo": "tag-dark",
+      "description": "Noninteractive metadata; semantic outcome variants use text and a matching border.",
+      "html": "<span class=\"ds-tag\">pixel</span>",
+      "css": ".ds-tag { display: inline-block; font: 400 12px/1 'Geist Mono', monospace; border: 1px solid var(--sb-line); color: var(--sb-dim); padding: 4px 6px; } .ds-tag.ds-style { color: var(--sb-accent); border-color: var(--sb-accent); } .ds-tag.ds-ok { color: var(--sb-ok); border-color: var(--sb-ok); } .ds-tag.ds-warn { color: var(--sb-danger); border-color: var(--sb-danger); } .ds-tag.ds-baked { color: var(--sb-warning); border-color: var(--sb-warning); }"
+    },
+    {
+      "name": "Character card",
+      "kind": "card",
+      "refersTo": "character-card-dark",
+      "description": "Fixed-width card in the real empty-thumbnail state; identity labels are placeholders, with no character artwork.",
+      "html": "<button type=\"button\" class=\"ds-card\" aria-label=\"Open Character\"><div class=\"ds-thumb\" aria-hidden=\"true\"><span class=\"ds-no-thumb\">no bake yet</span></div><div class=\"ds-card-body\"><div class=\"ds-card-name\">Character</div><div class=\"ds-card-id\">character-id</div></div></button>",
+      "css": ".ds-card { width: 264px; padding: 0; font: 400 13px/1.5 'Geist Mono', system-ui, sans-serif; color: var(--sb-text); background: var(--sb-panel); border: 1px solid var(--sb-line); border-radius: 0; display: flex; flex-direction: column; text-align: left; cursor: pointer; } .ds-card:hover, .ds-card:focus-visible { border-color: var(--sb-dim); } .ds-card:focus-visible { outline: 2px solid var(--sb-focus); outline-offset: 2px; } .ds-thumb { width: 100%; height: 132px; overflow: hidden; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--sb-line); background: repeating-conic-gradient(var(--sb-check-a) 0% 25%, var(--sb-check-b) 0% 50%) 0 0 / 16px 16px; } .ds-no-thumb { font: 400 12px/1 'Geist Mono', monospace; color: var(--sb-well-text); } .ds-card-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 7px; } .ds-card-name { font: 500 28px/1.1 'Barlow Condensed', sans-serif; } .ds-card-id { font: 400 12px/1 'Geist Mono', monospace; color: var(--sb-dim); }"
+    },
+    {
+      "name": "Reference well",
+      "kind": "custom",
+      "description": "Look's fixed dark reference well in its existing no-source-image state; no artwork is fabricated.",
+      "html": "<div class=\"ds-reference\"><p class=\"ds-note\" role=\"status\">No source image for this character.</p></div>",
+      "css": ".ds-reference { height: 380px; border: 1px solid var(--sb-line); background: repeating-conic-gradient(var(--sb-check-a) 0% 25%, var(--sb-check-b) 0% 50%) 0 0 / 24px 24px; display: grid; place-items: center; padding: 16px; } .ds-note { font: 400 12px/1.5 'Geist Mono', system-ui, sans-serif; color: var(--sb-well-text); max-width: 32ch; text-align: center; margin-bottom: 6px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Imprint",
+    "overview": "Imprint is a compact character workshop: condensed indigo headings, precise monospaced controls, fine crosshatch on the light workspace and sparse dither on blue-gray night surfaces. Solid panels keep the texture behind the work; reference images and saved sprites occupy dark, untextured wells.\n\nThe [public design guidance](../../docs/design/design-system.md) owns the shared visual commitments. This app-level record extracts the implemented system from [tokens](src/tokens.css), [type](src/fonts.css) and [styles](src/styles.css); those source files remain authoritative. [PRODUCT.md](PRODUCT.md) records product truth, while the [surface brief](.impeccable/surfaces/apps-studio-src-app-tsx.md) owns this screen's composition.",
+    "keyCharacteristics": [
+      "Condensed display type paired with compact monospaced controls.",
+      "Square fields, thin rules and solid indigo actions.",
+      "Independent light/dark shells around unchanged sprite pixels."
+    ],
+    "rules": [
+      {
+        "name": "The Dark Well Rule",
+        "body": "Canvas wells use the shared checker and caption roles in both themes. Workspace texture stays outside images and canvases.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat Surface Rule",
+        "body": "Ordinary panels use tone and thin borders. Menus and dialogs alone use the existing overlay shadows.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Saved Pixel Rule",
+        "body": "Recipe edits leave saved sprites unchanged until Bake. Display full saved cells at integer nearest-neighbor zoom; scrolling never trims or resamples them.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do consume semantic light/dark roles from tokens.css and preserve the shared well colors.",
+      "Do use the self-hosted display and UI faces with their existing fallback stacks.",
+      "Do preserve visible keyboard focus, reduced motion, localization growth and inspector access.",
+      "Do keep outcome labels, the exact CLI twin, stale-frame cost and honest empty/error states."
+    ],
+    "donts": [
+      "Don't invert the light palette to manufacture dark mode.",
+      "Don't place shell textures, filters or recoloring over sprite pixels.",
+      "Don't add decorative mascots, the rejected ASCII torus, notched buttons or entrance animation.",
+      "Don't present a changed recipe as newly baked output or browser resizing as mobile/native qualification."
+    ]
+  }
+}
