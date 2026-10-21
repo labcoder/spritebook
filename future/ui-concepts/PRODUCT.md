@@ -39,8 +39,13 @@ The maintainer rejected Slate, Paper and Signal. They like the typography and vi
 [Nous Research](https://nousresearch.com/) and the art direction of [Honcho](https://honcho.dev/),
 explicitly including animated ASCII art, dithering and crosshatching. Translate those qualities into
 a working editor; use original art and licensed type rather than copying either site's proprietary
-assets. The first round is an anti-reference, not an approved identity. No second-round direction
-has been selected yet.
+assets. The first round is an anti-reference, not an approved identity.
+
+The maintainer selected **Imprint** as the working direction and requested a focused polish: remove
+the arbitrary ASCII torus, use a slightly darker and less Nous-like blue, texture the workspace
+background, reduce the wordmark/title-bar height, and design a companion dark theme with its own
+color roles. The [paired refinement](imprint/README.md) remains a review artifact; application
+implementation and production token changes await review.
 
 ## Evidence on hand
 

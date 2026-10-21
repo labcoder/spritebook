@@ -1,8 +1,8 @@
 # Studio visual identity studies
 
-**Status: rejected first round, 20 October 2026.** The maintainer rejected all three directions. See
-the [second round](round-2/README.md) for the current exploration, informed by their Nous Research
-and Honcho references. This page and its demo remain historical evidence. No production application
+**Status: rejected first round, 20 October 2026.** The maintainer rejected all three directions.
+Imprint was selected from the second round; see the [paired light/dark polish](imprint/README.md)
+for the current review. This page and its demo remain historical evidence. No production application
 source, core behavior or ratified design tokens changed. Nothing was pushed.
 
 Open [index.html](index.html) in a browser. It works directly from disk, including fonts and
@@ -74,4 +74,4 @@ working editor. The decision remains with the maintainer.
    complete.
 
 No implementation milestone is marked complete by these studies. F7 qualification and the existing
-F5 editor roadmap remain unchanged while the identity is undecided.
+F5 editor roadmap remain unchanged while the Imprint refinements await review.

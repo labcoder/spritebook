@@ -1,9 +1,11 @@
 # Studio identity exploration, second round
 
-**Status: ready for visual selection; no direction approved.** Open [index.html](index.html)
-directly in a browser. It compares the captured 1440 × 900 screens, includes original ASCII motion
-and offers a 100% inspection view. The temporary Impeccable decision board is also linked from the
-viewer; replying in chat works if that local board has closed.
+**Status: Imprint selected as the working direction.** The
+[paired light/dark polish](../imprint/README.md) is the current review; these are the original
+second-round alternatives. Open [index.html](index.html) directly in a browser. It compares the
+captured 1440 × 900 screens, includes original ASCII motion and offers a 100% inspection view. Its
+temporary decision board was used during selection; use the paired Imprint review for current
+feedback.
 
 | Direction                      | Source sketch                      | Identity and tradeoff                                                                                                                                        |
 | ------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -120,5 +122,5 @@ Ordered before Impeccable's direction exercise:
    and small yellow actions. Signature: names and thumbnail images form a recognizable catalog
    rhythm across editor and roster surfaces.
 
-No direction has been selected. The familiar three-panel editor is an available fallback if the
-maintainer chooses it, rather than a template every candidate uses.
+The maintainer subsequently selected Imprint. The original three-panel fallback remains historical;
+no direction tournament or selection watcher is needed for the focused polish pass.
