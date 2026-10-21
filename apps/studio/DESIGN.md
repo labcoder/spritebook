@@ -289,6 +289,17 @@ Gallery cards have a fixed width, square corners, a dark checker thumbnail and a
 body. Hover/focus strengthens the border. Inspector sections and ordinary production panels use
 solid panel surfaces and separating rules, without resting shadows.
 
+### Model management
+
+Manage models uses a single list with one recommended build per model. A condensed model name,
+download size, memory requirement and a plain status carry the default row. Thin horizontal rules
+separate models; metadata is not boxed into badges. Details discloses exact versions, platform and
+license information, verification, repair and removal. Other versions preserves historical pins.
+Confirmations disclose terms and the exact CLI action before work starts. Inline progress appears
+immediately, shows real download bytes, and uses named indeterminate phases for dependency/native
+setup. Errors disclose their full reason on request. Keep the shared focus trap and transfer focus
+to running actions and completion messages.
+
 ### Inputs / Fields
 
 Text and numeric fields use panel/text, a strong border, square corners and an accent caret. Look

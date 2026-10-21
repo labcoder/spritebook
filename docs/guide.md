@@ -318,10 +318,15 @@ after undo; they do not guess the newest bake directory.
 
 ## 11. Manage or remove models
 
-Open **File > Manage models** (Ctrl+M). Install and verify operate on the selected catalog version.
-For installed versions with a runtime recipe, **Repair runtime** runs `models setup`; confirm the
-action and required license acceptance before it downloads or repairs dependencies. **Remove**
-deletes downloaded model files and their receipt. Python/runtime environments and shared caches
-remain separate. Generated results, accepted meshes and sprites remain in your workspace. See
+Open **File > Manage models** (Ctrl+M). Each model shows one recommended build for this machine;
+**Other versions** keeps historical builds available. Downloaded weights and runtime readiness have
+separate status labels. Installation immediately shows activity, real download bytes and the current
+setup phase. Dependency and native checks use an indeterminate indicator.
+
+Open **Details** for exact versions, terms, **Verify files**, **Repair runtime** and **Remove**. For
+installed versions with a runtime recipe, **Repair runtime** runs `models setup`; confirm the action
+and required license acceptance before it downloads or repairs dependencies. **Remove** deletes
+downloaded model files and their receipt. Python/runtime environments and shared caches remain
+separate. Generated results, accepted meshes and sprites remain in your workspace. See
 [storage and removal](models.md#storage-and-removal) for a full dependency reset and the CLI twins,
 including `models setup` for repairing a failed runtime installation.

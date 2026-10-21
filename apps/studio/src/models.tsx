@@ -1,356 +1,393 @@
-import { useJobBridge } from './jobscope';
-/**
- * Manage models (⌘M): the registry projected, with its gates VISIBLE —
- * license (SPDX + acceptance requirement), territory exclusions, VRAM floor,
- * disk cost. Actions wrap the registry verbs verbatim: install carries
- * --accept-license only when the user ticks the box (the CLI enforces the
- * gate either way — the GUI never bypasses, it only makes the gate legible),
- * and every action shows its CLI twin. Streams land in the log drawer.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal } from './modal';
+import type { ListedModel, ListedVersion } from '@spritebook/registry';
 import type { StudioBridge } from './bridge';
+import { useJobBridge } from './jobscope';
+import { Modal } from './modal';
+import { CliTwin, lastFailure } from './gen';
+import { type ProgressState, readProgress } from './bakeprogress';
 import { t } from './i18n';
 import { modelsArgs } from './args';
+import { useLandFocus } from './focus';
 
-interface ModelVersion {
-  version: string;
-  runtime?: string;
-  diskBytes: number;
-  platforms: string[];
-  minVramGb?: number;
-  vramProfiles?: unknown[];
-  installed: boolean;
-}
+type Action = 'install' | 'setup' | 'verify' | 'rm';
+const gb = (bytes: number) => (bytes / 1e9).toFixed(2);
+const byteLabel = (bytes: number) =>
+  bytes >= 1e9
+    ? `${gb(bytes)} GB`
+    : bytes >= 1e6
+    ? `${(bytes / 1e6).toFixed(1)} MB`
+    : `${Math.ceil(bytes / 1e3)} KB`;
 
-interface ModelRow {
-  id: string;
-  kind: string;
-  displayName: string;
-  license: {
-    name: string;
-    spdx?: string;
-    requiresAcceptance?: boolean;
-    excludedTerritories?: string[];
-  };
-  versions: ModelVersion[];
-}
-
-function gb(bytes: number): string {
-  return bytes === 0 ? '0' : (bytes / 1e9).toFixed(2);
-}
-
-export function cliTwin(
-  action: 'install' | 'setup' | 'verify' | 'rm',
-  ref: string,
-  acceptLicense: boolean,
-): string {
-  return `spritebook ${modelsArgs(action, ref, acceptLicense).join(' ')}`;
-}
-
-function VersionRow({ bridge, model, v, busy, setBusy, refresh }: {
-  bridge: StudioBridge;
-  model: ModelRow;
-  v: ModelVersion;
-  busy: string | null;
-  setBusy: (b: string | null) => void;
-  refresh: () => void;
-}) {
-  const ref = `${model.id}@${v.version}`;
-  const needsAcceptance = model.license.requiresAcceptance === true;
-  const [accepted, setAccepted] = useState(false);
-  const [confirming, setConfirming] = useState<'install' | 'setup' | 'rm' | null>(null);
-  const [lastExit, setLastExit] = useState<number | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [progress, setProgress] = useState<
-    { label: string; done: number; total: number } | null
-  >(null);
-
-  const runAction = useCallback(async (action: 'install' | 'setup' | 'verify' | 'rm') => {
-    setBusy(ref);
-    setConfirming(null);
-    setProgress(null);
-    const args = [...modelsArgs(action, ref, accepted), '--json'];
-    // the install streams one progress event per file (step download:<name>);
-    // a 22-file 16 GB run must read as MOTION, not a frozen dialog - the UX
-    // pass installed blind and had only the raw drawer to guess from
-    const r = await bridge.runCli(args, (line) => {
-      try {
-        const e = JSON.parse(line);
-        if (e.t === 'progress' && typeof e.step === 'string') {
-          setProgress({
-            label: e.step.startsWith('download:') ? e.step.slice('download:'.length) : e.step,
-            done: Number(e.done ?? 0),
-            total: Number(e.total ?? 0),
-          });
-        }
-      } catch { /* non-JSON lines stay the drawer's business */ }
-    });
-    setLastExit(r.exitCode);
-    setProgress(null);
-    setBusy(null);
-    refresh();
-  }, [bridge, ref, accepted, setBusy, refresh]);
-
-  const pendingTwin = cliTwin(confirming ?? 'verify', ref, accepted);
-  const isBusy = busy === ref;
-
+function ModelProgress({ progress }: { progress: ProgressState | null }) {
+  const step = progress?.step ?? '';
+  const bytes = step.includes('download-bytes:');
+  const determinate = bytes || step === 'verify';
+  const label = bytes
+    ? t('Downloading files')
+    : step.startsWith('setup:dependencies')
+    ? t('Installing dependencies')
+    : step.startsWith('setup:sidecar')
+    ? t('Preparing the model service')
+    : step.startsWith('setup:check')
+    ? t('Checking the runtime')
+    : step.startsWith('setup:')
+    ? t('Preparing runtime files')
+    : step.startsWith('download:') || step === 'verify'
+    ? t('Verifying model files')
+    : t('Starting…');
+  const dependency = step.startsWith('setup:dependencies:')
+    ? step.slice('setup:dependencies:'.length)
+    : '';
+  const detail = bytes
+    ? step.split('download-bytes:')[1]
+    : /^(Downloading|Downloaded|Installing|Installed|Prepared|Resolved)\s/.test(dependency)
+    ? dependency
+    : step.startsWith('download:')
+    ? step.slice('download:'.length)
+    : '';
   return (
-    <div className='mv'>
-      <span className='mono mv-ver'>{v.version}</span>
-      <span className='mono mv-size'>{gb(v.diskBytes)} GB</span>
-      {v.minVramGb !== undefined && (
-        <span className='mono mv-vram'>
-          {v.vramProfiles ? t('VRAM depends on configuration') : `≥${v.minVramGb} GiB VRAM`}
-        </span>
-      )}
-      <span className='mono mv-plat' title={v.platforms.join(', ')}>
-        {v.platforms.length} {t('platforms')}
-      </span>
-      {v.installed
-        ? <span className='mbadge ok'>{t('installed')}</span>
-        : <span className='mbadge'>{t('not installed')}</span>}
-      <span className='mv-actions'>
-        {v.installed && (
-          <button
-            type='button'
-            className='btn mbtn'
-            disabled={busy !== null}
-            onClick={() => runAction('verify')}
-          >
-            {isBusy ? t('Working…') : t('Verify')}
-          </button>
-        )}
-        {v.installed && v.runtime && (
-          <button
-            type='button'
-            className='btn mbtn'
-            disabled={busy !== null || (confirming === 'setup' && needsAcceptance && !accepted)}
-            onClick={() => confirming === 'setup' ? runAction('setup') : setConfirming('setup')}
-          >
-            {confirming === 'setup' ? t('Confirm runtime setup') : t('Repair runtime')}
-          </button>
-        )}
-        {v.installed && (confirming === 'rm'
-          ? (
-            <button
-              type='button'
-              className='btn mbtn danger'
-              disabled={busy !== null}
-              onClick={() => runAction('rm')}
-            >
-              {t('Confirm remove')}
-            </button>
-          )
-          : (
-            <button
-              type='button'
-              className='btn mbtn'
-              disabled={busy !== null}
-              onClick={() => setConfirming('rm')}
-            >
-              {t('Remove')}
-            </button>
-          ))}
-        {!v.installed && (confirming === 'install'
-          ? (
-            <button
-              type='button'
-              className='btn mbtn primaryish'
-              disabled={busy !== null || (needsAcceptance && !accepted)}
-              onClick={() => runAction('install')}
-            >
-              {t('Confirm download')} {gb(v.diskBytes)} GB
-            </button>
-          )
-          : (
-            <button
-              type='button'
-              className='btn mbtn'
-              disabled={busy !== null}
-              onClick={() => setConfirming('install')}
-            >
-              {t('Install')}
-            </button>
-          ))}
-      </span>
-      {isBusy && progress !== null && progress.total > 0 && (
-        <span className='mv-progress' role='status'>
-          <span className='mv-bar' aria-hidden='true'>
-            <span
-              className='mv-barfill'
-              style={{
-                width: `${Math.round((progress.done / progress.total) * 100)}%`,
-              }}
-            />
-          </span>
+    <div className='model-progress'>
+      <div className='model-progress-label'>
+        <span role='status'>{label}</span>
+        {determinate && progress && (
           <span className='mono dimtext'>
-            {progress.done}/{progress.total} · {progress.label}
+            {bytes
+              ? `${byteLabel(progress.done)} / ${byteLabel(progress.total)}`
+              : `${progress.done} / ${progress.total}`}
           </span>
-        </span>
-      )}
-      {(confirming === 'install' || confirming === 'setup') && needsAcceptance && (
-        <label className='mv-accept'>
-          <input
-            type='checkbox'
-            checked={accepted}
-            onChange={(e) => setAccepted(e.target.checked)}
-          />
-          {t('I accept the license')}: {model.license.name}
-        </label>
-      )}
-      {confirming === 'setup' && (
-        <span className='mono dimtext'>
-          {t('Runtime setup keeps model files and may download code and dependencies.')}
-        </span>
-      )}
-      {confirming && (
-        <span className='mv-twin mono'>
-          <span className='mv-twincmd'>$ {pendingTwin}</span>
-          <button
-            type='button'
-            className='btn mbtn'
-            onClick={() => {
-              navigator.clipboard.writeText(pendingTwin).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1200);
-              }, () => {});
-            }}
-          >
-            {copied ? t('Copied') : t('Copy')}
-          </button>
-        </span>
-      )}
-      {lastExit !== null && lastExit !== 0 && (
-        <span className='mv-exit mono'>
-          {t('failed — the log drawer has the verbatim reason')}
-        </span>
-      )}
+        )}
+      </div>
+      <progress aria-label={label} max={1} value={determinate ? progress?.fraction : undefined} />
+      {detail && <div className='model-progress-detail mono' title={detail}>{detail}</div>}
     </div>
   );
 }
 
-export function ManageModels({ bridge: baseBridge, open, onClose }: {
+function VersionRow({ bridge, model, v, busy, setBusy, refresh, historical = false }: {
   bridge: StudioBridge;
-  open: boolean;
-  onClose: () => void;
+  model: ListedModel;
+  v: ListedVersion;
+  busy: string | null;
+  setBusy: (ref: string | null) => void;
+  refresh: () => void;
+  historical?: boolean;
 }) {
-  const { bridge, busy: jobBusy, cancel } = useJobBridge(
-    baseBridge,
-    String(open),
+  const ref = `${model.id}@${v.version}`;
+  const [accepted, setAccepted] = useState(false);
+  const [confirming, setConfirming] = useState<Exclude<Action, 'verify'> | null>(null);
+  const [action, setAction] = useState<Action | null>(null);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
+  const [result, setResult] = useState<{ exit: number | null; message?: string } | null>(null);
+  const isBusy = busy === ref;
+  useLandFocus(isBusy, `[data-model-ref="${ref}"] [aria-busy="true"]`);
+  useLandFocus(!isBusy && result !== null, `[data-model-ref="${ref}"] > [role="status"]`);
+  const blocked = busy !== null && !isBusy;
+  const supported = v.platformSupported !== false;
+  const needsSetup = v.installed && v.runtime && !v.runtimePrepared;
+  const status = !supported
+    ? t('Unavailable on this machine')
+    : !v.installed
+    ? t('Not downloaded')
+    : needsSetup
+    ? t('Runtime setup required')
+    : v.runtimePrepared
+    ? t('Ready')
+    : t('Weights downloaded');
+  const run = async (next: Action) => {
+    if (busy !== null) return;
+    setBusy(ref);
+    setAction(next);
+    setConfirming(null);
+    setProgress(null);
+    setResult(null);
+    try {
+      const r = await bridge.runCli([...modelsArgs(next, ref, accepted), '--json'], (line) => {
+        const p = readProgress(line);
+        if (p) setProgress(p);
+      });
+      setResult({ exit: r.exitCode, message: lastFailure(r.lines)?.message });
+    } finally {
+      setBusy(null);
+      refresh();
+    }
+  };
+  return (
+    <div className='model-version' data-model-ref={ref}>
+      <div className='model-main'>
+        <div className='model-summary'>
+          {historical ? <h4 className='mono'>{v.version}</h4> : <h3>{model.displayName}</h3>}
+          <div className='model-meta'>
+            <span>{gb(v.diskBytes)} GB {t('model files')}</span>
+            {v.minVramGb !== undefined && (
+              <span>
+                {v.vramProfiles ? t('VRAM varies by settings') : `${v.minVramGb} GiB VRAM`}
+              </span>
+            )}
+            {historical && !v.runtime && <span>{t('Manual runtime setup')}</span>}
+          </div>
+        </div>
+        <div className='model-state'>
+          <span className={needsSetup ? 'model-status warning' : 'model-status'}>{status}</span>
+          {isBusy
+            ? <button type='button' className='btn mbtn' aria-busy='true'>{t('Working…')}</button>
+            : !v.installed
+            ? (
+              <button
+                type='button'
+                className='btn mbtn primary'
+                disabled={blocked || !supported}
+                onClick={() => setConfirming('install')}
+              >
+                {t('Install')}
+              </button>
+            )
+            : needsSetup
+            ? (
+              <button
+                type='button'
+                className='btn mbtn primary'
+                disabled={blocked || !supported}
+                onClick={() => setConfirming('setup')}
+              >
+                {t('Set up runtime')}
+              </button>
+            )
+            : null}
+        </div>
+      </div>
+      {isBusy && <ModelProgress progress={progress} />}
+      {isBusy && action && <CliTwin args={modelsArgs(action, ref, accepted)} />}
+      {confirming && !isBusy && (
+        <div className='model-confirm'>
+          <p>
+            {confirming === 'rm'
+              ? t('Remove model files? Projects and generated assets stay.')
+              : confirming === 'setup'
+              ? t('Set up the runtime using the downloaded model files.')
+              : `${t('Download model files:')} ${gb(v.diskBytes)} GB`}
+          </p>
+          {confirming !== 'rm' && v.runtime && (
+            <p className='dimtext'>
+              {t('Runtime setup also downloads code and Python dependencies.')}
+            </p>
+          )}
+          {confirming !== 'rm' && model.license.requiresAcceptance && (
+            <label className='model-accept'>
+              <input
+                type='checkbox'
+                checked={accepted}
+                onChange={(e) => setAccepted(e.target.checked)}
+              />
+              <span>
+                {t('I accept the license')}: {model.license.name}{' '}
+                {model.license.url && (
+                  <a href={model.license.url} target='_blank' rel='noreferrer'>
+                    {t('Read license')}
+                  </a>
+                )}
+              </span>
+            </label>
+          )}
+          <CliTwin args={modelsArgs(confirming, ref, accepted)} />
+          <div className='model-actions'>
+            <button
+              type='button'
+              className={`btn mbtn ${confirming === 'rm' ? 'danger' : 'primary'}`}
+              disabled={blocked ||
+                (confirming !== 'rm' && model.license.requiresAcceptance && !accepted)}
+              onClick={() => run(confirming)}
+            >
+              {confirming === 'rm'
+                ? t('Confirm remove')
+                : confirming === 'setup'
+                ? t('Confirm runtime setup')
+                : t('Confirm download')}
+            </button>
+            <button type='button' className='btn mbtn' onClick={() => setConfirming(null)}>
+              {t('Back')}
+            </button>
+          </div>
+        </div>
+      )}
+      {result && !isBusy && (
+        <div className={result.exit === 0 ? 'model-result' : 'model-error'} role='status'>
+          {result.exit === 0
+            ? t('Completed')
+            : result.exit === 130
+            ? t('Canceled')
+            : t('Could not complete this action')}
+          {result.message && (
+            <details>
+              <summary>{t('Show error')}</summary>
+              <p>{result.message}</p>
+            </details>
+          )}
+        </div>
+      )}
+      <details className='model-details'>
+        <summary>{t('Details')}</summary>
+        <dl>
+          <dt>{t('Build')}</dt>
+          <dd className='mono'>{ref}</dd>
+          <dt>{t('Platforms')}</dt>
+          <dd>{v.platforms.join(', ')}</dd>
+          <dt>{t('License')}</dt>
+          <dd>{model.license.spdx ?? model.license.name}</dd>
+          {v.runtime && (
+            <>
+              <dt>{t('Runtime')}</dt>
+              <dd>{v.runtimePrepared ? t('Prepared') : t('Setup required')}</dd>
+            </>
+          )}
+        </dl>
+        {v.notes && <p className='dimtext'>{v.notes}</p>}
+        {v.installed && (
+          <>
+            <div className='model-actions'>
+              <button
+                type='button'
+                className='btn mbtn'
+                disabled={busy !== null}
+                onClick={() => run('verify')}
+              >
+                {t('Verify files')}
+              </button>
+              {v.runtime && (
+                <button
+                  type='button'
+                  className='btn mbtn'
+                  disabled={busy !== null || !supported}
+                  onClick={() => setConfirming('setup')}
+                >
+                  {t('Repair runtime')}
+                </button>
+              )}
+              <button
+                type='button'
+                className='btn mbtn danger'
+                disabled={busy !== null}
+                onClick={() => setConfirming('rm')}
+              >
+                {t('Remove')}
+              </button>
+            </div>
+            <CliTwin args={modelsArgs('verify', ref, false)} />
+          </>
+        )}
+      </details>
+    </div>
   );
-  const [rows, setRows] = useState<ModelRow[] | null>(null);
+}
+
+export function ManageModels(
+  { bridge: baseBridge, open, onClose }: {
+    bridge: StudioBridge;
+    open: boolean;
+    onClose: () => void;
+  },
+) {
+  const { bridge, cancel } = useJobBridge(baseBridge, String(open));
+  const [rows, setRows] = useState<ListedModel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-
   const refresh = useCallback(async () => {
     setError(null);
     const r = await bridge.runCli(['models', 'list', '--json']);
-    if (r.exitCode !== 0 || r.lines.length === 0) {
-      setError(
-        t('could not read the catalog — the log drawer has the verbatim reason'),
-      );
-      setRows(null);
+    if (r.exitCode !== 0 || !r.lines.length) {
+      setError(t('Could not load models. Check the log, then refresh.'));
       return;
     }
     try {
-      const doc = JSON.parse(r.lines.at(-1)!);
-      setRows((doc.models ?? []) as ModelRow[]);
+      setRows(JSON.parse(r.lines.at(-1)!).models ?? []);
     } catch {
       setError(t('catalog output was not JSON'));
-      setRows(null);
     }
   }, [bridge]);
-
   useEffect(() => {
     if (open) refresh();
   }, [open, refresh]);
-
   const installedBytes = useMemo(
     () =>
-      (rows ?? []).flatMap((m) => m.versions).filter((v) => v.installed)
-        .reduce((a, v) => a + v.diskBytes, 0),
+      (rows ?? []).flatMap((m) => m.versions).filter((v) => v.installed).reduce(
+        (sum, v) => sum + v.diskBytes,
+        0,
+      ),
     [rows],
   );
-
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      label={t('Manage models')}
-      className='mdl'
-    >
+    <Modal open={open} onClose={onClose} label={t('Manage models')} className='mdl'>
       <div className='mdl-head'>
-        {jobBusy && (
-          <button
-            type='button'
-            className='btn'
-            onClick={cancel}
-            title='CLI: Ctrl+C'
-          >
-            {t('Cancel job')} <kbd>Ctrl+C</kbd>
+        <div>
+          <h2>{t('Manage models')}</h2>
+          <p className='dimtext'>{gb(installedBytes)} GB {t('model files downloaded')}</p>
+        </div>
+        <div className='model-actions'>
+          {busy && (
+            <button type='button' className='btn mbtn' onClick={cancel} title='CLI: Ctrl+C'>
+              {t('Cancel job')}
+            </button>
+          )}
+          <button type='button' className='btn mbtn' onClick={refresh} disabled={busy !== null}>
+            {t('Refresh')}
           </button>
-        )}
-        <span className='hud'>{t('Manage models')}</span>
-        <span className='mono dimtext'>
-          {t('installed')}: {gb(installedBytes)} GB
-        </span>
-        <button
-          type='button'
-          className='btn mbtn'
-          onClick={refresh}
-          disabled={busy !== null}
-        >
-          {t('Refresh')}
-        </button>
-        <button type='button' className='btn mbtn' onClick={onClose}>
-          {t('Close')}
-        </button>
-      </div>
-      <div className='mdl-note'>
-        {t(
-          'Gates are enforced by core, shown here so nothing refuses by surprise.',
-        )}
+          <button type='button' className='btn mbtn' onClick={onClose}>{t('Close')}</button>
+        </div>
       </div>
       <div className='mdl-body'>
-        {error && <div className='mdl-error mono'>{error}</div>}
-        {rows === null && !error && <div className='mdl-error mono'>…</div>}
-        {rows?.map((m) => (
-          <section key={m.id} className='mrow'>
-            <div className='mrow-head'>
-              <span className='mname'>{m.displayName}</span>
-              <span className='mono mid'>{m.id}</span>
-              <span className='mbadge kind'>{m.kind}</span>
-              <span
-                className='mbadge'
-                title={m.license.name}
-              >
-                {m.license.spdx ?? m.license.name}
-              </span>
-              {m.license.requiresAcceptance && (
-                <span className='mbadge gate'>
-                  {t('license acceptance required')}
-                </span>
-              )}
-              {(m.license.excludedTerritories?.length ?? 0) > 0 && (
-                <span className='mbadge gate'>
-                  {t('not available in')}: {m.license.excludedTerritories!.join(', ')}
-                </span>
-              )}
-            </div>
-            {m.versions.map((v) => (
+        {error && <p className='mdl-error' role='alert'>{error}</p>}
+        {rows === null && !error && (
+          <p className='mdl-loading' role='status'>{t('Loading models…')}</p>
+        )}
+        {rows?.length === 0 && <p className='mdl-loading'>{t('No models in this catalog.')}</p>}
+        {rows?.map((m) => {
+          const recommended = m.versions.find((v) => v.version === m.recommendedVersion) ??
+            m.versions.at(-1);
+          if (!recommended) return null;
+          const others = m.versions.filter((v) => v !== recommended);
+          return (
+            <section key={m.id} className='mrow' aria-label={m.displayName}>
               <VersionRow
-                key={v.version}
                 bridge={bridge}
                 model={m}
-                v={v}
+                v={recommended}
                 busy={busy}
                 setBusy={setBusy}
                 refresh={refresh}
               />
-            ))}
-          </section>
-        ))}
+              {(m.license.excludedTerritories?.length ?? 0) > 0 && (
+                <p className='model-restriction'>
+                  {t('not available in')}: {m.license.excludedTerritories!.join(', ')}
+                </p>
+              )}
+              {others.length > 0 && (
+                <details className='model-others'>
+                  <summary>
+                    {t('Other versions')} ({others.length}){others.some((v) => v.installed)
+                      ? ` · ${t('older files downloaded')}`
+                      : ''}
+                  </summary>
+                  <p className='dimtext'>
+                    {t(
+                      'The recommended build includes managed setup. Older builds remain for existing projects.',
+                    )}
+                  </p>
+                  {others.map((v) => (
+                    <VersionRow
+                      key={v.version}
+                      bridge={bridge}
+                      model={m}
+                      v={v}
+                      historical
+                      busy={busy}
+                      setBusy={setBusy}
+                      refresh={refresh}
+                    />
+                  ))}
+                </details>
+              )}
+            </section>
+          );
+        })}
       </div>
     </Modal>
   );

@@ -5,7 +5,10 @@
  */
 import { useEffect, useRef } from 'react';
 
-const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE =
+  'button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])';
+
+const isFocusable = (el: HTMLElement) => !el.hasAttribute('disabled') && el.checkVisibility();
 
 export function Modal(
   { open, onClose, label, className, children, initialFocus }: {
@@ -28,11 +31,10 @@ export function Modal(
     // filter [disabled] exactly like the Tab trap below does: focus() on a
     // disabled element silently no-ops and the aria-modal dialog opens with
     // focus still BEHIND it (walkthrough audit)
-    const enabled = (el: HTMLElement | null | undefined) =>
-      el && !el.hasAttribute('disabled') ? el : null;
+    const enabled = (el: HTMLElement | null | undefined) => el && isFocusable(el) ? el : null;
     const target = enabled(initialFocus ? pop?.querySelector<HTMLElement>(initialFocus) : null) ??
       [...(pop?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])]
-        .find((el) => !el.hasAttribute('disabled'));
+        .find(isFocusable);
     target?.focus();
     return () => restoreRef.current?.focus?.();
   }, [open, initialFocus]);
@@ -60,7 +62,7 @@ export function Modal(
               ...(popRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ??
                 []),
             ]
-              .filter((el) => !el.hasAttribute('disabled'));
+              .filter(isFocusable);
             if (items.length === 0) return;
             const first = items[0]!;
             const last = items[items.length - 1]!;

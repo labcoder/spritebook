@@ -397,6 +397,16 @@ reported Bulma mismatch had identical r1 geometry but a repainted colour texture
 CLI-twin checks cover byte preservation, explicit repainting and reversible promotion. This does not
 qualify the remaining rig, animation or native release paths.
 
+**F3-T2 / F5-T1 model-management follow-through, 2026-10-20:** one platform-compatible managed build
+is recommended per model, with historical builds under Other versions. Core exposes runtime
+preparation separately from weight receipts, rejects empty environments left by cleanup, and checks
+Blender with a disposable mesh artifact during UniRig setup. Installation streams real download
+bytes and named setup phases; Studio shows activity immediately and keeps diagnostics, consent and
+CLI twins available by disclosure. Reusing the existing checkpoints repaired the maintainer's UniRig
+runtime. An isolated Bulma rig completed in 187.64 seconds with 52 joints, finite weights and no
+zero-weight vertices; its 24 deformation flags remain a rig-quality review case for F5-T2. Native
+dialog/assistive-technology and clean-machine release qualification remain F7 work.
+
 The [remote-history review](remote-main-review.md) carries useful requirements into these tasks
 without adopting another core, project format, renderer or provisioning stack:
 

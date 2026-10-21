@@ -56,7 +56,16 @@ retry. Missing weights are an actionable model gate, never a silent download.
 
 ## Install and repair
 
-Studio's **Manage models** dialog wraps the same CLI operations:
+Studio's **Manage models** dialog shows one recommended build per model for the detected platform,
+preferring a managed runtime recipe. **Other versions** retains earlier builds and their install
+state for existing pins. The `.local1` suffix identifies SpriteBook's complete managed build, with
+runtime setup and required support files; it is not a second model trained by SpriteBook. Exact
+build IDs, platform declarations, terms and notes live under **Details**.
+
+Downloaded weights and runtime preparation are separate states. **Runtime setup required** offers
+setup directly; **Ready** means the weight receipt and prepared runtime are present. This is not a
+fresh inference or continuous dependency-integrity check. **Verify files**, **Repair runtime** and
+**Remove** are available under **Details**. The same operations are available on the CLI:
 
 ```sh
 spritebook models install rembg-u2net
@@ -70,7 +79,7 @@ spritebook models setup pixal3d@b0cb2e1b.local1 --accept-license
 For an installed version with a declared runtime recipe, Studio offers **Repair runtime**. Review
 the CLI twin, accept the declared terms when required, then choose **Confirm runtime setup**. This
 runs `models setup`, retaining model files while repairing source/dependencies. It can download code
-and wheels; **Verify** remains a separate model-file check.
+and wheels; **Verify files** remains a separate model-file check.
 
 TRELLIS.2 and Pixal3D require personal Hugging Face approval for the declared DINOv3 conditioner,
 authentication through `hf auth login` or `HF_TOKEN`, and explicit acceptance of the catalog terms.
@@ -98,6 +107,16 @@ spritebook models install unirig@36842e2b.local1 --from <models-root>/unirig/368
 `--from <dir>` supplies model files offline; source and wheel provisioning still need network access
 unless separately cached. Once prepared, the qualified workflows run with inference networking
 blocked.
+
+Installation shows activity as soon as it starts. File downloads report bytes received and the
+current filename; runtime preparation shows extraction, dependency installation, service preparation
+and native checks. Stages with no known byte total use an indeterminate indicator. Raw diagnostics
+remain in the log drawer; failures keep their reason available under **Show error**. **Cancel job**
+stops the owned job, and the refreshed inventory shows which verified files remain.
+
+In the NDJSON stream, `download-bytes:<file>` and `setup:download-bytes:<file>` use byte counts for
+`done`/`total`. The existing `download:<file>` completion events count verified files. Runtime phase
+events use `0/1` while running; they do not represent a percentage or ETA.
 
 Before a model job, core resolves exact project pins and rechecks consent, territory, platform,
 files and configuration-specific VRAM admission. Native runtime loading also verifies prepared
