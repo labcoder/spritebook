@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpriteBook visual identity studies</title>
+  <style>
+    @font-face { font-family: Plex; src: url('assets/plex-sans.woff2') format('woff2'); font-weight: 100 700; font-display: swap; }
+    @font-face { font-family: PlexMono; src: url('assets/plex-mono.woff2') format('woff2'); font-display: swap; }
+    @font-face { font-family: Chakra; src: url('assets/chakra.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+    * { box-sizing: border-box; }
+    html {
+      color-scheme: light dark;
+      --review-fg: light-dark(#202733, #edf0f5);
+      --review-muted: light-dark(#5c6472, #a9afbc);
+      --review-line: light-dark(#b7bfc9, #4c535f);
+      background: transparent; color: var(--foreground, var(--review-fg)); font-family: Plex, sans-serif;
+    }
+    body { margin: 0; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #7f9fff; outline-offset: 3px; }
+    button:disabled { cursor: default; }
+    ::selection { background: #b7ccff; color: #14254d; }
+    [hidden] { display: none !important; }
+    svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .symbols { position: absolute; width: 0; height: 0; overflow: hidden; }
+    .intro { font-size: 15px; line-height: 1.6; margin: 0 0 18px; max-width: 68ch; }
+    .intro small { display: block; color: var(--muted-foreground, var(--review-muted)); font-size: 12px; margin-top: 3px; }
+    .choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .choice { color: inherit; text-align: left; border: 1px solid var(--border, var(--review-line)); background: transparent; border-radius: 10px; padding: 14px; min-width: 0; }
+    .choice:hover { border-color: var(--foreground, var(--review-fg)); }
+    .choice[aria-pressed=true] { outline: 2px solid var(--foreground, var(--review-fg)); outline-offset: 2px; }
+    .choice strong { display: block; font-size: 16px; font-weight: 600; }
+    .choice small { display: block; font-size: 12px; color: var(--muted-foreground, var(--review-muted)); margin-top: 4px; line-height: 1.5; }
+    .palette { display: flex; gap: 3px; height: 22px; margin-bottom: 12px; }
+    .palette i { flex: 1; border-radius: 3px; }
+    .choice:first-child .palette i { border-radius: 6px; }
+    .choice:last-child .palette i { border-radius: 0; }
+    .description { display: flex; align-items: start; gap: 16px; margin: 22px 0 14px; }
+    .description h2 { margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -.025em; }
+    .description p { margin: 0; font-size: 14px; line-height: 1.6; max-width: 64ch; }
+    .review-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .review-tools button { background: transparent; color: inherit; border: 1px solid var(--border, var(--review-line)); border-radius: 6px; padding: 8px 12px; min-height: 38px; font-size: 12px; }
+    .review-tools button:hover { background: var(--secondary, light-dark(#edf0f4, #303945)); }
+    .shell { padding: 16px; border-radius: var(--radius, 12px); background: #0d1018; }
+    .viewport { overflow: hidden; width: 100%; position: relative; }
+    .viewport.actual { overflow: auto; height: 900px !important; }
+    .app {
+      --bg: #202125; --panel: #28292d; --raised: #323338; --line: #43454c;
+      --text: #f1eee8; --dim: #b0b0b8; --accent: #edb38e; --on-accent: #302116;
+      --selected: #463a34; --selected-ink: #f6c9ab; --rail: #242529;
+      --good: #9cd8b2; --caution: #e7c284; --focus: #91b8ff; --radius-control: 7px;
+      --heading: Plex; --gap: 22px; --shadow: 0 5px 18px rgb(0 0 0 / 15%);
+      width: 1360px; height: 850px; transform-origin: top left;
+      background: var(--bg); color: var(--text); font: 400 14px/1.5 Plex, sans-serif;
+      display: flex; flex-direction: column; overflow: hidden; border-radius: 10px;
+      text-align: left; font-variant-numeric: tabular-nums; color-scheme: dark;
+    }
+    .app[data-direction=slate][data-theme=light] {
+      --bg: #e6e3dd; --panel: #f5f2ed; --raised: #fffdf9; --line: #c7c1b8;
+      --text: #292624; --dim: #655e58; --accent: #974c29; --on-accent: #fff8f2;
+      --selected: #f1dece; --selected-ink: #783c21; --rail: #eeebe5;
+      --good: #326846; --caution: #805e25; --focus: #2e5ec5; color-scheme: light;
+    }
+    .app[data-direction=paper] {
+      --bg: #e7edf3; --panel: #f9fbfd; --raised: #ffffff; --line: #becbd9;
+      --text: #152a46; --dim: #50657c; --accent: #264dbb; --on-accent: #ffffff;
+      --selected: #e0e9fc; --selected-ink: #26489c; --rail: #eef3f8;
+      --good: #276347; --caution: #7f5423; --focus: #264dbb; --radius-control: 2px;
+      --heading: Chakra; --shadow: none; color-scheme: light;
+    }
+    .app[data-direction=paper][data-theme=dark] {
+      --bg: #1c2632; --panel: #263344; --raised: #314156; --line: #4c6078;
+      --text: #eaf1fc; --dim: #b5c4d8; --accent: #a3beff; --on-accent: #152b53;
+      --selected: #354d73; --selected-ink: #d9e5ff; --rail: #223043;
+      --good: #9bd6b9; --caution: #e9c493; --focus: #a3beff; color-scheme: dark;
+    }
+    .app[data-direction=signal] {
+      --bg: #142336; --panel: #1b3048; --raised: #27425e; --line: #42607e;
+      --text: #ecf5ff; --dim: #b1c7dd; --accent: #f0cf6c; --on-accent: #30250b;
+      --selected: #35465a; --selected-ink: #f4d98b; --rail: #152a43;
+      --good: #a9dbba; --caution: #f0cf6c; --focus: #83d6eb; --radius-control: 4px;
+      --heading: Chakra; --shadow: none; --gap: 20px;
+    }
+    .app[data-direction=signal][data-theme=light] {
+      --bg: #dce8ef; --panel: #f0f7fb; --raised: #ffffff; --line: #a9bfce;
+      --text: #142e46; --dim: #45617b; --accent: #164c6c; --on-accent: #ffffff;
+      --selected: #d3e8f3; --selected-ink: #184868; --rail: #e3eef5;
+      --good: #276342; --caution: #795719; --focus: #155798; color-scheme: light;
+    }
+    .app button, .app select, .app input { color: inherit; }
+    .app button { border: 0; background: none; }
+    .app button:focus-visible, .app input:focus-visible, .app select:focus-visible { outline-color: var(--focus); }
+    .app ::selection { color: var(--on-accent); background: var(--accent); }
+    .app ::-webkit-scrollbar { width: 8px; height: 8px; }
+    .app ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+    .mono { font-family: PlexMono, monospace; font-size: 11px; }
+    .dim { color: var(--dim); }
+    .windowbar { height: 46px; background: var(--panel); display: flex; align-items: center; gap: 32px; padding: 0 20px; border-bottom: 1px solid var(--line); flex: none; }
+    .brand { display: flex; align-items: center; gap: 9px; font-size: 18px; font-weight: 600; letter-spacing: -.035em; }
+    .brandmark { width: 23px; height: 23px; color: var(--accent); }
+    .app[data-direction=paper] .brand { font-family: Chakra, sans-serif; font-size: 19px; }
+    .app[data-direction=signal] .brand { font-family: Chakra, sans-serif; letter-spacing: .025em; font-size: 17px; }
+    .app[data-direction=signal] .windowbar { height: 48px; border-bottom: 2px solid var(--accent); }
+    .menus { display: flex; gap: 23px; color: var(--dim); font-size: 13px; }
+    .window-right { display: flex; align-items: center; gap: 22px; margin-left: auto; font-size: 12px; color: var(--dim); }
+    .window-controls { display: flex; gap: 24px; padding-left: 10px; }
+    .window-controls svg { width: 12px; height: 12px; }
+    .tabbar { display: flex; height: 44px; gap: 6px; align-items: end; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
+    .tab { padding: 10px 16px; min-width: 120px; color: var(--dim); font-size: 13px; display: flex; gap: 10px; align-items: center; border-radius: 7px 7px 0 0; }
+    .tab.active { color: var(--text); background: var(--bg); box-shadow: inset 0 2px var(--accent); }
+    .tab svg { width: 14px; height: 14px; }
+    .app[data-direction=paper] .tab { border-radius: 0; }
+    .app[data-direction=signal] .tab.active { background: var(--raised); box-shadow: none; }
+    .tab-path { margin: 0 0 11px auto; font-size: 11px; color: var(--dim); }
+    .workspace { display: grid; grid-template-columns: 174px 1fr; flex: 1; min-height: 0; }
+    .rail { padding: 26px 13px 18px; background: var(--rail); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+    .rail-label { margin: 0 12px 15px; font-size: 12px; color: var(--dim); }
+    .stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .stage { display: flex; align-items: center; gap: 11px; padding: 12px; border-radius: var(--radius-control); color: var(--dim); position: relative; }
+    .stage svg { width: 16px; height: 16px; }
+    .stage span { font-size: 11px; width: 18px; }
+    .stage strong { font-weight: 450; font-size: 14px; }
+    .stage .tick { margin-left: auto; width: 12px; height: 12px; color: var(--good); }
+    .stage.active { color: var(--selected-ink); background: var(--selected); }
+    .stage.active strong { font-weight: 600; }
+    .app[data-direction=paper] .stage.active { box-shadow: inset 0 0 0 1px var(--accent); }
+    .app[data-direction=signal] .stage span { color: var(--stage-color, var(--dim)); font-weight: 600; }
+    .app[data-direction=signal][data-theme=light] .stage span { color: #213e59; background: var(--stage-color, #e9edf3); border-radius: 2px; text-align: center; }
+    .app[data-direction=signal] .stage.active { box-shadow: inset 0 0 0 1px var(--accent); }
+    .rail-bottom { margin-top: auto; padding: 20px 12px 0; border-top: 1px solid var(--line); font-size: 12px; color: var(--dim); line-height: 1.8; }
+    .rail-bottom svg { width: 13px; height: 13px; vertical-align: -2px; margin-right: 5px; }
+    .working { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .workspace-head { height: 88px; padding: 18px var(--gap); display: flex; align-items: center; gap: 20px; flex: none; }
+    .workspace-head h1 { font-family: var(--heading), sans-serif; margin: 0; font-size: 26px; letter-spacing: -.025em; line-height: 1.2; font-weight: 600; }
+    .workspace-head p { margin: 5px 0 0; font-size: 12px; color: var(--dim); }
+    .head-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-control); }
+    .app button.icon-button { background: var(--panel); color: var(--dim); }
+    .app button.icon-button:hover, .app .soft-button:hover { background: var(--raised); color: var(--text); }
+    .app button:disabled { opacity: .45; }
+    .app .primary { display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--on-accent); background: var(--accent); padding: 10px 17px; font-weight: 600; font-size: 13px; border-radius: var(--radius-control); }
+    .app .primary:hover { filter: brightness(1.08); }
+    .primary svg { width: 15px; height: 15px; }
+    .cli-twin { font-family: PlexMono, monospace; font-size: 11px; text-align: right; padding-top: 5px; color: var(--dim); }
+    .cli-twin button { font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+    .editor { display: grid; grid-template-columns: minmax(0, 1fr) 278px; gap: 16px; padding: 0 var(--gap) 18px; flex: 1; min-height: 0; }
+    .preview { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--panel); border-radius: 10px; box-shadow: var(--shadow); }
+    .app[data-direction=paper] .preview { border: 1px solid var(--line); border-radius: 2px; }
+    .app[data-direction=signal] .preview { border-radius: 4px; border: 1px solid var(--line); }
+    .preview-toolbar { height: 47px; display: flex; align-items: center; padding: 0 14px; gap: 16px; flex: none; }
+    .preview-toolbar strong { font-weight: 500; font-size: 13px; }
+    .segments { display: inline-flex; gap: 2px; padding: 3px; background: var(--bg); border-radius: var(--radius-control); }
+    .segments button { padding: 4px 9px; color: var(--dim); border-radius: max(1px, calc(var(--radius-control) - 2px)); font-size: 11px; }
+    .segments button[aria-pressed=true] { background: var(--raised); color: var(--text); }
+    .segments button:hover { color: var(--text); }
+    .zoom { margin-left: auto; }
+    .canvas { flex: 1; min-height: 0; display: grid; place-items: center; padding: 16px; position: relative; overflow: hidden; background-color: #181c23; background-image: conic-gradient(#1e232c 25%, transparent 0 50%, #1e232c 0 75%, transparent 0); background-size: 20px 20px; color: #e2e7f0; }
+    .canvas-note { position: absolute; top: 17px; left: 18px; font-size: 11px; color: #b9c3d2; z-index: 1; }
+    .canvas-note b { display: block; font: 500 13px Plex, sans-serif; color: #eef2f8; margin-bottom: 2px; }
+    .canvas-badge { position: absolute; top: 17px; right: 18px; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #c4d6ce; }
+    .dot { width: 5px; height: 5px; display: inline-block; border-radius: 50%; background: currentColor; }
+    .sprite { display: block; flex: none; image-rendering: pixelated; background-repeat: no-repeat; }
+    .hero-sprite { margin-top: -26px; }
+    .pivot { position: absolute; bottom: 55px; left: calc(50% - 55px); width: 110px; height: 1px; background: #586472; }
+    .pivot::after { content: ''; position: absolute; left: 50%; top: -5px; width: 1px; height: 11px; background: #8192a6; }
+    .canvas-caption { position: absolute; bottom: 13px; left: 18px; right: 18px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #b9c3d2; }
+    .directions { display: flex; flex-wrap: wrap; width: 600px; justify-content: center; gap: 8px; }
+    .directions .direction-card { padding: 4px; text-align: center; background: #222a35; border-radius: 4px; font-size: 11px; color: #c9d4e3; }
+    .transport { height: 42px; display: flex; align-items: center; padding: 6px 14px; gap: 14px; font-size: 11px; color: var(--dim); border-bottom: 1px solid var(--line); flex: none; }
+    .app .play { display: grid; place-items: center; color: var(--text); width: 28px; height: 28px; background: var(--raised); border-radius: var(--radius-control); }
+    .transport .direction-picker { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+    .transport select { background: transparent; color: var(--text); border: 0; font-size: 11px; }
+    .frames { display: flex; justify-content: center; gap: 8px; padding: 12px 10px 8px; flex: none; }
+    .app .frame { background: var(--bg); border-radius: var(--radius-control); width: 102px; height: 104px; border: 1px solid transparent; position: relative; overflow: hidden; }
+    .app .frame[aria-pressed=true] { border-color: var(--accent); background: var(--selected); }
+    .app .frame:hover { border-color: var(--dim); }
+    .frame .sprite { margin-top: -7px; }
+    .frame .frame-number { position: absolute; bottom: 4px; left: 7px; font: 11px PlexMono, monospace; color: var(--dim); }
+    .frames-caption { display: flex; justify-content: space-between; padding: 0 16px 11px; font-size: 11px; color: var(--dim); }
+    .settings { background: var(--panel); padding: 19px 18px; border-radius: 10px; display: flex; flex-direction: column; min-height: 0; box-shadow: var(--shadow); }
+    .app[data-direction=paper] .settings { border-radius: 2px; border: 1px solid var(--line); }
+    .app[data-direction=signal] .settings { border-radius: 4px; border: 1px solid var(--line); }
+    .settings h2 { font: 600 16px/1.25 var(--heading), sans-serif; margin: 0; letter-spacing: -.015em; }
+    .settings .subtitle { font-size: 11px; color: var(--dim); margin: 5px 0 0; }
+    .settings section { margin-top: 20px; }
+    .settings h3 { margin: 0 0 11px; font-size: 12px; font-weight: 600; }
+    .field-label { display: block; font-size: 11px; color: var(--dim); margin-bottom: 5px; }
+    .app select.field, .app input.field { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-control); padding: 8px 9px; font-size: 12px; min-height: 36px; caret-color: var(--accent); }
+    .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .style-options { display: flex; flex-direction: column; gap: 6px; }
+    .app .style-option { display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius-control); font-size: 12px; }
+    .style-option span { color: var(--dim); font-size: 11px; }
+    .app .style-option[aria-pressed=true] { background: var(--selected); border-color: var(--accent); color: var(--selected-ink); }
+    .app .style-option[aria-pressed=true] span { color: var(--selected-ink); }
+    .app .style-option:hover { background: var(--raised); }
+    .settings .settings-note { font-size: 11px; line-height: 1.6; color: var(--dim); margin: 13px 0 0; }
+    .draft-notice { padding: 10px; color: var(--caution); background: var(--bg); border-radius: var(--radius-control); margin-top: 12px; font-size: 11px; line-height: 1.6; }
+    .recipe { padding-top: 12px; border-top: 1px solid var(--line); margin-top: auto; }
+    .recipe-row { display: flex; justify-content: space-between; font-size: 11px; gap: 12px; margin: 4px 0; }
+    .recipe-row span { color: var(--dim); }
+    .recipe-row strong { font-weight: 500; }
+    .statusbar { height: 30px; padding: 0 19px; border-top: 1px solid var(--line); background: var(--panel); display: flex; align-items: center; gap: 20px; color: var(--dim); font-size: 11px; flex: none; }
+    .statusbar .status-end { margin-left: auto; }
+    .statusbar .saved { display: flex; align-items: center; gap: 6px; color: var(--good); }
+    dialog { color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 26px; width: 500px; max-width: calc(100% - 32px); box-shadow: 0 20px 60px rgb(0 0 0 / 35%); }
+    dialog::backdrop { background: rgb(0 0 0 / 65%); }
+    dialog h2 { margin: 0 0 10px; font-size: 21px; font-family: Plex, sans-serif; }
+    dialog p { line-height: 1.7; font-size: 13px; }
+    .app dialog input { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 10px; width: 100%; font: 11px PlexMono, monospace; }
+    .dialog-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: end; }
+    .app .soft-button { padding: 9px 14px; border: 1px solid var(--line); border-radius: var(--radius-control); font-size: 12px; }
+    .fit-note { color: var(--muted-foreground, var(--review-muted)); font-size: 12px; line-height: 1.6; margin: 10px 0 0; }
+    .notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin-top: 22px; }
+    .notes h3 { font-size: 13px; margin: 0 0 5px; font-weight: 600; }
+    .notes p { font-size: 12px; line-height: 1.7; margin: 0; color: var(--muted-foreground, var(--review-muted)); }
+    details { margin-top: 22px; font-size: 12px; line-height: 1.8; color: var(--muted-foreground, var(--review-muted)); }
+    summary { cursor: pointer; width: fit-content; }
+    details p { max-width: 70ch; margin-bottom: 0; }
+    @media (max-width: 540px) {
+      .choices { gap: 7px; }
+      .choice { padding: 10px; }
+      .choice strong { font-size: 14px; }
+      .choice small { font-size: 11px; }
+      .palette { height: 17px; gap: 2px; }
+      .description { margin-top: 20px; }
+      .description h2 { font-size: 21px; }
+      .description p { font-size: 13px; }
+      .shell { padding: 16px; }
+      .notes { grid-template-columns: 1fr; gap: 15px; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <svg class="symbols" aria-hidden="true"><defs>
+    <symbol id="mark" viewBox="0 0 24 24"><path d="M3 4h7v16H3zM14 4h7v16h-7zM6 8h1M6 12h1M17 8h1M17 12h1"/><path d="M10 7h4M10 17h4"/></symbol>
+    <symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="icon-undo" viewBox="0 0 24 24"><path d="m8 5-5 5 5 5M3 10h11a6 6 0 0 1 0 12"/></symbol>
+    <symbol id="icon-redo" viewBox="0 0 24 24"><path d="m16 5 5 5-5 5M21 10H10a6 6 0 0 0 0 12"/></symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></symbol>
+    <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="grid" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></symbol>
+    <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="square" viewBox="0 0 24 24"><path d="M5 5h14v14H5z"/></symbol>
+    <symbol id="arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+    <symbol id="folder" viewBox="0 0 24 24"><path d="M3 6h7l2 3h9v11H3z"/></symbol>
+  </defs></svg>
+
+  <p class="intro">Three visual identities for the same character workspace.
+    <small>Unapproved concepts · sample workspace · no application changes</small>
+  </p>
+  <nav class="choices" aria-label="Visual identity concepts">
+    <button type="button" class="choice" data-choice="slate" aria-pressed="true">
+      <span class="palette" aria-hidden="true"><i style="background:#202125"></i><i style="background:#323338"></i><i style="background:#f1eee8"></i><i style="background:#edb38e"></i></span>
+      <strong>A · Slate</strong><small>Warm, quiet, precise<br>Recommended starting point</small>
+    </button>
+    <button type="button" class="choice" data-choice="paper" aria-pressed="false">
+      <span class="palette" aria-hidden="true"><i style="background:#e7edf3"></i><i style="background:#f9fbfd"></i><i style="background:#152a46"></i><i style="background:#264dbb"></i></span>
+      <strong>B · Paper</strong><small>Bright, crisp, structured<br>The strongest light identity</small>
+    </button>
+    <button type="button" class="choice" data-choice="signal" aria-pressed="false">
+      <span class="palette" aria-hidden="true"><i style="background:#142336"></i><i style="background:#27425e"></i><i style="background:#83d6eb"></i><i style="background:#f0cf6c"></i></span>
+      <strong>C · Signal</strong><small>Expressive, clear, technical<br>A more colorful workbench</small>
+    </button>
+  </nav>
+  <div class="description" aria-live="polite"><div><h2 id="concept-name">Slate</h2><p id="concept-description">Warm graphite, apricot selection, and quiet layers. The character carries the color; the interface gives it room.</p></div></div>
+  <div class="review-tools" role="group" aria-label="Concept preview options">
+    <button type="button" id="theme-toggle">Switch to light shell</button>
+    <button type="button" id="size-toggle" aria-pressed="false">Inspect at 100%</button>
+    <button type="button" id="reset">Reset sample controls</button>
+  </div>
+
+  <div class="shell">
+    <div class="viewport" id="viewport">
+      <article class="app" id="app" data-direction="slate" data-theme="dark" aria-label="SpriteBook desktop concept">
+        <header class="windowbar">
+          <div class="brand"><svg class="brandmark" aria-hidden="true"><use href="#mark"/></svg><span id="wordmark">spritebook</span></div>
+          <div class="menus" aria-label="Illustrative desktop menu"><span>File</span><span>Edit</span><span>View</span><span>Help</span></div>
+          <div class="window-right"><span>Models</span><span class="mono">Ctrl K</span><span class="window-controls" aria-hidden="true"><svg><use href="#minus"/></svg><svg><use href="#square"/></svg><svg><use href="#close"/></svg></span></div>
+        </header>
+        <div class="tabbar" aria-label="Illustrative open characters">
+          <div class="tab"><svg aria-hidden="true"><use href="#grid"/></svg>Characters</div>
+          <div class="tab active">Juniper<svg aria-hidden="true"><use href="#close"/></svg></div>
+          <div class="tab" style="min-width:auto" aria-hidden="true"><svg><use href="#plus"/></svg></div>
+          <span class="tab-path mono">Sample workspace / characters / pixal</span>
+        </div>
+        <div class="workspace">
+          <aside class="rail" aria-label="Character pipeline">
+            <p class="rail-label">Character pipeline</p>
+            <ol class="stages">
+              <li class="stage" style="--stage-color:#d6dc91"><span>01</span><strong>Generate</strong><svg class="tick" aria-label="Complete"><use href="#check"/></svg></li>
+              <li class="stage" style="--stage-color:#edaccf"><span>02</span><strong>Rig</strong><svg class="tick" aria-label="Complete"><use href="#check"/></svg></li>
+              <li class="stage" style="--stage-color:#afc3ff"><span>03</span><strong>Animate</strong><svg class="tick" aria-label="Complete"><use href="#check"/></svg></li>
+              <li class="stage active" style="--stage-color:#97dee7" aria-current="step"><span>04</span><strong>Look</strong></li>
+              <li class="stage" style="--stage-color:#f0cf6c"><span>05</span><strong>Bake</strong></li>
+              <li class="stage"><span>06</span><strong>Export</strong></li>
+            </ol>
+            <div class="rail-bottom"><svg aria-hidden="true"><use href="#folder"/></svg>Local workspace<br><span class="mono">characterId: pixal</span></div>
+          </aside>
+          <main class="working">
+            <header class="workspace-head">
+              <div><h1>Juniper</h1><p>Look <span aria-hidden="true">/</span> Find the character’s final sprite style</p></div>
+              <div class="head-actions">
+                <button type="button" class="icon-button" id="undo" aria-label="Undo sample changes" title="Undo sample changes"><svg aria-hidden="true"><use href="#icon-undo"/></svg></button>
+                <button type="button" class="icon-button" disabled aria-label="Redo sample changes"><svg aria-hidden="true"><use href="#icon-redo"/></svg></button>
+                <div><button type="button" class="primary" id="record">Record look<svg aria-hidden="true"><use href="#arrow"/></svg></button><div class="cli-twin"><button type="button" id="show-cli">CLI: spritebook look</button></div></div>
+              </div>
+            </header>
+            <div class="editor">
+              <section class="preview" aria-label="Saved sprite preview">
+                <div class="preview-toolbar"><strong>Sprite preview</strong>
+                  <div class="segments" role="group" aria-label="Preview content"><button type="button" data-view="sprite" aria-pressed="true">Single frame</button><button type="button" data-view="directions" aria-pressed="false">8 directions</button></div>
+                  <div class="segments zoom" role="group" aria-label="Sprite zoom"><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="true">4×</button></div>
+                </div>
+                <div class="canvas">
+                  <div class="canvas-note mono"><b>Walk loop</b><span id="frame-readout">Frame 01 / 06</span></div>
+                  <span class="canvas-badge"><span class="dot"></span>Saved bake</span>
+                  <div class="sprite hero-sprite" id="hero" role="img" aria-label="Previously baked Pixal3D character, walk loop frame 1"></div>
+                  <div class="directions" id="directions" hidden></div>
+                  <div class="pivot" id="pivot" aria-hidden="true"></div>
+                  <div class="canvas-caption mono"><span>100 × 128 px cell</span><span id="zoom-caption">4× · nearest neighbor</span></div>
+                </div>
+                <div class="transport">
+                  <button type="button" class="play" id="play" aria-label="Play saved animation" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-play"/></svg></button>
+                  <span>Walk loop</span><span class="mono">4.5 fps</span><span class="dim">Loop</span>
+                  <label class="direction-picker">Direction<select id="direction" aria-label="Preview direction"><option value="0">01 / 08</option><option value="1">02 / 08</option><option value="2">03 / 08</option><option value="3">04 / 08</option><option value="4">05 / 08</option><option value="5">06 / 08</option><option value="6">07 / 08</option><option value="7">08 / 08</option></select></label>
+                </div>
+                <div class="frames" id="frames" role="group" aria-label="Saved animation frames"></div>
+                <div class="frames-caption"><span>Core-produced frames · saved output</span><span class="mono">bake acc25412</span></div>
+              </section>
+              <aside class="settings" aria-label="Illustrative look controls">
+                <h2>Look settings</h2><p class="subtitle" id="settings-state">Sample recorded recipe</p>
+                <section><h3>Camera</h3>
+                  <label><span class="field-label">Preset</span><select class="field" id="camera"><option value="standard-30">Standard · 30°</option><option value="low-15">Low · 15°</option><option value="iso-45">Isometric · 45°</option></select></label>
+                  <div class="field-pair"><label><span class="field-label">Directions</span><select class="field" id="directions-setting"><option>8</option><option>4</option><option>16</option></select></label><label><span class="field-label">Pixels per metre</span><input class="field" id="ppm" type="number" min="1" max="256" value="32"></label></div>
+                </section>
+                <section><h3>Style</h3><div class="style-options" role="group" aria-label="Sample style recipe"><button type="button" class="style-option" data-style="pixel" aria-pressed="true">Pixel<span>16 colors</span></button><button type="button" class="style-option" data-style="cel-2" aria-pressed="false">Cel<span>6 colors</span></button><button type="button" class="style-option" data-style="painterly" aria-pressed="false">Painterly<span>32 colors</span></button></div>
+                  <div class="field-pair"><label><span class="field-label">Outline, px</span><input class="field" id="outline" type="number" min="0" max="4" step="0.5" value="0.5"></label><div><span class="field-label">Cell size</span><div style="padding-top:8px;font-size:12px">100 × 128 px</div></div></div>
+                </section>
+                <p class="settings-note">The preview shows the saved bake. Sample controls do not render a new look.</p>
+                <div class="draft-notice" id="draft-notice" role="status" hidden>Sample draft · a look change would mark all 144 frames stale.</div>
+                <div class="recipe"><div class="recipe-row"><span>Animation clips</span><strong>3 clips</strong></div><div class="recipe-row"><span>Frames in saved bake</span><strong>144 frames</strong></div><div class="recipe-row"><span>Source</span><strong>Pixal3D</strong></div></div>
+              </aside>
+            </div>
+          </main>
+        </div>
+        <footer class="statusbar"><span class="saved"><span class="dot"></span>Saved output available</span><span>Character ID: pixal</span><span class="status-end">Concept preview · no live jobs</span><span>Logs remain accessible in the app</span></footer>
+        <dialog id="concept-dialog" aria-labelledby="dialog-title"><h2 id="dialog-title">This is a design study</h2><p>These controls explore SpriteBook’s visual identity. Recording a look is disabled here; no manifest, model, or application setting is changed.</p><p>The CLI twin in the application remains part of the proposed design. This sample command describes the saved camera and style:</p><input id="cli-command" aria-label="Sample CLI command" readonly value="spritebook look --workspace ./characters/pixal --camera standard-30 --style pixel"><p id="copy-status" role="status" class="dim"></p><div class="dialog-actions"><button type="button" class="soft-button" id="copy-command">Copy sample command</button><button type="button" class="primary" id="close-dialog">Continue exploring</button></div></dialog>
+      </article>
+    </div>
+  </div>
+  <p class="fit-note">Desktop composition scaled to fit. “Inspect at 100%” keeps the sprite at integer zoom; scroll to inspect the full window. Menu, stage, and tab labels are illustrative.</p>
+  <div class="notes"><section><h3>Identity</h3><p id="identity-note">A warm charcoal shell, apricot actions, generous grouping, and soft rectangular controls. IBM Plex Sans carries the interface; mono is reserved for measurements and CLI.</p></section><section><h3>Why it fits</h3><p id="fit-description">Feels like a creative desktop tool and lets varied character artwork lead. The same system can cover the gallery, model manager, and six stages.</p></section><section><h3>Tradeoff</h3><p id="risk-note">The quieter identity is less distinctive from other creative apps. Its warmth, wordmark, and spacing would need consistent execution.</p></section></div>
+  <details><summary>What is real in this study?</summary><p>The eight walk strips are unmodified output from the completed Windows Pixal3D qualification, bake acc25412, recorded on 20 October 2026. The character is named Juniper for this study; the real character ID is pixal. Camera and style controls are illustrative. The existing OFL fonts are reused. This study does not establish new model runs, platform support, export parity, or native accessibility.</p></details>
+
+  <script>
+    const concepts = {
+      slate: { name: 'Slate', theme: 'dark', wordmark: 'spritebook', description: 'Warm graphite, apricot selection, and quiet layers. The character carries the color; the interface gives it room.', identity: 'A warm charcoal shell, apricot actions, generous grouping, and soft rectangular controls. IBM Plex Sans carries the interface; mono is reserved for measurements and CLI.', fit: 'Feels like a creative desktop tool and lets varied character artwork lead. The same system can cover the gallery, model manager, and six stages.', risk: 'The quieter identity is less distinctive from other creative apps. Its warmth, wordmark, and spacing would need consistent execution.' },
+      paper: { name: 'Paper', theme: 'light', wordmark: 'SpriteBook', description: 'Pale blue paper, dark ink, and crisp edges. A light working surface around a permanently dark sprite canvas.', identity: 'Cool whites and blue ink, square controls, outlined panels, and Chakra headings. A precise printed character without paper texture or decorative chrome.', fit: 'Clear in a bright room. Strong label contrast and tidy boundaries make settings and long production sessions easy to scan.', risk: 'More visible rules and panel boundaries can make dense screens feel busy. The dark canvas is a deliberate, strong contrast within the light shell.' },
+      signal: { name: 'Signal', theme: 'dark', wordmark: 'SpriteBook', description: 'Midnight blue, warm yellow, and a clear stage rhythm. More expressive than Slate, with color assigned a specific job.', identity: 'A saturated midnight shell, compact angular type, yellow actions, and small stage color cues. Flat surfaces and tighter geometry replace the current HUD styling.', fit: 'Carries more of SpriteBook’s existing personality forward. Useful when stages, selected recipes, and job state need immediate recognition.', risk: 'The boldest shell can compete with character colors. Stage color must remain secondary to labels, icons, and readable state text.' }
+    };
+    const strips = ['assets/walk-0.png','assets/walk-1.png','assets/walk-2.png','assets/walk-3.png','assets/walk-4.png','assets/walk-5.png','assets/walk-6.png','assets/walk-7.png'];
+    const app = document.getElementById('app');
+    const viewport = document.getElementById('viewport');
+    const hero = document.getElementById('hero');
+    const frameButtons = [];
+    const directionSprites = [];
+    let frame = 0;
+    let direction = 0;
+    let zoom = 4;
+    let playback;
+    let actualSize = false;
+
+    function drawSprite(element, atFrame, atDirection, scale) {
+      element.style.width = `${100 * scale}px`;
+      element.style.height = `${96 * scale}px`;
+      element.style.backgroundImage = `url("${strips[atDirection]}")`;
+      element.style.backgroundSize = `${600 * scale}px ${128 * scale}px`;
+      element.style.backgroundPosition = `${-100 * atFrame * scale}px ${-32 * scale}px`;
+    }
+    function paint() {
+      drawSprite(hero, frame, direction, zoom);
+      hero.setAttribute('aria-label', `Previously baked Pixal3D character, walk loop frame ${frame + 1}, direction ${direction + 1}`);
+      frameButtons.forEach((button, index) => {
+        drawSprite(button.firstElementChild, index, direction, 1);
+        button.setAttribute('aria-pressed', String(index === frame));
+      });
+      directionSprites.forEach((sprite, index) => drawSprite(sprite, frame, index, 1));
+      document.getElementById('frame-readout').textContent = `Frame ${String(frame + 1).padStart(2, '0')} / 06`;
+      document.getElementById('zoom-caption').textContent = `${zoom}× · nearest neighbor`;
+    }
+    function fit() {
+      const scale = actualSize ? 1 : Math.min(1, viewport.clientWidth / 1360);
+      app.style.transform = `scale(${scale})`;
+      viewport.style.height = `${850 * scale}px`;
+    }
+    function choose(key) {
+      if (!Object.hasOwn(concepts, key)) key = 'slate';
+      const concept = concepts[key];
+      app.dataset.direction = key;
+      app.dataset.theme = concept.theme;
+      document.getElementById('concept-name').textContent = concept.name;
+      document.getElementById('concept-description').textContent = concept.description;
+      document.getElementById('identity-note').textContent = concept.identity;
+      document.getElementById('fit-description').textContent = concept.fit;
+      document.getElementById('risk-note').textContent = concept.risk;
+      document.getElementById('wordmark').textContent = concept.wordmark;
+      document.querySelectorAll('[data-choice]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.choice === key)));
+      updateThemeLabel();
+    }
+    function updateThemeLabel() {
+      document.getElementById('theme-toggle').textContent = `Switch to ${app.dataset.theme === 'dark' ? 'light' : 'dark'} shell`;
+    }
+    function stop() {
+      clearInterval(playback);
+      playback = undefined;
+      document.getElementById('play').setAttribute('aria-pressed', 'false');
+      document.getElementById('play').setAttribute('aria-label', 'Play saved animation');
+      document.querySelector('#play use').setAttribute('href', '#icon-play');
+    }
+    function reset() {
+      stop(); frame = 0; direction = 0; zoom = 4;
+      document.getElementById('direction').value = '0';
+      document.getElementById('camera').value = 'standard-30';
+      document.getElementById('directions-setting').value = '8';
+      document.getElementById('ppm').value = '32';
+      document.getElementById('outline').value = '0.5';
+      document.getElementById('settings-state').textContent = 'Sample recorded recipe';
+      document.getElementById('draft-notice').hidden = true;
+      document.getElementById('hero').hidden = false;
+      document.getElementById('pivot').hidden = false;
+      document.getElementById('directions').hidden = true;
+      document.querySelectorAll('[data-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === 'sprite')));
+      document.querySelectorAll('[data-style]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.style === 'pixel')));
+      document.querySelectorAll('[data-zoom]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.zoom === '4')));
+      paint();
+    }
+    function draft() {
+      document.getElementById('settings-state').textContent = 'Sample draft · preview unchanged';
+      document.getElementById('draft-notice').hidden = false;
+    }
+    for (let index = 0; index < 6; index++) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'frame';
+      button.setAttribute('aria-label', `Show saved frame ${index + 1}`);
+      const sprite = document.createElement('span'); sprite.className = 'sprite'; sprite.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span'); label.className = 'frame-number'; label.textContent = String(index + 1).padStart(2, '0');
+      button.append(sprite, label);
+      button.addEventListener('click', () => { stop(); frame = index; paint(); });
+      document.getElementById('frames').append(button); frameButtons.push(button);
+    }
+    for (let index = 0; index < 8; index++) {
+      const card = document.createElement('div'); card.className = 'direction-card';
+      const sprite = document.createElement('span'); sprite.className = 'sprite'; sprite.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span'); label.textContent = String(index + 1).padStart(2, '0');
+      card.append(sprite, label); document.getElementById('directions').append(card); directionSprites.push(sprite);
+    }
+    document.querySelectorAll('[data-choice]').forEach(button => button.addEventListener('click', () => { choose(button.dataset.choice); history.replaceState(null, '', `#${button.dataset.choice}`); }));
+    document.getElementById('theme-toggle').addEventListener('click', () => { app.dataset.theme = app.dataset.theme === 'dark' ? 'light' : 'dark'; updateThemeLabel(); });
+    document.getElementById('size-toggle').addEventListener('click', event => { actualSize = !actualSize; viewport.classList.toggle('actual', actualSize); event.currentTarget.setAttribute('aria-pressed', String(actualSize)); event.currentTarget.textContent = actualSize ? 'Fit full window' : 'Inspect at 100%'; viewport.scrollTo(0, 0); fit(); });
+    document.querySelectorAll('[data-zoom]').forEach(button => button.addEventListener('click', () => { zoom = Number(button.dataset.zoom); document.querySelectorAll('[data-zoom]').forEach(item => item.setAttribute('aria-pressed', String(item === button))); paint(); }));
+    document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { const all = button.dataset.view === 'directions'; hero.hidden = all; document.getElementById('pivot').hidden = all; document.getElementById('directions').hidden = !all; document.querySelectorAll('[data-view]').forEach(item => item.setAttribute('aria-pressed', String(item === button))); }));
+    document.getElementById('direction').addEventListener('change', event => { direction = Number(event.target.value); paint(); });
+    document.getElementById('play').addEventListener('click', () => {
+      if (playback) return stop();
+      playback = setInterval(() => { frame = (frame + 1) % 6; paint(); }, 1000 / 4.5);
+      document.getElementById('play').setAttribute('aria-pressed', 'true');
+      document.getElementById('play').setAttribute('aria-label', 'Pause saved animation');
+      document.querySelector('#play use').setAttribute('href', '#icon-pause');
+    });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
+    document.getElementById('reset').addEventListener('click', reset);
+    document.getElementById('undo').addEventListener('click', reset);
+    document.querySelectorAll('.settings input, .settings select').forEach(input => input.addEventListener('input', draft));
+    document.querySelectorAll('[data-style]').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('[data-style]').forEach(item => item.setAttribute('aria-pressed', String(item === button))); draft(); }));
+    const dialog = document.getElementById('concept-dialog');
+    document.getElementById('record').addEventListener('click', () => { stop(); dialog.showModal(); });
+    document.getElementById('show-cli').addEventListener('click', () => { stop(); dialog.showModal(); });
+    document.getElementById('close-dialog').addEventListener('click', () => dialog.close());
+    document.getElementById('copy-command').addEventListener('click', async () => {
+      const command = document.getElementById('cli-command');
+      try { await navigator.clipboard.writeText(command.value); document.getElementById('copy-status').textContent = 'Sample command copied. It has not been run.'; }
+      catch { command.focus(); command.select(); document.getElementById('copy-status').textContent = 'Select and copy the sample command here.'; }
+    });
+    new ResizeObserver(fit).observe(viewport);
+    choose(location.hash.slice(1)); reset(); fit();
+  </script>
+</body>
+</html>
