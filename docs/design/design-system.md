@@ -63,6 +63,23 @@ expressed through labels, current-step semantics, dots and lock explanations.
 
 ## Components and copy
 
+The 56px title bar holds File/Edit, model access, palette, locale and theme controls. The character
+index lists the loaded roster at left; opened characters retain close/Delete and focus behavior.
+Up/Down moves between index entries. The six stages run horizontally and retain lock explanations.
+
+The stage heading is 44px. Inspector is a disclosure beside the stage; its existing width and
+keyboard resize controls remain available on wide windows. Below 1100px it stacks beneath the stage,
+where horizontal resize is unnecessary. Below 760px the browser preview stacks the index and
+content; the Tauri window still has a 960×600 minimum.
+
+Look shows the actual source image beside saved sprites, followed by a horizontal recipe. The
+comparison reuses Bake's atlas player with one clock for its directions. Clip and 1×/2×/4×/6× zoom
+are view controls, not manifest changes. The bridge currently supplies page 1 of the saved atlas;
+only frames on that page are shown. Large integer zoom scrolls within the well rather than
+resampling pixels. Missing sources and absent bakes have explicit empty states. Extra camera
+controls remain under "Camera and style details"; stale-frame cost and the exact CLI twin stay
+beside "Record look". A recipe edit leaves saved sprites unchanged until another bake.
+
 Base UI supplies existing headless menu and dialog behavior. Hand-authored CSS supplies the
 identity: square fields, restrained rules, solid action fills and consistent hover/focus states. Do
 not add a styled component kit for this rollout.

@@ -30,7 +30,7 @@ export function MenuBar(
     locale,
     gpu,
     canEdit,
-    onToggleTheme,
+    onThemeChange,
     onToggleLocale,
     onReload,
     onExam,
@@ -39,12 +39,12 @@ export function MenuBar(
     onUndo,
     onRedo,
   }: {
-    theme: string;
+    theme: 'light' | 'dark';
     locale: string;
     gpu: string | null;
     /** a character tab is active — undo/redo have a manifest to act on */
     canEdit: boolean;
-    onToggleTheme: () => void;
+    onThemeChange: (theme: 'light' | 'dark') => void;
     onToggleLocale: () => void;
     onReload: () => void;
     onExam: () => void;
@@ -96,6 +96,9 @@ export function MenuBar(
           </Menu.Positioner>
         </Menu.Portal>
       </Menu.Root>
+      <button type='button' className='menubtn' onClick={onModels}>
+        {t('Manage models…')}
+      </button>
       <div className='menur'>
         <button
           type='button'
@@ -103,7 +106,7 @@ export function MenuBar(
           onClick={onPalette}
           aria-label={t('Command palette')}
         >
-          ⌘K
+          Ctrl+K
         </button>
         <button
           type='button'
@@ -113,10 +116,17 @@ export function MenuBar(
         >
           {t('lang')}: {locale}
         </button>
-        <button type='button' className='chip' onClick={onToggleTheme}>
-          {t('theme')}: {theme}
-        </button>
-        <span className='chip'>
+        <label className='themecontrol'>
+          {t('Theme')}
+          <select
+            value={theme}
+            onChange={(e) => onThemeChange(e.target.value === 'light' ? 'light' : 'dark')}
+          >
+            <option value='light'>{t('Light')}</option>
+            <option value='dark'>{t('Dark')}</option>
+          </select>
+        </label>
+        <span className='chip gpuchip' title={gpu ?? undefined}>
           {gpu ? <b>{gpu}</b> : t('gpu: unexamined')}
         </span>
       </div>
@@ -129,6 +139,8 @@ export function MenuBar(
 export interface TabItem {
   id: string;
   label: string;
+  detail?: string;
+  closable?: boolean;
 }
 
 export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
@@ -144,16 +156,15 @@ export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
     const ids = tabs.map((x) => x.id);
     const at = ids.indexOf(active);
     let next: number | null = null;
-    if (e.key === 'ArrowRight') next = (at + 1) % ids.length;
-    else if (e.key === 'ArrowLeft') next = (at - 1 + ids.length) % ids.length;
+    if (e.key === 'ArrowDown') next = (at + 1) % ids.length;
+    else if (e.key === 'ArrowUp') next = (at - 1 + ids.length) % ids.length;
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = ids.length - 1;
     if (next !== null) {
       e.preventDefault();
       onSelect(ids[next]!);
-      const el = listRef.current?.querySelector<HTMLElement>(
-        `[data-tabid="${ids[next]}"]`,
-      );
+      const el = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-tabid]') ?? [])]
+        .find((tab) => tab.dataset.tabid === ids[next]);
       el?.focus();
     }
   }, [tabs, active, onSelect]);
@@ -162,11 +173,13 @@ export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
   // caught by the audit) — so the close affordance lives INSIDE the tab as a
   // non-focusable click target, and the keyboard path is the Delete key
   return (
-    <div className='tabsrow'>
+    <aside className='tabsrow' aria-label={t('Character index')}>
+      <div className='indexhead'>{t('Characters')}</div>
       <div
         className='tablist'
         role='tablist'
         aria-label={t('Characters')}
+        aria-orientation='vertical'
         ref={listRef}
       >
         {tabs.map((tab) => (
@@ -181,7 +194,7 @@ export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
             className={`ctab-btn ${tab.id === active ? 'on' : ''}`}
             onClick={() => onSelect(tab.id)}
             onKeyDown={(e) => {
-              if (e.key === 'Delete' && tab.id !== 'gallery') {
+              if (e.key === 'Delete' && tab.closable) {
                 e.preventDefault();
                 onClose(tab.id);
                 // the focused tab is about to unmount - without this the
@@ -196,8 +209,11 @@ export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
               onKeyDown(e);
             }}
           >
-            {tab.label}
-            {tab.id !== 'gallery' && (
+            <span className='ctab-label'>
+              <span className='ctab-name'>{tab.label}</span>
+              {tab.detail && <span className='ctab-detail'>{tab.detail}</span>}
+            </span>
+            {tab.closable && (
               <span
                 className='ctab-close'
                 title={`${t('Close')} (${t('Delete key')})`}
@@ -220,9 +236,12 @@ export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
         title={t('New character')}
         onClick={onNew}
       >
-        +
+        <svg viewBox='0 0 20 20' aria-hidden='true'>
+          <path d='M10 4v12M4 10h12' />
+        </svg>
+        {t('New character')}
       </button>
-    </div>
+    </aside>
   );
 }
 

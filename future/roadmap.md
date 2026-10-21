@@ -372,6 +372,15 @@ F4/F7 migration work, even when they touch the same modules as these later impro
 
 ### Retained model and editor cases
 
+**F5-T1 visual slice, 2026-10-20:** the maintainer approved Imprint for implementation on main.
+Studio now has paired light/dark roles, a compact title bar, loaded-character index, horizontal
+six-stage navigation, a disclosed inspector and source/saved-sprite comparison before Look's recipe.
+The shared Bake player supplies synchronized comparison views at integer zoom; core/CLI behavior and
+journaled edits remain authoritative. Model management, logs, locale and command palette use the
+same identity. Browser replay evidence uses prior bake `acc25412`; it is not new inference or native
+release qualification. F5-T1 remains open for the broader roster and early preview work; F5-T2/T3
+and F7 keep their interaction, lifecycle and native accessibility gates.
+
 The [remote-history review](remote-main-review.md) carries useful requirements into these tasks
 without adopting another core, project format, renderer or provisioning stack:
 

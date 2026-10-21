@@ -7,6 +7,7 @@ import { test } from 'node:test';
  */
 import { assertEquals } from '@std/assert';
 import {
+  comparisonDirections,
   DIRECTION_CHOICES,
   ELEVATION_DETENTS,
   lookArgs,
@@ -15,6 +16,13 @@ import {
   resolvedStyle,
   staleFrames,
 } from './src/look.ts';
+
+test('comparison uses available angles, including sparse and empty bakes', () => {
+  assertEquals(comparisonDirections([]), []);
+  assertEquals(comparisonDirections([0, 4]), [0, 4]);
+  assertEquals(comparisonDirections([0, 1, 2, 3, 4, 5, 6, 7]), [0, 2, 4]);
+  assertEquals(comparisonDirections([1, 3, 5, 7]), [1, 3, 5]);
+});
 
 const CAMERAS = [
   {

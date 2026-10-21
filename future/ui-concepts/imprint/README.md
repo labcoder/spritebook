@@ -1,13 +1,14 @@
 # Imprint polish: paired light and dark studies
 
-**Status: Imprint is the selected working direction; this refinement awaits visual review.** Open
+**Status: approved by the maintainer on 2026-10-20 and implemented in Studio.** Open
 [review.html](review.html) for the comparison, or serve [index.html](index.html) for the 1440 × 900
 editor sketch with its working Theme selector. The remaining editor controls are illustrative and do
 not call SpriteBook.
 
 This uses Impeccable 4.7.0's polish workflow and preserves Imprint's condensed type, monospaced
-controls, open comparison, six stages and real saved sprite output. Production application source
-and ratified design tokens remain unchanged. Do not push.
+controls, open comparison, six stages and real saved sprite output. The production implementation
+lives in `apps/studio`; the [design system](../../../docs/design/design-system.md) records its roles
+and interactions. This HTML sketch remains a design reference, not the application. Do not push.
 
 ## The requested changes
 
@@ -24,7 +25,8 @@ and ratified design tokens remain unchanged. Do not push.
 
 ## Study palette
 
-These are draft tokens in the sketch, not a production design-system amendment.
+These approved study roles are reflected in the production token layer. Production additionally
+defines accessible success, warning and error states.
 
 | Role            | Light                      | Dark                       |
 | --------------- | -------------------------- | -------------------------- |
@@ -69,6 +71,7 @@ Raw-file editor launch was not verified: the automation CLI blocks launching `fi
 editor was verified through a loopback static server; the self-contained viewer was also verified
 without that server.
 
-This is a focused visual polish pass, not a full accessibility audit or native desktop
-qualification. Production light/dark application, localization expansion, busy/error states and
-platform behavior remain part of the later approved implementation. No roadmap gate closes.
+The study verification above predates implementation and does not qualify the application. The
+production rollout retains real character/atlas reads, CLI-backed edits, logs and model gates; its
+verification and remaining limits are recorded in the design system and F5-T1 roadmap note. Native
+desktop accessibility and release qualification remain separate gates.

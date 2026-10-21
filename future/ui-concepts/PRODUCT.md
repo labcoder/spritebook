@@ -44,8 +44,9 @@ assets. The first round is an anti-reference, not an approved identity.
 The maintainer selected **Imprint** as the working direction and requested a focused polish: remove
 the arbitrary ASCII torus, use a slightly darker and less Nous-like blue, texture the workspace
 background, reduce the wordmark/title-bar height, and design a companion dark theme with its own
-color roles. The [paired refinement](imprint/README.md) remains a review artifact; application
-implementation and production token changes await review.
+color roles. The maintainer approved the [paired refinement](imprint/README.md) for implementation
+on 2026-10-20. Current application context is in
+[Studio's PRODUCT.md](../../apps/studio/PRODUCT.md); this file records the study brief.
 
 ## Evidence on hand
 

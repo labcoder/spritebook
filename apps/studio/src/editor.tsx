@@ -1,11 +1,5 @@
 import { useJobBridge } from './jobscope';
-/**
- * The editor frame for one open character: stage rail (hue chips, lock
- * states), canvas well (core-produced pixels at integer zoom, dark checker
- * in both themes), and the read-only inspector behind a resizable grip.
- * No editing verbs exist here yet — every panel is a projection of the
- * manifest, and says so.
- */
+/** Six-stage frame over CLI-backed editing; the inspector is a read-only projection. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StudioBridge } from './bridge';
 import type { CharacterCard } from './manifest';
@@ -25,11 +19,11 @@ import { prefs } from './prefs';
 function stageLabel(k: StageKey): string {
   switch (k) {
     case 'gen':
-      return t('Gen');
+      return t('Generate');
     case 'rig':
       return t('Rig');
     case 'anim':
-      return t('Anim');
+      return t('Animate');
     case 'look':
       return t('Look');
     case 'bake':
@@ -86,81 +80,6 @@ function StageRail({ stages, active, onSelect, busy, onCancel }: {
           : ''}
       </div>
     </nav>
-  );
-}
-
-/* ---------------- canvas well ---------------- */
-
-const ZOOMS = [1, 2, 4] as const;
-
-function CanvasWell(
-  { bridge, card }: { bridge: StudioBridge; card: CharacterCard },
-) {
-  const [src, setSrc] = useState<string | null>(null);
-  const [missing, setMissing] = useState(false);
-  const [zoom, setZoom] = useState<number>(2);
-  const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    setSrc(null);
-    setMissing(false);
-    setNat(null);
-    bridge.readThumb(card.dir).then((s) => {
-      if (!live) return;
-      if (s) setSrc(s);
-      else setMissing(true);
-    }, () => live && setMissing(true));
-    return () => {
-      live = false;
-    };
-  }, [bridge, card.dir]);
-
-  return (
-    <div className='center'>
-      <div className='canvashead'>
-        <span className='hud'>{t('preview')}</span>
-        <span className='mono dimtext'>
-          {card.lastBakeId
-            ? `${t('bake')} ${card.lastBakeId} · ${t('contact strip')}`
-            : t('no bake recorded')}
-        </span>
-        <div className='zoom' role='group' aria-label={t('Zoom')}>
-          {ZOOMS.map((z) => (
-            <button
-              key={z}
-              type='button'
-              aria-pressed={zoom === z}
-              onClick={() => setZoom(z)}
-            >
-              {z}×
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className='well'>
-        {src
-          ? (
-            <img
-              src={src}
-              alt={`${card.displayName} — ${t('contact strip')}`}
-              onLoad={(e) => {
-                const el = e.currentTarget;
-                setNat({ w: el.naturalWidth, h: el.naturalHeight });
-              }}
-              style={nat ? { width: nat.w * zoom, height: nat.h * zoom } : { visibility: 'hidden' }}
-            />
-          )
-          : (
-            <span className='nothumb mono'>
-              {missing ? t('no bake yet — the well shows core output only') : '…'}
-            </span>
-          )}
-        <span className='wellnote mono'>
-          {t('nearest-neighbor · integer zoom · core output')}
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -325,6 +244,7 @@ export function Editor(
   // unlocked the rail (UX pass 2, F10)
   const [active, setActive] = useState<StageKey>('gen');
   const [inspW, setInspW] = useInspectorWidth();
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   // an active stage can become locked when switching characters — fall back
   const activeStage = stages.find((s) => s.key === active);
   const effective = activeStage && activeStage.state !== 'locked' ? active : 'gen';
@@ -376,6 +296,24 @@ export function Editor(
     return () => cancelAnimationFrame(raf);
   }, [effective]);
 
+  const heading = (
+    <div className='editorheading'>
+      <h1>{stageLabel(effective)}</h1>
+      <p>{card.displayName}</p>
+    </div>
+  );
+  const inspectorToggle = (
+    <button
+      type='button'
+      className='btn inspector-toggle'
+      aria-expanded={inspectorOpen}
+      aria-controls='character-inspector'
+      onClick={() => setInspectorOpen((open) => !open)}
+    >
+      {t('Inspector')}
+    </button>
+  );
+
   return (
     <div className='editor'>
       <StageRail
@@ -385,84 +323,64 @@ export function Editor(
         busy={busy}
         onCancel={cancel}
       />
-      {effective === 'gen'
-        ? (
-          <div className='center genstage'>
-            <Candidates
-              bridge={bridge}
-              onOpenModels={onOpenModels}
-              catalogEpoch={catalogEpoch}
-              dir={card.dir}
-              manifest={manifest}
-              onChanged={onChanged}
-            />
-          </div>
-        )
-        : effective === 'rig'
-        ? (
-          <div className='center genstage'>
-            <RigStage
-              bridge={bridge}
-              dir={card.dir}
-              manifest={manifest}
-              onChanged={onChanged}
-            />
-          </div>
-        )
-        : effective === 'anim'
-        ? (
-          <div className='center genstage'>
-            <AnimStage
-              bridge={bridge}
-              dir={card.dir}
-              manifest={manifest}
-              onChanged={onChanged}
-            />
-          </div>
-        )
-        : effective === 'look'
-        ? (
-          <div className='center genstage'>
-            <LookStage
-              bridge={bridge}
-              dir={card.dir}
-              manifest={manifest}
-              onChanged={onChanged}
-            />
-          </div>
-        )
-        : effective === 'bake'
-        ? (
-          <div className='center genstage'>
-            <BakeStage
-              bridge={bridge}
-              dir={card.dir}
-              manifest={manifest}
-              onChanged={onChanged}
-              onGoToStage={setActive}
-            />
-          </div>
-        )
-        : effective === 'export'
-        ? (
-          <div className='center genstage'>
-            <ExportStage
-              bridge={bridge}
-              dir={card.dir}
-              manifest={manifest}
-              onChanged={onChanged}
-            />
-          </div>
-        )
-        : <CanvasWell bridge={bridge} card={card} />}
-      <Grip width={inspW} setWidth={setInspW} />
-      <div style={{ width: inspW }} className='inspwrap'>
-        <Inspector
-          stage={effective}
-          stages={stages}
-          manifest={manifest}
-          dir={card.dir}
-        />
+      <div className='editorbody'>
+        <div className='center genstage'>
+          {effective !== 'look' && (
+            <header className='editorhead'>{heading}{inspectorToggle}</header>
+          )}
+          {effective === 'gen'
+            ? (
+              <Candidates
+                bridge={bridge}
+                onOpenModels={onOpenModels}
+                catalogEpoch={catalogEpoch}
+                dir={card.dir}
+                manifest={manifest}
+                onChanged={onChanged}
+              />
+            )
+            : effective === 'rig'
+            ? <RigStage bridge={bridge} dir={card.dir} manifest={manifest} onChanged={onChanged} />
+            : effective === 'anim'
+            ? <AnimStage bridge={bridge} dir={card.dir} manifest={manifest} onChanged={onChanged} />
+            : effective === 'look'
+            ? (
+              <LookStage
+                bridge={bridge}
+                dir={card.dir}
+                manifest={manifest}
+                onChanged={onChanged}
+                heading={heading}
+                inspectorToggle={inspectorToggle}
+              />
+            )
+            : effective === 'bake'
+            ? (
+              <BakeStage
+                bridge={bridge}
+                dir={card.dir}
+                manifest={manifest}
+                onChanged={onChanged}
+                onGoToStage={setActive}
+              />
+            )
+            : (
+              <ExportStage
+                bridge={bridge}
+                dir={card.dir}
+                manifest={manifest}
+                onChanged={onChanged}
+              />
+            )}
+        </div>
+        {inspectorOpen && (
+          <>
+            <Grip width={inspW} setWidth={setInspW} />
+            <div id='character-inspector' style={{ width: inspW }} className='inspwrap'>
+              <Inspector stage={effective} stages={stages} manifest={manifest} dir={card.dir} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

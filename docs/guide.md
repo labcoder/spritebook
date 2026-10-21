@@ -30,10 +30,13 @@ exports. A **projects root** is a folder that holds many workspaces.
 3. Select **Load**, or press Enter.
 
 The gallery shows one card for each character in the root. Select a card to open that character in a
-tab. Select **+** to make a new character.
+workspace. You can also select a character directly in the left index. Select **New character** to
+make another.
 
-The tab strip holds the gallery and each open character. The status bar at the bottom shows the
-character count, the bridge (which engine runs your commands: `tauri` is the real CLI, a browser
+The character index holds the gallery and the loaded roster. Opened entries can be closed with their
+close control or the Delete key; this leaves the character's files intact. Use **Theme** in the
+compact title bar to select Imprint's light or dark appearance. The status bar at the bottom shows
+the character count, the bridge (which engine runs your commands: `tauri` is the real CLI, a browser
 preview is a demo), and the log handle (opens the session log — every line the CLI writes).
 
 To check your machine, select **Run health exam**. It reports the GPU, the sidecar (the local Python
@@ -50,7 +53,7 @@ it.
 
 To make a character:
 
-1. Select **+** in the tab strip.
+1. Select **New character** in the character index.
 
 2. Type a name. Studio makes the character id below the box. The id is lowercase letters, digits,
    and dashes.
@@ -170,19 +173,24 @@ The camera controls are:
 
 | Control               | What it does                                                       |
 | --------------------- | ------------------------------------------------------------------ |
-| **Preset**            | selects a camera preset, such as `standard-30`                     |
+| **Camera**            | selects a camera preset, such as `standard-30`                     |
 | **Elevation**         | the camera angle above the ground, in degrees                      |
 | **Directions**        | how many directions to bake: 2, 4, 8, or 16                        |
 | **Pixels per metre**  | the world-locked ruler. The whole roster shares it                 |
 | **Cell width/height** | the size of one sprite cell, in pixels. The shipped default is 112 |
 
-The elevation has detent buttons at the common angles. The slider moves 0.5 degrees for each arrow
-key press.
+The main recipe row contains camera, direction count, cell size, style, colour count and outline.
+Open **Camera and style details** for elevation, its detent buttons and pixels per metre. The
+elevation slider moves 0.5 degrees for each arrow key press. The selected style also states its mode
+and supersampling there.
 
-The style cards set the look: the colour count, the outline width, and the dither. Use the arrow
-keys to move between the cards.
+The comparison shows the original source image beside sprites from the saved bake. Select a
+**Clip**, then **Play** or **Pause**. The displayed directions share one playback clock. Zoom is
+nearest-neighbor at 1×, 2×, 4× or 6×; large cells scroll within the dark well. This preview
+currently shows the first atlas page, as labeled. Bake retains its full review controls.
 
-The direction strips below show real pixels from the last bake, at integer zoom.
+Select **Inspector** to inspect recorded manifest values and the workspace path. Its resize grip
+supports arrow keys on wide windows; on narrower windows the panel stacks below the stage.
 
 CAUTION: every frame key holds the whole recipe, so a look change makes every baked frame stale. The
 stage states the exact frame count before you record. This is all-or-none: there is no partial
@@ -261,16 +269,17 @@ The exporters are pure projections of one bake manifest. The same bake always wr
 Every control is reachable with the keyboard alone. The full journey was driven this way, and a test
 holds it there.
 
-| Key                  | What it does                                                                                             |
-| -------------------- | -------------------------------------------------------------------------------------------------------- |
-| Tab, Shift+Tab       | move between controls                                                                                    |
-| Enter, Space         | activate the focused control                                                                             |
-| Arrow keys           | move inside a group: the tabs, the stage rail cards, the backend cards, the track cards, the style cards |
-| Ctrl+K               | open the command palette                                                                                 |
-| Ctrl+M               | open **Manage models**                                                                                   |
-| Ctrl+Z, Ctrl+Shift+Z | undo and redo the last recorded change                                                                   |
-| Delete               | close the focused character tab                                                                          |
-| Escape               | close the palette, a dialog, or the log drawer                                                           |
+| Key                  | What it does                                                              |
+| -------------------- | ------------------------------------------------------------------------- |
+| Tab, Shift+Tab       | move between controls                                                     |
+| Enter, Space         | activate the focused control                                              |
+| Up/Down              | move between entries in the character index; change native select values  |
+| Left/Right           | move inside backend/track radio groups; resize the focused inspector grip |
+| Ctrl+K               | open the command palette                                                  |
+| Ctrl+M               | open **Manage models**                                                    |
+| Ctrl+Z, Ctrl+Shift+Z | undo and redo the last recorded change                                    |
+| Delete               | close the focused opened character entry                                  |
+| Escape               | close the palette, a dialog, or the log drawer                            |
 
 A group of cards is one stop on the Tab path. Use the arrow keys inside it.
 

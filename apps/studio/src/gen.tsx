@@ -323,7 +323,7 @@ export function CliTwin({ args }: { args: string[] }) {
         /* static text, NOT a tab stop: the walkthrough counted it as a dead
           focus position before every Copy button on five surfaces */
       }
-      <span className='clitwincmd' title={line} role='note' aria-label={t('CLI twin')}>
+      <span className='clitwincmd' title={line} role='note' aria-label={t('CLI twin')} tabIndex={0}>
         $ {line}
       </span>
       <button
@@ -737,7 +737,7 @@ interface ResultEntry {
 
 /** Where `gen` stored the source image: content-addressed under source/.
  * Mirrors core's sourceImagePath - dot>0, so a dotfile keeps no extension. */
-function storedSourcePath(dir: string, m: Record<string, unknown>): string | null {
+export function storedSourcePath(dir: string, m: Record<string, unknown>): string | null {
   const src = m.source as { sha256?: string; originalFilename?: string } | undefined;
   if (!src?.sha256 || !src.originalFilename) return null;
   const dot = src.originalFilename.lastIndexOf('.');

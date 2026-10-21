@@ -1,14 +1,15 @@
 /**
  * Stage 04 (P4-T2): the look as a choice with a stated cost. Camera controls
- * (elevation detents, directions, px/m, cell), style preset cards carrying
- * their real knobs, pixel-truth direction strips sliced from the last bake's
- * own atlas at INTEGER zoom, and "marks N frames stale" before Apply — every
+ * (elevation detents, directions, px/m, cell), style presets carrying
+ * their real knobs, a source/saved-sprite comparison from the bake's own
+ * atlas at INTEGER zoom, and "marks N frames stale" before Apply — every
  * frame key embeds the whole recipe, so a look change invalidates all of it.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import type { StudioBridge } from './bridge';
 import {
   type CameraPresetRow,
+  comparisonDirections,
   DIRECTION_CHOICES,
   ELEVATION_DETENTS,
   lookArgs,
@@ -20,91 +21,20 @@ import {
   type StylePresetRow,
 } from './look';
 import { t } from './i18n';
-import { CliTwin } from './gen';
-import { useLandFocus, useRovingRadio } from './focus';
-
-interface BakeFrame {
-  clipId: string;
-  direction: number;
-  frame: number;
-  atlas: { x: number; y: number; w: number; h: number; pageIndex: number };
-}
-
-/* ---------------- pixel-truth strips ---------------- */
-
-function DirectionStrips({ atlas, zoom }: {
-  atlas: { manifest: unknown; png: string };
-  zoom: number;
-}) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const m = (atlas.manifest ?? {}) as Record<string, unknown>;
-  const frames = (Array.isArray(m.frames) ? m.frames : []) as BakeFrame[];
-  const rows = useMemo(() => {
-    const byDir = new Map<number, BakeFrame[]>();
-    for (const f of frames) {
-      const list = byDir.get(f.direction) ?? [];
-      list.push(f);
-      byDir.set(f.direction, list);
-    }
-    return [...byDir.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([dir, fs]) => [dir, fs.sort((a, b) => a.frame - b.frame)] as const);
-  }, [frames]);
-
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas || rows.length === 0) return;
-    const cellW = rows[0]![1][0]?.atlas.w ?? 64;
-    const cellH = rows[0]![1][0]?.atlas.h ?? 64;
-    const cols = Math.max(...rows.map(([, fs]) => fs.length));
-    canvas.width = cols * cellW * zoom;
-    canvas.height = rows.length * cellH * zoom;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    // pixel truth: nearest-neighbor at integer zoom, never a smooth scale
-    ctx.imageSmoothingEnabled = false;
-    const img = new Image();
-    img.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      rows.forEach(([, fs], r) => {
-        fs.forEach((f, c) => {
-          ctx.drawImage(
-            img,
-            f.atlas.x,
-            f.atlas.y,
-            f.atlas.w,
-            f.atlas.h,
-            c * cellW * zoom,
-            r * cellH * zoom,
-            cellW * zoom,
-            cellH * zoom,
-          );
-        });
-      });
-    };
-    img.src = `data:image/png;base64,${atlas.png}`;
-  }, [atlas.png, rows, zoom]);
-
-  if (rows.length === 0) return null;
-  return (
-    <div className='strips'>
-      <canvas
-        ref={ref}
-        className='stripcanvas'
-        role='img'
-        aria-label={`${rows.length} ${t('direction strips from the last bake')}`}
-      />
-    </div>
-  );
-}
+import { CliTwin, storedSourcePath } from './gen';
+import { useLandFocus } from './focus';
+import { Player } from './bakestage';
+import { summarize } from './bakeprogress';
 
 /* ---------------- the stage ---------------- */
 
-export function LookStage({ bridge, dir, manifest, onChanged }: {
+export function LookStage({ bridge, dir, manifest, onChanged, heading, inspectorToggle }: {
   bridge: StudioBridge;
   dir: string;
   manifest: unknown;
   onChanged: () => void;
+  heading: ReactNode;
+  inspectorToggle: ReactNode;
 }) {
   const m = (manifest ?? {}) as Record<string, unknown>;
   const look = m.look as LookRecord | undefined;
@@ -114,10 +44,36 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
   const [error, setError] = useState<string | null>(null);
   const [atlas, setAtlas] = useState<{ manifest: unknown; png: string } | null>(null);
   const [zoom, setZoom] = useState(2);
+  const [clip, setClip] = useState('');
+  const [playing, setPlaying] = useState(false);
+  const [frame, setFrame] = useState(0);
   const [draft, setDraft] = useState<LookDraft | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
+  const [referenceLoading, setReferenceLoading] = useState(false);
+  const source = m.source as { kind?: string } | undefined;
+  const sourcePath = source?.kind === 'image' ? storedSourcePath(dir, m) : null;
+
+  useEffect(() => {
+    let live = true;
+    setReference(null);
+    setReferenceLoading(sourcePath !== null);
+    if (sourcePath) {
+      bridge.readImage(sourcePath).then((src) => {
+        if (live) {
+          setReference(src);
+          setReferenceLoading(false);
+        }
+      }, () => {
+        if (live) setReferenceLoading(false);
+      });
+    }
+    return () => {
+      live = false;
+    };
+  }, [bridge, sourcePath]);
 
   useEffect(() => {
     let live = true;
@@ -172,6 +128,29 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
     if (recorded && draft === null) setDraft(recorded);
   }, [recorded, draft]);
 
+  const summary = useMemo(() => {
+    const page = (atlas?.manifest ?? {}) as { frames?: { atlas: { pageIndex: number } }[] };
+    // The bridge supplies page 0; do not crop other pages from those bytes.
+    return summarize({ ...page, frames: page.frames?.filter((f) => f.atlas.pageIndex === 0) });
+  }, [atlas]);
+  const savedClip = summary?.clips.includes(clip) ? clip : summary?.clips[0] ?? '';
+  const savedDirections = summary
+    ? comparisonDirections([
+      ...new Set(
+        summary.frames.filter((f) => f.clipId === savedClip)
+          .map((f) => f.direction),
+      ),
+    ].sort((a, b) => a - b))
+    : [];
+  const frameCount =
+    summary?.frames.filter((f) => f.clipId === savedClip && f.direction === savedDirections[0])
+      .length ?? 0;
+  useEffect(() => setFrame(0), [savedClip]);
+  useEffect(() => {
+    if (!playing || frameCount === 0) return;
+    const timer = setInterval(() => setFrame((f) => (f + 1) % frameCount), 125);
+    return () => clearInterval(timer);
+  }, [playing, frameCount]);
   const cameraBase = cameras.find((c) => c.id === draft?.cameraPresetId);
   const styleBase = styles.find((s) => s.id === draft?.stylePresetId);
   const bakedFrames = (() => {
@@ -203,19 +182,10 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
   // the keyboard at the top of the stage (the walkthrough finding).
   useLandFocus(applied && draft !== null && !dirty, '#lookcam');
 
-  // the radio-group keyboard contract the role announces
-  const styleRoving = useRovingRadio(
-    styles.length,
-    styles.findIndex((s) => s.id === draft?.stylePresetId),
-    (i) => {
-      const s = styles[i];
-      if (s) set({ stylePresetId: s.id, maxColors: s.maxColors, outlineWidthPx: s.outlineWidthPx });
-    },
-  );
-
   if (error) {
     return (
       <div className='lookstage'>
+        <header className='editorhead'>{heading}{inspectorToggle}</header>
         <div className='mdl-error mono'>{error}</div>
       </div>
     );
@@ -223,6 +193,7 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
   if (!draft) {
     return (
       <div className='lookstage'>
+        <header className='editorhead'>{heading}{inspectorToggle}</header>
         <div className='inote'>…</div>
       </div>
     );
@@ -230,287 +201,344 @@ export function LookStage({ bridge, dir, manifest, onChanged }: {
 
   return (
     <div className='lookstage'>
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Camera')}</span>
-          <span className='ieyebrow mono'>04// LOOK</span>
-        </div>
-        <div className='genrow'>
-          <label htmlFor='lookcam'>{t('Preset')}</label>
-          <select
-            id='lookcam'
-            className='optnum mono'
-            value={draft.cameraPresetId}
-            onChange={(e) => {
-              const base = cameras.find((c) => c.id === e.target.value);
-              set(
-                base
-                  ? {
-                    cameraPresetId: base.id,
-                    elevationDeg: base.elevationDeg,
-                    directions: base.directions,
-                    pixelsPerMeter: base.pixelsPerMeter,
-                    cellW: base.cellPx.w,
-                    cellH: base.cellPx.h,
-                  }
-                  : { cameraPresetId: e.target.value },
-              );
-            }}
-          >
-            {cameras.map((c) => <option key={c.id} value={c.id}>{c.id}</option>)}
-          </select>
-        </div>
-        <div className='genrow'>
-          <label htmlFor='lookelev'>{t('Elevation')}</label>
-          <input
-            id='lookelev'
-            type='range'
-            min={0}
-            max={89}
-            step={0.001}
-            value={draft.elevationDeg}
-            onChange={(e) => set({ elevationDeg: Number(e.target.value) })}
-            onKeyDown={(e) => {
-              // the native 0.001° step serves the pointer — end to end by
-              // arrow key is ~89000 presses, so keys move in half-degrees
-              const by = e.key === 'ArrowUp' || e.key === 'ArrowRight'
-                ? 0.5
-                : e.key === 'ArrowDown' || e.key === 'ArrowLeft'
-                ? -0.5
-                : e.key === 'PageUp'
-                ? 5
-                : e.key === 'PageDown'
-                ? -5
-                : null;
-              if (by === null) return;
-              e.preventDefault();
-              set({ elevationDeg: Math.min(89, Math.max(0, draft.elevationDeg + by)) });
-            }}
-            className='lookslider'
-          />
-          <span className='mono lookval'>{draft.elevationDeg.toFixed(3)}°</span>
-          <span className='detents'>
-            {ELEVATION_DETENTS.map((d) => (
-              <button
-                key={d.deg}
-                type='button'
-                className='btn mbtn'
-                aria-pressed={Math.abs(draft.elevationDeg - d.deg) < 0.0005}
-                onClick={() => set({ elevationDeg: d.deg })}
-              >
-                {d.label}
-              </button>
-            ))}
-          </span>
-        </div>
-        <div className='genrow'>
-          <label id='dirslabel'>{t('Directions')}</label>
-          <span className='m-seg' role='group' aria-labelledby='dirslabel'>
-            {DIRECTION_CHOICES.map((d) => (
-              <button
-                key={d}
-                type='button'
-                className='btn mbtn'
-                aria-pressed={draft.directions === d}
-                onClick={() => set({ directions: d })}
-              >
-                {d}
-              </button>
-            ))}
-          </span>
-        </div>
-        <div className='genrow'>
-          <label htmlFor='lookppm'>{t('Pixels per metre')}</label>
-          <input
-            id='lookppm'
-            type='number'
-            className='optnum mono'
-            min={1}
-            value={draft.pixelsPerMeter}
-            onChange={(e) => set({ pixelsPerMeter: Number(e.target.value) || 1 })}
-          />
-          <label htmlFor='lookcellw'>{t('Cell')}</label>
-          <input
-            id='lookcellw'
-            type='number'
-            className='optnum mono cellnum'
-            min={1}
-            value={draft.cellW}
-            aria-label={t('Cell width')}
-            onChange={(e) => set({ cellW: Number(e.target.value) || 1 })}
-          />
-          <span className='mono'>×</span>
-          <input
-            type='number'
-            className='optnum mono cellnum'
-            min={1}
-            value={draft.cellH}
-            aria-label={t('Cell height')}
-            onChange={(e) => set({ cellH: Number(e.target.value) || 1 })}
-          />
-        </div>
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Style')}</span>
-        </div>
-        <div className='backends' role='radiogroup' aria-label={t('Style')}>
-          {styles.map((s, i) => (
-            <button
-              key={s.id}
-              type='button'
-              role='radio'
-              aria-checked={draft.stylePresetId === s.id}
-              className={`backend ${draft.stylePresetId === s.id ? 'on' : ''}`}
-              {...styleRoving(i)}
-              onClick={() =>
-                set({
-                  stylePresetId: s.id,
-                  maxColors: s.maxColors,
-                  outlineWidthPx: s.outlineWidthPx,
-                })}
-            >
-              <span className='bname'>{s.id}</span>
-              <span className='btags'>
-                <span className='mbadge kind'>{s.mode}</span>
-                <span className='mbadge'>
-                  {s.maxColors ? `${s.maxColors} ${t('colours')}` : t('no palette')}
-                </span>
-                <span className='mbadge'>
-                  {s.outlineWidthPx ? `${t('outline')} ${s.outlineWidthPx}px` : t('no outline')}
-                </span>
-                {s.superSample && (
-                  <span className='mbadge'>{s.superSample}× {t('supersample')}</span>
-                )}
+      <header className='editorhead'>
+        {heading}
+        <div className='lookapply'>
+          <div className='gensechead'>
+            {dirty && stale > 0 && (
+              <span className='stalecost mono' role='status'>
+                {t('marks')} {stale} {t('frames stale')}
               </span>
-            </button>
-          ))}
-        </div>
-        {(styleBase?.maxColors !== undefined || styleBase?.outlineWidthPx !== undefined) && (
-          <div className='genrow'>
-            {styleBase?.maxColors !== undefined && (
-              <>
-                <label htmlFor='lookcolors'>{t('Colours')}</label>
-                <input
-                  id='lookcolors'
-                  type='number'
-                  className='optnum mono'
-                  min={2}
-                  max={256}
-                  value={draft.maxColors ?? styleBase.maxColors}
-                  onChange={(e) => set({ maxColors: Number(e.target.value) || 2 })}
-                />
-              </>
             )}
-            {styleBase?.outlineWidthPx !== undefined && (
-              <>
-                <label htmlFor='lookoutline'>{t('Outline px')}</label>
-                <input
-                  id='lookoutline'
-                  type='number'
-                  className='optnum mono'
-                  min={0.25}
-                  max={8}
-                  step={0.25}
-                  value={draft.outlineWidthPx ?? styleBase.outlineWidthPx}
-                  onChange={(e) => set({ outlineWidthPx: Number(e.target.value) || 0.25 })}
-                />
-              </>
+            {dirty && stale === 0 && (
+              <span className='inote'>{t('nothing baked yet — no frames to invalidate')}</span>
             )}
           </div>
-        )}
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Apply')}</span>
-          {dirty && stale > 0 && (
-            <span className='stalecost mono' role='status'>
-              {t('marks')} {stale} {t('frames stale')}
-            </span>
-          )}
-          {dirty && stale === 0 && (
-            <span className='inote'>{t('nothing baked yet — no frames to invalidate')}</span>
-          )}
-        </div>
-        <div className='genrow'>
-          {
-            /* !dirty is a real input blocker; busy is not — disabling the
+          <div className='genrow'>
+            {
+              /* !dirty is a real input blocker; busy is not — disabling the
               focused button while the run flies drops keyboard focus to
               <body> */
-          }
-          <button
-            type='button'
-            className='btn primary'
-            disabled={!dirty}
-            aria-busy={busy}
-            onClick={apply}
-          >
-            {busy ? t('Recording…') : t('Record look')}
-          </button>
-          {dirty && (
+            }
             <button
               type='button'
-              className='btn mbtn'
-              onClick={() => {
-                if (busy) return; // the run in flight is recording this draft
-                setDraft(recorded);
-                // the reset clears `dirty`, which unmounts THIS button - land
-                // at the top of the stage rather than dropping to <body>
-                requestAnimationFrame(() => {
-                  document.querySelector<HTMLElement>('#lookcam')?.focus();
-                });
-              }}
+              className='btn primary'
+              disabled={!dirty}
+              aria-busy={busy}
+              onClick={apply}
             >
-              {t('Reset to recorded')}
+              {busy ? t('Recording…') : t('Record look')}
             </button>
-          )}
-          {!dirty && (
-            <span className='inote'>
-              {look !== undefined
-                ? t('this is the recorded look')
-                // F11: the note claimed a recording that did not exist while
-                // the inspector said "no look recorded" one panel over
-                : t('nothing recorded yet — Record look writes these values')}
+            {dirty && (
+              <button
+                type='button'
+                className='btn mbtn'
+                onClick={() => {
+                  if (busy) return; // the run in flight is recording this draft
+                  setDraft(recorded);
+                  // the reset clears `dirty`, which unmounts THIS button - land
+                  // at the top of the stage rather than dropping to <body>
+                  requestAnimationFrame(() => {
+                    document.querySelector<HTMLElement>('#lookcam')?.focus();
+                  });
+                }}
+              >
+                {t('Reset to recorded')}
+              </button>
+            )}
+            {!dirty && (
+              <span className='inote'>
+                {look !== undefined
+                  ? t('this is the recorded look')
+                  // F11: the note claimed a recording that did not exist while
+                  // the inspector said "no look recorded" one panel over
+                  : t('nothing recorded yet — Record look writes these values')}
+              </span>
+            )}
+          </div>
+          {failed && (
+            <span className='mv-exit mono' role='status'>
+              {t('failed — the log drawer has the verbatim reason')}
             </span>
           )}
+          <CliTwin args={args} />
         </div>
-        {failed && (
-          <span className='mv-exit mono' role='status'>
-            {t('failed — the log drawer has the verbatim reason')}
-          </span>
-        )}
-        <CliTwin args={args} />
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Last bake')}</span>
-          <div className='zoom' role='group' aria-label={t('Zoom')}>
-            {[1, 2, 4].map((z) => (
-              <button
-                key={z}
-                type='button'
-                aria-pressed={zoom === z}
-                onClick={() => setZoom(z)}
-              >
-                {z}×
-              </button>
-            ))}
+        {inspectorToggle}
+      </header>
+      <div className='lookcomparison'>
+        <section className='referencepane'>
+          <div className='gensechead'>
+            <span className='hud'>{t('Reference')}</span>
+          </div>
+          <div className='referencewell'>
+            {reference
+              ? <img src={reference} alt={t('Original character reference')} />
+              : (
+                <p className='inote' role='status'>
+                  {referenceLoading
+                    ? t('Loading reference...')
+                    : sourcePath
+                    ? t('Reference unavailable. Check the source file in the workspace.')
+                    : t('No source image for this character.')}
+                </p>
+              )}
+          </div>
+          <p className='inote'>{t('Original input')}</p>
+        </section>
+        <section className='outputpane'>
+          <div className='gensechead'>
+            <span className='hud'>{t('Saved output')}</span>
+            {summary && <span className='inote mono'>{summary.bakeId}</span>}
+            <div className='zoom' role='group' aria-label={t('Zoom')}>
+              {[1, 2, 4, 6].map((z) => (
+                <button
+                  key={z}
+                  type='button'
+                  aria-pressed={zoom === z}
+                  onClick={() => setZoom(z)}
+                >
+                  {z}×
+                </button>
+              ))}
+            </div>
+          </div>
+          {atlas && summary
+            ? (
+              <>
+                <div className='savedwell'>
+                  {savedDirections.map((direction) => (
+                    <div className='savedview' key={direction}>
+                      <Player
+                        summary={summary}
+                        atlasPng={atlas.png}
+                        pass='lit'
+                        dir={direction}
+                        clip={savedClip}
+                        playing={false}
+                        frame={frame}
+                        fps={8}
+                        zoom={zoom}
+                      />
+                      <span>{t('direction')} {direction}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className='savedtransport'>
+                  <button
+                    type='button'
+                    className='btn mbtn'
+                    aria-pressed={playing}
+                    onClick={() => setPlaying((current) => !current)}
+                  >
+                    {playing ? t('Pause') : t('Play')}
+                  </button>
+                  <label htmlFor='savedclip'>{t('Clip')}</label>
+                  <select
+                    id='savedclip'
+                    className='optnum'
+                    value={savedClip}
+                    onChange={(e) => setClip(e.target.value)}
+                  >
+                    {summary.clips.map((id) => <option key={id} value={id}>{id}</option>)}
+                  </select>
+                </div>
+                <div className='inote'>
+                  {t('Saved atlas page 1. Nearest-neighbor at integer zoom.')}
+                  {dirty ? ` · ${t('these pixels are the OLD look')}` : ''}
+                </div>
+              </>
+            )
+            : (
+              <div className='inote previewempty'>
+                {t('no bake yet — Bake renders what this stage records')}
+              </div>
+            )}
+        </section>
+      </div>
+      <section className='lookrecipe' aria-label={t('Look recipe')}>
+        <h2>{t('Look recipe')}</h2>
+        <div className='lookfields'>
+          <div className='lookfield'>
+            <label htmlFor='lookcam'>{t('Camera')}</label>
+            <select
+              id='lookcam'
+              value={draft.cameraPresetId}
+              onChange={(e) => {
+                const base = cameras.find((c) => c.id === e.target.value);
+                set(
+                  base
+                    ? {
+                      cameraPresetId: base.id,
+                      elevationDeg: base.elevationDeg,
+                      directions: base.directions,
+                      pixelsPerMeter: base.pixelsPerMeter,
+                      cellW: base.cellPx.w,
+                      cellH: base.cellPx.h,
+                    }
+                    : { cameraPresetId: e.target.value },
+                );
+              }}
+            >
+              {cameras.map((c) => <option key={c.id} value={c.id}>{c.id}</option>)}
+            </select>
+          </div>
+          <div className='lookfield'>
+            <label htmlFor='lookdirs'>{t('Directions')}</label>
+            <select
+              id='lookdirs'
+              value={draft.directions}
+              onChange={(e) => set({ directions: Number(e.target.value) })}
+            >
+              {DIRECTION_CHOICES.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className='lookfield'>
+            <label htmlFor='lookcellw'>{t('Cell')}</label>
+            <div className='lookcell'>
+              <input
+                id='lookcellw'
+                type='number'
+                min={1}
+                value={draft.cellW}
+                aria-label={t('Cell width')}
+                onChange={(e) => set({ cellW: Number(e.target.value) || 1 })}
+              />
+              <span aria-hidden='true'>×</span>
+              <input
+                type='number'
+                min={1}
+                value={draft.cellH}
+                aria-label={t('Cell height')}
+                onChange={(e) => set({ cellH: Number(e.target.value) || 1 })}
+              />
+            </div>
+          </div>
+          <div className='lookfield'>
+            <label htmlFor='lookstyle'>{t('Style')}</label>
+            <select
+              id='lookstyle'
+              value={draft.stylePresetId}
+              onChange={(e) => {
+                const style = styles.find((s) => s.id === e.target.value);
+                if (style) {
+                  set({
+                    stylePresetId: style.id,
+                    maxColors: style.maxColors,
+                    outlineWidthPx: style.outlineWidthPx,
+                  });
+                }
+              }}
+            >
+              {styles.map((s) => <option key={s.id} value={s.id}>{s.id}</option>)}
+            </select>
+          </div>
+          <div className='lookfield'>
+            {styleBase?.maxColors !== undefined
+              ? (
+                <>
+                  <label htmlFor='lookcolors'>{t('Colours')}</label>
+                  <input
+                    id='lookcolors'
+                    type='number'
+                    min={2}
+                    max={256}
+                    value={draft.maxColors ?? styleBase.maxColors}
+                    onChange={(e) => set({ maxColors: Number(e.target.value) || 2 })}
+                  />
+                </>
+              )
+              : (
+                <>
+                  <span>{t('Colours')}</span>
+                  <span className='inote'>{t('no palette')}</span>
+                </>
+              )}
+          </div>
+          <div className='lookfield'>
+            {styleBase?.outlineWidthPx !== undefined
+              ? (
+                <>
+                  <label htmlFor='lookoutline'>{t('Outline px')}</label>
+                  <input
+                    id='lookoutline'
+                    type='number'
+                    min={0.25}
+                    max={8}
+                    step={0.25}
+                    value={draft.outlineWidthPx ?? styleBase.outlineWidthPx}
+                    onChange={(e) => set({ outlineWidthPx: Number(e.target.value) || 0.25 })}
+                  />
+                </>
+              )
+              : (
+                <>
+                  <span>{t('Outline px')}</span>
+                  <span className='inote'>{t('no outline')}</span>
+                </>
+              )}
           </div>
         </div>
-        {atlas
-          ? (
-            <>
-              <DirectionStrips atlas={atlas} zoom={zoom} />
-              <div className='inote'>
-                {t('nearest-neighbor · integer zoom · one row per direction')}
-                {dirty ? ` · ${t('these pixels are the OLD look')}` : ''}
-              </div>
-            </>
-          )
-          : <div className='inote'>{t('no bake yet — Bake renders what this stage records')}</div>}
+        <details className='lookadvanced'>
+          <summary>{t('Camera and style details')}</summary>
+          <div className='genrow'>
+            <label htmlFor='lookelev'>{t('Elevation')}</label>
+            <input
+              id='lookelev'
+              type='range'
+              min={0}
+              max={89}
+              step={0.001}
+              value={draft.elevationDeg}
+              className='lookslider'
+              onChange={(e) => set({ elevationDeg: Number(e.target.value) })}
+              onKeyDown={(e) => {
+                const by = e.key === 'ArrowUp' || e.key === 'ArrowRight'
+                  ? 0.5
+                  : e.key === 'ArrowDown' || e.key === 'ArrowLeft'
+                  ? -0.5
+                  : e.key === 'PageUp'
+                  ? 5
+                  : e.key === 'PageDown'
+                  ? -5
+                  : null;
+                if (by === null) return;
+                e.preventDefault();
+                set({ elevationDeg: Math.min(89, Math.max(0, draft.elevationDeg + by)) });
+              }}
+            />
+            <span className='mono lookval'>{draft.elevationDeg.toFixed(3)}°</span>
+            <span className='detents'>
+              {ELEVATION_DETENTS.map((d) => (
+                <button
+                  key={d.deg}
+                  type='button'
+                  className='btn mbtn'
+                  aria-pressed={Math.abs(draft.elevationDeg - d.deg) < 0.0005}
+                  onClick={() => set({ elevationDeg: d.deg })}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </span>
+          </div>
+          <div className='genrow'>
+            <label htmlFor='lookppm'>{t('Pixels per metre')}</label>
+            <input
+              id='lookppm'
+              type='number'
+              className='optnum mono'
+              min={1}
+              value={draft.pixelsPerMeter}
+              onChange={(e) => set({ pixelsPerMeter: Number(e.target.value) || 1 })}
+            />
+            {styleBase && (
+              <span className='inote'>
+                {styleBase.mode}
+                {styleBase.superSample ? ` · ${styleBase.superSample}× ${t('supersample')}` : ''}
+              </span>
+            )}
+          </div>
+        </details>
       </section>
     </div>
   );

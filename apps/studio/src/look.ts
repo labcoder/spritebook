@@ -5,6 +5,16 @@
  * react-free, so look_test.ts holds them.
  */
 
+/** Spread comparison views around the saved directions without inventing missing angles. */
+export function comparisonDirections(directions: number[]): number[] {
+  if (directions.length <= 3) return directions;
+  return [
+    directions[0]!,
+    directions[Math.floor(directions.length / 4)]!,
+    directions[Math.floor(directions.length / 2)]!,
+  ];
+}
+
 export interface CameraPresetRow {
   id: string;
   elevationDeg: number;

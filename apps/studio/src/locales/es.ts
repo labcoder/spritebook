@@ -6,6 +6,23 @@
  * purpose — they match the CLI the GUI mirrors.
  */
 export const es: Record<string, string> = {
+  'Saved atlas page 1. Nearest-neighbor at integer zoom.':
+    'Página 1 del atlas guardado. Vecino más cercano con zoom entero.',
+  'Camera and style details': 'Detalles de cámara y estilo',
+  'Animate': 'Animar',
+  'Character index': 'Índice de personajes',
+  'Dark': 'Oscuro',
+  'Light': 'Claro',
+  'Loading reference...': 'Cargando referencia...',
+  'Look recipe': 'Receta de estilo',
+  'No source image for this character.': 'Este personaje no tiene una imagen de origen.',
+  'Original character reference': 'Referencia original del personaje',
+  'Original input': 'Entrada original',
+  'Reference': 'Referencia',
+  'Reference unavailable. Check the source file in the workspace.':
+    'La referencia no está disponible. Revisa el archivo de origen en el espacio de trabajo.',
+  'Saved output': 'Resultado guardado',
+  'Theme': 'Tema',
   'Cancel job': 'Cancelar tarea',
   'VRAM depends on configuration': 'La VRAM depende de la configuración',
   // gallery

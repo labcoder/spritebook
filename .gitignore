@@ -20,6 +20,9 @@ tests/failures/
 # Render throughput probe output (uploaded as a CI artifact; a trend signal, not a golden)
 .render-bench/
 
+# Generated design review captures; selected guide images are committed under docs/img.
+/apps/studio/.impeccable/review/
+
 # Retired experiments stay local; their history remains in Git.
 /spikes/
 apps/studio/src-tauri/target/

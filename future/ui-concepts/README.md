@@ -2,8 +2,9 @@
 
 **Status: rejected first round, 20 October 2026.** The maintainer rejected all three directions.
 Imprint was selected from the second round; see the [paired light/dark polish](imprint/README.md)
-for the current review. This page and its demo remain historical evidence. No production application
-source, core behavior or ratified design tokens changed. Nothing was pushed.
+for the approved direction now implemented in Studio. This page and its demo remain historical
+evidence; they did not change production source. The later approved rollout updates Studio's
+identity while preserving core behavior. Nothing was pushed.
 
 Open [index.html](index.html) in a browser. It works directly from disk, including fonts and
 sprites. Choose A/B/C, switch the shell theme, or inspect at 100%. Frame selection, playback, eight

@@ -26,7 +26,7 @@ const PASSES = ['lit', 'albedo', 'normal', 'depth', 'mask'] as const;
 
 /* ---------------- the sprite player ---------------- */
 
-function Player({ summary, atlasPng, pass, dir, clip, playing, fps, zoom }: {
+export function Player({ summary, atlasPng, pass, dir, clip, playing, fps, zoom, frame }: {
   summary: BakeSummary;
   atlasPng: string;
   pass: string;
@@ -35,19 +35,26 @@ function Player({ summary, atlasPng, pass, dir, clip, playing, fps, zoom }: {
   playing: boolean;
   fps: number;
   zoom: number;
+  /** Look's comparison shares one clock across its directions. */
+  frame?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [at, setAt] = useState(0);
   const frames = playFrames(summary, clip, dir);
+  const current = Math.min(frame ?? at, frames.length - 1);
 
   useEffect(() => {
-    const img = new Image();
-    img.onload = () => {
-      imgRef.current = img;
-      setAt((v) => v); // repaint with the new page
+    let live = true;
+    setImg(null);
+    const next = new Image();
+    next.onload = () => {
+      if (live) setImg(next);
     };
-    img.src = `data:image/png;base64,${atlasPng}`;
+    next.src = `data:image/png;base64,${atlasPng}`;
+    return () => {
+      live = false;
+    };
   }, [atlasPng]);
 
   useEffect(() => {
@@ -60,9 +67,13 @@ function Player({ summary, atlasPng, pass, dir, clip, playing, fps, zoom }: {
 
   useEffect(() => {
     const canvas = ref.current;
-    const img = imgRef.current;
-    const f = frames[Math.min(at, frames.length - 1)];
-    if (!canvas || !img || !f) return;
+    const f = frames[current];
+    if (!canvas) return;
+    if (!img || !f) {
+      canvas.width = 0;
+      canvas.height = 0;
+      return;
+    }
     canvas.width = f.atlas.w * zoom;
     canvas.height = f.atlas.h * zoom;
     const ctx = canvas.getContext('2d');
@@ -80,7 +91,7 @@ function Player({ summary, atlasPng, pass, dir, clip, playing, fps, zoom }: {
       f.atlas.w * zoom,
       f.atlas.h * zoom,
     );
-  }, [at, frames, zoom, pass, atlasPng]);
+  }, [current, frames, zoom, pass, img]);
 
   return (
     <div className='player'>
@@ -89,11 +100,13 @@ function Player({ summary, atlasPng, pass, dir, clip, playing, fps, zoom }: {
           ref={ref}
           className='stripcanvas'
           role='img'
-          aria-label={`${clip} ${t('direction')} ${dir} ${t('frame')} ${at + 1}/${frames.length}`}
+          aria-label={`${clip} ${t('direction')} ${dir} ${t('frame')} ${
+            current + 1
+          }/${frames.length}`}
         />
       </div>
       <div className='playermeta mono'>
-        {t('frame')} {frames.length === 0 ? 0 : at + 1}/{frames.length} · {pass}
+        {t('frame')} {current + 1}/{frames.length} · {pass}
       </div>
     </div>
   );

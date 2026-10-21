@@ -1,8 +1,4 @@
-/**
- * SpriteBook Studio — the T1 chrome over the walking skeleton. Read-only by
- * construction: the only core verb this window can run is `doctor`; every
- * panel is a projection of character manifests.
- */
+/** Studio projects core manifests; mutations and jobs stay behind the CLI bridge. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLingui } from '@lingui/react';
 import { makeBridge, type RawWorkspace } from './bridge';
@@ -209,12 +205,18 @@ export default function App() {
   // an i18n.activate() (the tabs lagged one locale behind under useMemo)
   const tabs = [
     { id: 'gallery', label: t('Gallery') },
-    ...openDirs.map((dir) => ({
-      id: dir,
-      label: byDir.get(dir)?.card.displayName ?? dir.split(/[\\/]/).pop() ??
-        dir,
+    ...(workspaces ?? []).map(({ card }) => ({
+      id: card.dir,
+      label: card.displayName,
+      detail: card.id !== card.displayName ? card.id : card.stylePresetId,
+      closable: openDirs.includes(card.dir),
     })),
-    ...(newOpen ? [{ id: '__new__', label: t('New character') }] : []),
+    ...openDirs.filter((dir) => !byDir.has(dir)).map((dir) => ({
+      id: dir,
+      label: dir.split(/[\\/]/).pop() ?? dir,
+      closable: true,
+    })),
+    ...(newOpen ? [{ id: '__new__', label: t('New character'), closable: true }] : []),
   ];
 
   const activeWs = activeTab === 'gallery' ? undefined : byDir.get(activeTab);
@@ -293,7 +295,7 @@ export default function App() {
         locale={locale}
         gpu={adapter?.description ?? null}
         canEdit={activeTab !== 'gallery'}
-        onToggleTheme={toggleTheme}
+        onThemeChange={setThemeState}
         onToggleLocale={toggleLocale}
         onReload={load}
         onExam={runExam}
@@ -318,98 +320,104 @@ export default function App() {
           setCatalogEpoch((e) => e + 1);
         }}
       />
-      <Tabs
-        tabs={tabs}
-        active={activeTab}
-        onSelect={setActiveTab}
-        onClose={closeTab}
-        onNew={openNew}
-      />
-
-      {activeTab === 'gallery' && (
-        <div className='toolbar'>
-          {
-            /* NOT id='root': index.html mounts React on <div id="root">, and
+      <div className='workbench'>
+        <Tabs
+          tabs={tabs}
+          active={activeTab}
+          onSelect={(id) => {
+            if (id === 'gallery' || id === '__new__') setActiveTab(id);
+            else openCharacter(id);
+          }}
+          onClose={closeTab}
+          onNew={openNew}
+        />
+        <div className='workarea'>
+          {activeTab === 'gallery' && (
+            <div className='toolbar'>
+              {
+                /* NOT id='root': index.html mounts React on <div id="root">, and
               the duplicate id made querySelector('#root') answer with the
               mount div - found when a driver tried to type into it */
-          }
-          <label htmlFor='projectsroot'>{t('Projects root')}</label>
-          <input
-            id='projectsroot'
-            className='rootinput'
-            value={root}
-            onChange={(e) => setRoot(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') load();
-            }}
-            spellCheck={false}
-          />
-          <button type='button' className='btn' onClick={load}>
-            {t('Load')}
-          </button>
-          {
-            /* aria-busy, not disabled: disabling the focused button drops
+              }
+              <label htmlFor='projectsroot'>{t('Projects root')}</label>
+              <input
+                id='projectsroot'
+                className='rootinput'
+                value={root}
+                onChange={(e) => setRoot(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') load();
+                }}
+                spellCheck={false}
+              />
+              <button type='button' className='btn' onClick={load}>
+                {t('Load')}
+              </button>
+              {
+                /* aria-busy, not disabled: disabling the focused button drops
               keyboard focus to <body> for the whole exam (walkthrough) */
-          }
-          <button
-            type='button'
-            className='btn primary'
-            onClick={() => {
-              if (!exam.running) runExam();
-            }}
-            aria-busy={exam.running}
-          >
-            {exam.running ? t('Examining…') : t('Run health exam')}
-          </button>
-        </div>
-      )}
-
-      <main
-        id='main-panel'
-        role='tabpanel'
-        aria-label={activeTab === 'gallery' ? t('Gallery') : activeWs?.card.displayName}
-        className='mainpanel'
-      >
-        {activeTab === 'gallery'
-          ? (
-            <Gallery
-              bridge={bridge}
-              cards={workspaces?.map((w) => w.card) ?? null}
-              loadError={loadError}
-              onOpen={openCharacter}
-              onUseDefault={() => setRoot(DEFAULT_ROOT)}
-            />
-          )
-          : activeTab === '__new__'
-          ? (
-            <GenerateNew
-              key={root}
-              bridge={bridge}
-              projectsRoot={root}
-              onCreated={onCreated}
-              onOpenModels={() => setModelsOpen(true)}
-              catalogEpoch={catalogEpoch}
-              vramGb={typeof exam.report?.vramGb === 'number' ? exam.report.vramGb : null}
-            />
-          )
-          : activeWs
-          ? (
-            <Editor
-              key={activeWs.card.dir}
-              onOpenModels={() => setModelsOpen(true)}
-              catalogEpoch={catalogEpoch}
-              bridge={bridge}
-              card={activeWs.card}
-              manifest={activeWs.raw.manifest}
-              onChanged={load}
-            />
-          )
-          : (
-            <div className='empty'>
-              <p>{t('This character is no longer under the loaded root.')}</p>
+              }
+              <button
+                type='button'
+                className='btn primary'
+                onClick={() => {
+                  if (!exam.running) runExam();
+                }}
+                aria-busy={exam.running}
+              >
+                {exam.running ? t('Examining…') : t('Run health exam')}
+              </button>
             </div>
           )}
-      </main>
+
+          <main
+            id='main-panel'
+            role='tabpanel'
+            aria-label={activeTab === 'gallery' ? t('Gallery') : activeWs?.card.displayName}
+            className='mainpanel'
+          >
+            {activeTab === 'gallery'
+              ? (
+                <Gallery
+                  bridge={bridge}
+                  cards={workspaces?.map((w) => w.card) ?? null}
+                  loadError={loadError}
+                  onOpen={openCharacter}
+                  onUseDefault={() => setRoot(DEFAULT_ROOT)}
+                />
+              )
+              : activeTab === '__new__'
+              ? (
+                <GenerateNew
+                  key={root}
+                  bridge={bridge}
+                  projectsRoot={root}
+                  onCreated={onCreated}
+                  onOpenModels={() => setModelsOpen(true)}
+                  catalogEpoch={catalogEpoch}
+                  vramGb={typeof exam.report?.vramGb === 'number' ? exam.report.vramGb : null}
+                />
+              )
+              : activeWs
+              ? (
+                <Editor
+                  key={activeWs.card.dir}
+                  onOpenModels={() => setModelsOpen(true)}
+                  catalogEpoch={catalogEpoch}
+                  bridge={bridge}
+                  card={activeWs.card}
+                  manifest={activeWs.raw.manifest}
+                  onChanged={load}
+                />
+              )
+              : (
+                <div className='empty'>
+                  <p>{t('This character is no longer under the loaded root.')}</p>
+                </div>
+              )}
+          </main>
+        </div>
+      </div>
 
       <LogDrawer
         open={drawerOpen}
