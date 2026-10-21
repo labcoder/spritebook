@@ -41,6 +41,8 @@ shows its CLI twin for every action. See [`docs/prd.md`](docs/prd.md) for the pr
 Use **Node 24.22.0** (the pin in `.node-version`), npm, and Rust/Cargo. Windows runtime packaging
 also needs the Windows SDK's `mt.exe`. The repo is a locked npm workspace; product behavior remains
 TypeScript, compiled to JavaScript, with Tauri/React for the desktop and Node/Dawn for rendering.
+Windows archive extraction uses the OS-provided `System32/tar.exe`, independently of Git/MSYS tools
+on `PATH`.
 
 ```sh
 npm ci --ignore-scripts

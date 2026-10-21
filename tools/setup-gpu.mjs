@@ -1,10 +1,10 @@
 import { strict as assert } from 'node:assert';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extractArchive } from './archive.ts';
 
 export const VULKAN_VERSION = '1.4.341.0';
 const ARCHIVE_HASH = '20571dcc8292b80a47d68bbbfa4094d87044041f50f4e2e1f326a01e3732b226';
@@ -35,9 +35,7 @@ export async function installVulkan(target) {
   assert.equal(sha(zip), ARCHIVE_HASH, 'cached Vulkan archive checksum');
   const temp = await mkdtemp(join(tmpdir(), 'spritebook-vulkan-'));
   try {
-    execFileSync('tar.exe', ['-xf', zipPath, '-C', temp], {
-      windowsHide: true,
-    });
+    extractArchive(zipPath, temp);
     const root = join(temp, `VulkanRT-X64-${VULKAN_VERSION}-Components`);
     assert.equal(
       sha(await readFile(join(root, 'x64/vulkan-1.dll'))),

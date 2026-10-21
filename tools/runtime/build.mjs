@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extractArchive } from '../archive.ts';
 import { installVulkan } from '../setup-gpu.mjs';
 import { publishRuntime, recoverRuntime } from './publish.ts';
 
@@ -67,9 +68,7 @@ try {
     const archive = await download(pin[kind]);
     const unpack = join(temp, kind);
     await mkdir(unpack);
-    execFileSync(process.platform === 'win32' ? 'tar.exe' : 'tar', ['-xf', archive, '-C', unpack], {
-      windowsHide: true,
-    });
+    extractArchive(archive, unpack);
     const archiveRoot = basename(archive).replace(/\.(?:zip|tar\.gz)$/, '');
     const binary = kind === 'node'
       ? join(unpack, archiveRoot, process.platform === 'win32' ? 'node.exe' : 'bin/node')
