@@ -57,13 +57,7 @@ export function MenuBar(
   return (
     <header className='menubar'>
       <div className='logo'>
-        <div className='logomark' aria-hidden='true'>
-          <i />
-          <i />
-          <i />
-          <i />
-        </div>
-        <span className='wordmark'>SPRITEBOOK</span>
+        <span className='wordmark'>SpriteBook</span>
       </div>
       <Menu.Root>
         <Menu.Trigger className='menubtn'>{t('File')}</Menu.Trigger>

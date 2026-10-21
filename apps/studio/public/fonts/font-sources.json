@@ -1,0 +1,16 @@
+[
+  {
+    "file": "barlow-condensed.woff2",
+    "source": "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4-Lwz3bWuQ.woff2",
+    "sha256": "460f141ec8f6c9a1516bfd2bd9fe71656246d7a9d04a0955faf53158d8970c4c",
+    "bytes": 21424,
+    "license": "OFL-barlowcondensed.txt"
+  },
+  {
+    "file": "geist-mono.woff2",
+    "source": "https://fonts.gstatic.com/s/geistmono/v6/or3nQ6H-1_WfwkMZI_qYFrcdmg.woff2",
+    "sha256": "684ad5b531f81d43c1e8c7038262d5db7cdc1f68006e04d6c7769efa8d33c8cc",
+    "bytes": 23128,
+    "license": "OFL-geistmono.txt"
+  }
+]

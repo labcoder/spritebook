@@ -24,3 +24,7 @@ SpriteBook. Suggested credit:
 The SpriteBook name, logo, icons, and brand assets are trademarks or trade
 dress of Oscar Sanchez and are not licensed by the AGPL except as needed to
 identify the software truthfully and preserve required legal notices.
+
+Studio bundles Barlow Condensed and Geist Mono under the SIL Open Font
+License 1.1. Complete copyright and license notices are included in
+apps/studio/public/fonts/OFL-barlowcondensed.txt and OFL-geistmono.txt.

@@ -1,105 +1,62 @@
-/**
- * The semantic token layer — RATIFIED 2026-07-31 (docs/design/design-system.md, D-030).
- *
- * Dark is the identity (concept A, "Marathon"); light is concept B ("printed
- * spec sheet"). Components consume ONLY these custom properties — no raw hex
- * below the token layer, ever (design-system hard commitment 1). The one
- * deliberate hue divergence between themes is --sb-ok: acid reads "alive" on
- * charcoal but decorative on paper, where cobalt ink reads "recorded".
- *
- * Canvas wells stay dark and checkered in BOTH themes (hard commitment 4):
- * --sb-check-a/b never change with the theme.
- */
-
+/* Imprint, approved 2026-10-20. Components consume roles, never palette names.
+ * Canvas colors are identical in both themes: the shell must not recolor output. */
 :root,
 :root[data-theme='dark'] {
-  /* surfaces */
-  --sb-bg: #141416;
-  --sb-panel: #1b1b1f;
-  --sb-raise: #232329;
-  --sb-line: #32323a;
-  --sb-line-strong: #32323a;
-
-  /* text */
-  --sb-text: #e7e4dc;
-  --sb-dim: #8f8d96;
-
-  /* pipeline accents — hue codes the subsystem (the Marathon move) */
-  --sb-acid: #c6dc34;
-  --sb-magenta: #dd3fd3;
-  --sb-cobalt: #5a6bf0;
-  --sb-cyan: #55d0d6;
-  --sb-sun: #e8c226;
-  /* AA amendment (tokens_test.ts): the ratified #E23B2E measured 4.01:1 as
-   * TEXT on panel — the status bar and warn badges genuinely set it as text,
-   * so the value moved to the nearest vermilion that clears 4.5 on bg, panel
-   * AND raise. Fills only got more visible. */
-  --sb-signal: #f05d4e;
-
-  /* states */
-  --sb-ok: #c6dc34;
-  --sb-focus: #5a6bf0;
-  --sb-on-acid: #17190a;
-
-  /* accents in a TEXT role (rule 5 generalized): on charcoal the accents are
-   * already legible, so dark ink == accent; light overrides below. Cobalt is
-   * deliberately ABSENT — it fails AA as text on dark (3.9:1) and is a focus
-   * ring, never copy. */
-  --sb-acid-ink: #c6dc34;
-  /* the one dark ink that ISN'T its accent: #DD3FD3 reads 4.26:1 on raise */
-  --sb-magenta-ink: #e14fd8;
-  --sb-cyan-ink: #55d0d6;
-  --sb-sun-ink: #e8c226;
-  --sb-signal-ink: #f05d4e;
-
-  /* keyboard/pointer selection surface: deep cobalt holds light text at AA in
-   * both themes (raw cobalt under bg-coloured text measured 3.9:1 — axe) */
-  --sb-select-bg: #3140c4;
-  --sb-select-text: #e7e4dc;
-
-  /* canvas wells — fixed in both themes (rule 4) */
-  --sb-check-a: #232329;
-  --sb-check-b: #1b1b20;
+  color-scheme: dark;
+  --sb-bg: #1b2130;
+  --sb-panel: #252e40;
+  --sb-chrome: #202839;
+  --sb-raise: #303e58;
+  --sb-footer: #242e43;
+  --sb-line: #3a4760;
+  --sb-line-strong: #6c7b9a;
+  --sb-text: #e1e6f0;
+  --sb-dim: #a6b1c8;
+  --sb-accent: #b7c6fa;
+  --sb-action: #a9beff;
+  --sb-action-hover: #c4d2ff;
+  --sb-on-action: #18223f;
+  --sb-select-bg: #2d3b59;
+  --sb-select-text: #d1dcff;
+  --sb-current: #2b3e6b;
+  --sb-on-current: #dee7ff;
+  --sb-focus: #c4d2ff;
+  --sb-ok: #adcbbd;
+  --sb-warning: #e1c48d;
+  --sb-danger: #ffaea5;
+  --sb-on-danger: #331c21;
+  --sb-check-a: #171e28;
+  --sb-check-b: #1c232d;
+  --sb-well-text: #cfd8e4;
+  --sb-texture: url('/textures/dither.svg');
 }
 
 :root[data-theme='light'] {
-  --sb-bg: #ece9e0;
-  --sb-panel: #f6f4ed;
-  --sb-raise: #e2dfd4;
-  --sb-line: #cdc9bb;
-  --sb-line-strong: #b9b5a6;
-
-  --sb-text: #191a1c;
-  /* AA amendment: #66646C measured 4.37:1 on raise — five points darker
-   * clears it everywhere with no visible character change */
-  --sb-dim: #615f67;
-
-  /* acid stays a FILL on light (rule 5); ink-darkened variants are for text */
-  --sb-acid: #c6dc34;
-  --sb-magenta: #a31896;
-  --sb-cobalt: #3140c4;
-  --sb-cyan: #2fa9b0;
-  --sb-sun: #c79a12;
-  --sb-signal: #c6301f;
-
-  --sb-ok: #3140c4;
-  --sb-focus: #3140c4;
-  --sb-on-acid: #17190a;
-
-  /* ink-darkened accent variants for text on paper — each clears 4.5:1 on
-   * panel AND raise (held by tokens_test.ts). acid-ink runs darker than the
-   * doc's #67750A, which fails on raise (3.8:1). */
-  --sb-acid-ink: #4f5a06;
-  --sb-magenta-ink: #8a1480;
-  --sb-cyan-ink: #19646a;
-  --sb-sun-ink: #715703;
-  --sb-signal-ink: #a2261c;
-
-  --sb-select-bg: #3140c4;
-  --sb-select-text: #f6f4ed;
-
-  /* rule 4, stated where a light-theme edit would look for it: the wells do
-   * not follow the theme — same values as dark, on purpose */
-  --sb-check-a: #232329;
-  --sb-check-b: #1b1b20;
+  color-scheme: light;
+  --sb-bg: #f1f0e9;
+  --sb-panel: #f8f7f2;
+  --sb-chrome: #eeefea;
+  --sb-raise: #e3e7f0;
+  --sb-footer: #e1e5ee;
+  --sb-line: #b6bdcf;
+  --sb-line-strong: #7a86a9;
+  --sb-text: #303a66;
+  --sb-dim: #535e7c;
+  --sb-accent: #2d3d88;
+  --sb-action: #2d3d88;
+  --sb-action-hover: #23336f;
+  --sb-on-action: #fafaf5;
+  --sb-select-bg: #dee4f2;
+  --sb-select-text: #293a7c;
+  --sb-current: #2d3d88;
+  --sb-on-current: #fafaf5;
+  --sb-focus: #354ba8;
+  --sb-ok: #375f51;
+  --sb-warning: #765515;
+  --sb-danger: #9c393a;
+  --sb-on-danger: #fafaf5;
+  --sb-check-a: #171e28;
+  --sb-check-b: #1c232d;
+  --sb-well-text: #cfd8e4;
+  --sb-texture: url('/textures/hatch.svg');
 }

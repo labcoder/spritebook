@@ -1,20 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { test } from 'node:test';
-/**
- * The ratified token layer, held to its own commitments (design-system.md):
- *
- *  1. every colour is a semantic light/dark pair — both themes define the
- *     same token set, nothing falls through to the other theme by accident;
- *  2. WCAG 2.1 AA — text on its surfaces, in both themes, computed here so a
- *     future "tweak one hex" cannot silently break contrast;
- *  4. canvas wells stay dark in BOTH themes — the checker tokens are
- *     theme-invariant by value;
- *  plus the two ratified deltas: state/ok diverges in hue by theme, and
- *  light's line/strong is stronger than its line.
- *
- * Runs under the plain Node suite: it parses tokens.css textually — the file
- * IS the contract, no browser needed.
- */
+/** Contrast and pixel-surround contracts for both Imprint themes. */
 import { assert, assertEquals } from '@std/assert';
 
 const css = await fs.readFile(new URL('./src/tokens.css', import.meta.url), 'utf8');
@@ -65,7 +51,7 @@ test('both themes define the identical token set — no accidental fallthrough',
 
 test('AA: primary and secondary text hold 4.5:1 on every surface, both themes', () => {
   for (const [name, t] of [['dark', dark], ['light', light]] as const) {
-    for (const surface of ['sb-bg', 'sb-panel', 'sb-raise']) {
+    for (const surface of ['sb-bg', 'sb-panel', 'sb-chrome', 'sb-raise', 'sb-footer']) {
       for (const text of ['sb-text', 'sb-dim']) {
         const ratio = contrast(t.get(text)!, t.get(surface)!);
         assert(
@@ -77,10 +63,19 @@ test('AA: primary and secondary text hold 4.5:1 on every surface, both themes', 
   }
 });
 
-test('AA: the primary action reads — on-acid ink on the acid fill', () => {
-  for (const t of [dark, light]) {
-    const ratio = contrast(t.get('sb-on-acid')!, t.get('sb-acid')!);
-    assert(ratio >= 4.5, `on-acid on acid is ${ratio.toFixed(2)}:1`);
+test('AA: primary actions, current stages, and error badges keep readable text', () => {
+  for (const [name, t] of [['dark', dark], ['light', light]] as const) {
+    for (
+      const [text, fill] of [
+        ['sb-on-action', 'sb-action'],
+        ['sb-on-action', 'sb-action-hover'],
+        ['sb-on-current', 'sb-current'],
+        ['sb-on-danger', 'sb-danger'],
+      ]
+    ) {
+      const ratio = contrast(t.get(text)!, t.get(fill)!);
+      assert(ratio >= 4.5, `${name}: ${text} on ${fill} is ${ratio.toFixed(2)}:1`);
+    }
   }
 });
 
@@ -92,34 +87,25 @@ test('rule 4: the canvas well checker is dark in BOTH themes, by value', () => {
   }
 });
 
-test('the ratified deltas: ok diverges by theme; light line/strong is stronger', () => {
-  assertEquals(dark.get('sb-ok'), dark.get('sb-acid'), 'dark ok IS acid');
-  assertEquals(light.get('sb-ok'), light.get('sb-cobalt'), 'light ok IS cobalt ink');
-  assert(dark.get('sb-ok') !== light.get('sb-ok'), 'the hue divergence is real');
-  // stronger = darker than line on the light ground
-  const mean = (hex: string) => hexToRgb(hex).reduce((a, c) => a + c, 0) / 3;
-  assert(
-    mean(light.get('sb-line-strong')!) < mean(light.get('sb-line')!),
-    'light line/strong is darker than line',
-  );
-});
-
-test('every accent-as-text ink clears 4.5:1 on panel AND raise, both themes', () => {
-  // rule 5 generalized by the manual AA pass: accents in a TEXT role go
-  // through -ink tokens (tags, drawer severities, badges). Cobalt has no ink
-  // on purpose — it fails as text on dark and is a focus ring, never copy.
-  const inks = ['sb-acid-ink', 'sb-magenta-ink', 'sb-cyan-ink', 'sb-sun-ink', 'sb-signal-ink'];
+test('status text holds AA on surfaces and selected cards, both themes', () => {
   for (const [name, t] of [['dark', dark], ['light', light]] as const) {
-    for (const ink of inks) {
-      assert(t.has(ink), `${name} defines ${ink}`);
-      for (const surface of ['sb-panel', 'sb-raise']) {
+    for (const ink of ['sb-accent', 'sb-ok', 'sb-warning', 'sb-danger', 'sb-dim']) {
+      for (const surface of ['sb-bg', 'sb-panel', 'sb-raise', 'sb-select-bg', 'sb-footer']) {
         const ratio = contrast(t.get(ink)!, t.get(surface)!);
-        assert(
-          ratio >= 4.5,
-          `${name}: ${ink} on ${surface} is ${ratio.toFixed(2)}:1, AA wants 4.5:1`,
-        );
+        assert(ratio >= 4.5, `${name}: ${ink} on ${surface} is ${ratio.toFixed(2)}:1`);
       }
     }
+  }
+});
+
+test('fields and focus rings have visible boundaries, both themes', () => {
+  for (const [name, t] of [['dark', dark], ['light', light]] as const) {
+    for (const ink of ['sb-line-strong', 'sb-focus']) {
+      const ratio = contrast(t.get(ink)!, t.get('sb-panel')!);
+      assert(ratio >= 3, `${name}: ${ink} on panel is ${ratio.toFixed(2)}:1`);
+    }
+    const ratio = contrast(t.get('sb-well-text')!, t.get('sb-check-b')!);
+    assert(ratio >= 4.5, `${name}: preview captions are ${ratio.toFixed(2)}:1`);
   }
 });
 
@@ -127,16 +113,5 @@ test('the selection surface holds its text at 4.5:1, both themes', () => {
   for (const [name, t] of [['dark', dark], ['light', light]] as const) {
     const ratio = contrast(t.get('sb-select-text')!, t.get('sb-select-bg')!);
     assert(ratio >= 4.5, `${name}: select-text on select-bg is ${ratio.toFixed(2)}:1`);
-  }
-});
-
-test('status hues stay AA-legible as TEXT on the status bar panel', () => {
-  // the status bar renders ok/signal as text on panel — that is a real usage
-  // in App.tsx, so it is a real constraint here
-  for (const [name, t] of [['dark', dark], ['light', light]] as const) {
-    for (const k of ['sb-ok', 'sb-signal']) {
-      const ratio = contrast(t.get(k)!, t.get('sb-panel')!);
-      assert(ratio >= 4.5, `${name}: ${k} text on panel is ${ratio.toFixed(2)}:1`);
-    }
   }
 });

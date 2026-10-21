@@ -1,40 +1,15 @@
-/**
- * The three ratified faces (design-system.md, all SIL OFL 1.1), self-hosted.
- * These are LATIN subsets — enough for the walking skeleton; the full sets
- * land with Lingui in the T1 i18n pass.
- */
+/* Self-hosted Imprint faces. Complete OFL notices and source pins are in public/fonts. */
 @font-face {
-  font-family: 'Chakra Petch';
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-  src: url('/fonts/ChakraPetch-600.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Chakra Petch';
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-  src: url('/fonts/ChakraPetch-700.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-weight: 100 700; /* variable file */
-  font-style: normal;
-  font-display: swap;
-  src: url('/fonts/IBMPlexSans.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'IBM Plex Mono';
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  src: url('/fonts/IBMPlexMono-400.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'IBM Plex Mono';
+  font-family: 'Barlow Condensed';
   font-weight: 500;
   font-style: normal;
   font-display: swap;
-  src: url('/fonts/IBMPlexMono-500.woff2') format('woff2');
+  src: url('/fonts/barlow-condensed.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/geist-mono.woff2') format('woff2');
 }

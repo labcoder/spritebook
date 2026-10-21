@@ -65,7 +65,6 @@ function StageRail({ stages, active, onSelect, busy, onCancel }: {
           }}
         >
           <span className='n mono'>{s.n}</span>
-          <i className='hue' style={{ background: `var(${s.hueVar})` }} />
           <span className='nm hud'>{stageLabel(s.key)}</span>
           <i className={`dot ${s.state}`} aria-hidden='true' />
           {s.state === 'locked' && <span className='sr-only'>{t('locked')} — {s.note}</span>}

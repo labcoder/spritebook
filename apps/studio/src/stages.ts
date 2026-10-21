@@ -12,8 +12,6 @@ export interface Stage {
   key: StageKey;
   /** two-digit rail index, '01'…'06' */
   n: string;
-  /** semantic token carrying the stage hue (the Marathon move) */
-  hueVar: string;
   state: StageState;
   /** one honest line: what is recorded, or what unlocks it */
   note: string;
@@ -42,7 +40,6 @@ export function stageStates(manifest: unknown): Stage[] {
   const genStage: Stage = {
     key: 'gen',
     n: '01',
-    hueVar: '--sb-acid',
     // results without a canonical mesh mean a PICK is pending — that is a
     // warn (something needs the user), not a done (nothing does)
     state: canonical ? 'done' : (results > 0 ? 'warn' : 'idle'),
@@ -51,10 +48,9 @@ export function stageStates(manifest: unknown): Stage[] {
       : (results > 0 ? `${results} results, none picked` : 'nothing generated'),
   };
 
-  const locked = (key: StageKey, n: string, hueVar: string): Stage => ({
+  const locked = (key: StageKey, n: string): Stage => ({
     key,
     n,
-    hueVar,
     state: 'locked',
     note: lockNote,
   });
@@ -62,18 +58,17 @@ export function stageStates(manifest: unknown): Stage[] {
   if (!canonical) {
     return [
       genStage,
-      locked('rig', '02', '--sb-magenta'),
-      locked('anim', '03', '--sb-cobalt'),
-      locked('look', '04', '--sb-cyan'),
-      locked('bake', '05', '--sb-sun'),
-      locked('export', '06', '--sb-text'),
+      locked('rig', '02'),
+      locked('anim', '03'),
+      locked('look', '04'),
+      locked('bake', '05'),
+      locked('export', '06'),
     ];
   }
 
   const rigStage: Stage = {
     key: 'rig',
     n: '02',
-    hueVar: '--sb-magenta',
     state: rig ? (rig.accepted === true ? 'done' : 'warn') : 'idle',
     note: rig
       ? `track ${rig.track ?? '?'} · ${rig.jointCount ?? '?'} joints · ${
@@ -88,7 +83,6 @@ export function stageStates(manifest: unknown): Stage[] {
     {
       key: 'anim',
       n: '03',
-      hueVar: '--sb-cobalt',
       state: clips > 0 ? 'done' : 'idle',
       note: clips > 0
         ? `${clips} clips enabled`
@@ -97,7 +91,6 @@ export function stageStates(manifest: unknown): Stage[] {
     {
       key: 'look',
       n: '04',
-      hueVar: '--sb-cyan',
       state: typeof look.stylePresetId === 'string' ? 'done' : 'idle',
       note: typeof look.stylePresetId === 'string'
         ? `style ${look.stylePresetId} · camera ${look.cameraPresetId ?? '?'}`
@@ -106,14 +99,12 @@ export function stageStates(manifest: unknown): Stage[] {
     {
       key: 'bake',
       n: '05',
-      hueVar: '--sb-sun',
       state: typeof m.lastBakeId === 'string' ? 'done' : 'idle',
       note: typeof m.lastBakeId === 'string' ? `bake ${m.lastBakeId}` : 'never baked',
     },
     {
       key: 'export',
       n: '06',
-      hueVar: '--sb-text',
       state: has(m.export) ? 'done' : 'idle',
       note: has(m.export) ? 'exported' : 'no export recorded',
     },
