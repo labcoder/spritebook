@@ -7,7 +7,7 @@ import { test } from 'node:test';
  * streams, so a malformed event fails the suite wherever it appears.
  */
 import { assert, assertEquals, assertStringIncludes } from '@std/assert';
-import type { Platform } from '@spritebook/schema';
+import type { JobEvent, Platform } from '@spritebook/schema';
 import { canonicalJson, InstallReceiptSchema, parseWith } from '@spritebook/schema';
 import { listInstalled, resolveInstalled } from './dist/installed.js';
 import { hashFile } from './dist/hash.js';
@@ -79,12 +79,30 @@ test('install: happy path - verified files land, canonical receipt, events in or
     const events = await collect(install(rig));
     assertEquals(
       events.map((e) => e.t),
-      ['queued', 'started', 'progress', 'progress', 'artifact', 'done'],
+      [
+        'queued',
+        'started',
+        'progress',
+        'progress',
+        'progress',
+        'progress',
+        'progress',
+        'progress',
+        'artifact',
+        'done',
+      ],
     );
     // the step names the file, so a long install reads as motion in the log
     assertEquals(
       ofType(events, 'progress').map((p) => [p.step, p.done, p.total]),
-      [['download:model.ckpt', 1, 2], ['download:config.yaml', 2, 2]],
+      [
+        ['download-bytes:model.ckpt', 0, TOY_A.byteLength],
+        ['download-bytes:model.ckpt', TOY_A.byteLength, TOY_A.byteLength],
+        ['download:model.ckpt', 1, 2],
+        ['download-bytes:config.yaml', 0, TOY_B.byteLength],
+        ['download-bytes:config.yaml', TOY_B.byteLength, TOY_B.byteLength],
+        ['download:config.yaml', 2, 2],
+      ],
     );
     const [art] = ofType(events, 'artifact');
     assertEquals(art.kind, 'install-receipt');
@@ -119,6 +137,7 @@ test('install: happy path - verified files land, canonical receipt, events in or
       version: '1.0',
       diskBytes: TOY_A.byteLength + TOY_B.byteLength,
       platforms: ['windows-cpu', 'linux-cpu', 'macos-cpu'],
+      platformSupported: true,
       installed: true,
       // the D-009 form contract rides the list row (P4-T2)
       paramsSchema: {},
@@ -143,7 +162,7 @@ test('setup refuses a historical weights-only version and names its managed repl
     entry.versions.push({ ...entry.versions[0], version: '2.0', runtime: 'unirig-win' });
     const receipt = await fs.readFile(`${rig.root}/toy-rig/1.0/receipt.json`, 'utf8');
     const events = await collect(runSetupJob({
-      jobId: 'setup-old',
+      jobId: 'setup-old' as JobEvent['jobId'],
       catalog: rig.catalog,
       root: rig.root,
       modelId: 'toy-rig',
@@ -155,6 +174,61 @@ test('setup refuses a historical weights-only version and names its managed repl
     assertStringIncludes(error.message, 'models install toy-rig@2.0');
     assertEquals(await fs.readFile(`${rig.root}/toy-rig/1.0/receipt.json`, 'utf8'), receipt);
   } finally {
+    await fs.rm(rig.tmp, { recursive: true, force: true });
+  }
+});
+
+test('listing recommends a compatible managed build without hiding older installs', async () => {
+  const rig = await installRig();
+  try {
+    await collect(install(rig));
+    const entry = rig.catalog.models[0];
+    entry.versions.unshift({ ...entry.versions[0], version: '3.0', platforms: ['macos-cpu'] });
+    entry.versions.push({ ...entry.versions[1], version: '2.0', runtime: 'missing-test-runtime' });
+    entry.versions.push({ ...entry.versions[1], version: '4.0', platforms: ['windows-cpu'] });
+    const [row] = await runListQuery({
+      catalog: rig.catalog,
+      root: rig.root,
+      platform: 'windows-cuda',
+    });
+    assertEquals(row.recommendedVersion, '2.0');
+    assertEquals(row.versions.find((v) => v.version === '1.0')?.installed, true);
+    assertEquals(row.versions.find((v) => v.version === '3.0')?.platformSupported, false);
+    assertEquals(row.versions.find((v) => v.version === '2.0')?.runtimePrepared, false);
+  } finally {
+    await fs.rm(rig.tmp, { recursive: true, force: true });
+  }
+});
+
+test('download bytes reach the job stream before a model file finishes', async () => {
+  const rig = await installRig();
+  const resume = Promise.withResolvers<void>();
+  let completed = false;
+  let observed = false;
+  try {
+    for await (
+      const event of install(rig, {
+        fetcher: async (url, path, onBytes) => {
+          assert(onBytes, 'the installer must connect the fetcher byte callback');
+          onBytes(1);
+          await resume.promise;
+          await rig.fetcher(url, path);
+          completed = true;
+        },
+      })
+    ) {
+      if (
+        !observed && event.t === 'progress' && event.step.startsWith('download-bytes:') &&
+        event.done === 1
+      ) {
+        assertEquals(completed, false, 'progress is visible during the first download');
+        observed = true;
+        resume.resolve();
+      }
+    }
+    assert(observed, 'a live byte update reached the consumer');
+  } finally {
+    resume.resolve();
     await fs.rm(rig.tmp, { recursive: true, force: true });
   }
 });

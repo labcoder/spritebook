@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { createInterface } from 'node:readline';
 import { promises as fs } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
@@ -20,18 +21,45 @@ import {
 import { type Fetcher, fetchToFile } from './install.ts';
 import { hashFile } from './hash.ts';
 import { compareVersions, resolveInstalled } from './installed.ts';
+import { downloadFile } from './download.ts';
 
-async function run(command: string, args: string[], env: NodeJS.ProcessEnv): Promise<void> {
+async function* run(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  jobId: JobEvent['jobId'],
+  step: string,
+): AsyncIterable<JobEvent> {
   const child = spawn(command, args, {
     env,
     windowsHide: true,
     stdio: ['ignore', 'ignore', 'pipe'],
   });
   const closed = once(child, 'close');
+  void closed.catch(() => {});
+  const lines = createInterface({ input: child.stderr });
   let tail = '';
-  child.stderr.setEncoding('utf8').on('data', (s) => tail = (tail + s).slice(-16_384));
-  const [code] = await closed;
-  if (code !== 0) throw new Error(`Model runtime setup failed (${code}): ${tail}`);
+  try {
+    for await (const line of lines) {
+      tail = (tail + line + '\n').slice(-16_384);
+      if (line.trim()) {
+        yield {
+          t: 'progress',
+          jobId,
+          at: new Date().toISOString(),
+          step: `${step}:${line.trim()}`,
+          done: 0,
+          total: 1,
+        };
+      }
+    }
+    const [code] = await closed;
+    if (code !== 0) throw new Error(`Model runtime setup failed (${code}): ${tail}`);
+  } finally {
+    lines.close();
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await closed;
+  }
 }
 
 /** Publish verified sources, install only frozen wheels, then admit the native stack. */
@@ -62,7 +90,14 @@ export async function* prepareModelRuntime(
       await fs.mkdir(join(stage, 'downloads'));
       for (const [i, file] of info.recipe.sources.entries()) {
         const path = join(stage, 'downloads', String(i));
-        await (opts.fetcher ?? fetchToFile)(file.url, path);
+        yield* downloadFile(
+          opts.fetcher ?? fetchToFile,
+          file.url,
+          path,
+          file.bytes,
+          jobId,
+          `setup:download-bytes:${file.path}`,
+        );
         if ((await fs.stat(path)).size !== file.bytes || await hashFile(path) !== file.sha256) {
           throw new Error(`Model runtime source hash/size mismatch: ${file.url}`);
         }
@@ -75,15 +110,22 @@ export async function* prepareModelRuntime(
           total: info.recipe.sources.length,
         };
       }
-      await run(uv, [
-        'run',
-        '--no-project',
-        '--python',
-        '3.11.16',
-        join(info.sidecarDir, 'runtimes/unpack.py'),
-        info.recipePath,
-        stage,
-      ], env);
+      yield { t: 'progress', jobId, at: at(), step: 'setup:extract', done: 0, total: 1 };
+      yield* run(
+        uv,
+        [
+          'run',
+          '--no-project',
+          '--python',
+          '3.11.16',
+          join(info.sidecarDir, 'runtimes/unpack.py'),
+          info.recipePath,
+          stage,
+        ],
+        env,
+        jobId,
+        'setup:extract',
+      );
       // Only an app-owned, fingerprinted directory is replaced; installed weights live elsewhere.
       await fs.rm(info.root, { recursive: true, force: true });
       await fs.rename(stage, info.root);
@@ -91,44 +133,64 @@ export async function* prepareModelRuntime(
     }
     await fs.rm(join(info.root, 'ready.json'), { force: true });
     yield { t: 'progress', jobId, at: at(), step: 'setup:dependencies', done: 0, total: 1 };
-    await run(uv, [
-      'sync',
-      '--frozen',
-      '--reinstall',
-      '--no-build',
-      '--no-editable',
-      '--no-install-project',
-      '--project',
-      info.project,
-      ...(info.recipe.extra ? ['--extra', info.recipe.extra] : []),
-    ], { ...env, UV_PROJECT_ENVIRONMENT: info.environment });
+    yield* run(
+      uv,
+      [
+        'sync',
+        '--frozen',
+        '--reinstall',
+        '--no-build',
+        '--no-editable',
+        '--no-install-project',
+        '--project',
+        info.project,
+        ...(info.recipe.extra ? ['--extra', info.recipe.extra] : []),
+      ],
+      { ...env, UV_PROJECT_ENVIRONMENT: info.environment },
+      jobId,
+      'setup:dependencies',
+    );
     // Prepare our own non-editable package while setup still has network access.
-    await run(uv, [
-      'run',
-      '--frozen',
-      '--no-editable',
-      '--project',
-      info.sidecarDir,
-      'python',
-      '-c',
-      'import spritebook_sidecar',
-    ], {
-      ...env,
-      PYTHONPATH: '',
-      UV_PROJECT_ENVIRONMENT: await sidecarEnvironmentDir(info.sidecarDir),
-    });
+    yield { t: 'progress', jobId, at: at(), step: 'setup:sidecar', done: 0, total: 1 };
+    yield* run(
+      uv,
+      [
+        'run',
+        '--frozen',
+        '--no-editable',
+        '--project',
+        info.sidecarDir,
+        'python',
+        '-c',
+        'import spritebook_sidecar',
+      ],
+      {
+        ...env,
+        PYTHONPATH: '',
+        UV_PROJECT_ENVIRONMENT: await sidecarEnvironmentDir(info.sidecarDir),
+      },
+      jobId,
+      'setup:sidecar',
+    );
     const python = join(info.environment, 'Scripts/python.exe');
     const bindings = Object.fromEntries(
       Object.entries(info.recipe.environment).map(([key, path]) => [key, join(info.root, path)]),
     );
-    await run(python, [join(info.sidecarDir, info.recipe.check)], {
-      ...env,
-      ...bindings,
-      PYTHONPATH: '',
-      HF_HUB_OFFLINE: '1',
-      TRANSFORMERS_OFFLINE: '1',
-      HF_HUB_DISABLE_TELEMETRY: '1',
-    });
+    yield { t: 'progress', jobId, at: at(), step: 'setup:check', done: 0, total: 1 };
+    yield* run(
+      python,
+      [join(info.sidecarDir, info.recipe.check)],
+      {
+        ...env,
+        ...bindings,
+        PYTHONPATH: '',
+        HF_HUB_OFFLINE: '1',
+        TRANSFORMERS_OFFLINE: '1',
+        HF_HUB_DISABLE_TELEMETRY: '1',
+      },
+      jobId,
+      'setup:check',
+    );
     const files: Record<string, string> = ready?.files ?? {};
     async function record(dir: string): Promise<void> {
       for (const item of await fs.readdir(dir, { withFileTypes: true })) {

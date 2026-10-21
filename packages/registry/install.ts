@@ -5,7 +5,8 @@ import { prepareModelRuntime } from './setup.ts';
 import type { Stats } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { modelRuntime } from '@spritebook/core';
+import { modelRuntime, readModelRuntime } from '@spritebook/core';
+import { downloadFile } from './download.ts';
 /**
  * Install / verify / rm jobs (D-009), speaking the runBakeJob event
  * discipline: queued -> started -> per-file progress -> artifact -> done,
@@ -266,7 +267,14 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
       const parent = dest.slice(0, dest.lastIndexOf('/'));
       await fs.mkdir(parent, { recursive: true });
       try {
-        await fetcher(f.url, dest);
+        yield* downloadFile(
+          fetcher,
+          f.url,
+          dest,
+          f.bytes,
+          jobId,
+          `download-bytes:${f.path.split('/').at(-1)}`,
+        );
       } catch (err) {
         throw new JobFail(
           'download-failed',
@@ -568,6 +576,9 @@ export async function* runRmJob(opts: RmJobOpts): AsyncIterable<JobEvent> {
 export interface ListedVersion {
   version: string;
   runtime?: string;
+  runtimePrepared?: boolean;
+  platformSupported: boolean;
+  notes?: string;
   diskBytes: number;
   platforms: Platform[];
   minVramGb?: number;
@@ -587,9 +598,11 @@ export interface ListedModel {
   id: string;
   kind: ModelEntry['kind'];
   displayName: string;
+  recommendedVersion?: string;
   license: {
     name: string;
     spdx?: string;
+    url?: string;
     requiresAcceptance: boolean;
     excludedTerritories?: string[];
   };
@@ -601,8 +614,17 @@ export interface ListedModel {
  * Catalog order is preserved; `installed` means a valid receipt exists.
  */
 export async function runListQuery(
-  opts: { catalog: ModelCatalog; root: string },
+  opts: { catalog: ModelCatalog; root: string; platform?: Platform },
 ): Promise<ListedModel[]> {
+  const platform = opts.platform ?? await detectPlatform();
+  const runtimeStates = new Map<string, boolean>();
+  const runtimes = new Set(
+    opts.catalog.models.flatMap((m) => m.versions.flatMap((v) => v.runtime ?? [])),
+  );
+  await Promise.all([...runtimes].map(async (id) => {
+    const prepared = await modelRuntime(id).then(readModelRuntime).catch(() => undefined);
+    runtimeStates.set(id, prepared !== undefined);
+  }));
   const installed = new Set(
     (await listInstalled(opts.root)).map((x) => `${x.id}@${x.version}`),
   );
@@ -610,9 +632,15 @@ export async function runListQuery(
     id: m.id,
     kind: m.kind,
     displayName: m.displayName,
+    recommendedVersion: m.versions.filter((v) => gatePlatform(v, platform).ok)
+      .sort((a, b) => {
+        if (Boolean(a.runtime) !== Boolean(b.runtime)) return a.runtime ? 1 : -1;
+        return compareVersions(a.version, b.version);
+      }).at(-1)?.version,
     license: {
       name: m.license.name,
       ...(m.license.spdx !== undefined ? { spdx: m.license.spdx } : {}),
+      ...(m.license.url ? { url: m.license.url } : {}),
       requiresAcceptance: m.license.requiresAcceptance,
       ...(m.license.excludedTerritories !== undefined
         ? { excludedTerritories: m.license.excludedTerritories }
@@ -620,7 +648,9 @@ export async function runListQuery(
     },
     versions: m.versions.map((v) => ({
       version: v.version,
-      ...(v.runtime ? { runtime: v.runtime } : {}),
+      ...(v.runtime ? { runtime: v.runtime, runtimePrepared: runtimeStates.get(v.runtime) } : {}),
+      platformSupported: gatePlatform(v, platform).ok,
+      ...(v.notes ? { notes: v.notes } : {}),
       diskBytes: versionDiskBytes(v),
       platforms: v.platforms,
       ...(v.minVramGb !== undefined ? { minVramGb: v.minVramGb } : {}),
