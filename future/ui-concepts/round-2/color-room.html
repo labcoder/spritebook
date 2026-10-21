@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SpriteBook — Phosphor</title>
+<link rel="icon" href="data:,">
+<style>
+@font-face{font-family:Silkscreen;src:url('assets/silkscreen.woff2');font-weight:400}@font-face{font-family:Geist;src:url('assets/geist-mono.woff2');font-weight:400 600}
+:root{color-scheme:dark;--ground:#1c201c;--surface:#282e26;--well:#171b17;--ink:#e5e9dd;--dim:#adb8a2;--line:#47503e;--accent:#cee3b2}
+*{box-sizing:border-box}body{margin:0;width:1440px;height:900px;overflow:hidden;background:var(--ground);color:var(--ink);font:13px/1.4 Geist,monospace;display:grid;grid-template-rows:104px 515px 169px 86px 26px}button,select,input{font:inherit}button,select{color:inherit;cursor:pointer}button{border:0;border-radius:0;background:transparent}button:hover,select:hover{background:#35402d}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}::selection{background:var(--accent);color:var(--ground)}svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:square;stroke-linejoin:miter}p,h1,h2,figure{margin:0}select{height:32px;border:1px solid #67745a;border-radius:0;padding:0 28px 0 10px;background:var(--ground)}.dim{color:var(--dim)}.numeric{font-variant-numeric:tabular-nums}
+.appbar{position:relative;display:flex;align-items:center;padding:0 27px;gap:42px;border-bottom:1px solid #78856a;overflow:hidden}.brand{font:36px/1 Silkscreen,monospace;color:var(--accent);letter-spacing:-.025em}.menus{display:flex;gap:5px;align-self:flex-end;margin-bottom:22px}.menus button{padding:6px 11px}.appbar .right{margin-left:auto;display:flex;align-items:center;gap:21px}.ascii-mark{width:192px;height:102px;object-fit:contain}.history{display:flex;gap:7px}.icon{width:30px;height:30px;display:grid;place-items:center}
+.workspace{display:grid;grid-template-columns:158px 1fr;min-height:0}.stages{padding:25px 15px 0;background:#242b22;border-right:1px solid var(--line)}.stages .back{display:flex;align-items:center;gap:7px;color:var(--dim);padding:0 0 27px;font-size:13px}.stages .back svg{width:14px}.stages nav{display:grid;gap:8px}.stages nav button{height:42px;text-align:left;padding:0 13px;font-size:14px}.stages nav .current{background:var(--accent);color:var(--ground);font-weight:600;box-shadow:inset 0 0 0 1px var(--accent)}
+.studio{display:grid;grid-template-rows:64px 1fr;min-width:0}.characterbar{display:flex;align-items:center;padding:0 25px;gap:22px}.characterbar h1{font:24px/1 Silkscreen,monospace}.characterbar .stats{padding-left:23px;border-left:1px solid var(--line);color:var(--dim)}.record{margin-left:auto;display:flex;align-items:center;gap:17px}.record code{font:13px Geist,monospace;color:var(--dim)}.primary{background:var(--accent);color:var(--ground);padding:10px 18px;font-weight:600;font-size:14px}.primary:hover{background:#e3f0d2}
+.picturedesk{display:grid;grid-template-columns:454px 1fr;background:var(--well);border-top:1px solid var(--line)}.picturedesk figure{position:relative;overflow:hidden}.reference{border-right:1px solid var(--line)}.viewbar{height:45px;display:flex;align-items:center;gap:16px;padding:0 25px}.viewbar h2{font:16px/1.2 Silkscreen,monospace}.viewbar .dim{font-size:13px}.viewbar .push{margin-left:auto}.reference img{position:absolute;left:27px;top:41px;width:400px;height:400px;object-fit:contain}.saved .viewbar{padding-right:26px}.saved::before{content:'';position:absolute;inset:45px 0 45px;background:conic-gradient(#191e18 25%,#1d231c 0 50%,#191e18 0 75%,#1d231c 0);background-size:32px 32px}.zoom{display:flex;align-items:center;gap:12px;font-size:13px}.sprite{image-rendering:pixelated;background-image:url('../assets/walk-0.png');background-repeat:no-repeat}.hero{position:absolute;width:216px;height:360px;left:306px;top:52px;background-size:3600px 768px;background-position:-1392px -360px}.datum{position:absolute;left:74px;right:74px;bottom:51px;border-top:1px dashed #57624a}.datum::after{content:'';position:absolute;left:339px;top:-5px;width:1px;height:9px;background:var(--accent)}.picturecaption{position:absolute;bottom:16px;left:25px;right:26px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--dim)}.saved .picturecaption strong{color:var(--ink);font-size:13px;font-weight:400}.directionnav{position:absolute;right:28px;top:89px;display:grid;gap:3px}.directionnav button{width:42px;height:29px;color:var(--dim);font-size:13px}.directionnav .selected{background:var(--accent);color:var(--ground);border:1px solid var(--accent)}.directionnav span{position:absolute;right:54px;top:7px;font-size:13px;color:var(--dim);white-space:nowrap}
+.exposures{display:grid;grid-template-columns:190px 1fr;border-top:1px solid #78856a;border-bottom:1px solid #78856a;background:#252d22}.clip{padding:18px 23px 0}.clip select{width:144px;height:32px;background:#303b29;border-color:#67745a}.transport{display:flex;align-items:center;gap:10px;margin-top:14px}.transport button{width:29px;height:29px;display:grid;place-items:center}.transport .play{color:var(--accent)}.clip p{margin-top:10px;font-size:13px;color:var(--dim)}.film{display:grid;grid-template-columns:repeat(6,1fr);padding-right:20px;min-width:0}.exposure{position:relative;margin-top:12px;height:144px;border-left:1px dashed #59634e}.exposure:last-child{border-right:1px dashed #59634e}.exposure.active{background:#303a29;outline:1px solid var(--accent);outline-offset:-1px}.exposure.active::before{content:'';position:absolute;left:1px;right:1px;top:1px;height:25px;background:repeating-linear-gradient(135deg,transparent 0 4px,#a5bf8640 4px 5px)}.frame-number{position:absolute;top:5px;left:10px;padding:0 5px;font-size:13px;color:var(--dim);background:#252d22}.active .frame-number{color:var(--accent);background:#303a29;font-weight:600}.frame{position:absolute;left:0;top:22px;width:200px;height:112px;background-size:1200px 256px;background-position:var(--frame-x) -120px}.frame-marker{position:absolute;left:50%;bottom:0;width:1px;height:7px;background:#6b7c59}.active .frame-marker{background:var(--accent);height:11px}
+.shelf{display:flex;align-items:center;padding:0 25px;gap:28px;background:var(--surface)}.shelf-title{width:137px;font:14px/1.5 Silkscreen,monospace;flex-shrink:0}.setting{display:grid;gap:7px}.setting label{font-size:13px;color:#bdc8b1}.setting select{min-width:125px;background:#20271e;border-color:#67745a}.setting.narrow select{min-width:92px}.setting input[type=number]{width:82px;height:32px;padding:0 9px;color:var(--ink);border:1px solid #67745a;border-radius:0;background:#20271e}.palette{display:flex;height:32px;align-items:center;gap:5px}.swatch{width:19px;height:22px;background:var(--swatch);border:1px solid #a1ad94}.shelf .reset{margin-left:auto;color:var(--dim);padding:8px 8px;font-size:13px;text-decoration:underline;text-underline-offset:4px}.footer{padding:0 25px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--dim);background:var(--ground)}
+@media(prefers-reduced-motion:reduce){.ascii-mark{display:none}*{animation:none!important;transition:none!important}}
+.ascii-mark.orbit-still{display:none}@media(prefers-reduced-motion:reduce){.ascii-mark.orbit-live{display:none}.ascii-mark.orbit-still{display:block}}
+</style>
+</head>
+<body>
+<header class="appbar">
+  <div class="brand">SpriteBook</div>
+  <nav class="menus" aria-label="Application"><button>File</button><button>Edit</button><button>View</button><button>Character</button><button>Help</button></nav>
+  <div class="right"><div class="history"><button class="icon" aria-label="Undo"><svg viewBox="0 0 20 20"><path d="M7 5 3 9l4 4M3 9h9a5 5 0 0 1 5 5"/></svg></button><button class="icon" aria-label="Redo"><svg viewBox="0 0 20 20"><path d="m13 5 4 4-4 4M17 9H8a5 5 0 0 0-5 5"/></svg></button></div><img class="orbit-live ascii-mark" src="assets/ascii-orbit-green.svg" alt="" aria-hidden="true"><img class="orbit-still ascii-mark" src="assets/ascii-orbit-green-still.svg" alt="" aria-hidden="true"></div>
+</header>
+<div class="workspace">
+  <aside class="stages">
+    <button class="back"><svg viewBox="0 0 20 20"><path d="m11 5-5 5 5 5"/></svg>Characters</button>
+    <nav aria-label="Character stages"><button>Generate</button><button>Rig</button><button>Animate</button><button class="current" aria-current="step">Look</button><button>Bake</button><button>Export</button></nav>
+  </aside>
+  <main class="studio">
+    <header class="characterbar"><h1>pixal</h1><p class="stats numeric">3 clips &nbsp;·&nbsp; 144 frames &nbsp;·&nbsp; 8 directions</p><div class="record"><code>spritebook look</code><button class="primary">Record look</button></div></header>
+    <section class="picturedesk" aria-label="Reference and saved output comparison">
+      <figure class="reference"><div class="viewbar"><h2>Reference</h2><span class="dim push">Source image</span></div><img src="assets/reference.png" alt="Reference illustration of a turquoise-haired character with a red bow, pink top and blue skirt"><figcaption class="picturecaption"><span>Original illustration</span><span class="numeric">1280 × 1280</span></figcaption></figure>
+      <figure class="saved">
+        <div class="viewbar"><h2>Saved sprite</h2><span class="dim">Lit pass</span><span class="push"></span><div class="zoom"><button aria-label="Zoom out">−</button><span class="numeric">6×</span><button aria-label="Zoom in">+</button></div></div>
+        <div class="sprite hero" role="img" aria-label="Previously baked pixal walk sprite, frame 3, direction 0, at six times integer zoom"></div><div class="datum" aria-hidden="true"></div>
+        <nav class="directionnav" aria-label="Saved directions"><span>Direction</span><button class="selected" aria-current="true">0</button><button>1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>6</button><button>7</button></nav>
+        <figcaption class="picturecaption"><strong>Walk <span class="dim">&nbsp; / &nbsp; Frame 3 of 6</span></strong><span class="numeric">100 × 128 px &nbsp;·&nbsp; Transparent</span></figcaption>
+      </figure>
+    </section>
+  </main>
+</div>
+<section class="exposures" aria-label="Saved walk exposures">
+  <div class="clip"><select aria-label="Clip"><option>Walk</option></select><div class="transport"><button aria-label="Previous frame"><svg viewBox="0 0 20 20"><path d="M4 4v12M15 4l-8 6 8 6z"/></svg></button><button class="play" aria-label="Play saved frames"><svg viewBox="0 0 20 20"><path d="m6 3 10 7-10 7z"/></svg></button><button aria-label="Next frame"><svg viewBox="0 0 20 20"><path d="M16 4v12M5 4l8 6-8 6z"/></svg></button></div><p>Saved frames &nbsp;·&nbsp; 2×</p></div>
+  <div class="film">
+    <div class="exposure"><span class="frame-number">1</span><div class="sprite frame" style="--frame-x:0px" role="img" aria-label="Walk frame 1"></div><i class="frame-marker"></i></div>
+    <div class="exposure"><span class="frame-number">2</span><div class="sprite frame" style="--frame-x:-200px" role="img" aria-label="Walk frame 2"></div><i class="frame-marker"></i></div>
+    <div class="exposure active"><span class="frame-number">3</span><div class="sprite frame" style="--frame-x:-400px" role="img" aria-label="Walk frame 3, selected"></div><i class="frame-marker"></i></div>
+    <div class="exposure"><span class="frame-number">4</span><div class="sprite frame" style="--frame-x:-600px" role="img" aria-label="Walk frame 4"></div><i class="frame-marker"></i></div>
+    <div class="exposure"><span class="frame-number">5</span><div class="sprite frame" style="--frame-x:-800px" role="img" aria-label="Walk frame 5"></div><i class="frame-marker"></i></div>
+    <div class="exposure"><span class="frame-number">6</span><div class="sprite frame" style="--frame-x:-1000px" role="img" aria-label="Walk frame 6"></div><i class="frame-marker"></i></div>
+  </div>
+</section>
+<section class="shelf" aria-label="Look settings">
+  <h2 class="shelf-title">Look settings</h2>
+  <div class="setting"><label for="style">Style</label><select id="style"><option>Pixel</option></select></div>
+  <div class="setting narrow"><label for="elevation">Elevation</label><select id="elevation"><option>26.6°</option></select></div>
+  <div class="setting narrow"><label for="directions">Directions</label><select id="directions"><option>8</option></select></div>
+  <div class="setting"><label for="cell">Cell size</label><select id="cell"><option>100 × 128 px</option></select></div>
+  <div class="setting"><label for="outline">Outline · px</label><input id="outline" type="number" value="1" min="0" max="4"></div>
+  <div class="setting"><label>Palette</label><div class="palette" aria-label="Illustrative palette controls"><span class="swatch" style="--swatch:#29263b"></span><span class="swatch" style="--swatch:#5c495a"></span><span class="swatch" style="--swatch:#a16d83"></span><span class="swatch" style="--swatch:#d7a49d"></span><span class="swatch" style="--swatch:#72aaa5"></span><span class="swatch" style="--swatch:#d8d4bc"></span></div></div>
+  <button class="reset">Reset settings</button>
+</section>
+<footer class="footer"><span>Saved bake acc25412 &nbsp;·&nbsp; Pixal3D &nbsp;·&nbsp; Character ID: pixal</span><span>Sample settings &nbsp;·&nbsp; Changes require a new bake</span></footer>
+</body>
+</html>

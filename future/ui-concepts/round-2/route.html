@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440, initial-scale=1">
+<title>SpriteBook — Imprint</title>
+<link rel="icon" href="data:,">
+<style>
+@font-face{font-family:'Barlow Condensed';src:url('assets/barlow-condensed.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:'Geist Mono';src:url('assets/geist-mono.woff2') format('woff2');font-weight:400 600;font-style:normal;font-display:swap}
+:root{--paper:#F1F1EB;--ink:#2634DA;--blue:#2634DA;--muted:#4D58A0;--line:#2634DA66;--well:#171E28;--panel:#E8EAE9;--white:#F1F1EB;--welltext:#CFD8E4}
+*{box-sizing:border-box}html,body{margin:0;width:1440px;height:900px;overflow:hidden}body{font-family:'Geist Mono',monospace;font-size:13px;line-height:1.4;color:var(--ink);background:var(--paper);font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}button{cursor:pointer}button,select,input{border:1px solid var(--line);border-radius:0;background:var(--paper)}button:hover,select:hover{background:#DFE2F3}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:3px}button:disabled{cursor:default;opacity:.4}::selection{color:var(--white);background:var(--blue)}input{caret-color:var(--blue)}a{text-underline-offset:3px}svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.app-head{height:100px;padding:0 26px;display:flex;align-items:center;gap:28px;border-bottom:1px solid var(--ink)}.brand{font-family:'Barlow Condensed',sans-serif;font-size:82px;font-weight:500;line-height:1;letter-spacing:-.035em;min-width:302px}.menus{display:flex;gap:23px}.menus button{padding:8px 0;border:0;background:none}.workspace-name{margin-left:auto;color:var(--muted);max-width:150px}.history{display:flex;gap:4px}.history button{display:grid;place-items:center;width:30px;height:30px;border:0;background:none}.history button:hover{background:#DFE2F3}.hatch{width:72px;height:24px;background-image:repeating-linear-gradient(45deg,var(--ink) 0 1px,transparent 1px 4px),repeating-linear-gradient(-45deg,var(--ink) 0 1px,transparent 1px 4px)}
+.shell{height:772px;display:grid;grid-template-columns:184px 1fr}.characters{border-right:1px solid var(--ink);display:flex;flex-direction:column}.index-title{height:58px;padding:0 15px;display:flex;align-items:center;justify-content:space-between}.index-title h2{font-size:13px;font-weight:500;margin:0}.icon-button{padding:0;display:grid;place-items:center;width:24px;height:28px;border:0;background:transparent}.character{border:0;display:flex;gap:12px;align-items:center;text-align:left;padding:14px 15px;width:100%;background:var(--ink);color:var(--white)}.character:hover{background:#1826C5}.character img{width:40px;height:60px;object-fit:cover;object-position:50% 20%;background:var(--well)}.character strong{display:block;font-family:'Barlow Condensed',sans-serif;font-size:29px;line-height:1.1;font-weight:500}.character span{display:block;margin-top:5px;font-size:13px;color:#DDE0FA}.new-character{height:38px;margin:16px 12px;padding:0 9px;display:flex;align-items:center;gap:7px;text-align:left;background:transparent;font-size:12px}.new-character svg{width:15px}.ascii-art{margin:auto 8px 28px;height:100px;display:grid;place-items:center;overflow:hidden}.ascii-art img{display:block;width:168px;height:90px}.index-foot{margin:0 15px 20px;color:var(--muted)}
+main{min-width:0;display:grid;grid-template-rows:58px 96px 478px 140px}.stages{margin:0 28px;display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--ink)}.stage{position:relative;border:0;background:transparent;display:flex;align-items:center;justify-content:center;gap:10px;font-size:14px;color:var(--ink)}.stage svg{width:14px;height:14px;stroke-width:1.5}.stage:hover{background:#DFE2F3}.stage[aria-current=step]{color:var(--paper);background:var(--ink);font-weight:500}.stage[aria-current=step]:after{position:absolute;content:'';height:1px;bottom:8px;left:64px;right:64px;background:var(--paper)}
+.workspace-head{padding:12px 28px;display:flex;justify-content:space-between;align-items:center}.workspace-title{display:flex;align-items:center;gap:28px}.workspace-head h1{font-family:'Barlow Condensed',sans-serif;font-size:64px;line-height:1;font-weight:500;letter-spacing:-.025em;margin:0}.workspace-head p{margin:0;font-size:13px;line-height:1.65;color:var(--muted);max-width:300px}.record{display:flex;align-items:center;gap:18px}.cli{font-size:12px;color:var(--muted)}.primary{height:44px;min-width:160px;padding:0 18px;border-color:var(--blue);background:var(--blue);color:var(--white);font-size:13px;font-weight:500}.primary:hover{background:#1826C5;border-color:#1826C5}
+.comparison{display:grid;grid-template-columns:430px 1fr;gap:20px;padding:0 28px 14px}.pane{min-width:0;display:grid;grid-template-rows:34px 386px 44px}.pane-title{display:flex;align-items:center;justify-content:space-between}.pane-title h2{font-size:14px;font-weight:500;margin:0}.pane-title p{font-size:12px;color:var(--muted);margin:0}.view-tools{display:flex;align-items:center;gap:12px;font-size:12px}.view-tools select{font-size:13px;width:65px;height:26px;padding:0 6px}.well{overflow:hidden;background-color:var(--well);background-image:conic-gradient(#1C232D 25%,transparent 0 50%,#1C232D 0 75%,transparent 0);background-size:24px 24px}.reference-well{display:grid;place-items:center}.reference-well img{display:block;width:372px;height:372px;object-fit:contain}.sprites{height:100%;display:flex;align-items:center;justify-content:center;gap:23px}.sprite-figure{margin:0;text-align:center}.sprite{width:192px;height:354px;background-repeat:no-repeat;background-size:3600px 768px;background-position:-204px -324px;image-rendering:pixelated}.front{background-image:url('../assets/walk-0.png')}.side{background-image:url('../assets/walk-2.png')}.back{background-image:url('../assets/walk-4.png')}.sprite-figure figcaption{font-size:13px;color:var(--welltext);margin-top:8px;line-height:20px}.pane-foot{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px}.pane-foot select{height:28px;min-width:60px;padding:0 8px}.transport{display:flex;align-items:center;gap:11px;color:var(--ink)}.transport button{width:28px;height:28px;padding:0;display:grid;place-items:center}.transport svg{width:14px;height:14px}.frames{display:flex;gap:5px;margin-left:5px}.frame{width:30px;height:5px;background:#2634DA2B}.frame.current{background:var(--blue)}.frame-count{font-size:13px;margin-left:5px}
+.recipe{padding:16px 28px 20px;border-top:1px solid var(--ink)}.recipe-head{display:flex;align-items:baseline;gap:14px;margin-bottom:13px}.recipe h2{margin:0;font-size:14px;font-weight:500}.recipe-head p{margin:0;font-size:12px;color:var(--muted)}.recipe-head .totals{margin-left:auto;color:var(--ink)}.fields{display:grid;grid-template-columns:1.5fr .8fr 1.25fr 1.15fr 1.1fr .9fr;gap:18px}.field label{display:block;margin-bottom:7px;font-size:13px;color:var(--muted)}.field select,.field input{width:100%;height:36px;padding:0 10px;background:var(--paper);font-size:13px;border-color:var(--ink)}.field input{min-width:0}.app-foot{height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 15px;background:var(--ink);color:var(--paper);font-size:12px}.footer-right{display:flex;gap:24px}
+@media(prefers-reduced-motion:reduce){.ascii-art img{animation:none}}
+.ascii-art img.orbit-still{display:none}@media(prefers-reduced-motion:reduce){.ascii-art img.orbit-live{display:none}.ascii-art img.orbit-still{display:block}}
+</style>
+</head>
+<body>
+<header class="app-head">
+  <div class="brand">SpriteBook</div>
+  <nav class="menus" aria-label="Application"><button type="button">File</button><button type="button">Edit</button><button type="button">View</button><button type="button">Character</button><button type="button">Help</button></nav>
+  <span class="workspace-name">Character workspace</span>
+  <div class="history"><button type="button" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="m9 5-5 5 5 5M4 10h10a6 6 0 0 1 0 12"/></svg></button><button type="button" aria-label="Redo" disabled><svg viewBox="0 0 24 24"><path d="m15 5 5 5-5 5M20 10H10a6 6 0 0 0 0 12"/></svg></button></div>
+  <div class="hatch" aria-hidden="true"></div>
+</header>
+<div class="shell">
+<aside class="characters" aria-label="Character index">
+  <div class="index-title"><h2>Characters</h2><button class="icon-button" type="button" aria-label="Character index options"><svg viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button></div>
+  <button type="button" class="character" aria-current="true"><img src="assets/reference.png" alt=""><div><strong>pixal</strong><span>3 clips</span></div></button>
+  <button type="button" class="new-character"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New character</button>
+  <div class="ascii-art" aria-hidden="true"><img class="orbit-live" src="assets/ascii-orbit-blue.svg" alt=""><img class="orbit-still" src="assets/ascii-orbit-blue-still.svg" alt=""></div>
+  <p class="index-foot">1 character</p>
+</aside>
+<main>
+  <nav class="stages" aria-label="Character stages">
+    <button class="stage" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg>Generate</button>
+    <button class="stage" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg>Rig</button>
+    <button class="stage" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg>Animate</button>
+    <button class="stage" type="button" aria-current="step">Look</button>
+    <button class="stage" type="button">Bake</button>
+    <button class="stage" type="button">Export</button>
+  </nav>
+  <div class="workspace-head"><div class="workspace-title"><h1>Look</h1><p>Compare the reference with your saved sprites.</p></div><div class="record"><span class="cli">spritebook look</span><button class="primary" type="button">Record look</button></div></div>
+  <section class="comparison" aria-label="Reference and saved sprite comparison">
+    <div class="pane">
+      <div class="pane-title"><h2>Reference</h2><p>Original input</p></div>
+      <div class="well reference-well"><img src="assets/reference.png" alt="Original full-body reference of a turquoise-haired character in a pink top and blue skirt."></div>
+      <div class="pane-foot"><span>1280 × 1280 px</span><label>Zoom <select aria-label="Reference zoom"><option>Fit</option></select></label></div>
+    </div>
+    <div class="pane">
+      <div class="pane-title"><h2>Saved output</h2><div class="view-tools"><span>Walk · frame 1 of 6</span><select aria-label="Sprite zoom"><option>6×</option></select></div></div>
+      <div class="well"><div class="sprites">
+        <figure class="sprite-figure"><div class="sprite front" role="img" aria-label="Saved walk sprite, direction 1, at six-times integer zoom."></div><figcaption>0°</figcaption></figure>
+        <figure class="sprite-figure"><div class="sprite side" role="img" aria-label="Saved walk sprite, direction 3, at six-times integer zoom."></div><figcaption>90°</figcaption></figure>
+        <figure class="sprite-figure"><div class="sprite back" role="img" aria-label="Saved walk sprite, direction 5, at six-times integer zoom."></div><figcaption>180°</figcaption></figure>
+      </div></div>
+      <div class="pane-foot"><div class="transport"><button type="button" aria-label="Play saved walk frames"><svg viewBox="0 0 16 16"><path d="m5 3 7 5-7 5z" fill="currentColor" stroke="none"/></svg></button><span>Walk</span><div class="frames" aria-hidden="true"><span class="frame current"></span><span class="frame"></span><span class="frame"></span><span class="frame"></span><span class="frame"></span><span class="frame"></span></div><span class="frame-count">1 / 6</span></div><span>3 of 8 directions shown</span></div>
+    </div>
+  </section>
+  <section class="recipe" aria-labelledby="recipe-title">
+    <div class="recipe-head"><h2 id="recipe-title">Look recipe</h2><p>Sample settings</p><p class="totals">3 clips · 144 frames</p></div>
+    <div class="fields">
+      <div class="field"><label for="camera">Camera</label><select id="camera"><option>Standard 30°</option><option>Isometric</option><option>Low 15°</option></select></div>
+      <div class="field"><label for="directions">Directions</label><select id="directions"><option>8</option><option>4</option><option>16</option></select></div>
+      <div class="field"><label for="cell">Cell size</label><input id="cell" value="100 × 128 px" readonly></div>
+      <div class="field"><label for="style">Style</label><select id="style"><option>Pixel</option><option>Cel</option><option>Painterly</option></select></div>
+      <div class="field"><label for="colours">Palette</label><select id="colours"><option>16 colours</option><option>32 colours</option></select></div>
+      <div class="field"><label for="outline">Outline</label><input id="outline" value="0.5 px" readonly></div>
+    </div>
+  </section>
+</main>
+</div>
+<footer class="app-foot"><span>Character pixal</span><div class="footer-right"><span>Sample settings</span><span>Saved bake acc25412</span></div></footer>
+</body>
+</html>

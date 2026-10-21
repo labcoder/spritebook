@@ -1,8 +1,9 @@
 # Studio visual identity studies
 
-**Status: unapproved exploration, 20 October 2026.** No application source, core behavior,
-dependencies, or ratified design tokens have changed. Nothing was pushed. The maintainer wants to
-choose visual identity first, using character editing and sprite preview as the comparison surface.
+**Status: rejected first round, 20 October 2026.** The maintainer rejected all three directions. See
+the [second round](round-2/README.md) for the current exploration, informed by their Nous Research
+and Honcho references. This page and its demo remain historical evidence. No production application
+source, core behavior or ratified design tokens changed. Nothing was pushed.
 
 Open [index.html](index.html) in a browser. It works directly from disk, including fonts and
 sprites. Choose A/B/C, switch the shell theme, or inspect at 100%. Frame selection, playback, eight
@@ -11,15 +12,14 @@ the CLI or desktop bridge.
 
 ## The choices
 
-| Direction                   | Visual language                                                 | Typography and geometry                                                 | Main tradeoff                                                                |
-| --------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| **A · Slate — recommended** | Warm graphite, apricot actions, quiet surface layers            | Plex Sans throughout; restrained mono; soft rectangular controls        | Familiar creative-tool identity; needs consistent detail to feel distinctive |
-| **B · Paper**               | Cool pale surfaces, blue ink, dark sprite canvas                | Chakra headings; Plex controls; square corners and explicit panel rules | Strong light identity; dense screens can accumulate too many boundaries      |
-| **C · Signal**              | Saturated midnight blue, yellow actions, small stage-color cues | Compact Chakra headings; flat surfaces; tighter, angular geometry       | More recognizable personality; shell color can compete with artwork          |
+| Direction      | Visual language                                                 | Typography and geometry                                                 | Main tradeoff                                                                |
+| -------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **A · Slate**  | Warm graphite, apricot actions, quiet surface layers            | Plex Sans throughout; restrained mono; soft rectangular controls        | Familiar creative-tool identity; needs consistent detail to feel distinctive |
+| **B · Paper**  | Cool pale surfaces, blue ink, dark sprite canvas                | Chakra headings; Plex controls; square corners and explicit panel rules | Strong light identity; dense screens can accumulate too many boundaries      |
+| **C · Signal** | Saturated midnight blue, yellow actions, small stage-color cues | Compact Chakra headings; flat surfaces; tighter, angular geometry       | More recognizable personality; shell color can compete with artwork          |
 
-Start with **Slate** if the goal is a contemporary creative desktop tool whose artwork leads. Choose
-**Paper** if a bright working environment and crisp printed character matter more. **Signal**
-carries more of the existing identity forward, with larger labels and less diagnostic ornament.
+The common layout, tiny annotations and limited variation between directions did not give the
+maintainer a convincing visual identity. None is recommended for implementation.
 
 All three have light/dark shell variants and permanently dark canvas wells. The comparison keeps
 composition and content consistent: these are identity options, not three proposed navigation
@@ -28,10 +28,11 @@ layout or interaction shown here.
 
 ## Evidence and reuse
 
-- The eight PNG strips are byte-for-byte copies of the completed Pixal3D Windows qualification's
+- The eight PNG strips preserve the image payload of the completed Pixal3D Windows qualification's
   `pixal-walk-loop-d00..07-strip.png`, bake `acc25412`, recorded `2026-10-20T04:37:39.792Z`. Each is
   600 × 128 pixels: six 100 × 128 frames. The original evidence is preserved under
-  `.render-bench/cleanup-temp/evidence/`.
+  `.render-bench/cleanup-temp/evidence/`. Round two added origin metadata to these shared PNGs;
+  their pixel-bearing chunks remain byte-identical.
 - The UI crops transparent cell padding for presentation; it does not change the source PNGs.
   Sprites use nearest-neighbor sampling at 2×/4× inside the desktop composition. The fit-to-page
   overview scales the entire composition; use 100% to inspect pixels. No new model inference or

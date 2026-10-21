@@ -1,0 +1,37 @@
+[
+  {
+    "file": "barlow-condensed.woff2",
+    "source": "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4-Lwz3bWuQ.woff2",
+    "sha256": "460f141ec8f6c9a1516bfd2bd9fe71656246d7a9d04a0955faf53158d8970c4c",
+    "bytes": 21424,
+    "license": "OFL-barlowcondensed.txt"
+  },
+  {
+    "file": "geist-mono.woff2",
+    "source": "https://fonts.gstatic.com/s/geistmono/v6/or3nQ6H-1_WfwkMZI_qYFrcdmg.woff2",
+    "sha256": "684ad5b531f81d43c1e8c7038262d5db7cdc1f68006e04d6c7769efa8d33c8cc",
+    "bytes": 23128,
+    "license": "OFL-geistmono.txt"
+  },
+  {
+    "file": "silkscreen.woff2",
+    "source": "https://fonts.gstatic.com/s/silkscreen/v6/m8JXjfVPf62XiF7kO-i9YLNlaw.woff2",
+    "sha256": "e6c72ea4702249202bcdd79d3343057e4e25ef1f04e3fcffd8602ab53b40b4cc",
+    "bytes": 8404,
+    "license": "OFL-silkscreen.txt"
+  },
+  {
+    "file": "eb-garamond.woff2",
+    "source": "https://fonts.gstatic.com/s/ebgaramond/v33/SlGUmQSNjdsmc35JDF1K5GR1SDk.woff2",
+    "sha256": "88603384163d301aebd5bd769832a8bfe3c9004ec24178417b9817f0ad32c63b",
+    "bytes": 44336,
+    "license": "OFL-ebgaramond.txt"
+  },
+  {
+    "file": "eb-garamond-italic.woff2",
+    "source": "https://fonts.gstatic.com/s/ebgaramond/v33/SlGWmQSNjdsmc35JDF1K5GRweDs1Zw.woff2",
+    "sha256": "c664773f7e1d42d36326aa457becf7674236168c74cf7d74e87e5778ef7640f9",
+    "bytes": 47940,
+    "license": "OFL-ebgaramond.txt"
+  }
+]

@@ -33,6 +33,15 @@ The maintainer wants visual style and identity first, using character editing an
 the comparison surface. Present alternatives before implementation. All work stays local; publishing
 to origin is prohibited until renewed instruction.
 
+## Confirmed visual references, second round
+
+The maintainer rejected Slate, Paper and Signal. They like the typography and visual style of
+[Nous Research](https://nousresearch.com/) and the art direction of [Honcho](https://honcho.dev/),
+explicitly including animated ASCII art, dithering and crosshatching. Translate those qualities into
+a working editor; use original art and licensed type rather than copying either site's proprietary
+assets. The first round is an anti-reference, not an approved identity. No second-round direction
+has been selected yet.
+
 ## Evidence on hand
 
 Current Studio source, the design system, docs/img/stage-04-look.png and the running browser demo

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SpriteBook identity studies, round two</title><link rel="icon" href="data:,">
+<style>
+:root{color-scheme:light dark;--fg:var(--foreground,light-dark(#222820,#e5e8e0));--dim:var(--muted-foreground,light-dark(#596055,#aab3a3));--line:var(--border,light-dark(#c5ccbf,#50594c));--panel:var(--card,light-dark(#f3f5ef,#252c24))}
+*{box-sizing:border-box}html,body{margin:0;background:transparent;color:var(--fg)}body{font:14px/1.55 var(--font-sans,system-ui,sans-serif)}button,a{font:inherit}button{color:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:2px solid var(--fg);outline-offset:4px}a{color:inherit;text-underline-offset:4px}::selection{color:var(--panel);background:var(--fg)}h1{font-size:25px;line-height:1.2;font-weight:600;letter-spacing:-.025em;margin:0 0 10px}p{margin:0}.intro{max-width:65ch;color:var(--dim)}.choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}.choice{border:1px solid var(--line);background:transparent;border-radius:6px;padding:8px;text-align:left;min-width:0}.choice img{display:block;width:100%;height:auto;border-radius:2px}.choice span{display:block;font-weight:600;margin:8px 4px 2px}.choice small{display:block;color:var(--dim);margin:0 4px 3px;font-size:12px}.choice[aria-pressed=true]{outline:2px solid var(--fg);outline-offset:2px}.choice:hover{background:var(--panel)}
+.study[hidden]{display:none}.identity{padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:18px;border-radius:6px}.identity h2{margin:0 0 7px;font:600 21px/1.2 var(--font-sans,system-ui,sans-serif)}.identity p{font-size:13px;max-width:47ch}.identity img{width:156px;height:84px;flex:none}.imprint{background:#f1f1eb;color:#2634da}.phosphor{background:#1c201c;color:#cee3b2}.etch{background:#eee9da;color:#85452f}.swatches{display:flex;gap:5px;margin-top:12px}.swatches i{display:block;width:21px;height:9px;background:var(--ink);border:1px solid currentColor}
+.tools{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:17px 0 10px}.tools p{font-size:12px;color:var(--dim)}.tools button,.replay{border:1px solid var(--line);border-radius:4px;background:transparent;padding:5px 10px;font-size:12px}.screen{margin:0;overflow:auto;scrollbar-color:var(--dim) transparent;scrollbar-width:thin}.screen img{display:block;width:100%;height:auto}.screen.actual img{width:1440px;max-width:none}.note{color:var(--dim);margin-top:14px;font-size:13px;max-width:70ch}.closing{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:22px;padding-top:16px}.closing p{font-size:12px;color:var(--dim)}.board{font-weight:600}.replay:hover,.tools button:hover{background:var(--panel)}
+@media(max-width:480px){.choices{gap:8px}.choice{padding:5px}.choice span{font-size:13px;margin-left:1px}.choice small{font-size:11px;margin-left:1px}.identity{padding:16px;gap:10px}.identity img{width:100px;height:65px}.identity h2{font-size:19px}.identity p{font-size:12px}.tools{align-items:flex-start}.tools p{max-width:23ch}.closing{gap:14px}.intro{font-size:13px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+.identity img.orbit-still{display:none}@media(prefers-reduced-motion:reduce){.identity img.orbit-live{display:none}.identity img.orbit-still{display:block}}
+</style>
+</head>
+<body>
+<h1>SpriteBook identity studies</h1>
+<p class="intro">Three studies shaped by your Nous Research and Honcho references. These explore identity in the character editor; the app has not changed.</p>
+<div class="choices" role="group" aria-label="Compare identity studies">
+  <button class="choice" data-study="imprint" aria-pressed="true"><img src="review/imprint.png" alt="Imprint: chalk, cobalt and condensed lettering"><span>A · Imprint</span><small>Recommended next direction</small></button>
+  <button class="choice" data-study="phosphor" aria-pressed="false"><img src="review/phosphor.png" alt="Phosphor: a dark bitmap animation room"><span>B · Phosphor</span><small>Bitmap, warm dark, pale green</small></button>
+  <button class="choice" data-study="etch" aria-pressed="false"><img src="review/etch.png" alt="Etch: copper, serif lettering and eight sprite directions"><span>C · Etch</span><small>Serif, copper, engraved paper</small></button>
+</div>
+<section class="study" id="imprint" aria-label="Imprint concept">
+  <div class="identity imprint"><div><h2>Imprint</h2><p>Compressed display type, cobalt ink, fine rules and crosshatching. The closest translation of Nous.</p><div class="swatches" aria-hidden="true"><i style="--ink:#2634da"></i><i style="--ink:#f1f1eb"></i><i style="--ink:#171e28"></i></div></div><img class="orbit-live orbit" src="assets/ascii-orbit-blue.svg" alt="Original animated ASCII torus identity study"><img class="orbit-still orbit" src="assets/ascii-orbit-blue-still.svg" alt=""></div>
+  <div class="tools"><p>1440 × 900 sketch · overview scales the whole screen.</p><button class="zoom" aria-pressed="false">Inspect at 100%</button></div>
+  <figure class="screen"><img src="review/imprint.png" alt="Imprint character editor: horizontal stages, reference beside three saved sprite directions, one recipe row"></figure>
+  <p class="note">Barlow Condensed + Geist Mono. Strongest identity at a glance; the large blue wordmark may need a quieter compact version for long editing sessions.</p>
+</section>
+<section class="study" id="phosphor" aria-label="Phosphor concept" hidden>
+  <div class="identity phosphor"><div><h2>Phosphor</h2><p>Bitmap lettering, an original ASCII mark and a hatched exposure label. The closest translation of Honcho.</p><div class="swatches" aria-hidden="true"><i style="--ink:#cee3b2"></i><i style="--ink:#1c201c"></i><i style="--ink:#e5e9dd"></i></div></div><img class="orbit-live orbit" src="assets/ascii-orbit-green.svg" alt="Original animated ASCII torus identity study"><img class="orbit-still orbit" src="assets/ascii-orbit-green-still.svg" alt=""></div>
+  <div class="tools"><p>1440 × 900 sketch · overview scales the whole screen.</p><button class="zoom" aria-pressed="false">Inspect at 100%</button></div>
+  <figure class="screen"><img src="review/phosphor.png" alt="Phosphor character editor: warm dark comparison wells, vertical stages and a continuous exposure strip"></figure>
+  <p class="note">Silkscreen + Geist Mono. A convincing animation-room identity; its retro emphasis could narrow the product's perceived fit for cel and painterly work.</p>
+</section>
+<section class="study" id="etch" aria-label="Etch concept" hidden>
+  <div class="identity etch"><div><h2>Etch</h2><p>Expressive serif lettering, copper ink and an engraved maker's mark. A quieter, more editorial alternative.</p><div class="swatches" aria-hidden="true"><i style="--ink:#85452f"></i><i style="--ink:#eee9da"></i><i style="--ink:#352f28"></i></div></div><img class="orbit-live orbit" src="assets/ascii-orbit-copper.svg" alt="Original animated ASCII torus identity study"><img class="orbit-still orbit" src="assets/ascii-orbit-copper-still.svg" alt=""></div>
+  <div class="tools"><p>1440 × 900 sketch · overview scales the whole screen.</p><button class="zoom" aria-pressed="false">Inspect at 100%</button></div>
+  <figure class="screen"><img src="review/etch.png" alt="Etch character editor: eight-direction proof board, reference index and open settings"></figure>
+  <p class="note">EB Garamond + Geist Mono. Calmest hierarchy and the broadest direction comparison; furthest from the compressed and bitmap lettering you referenced.</p>
+</section>
+<div class="closing"><button class="replay">Replay ASCII motion</button><a class="board" href="http://127.0.0.1:56911/" target="_blank" rel="noreferrer">Choose on the decision board ↗</a><p>Static concepts · real prior sprite output · no app changes</p></div>
+<script>
+const choices=[...document.querySelectorAll('.choice')];
+function replay(){
+  const img=document.querySelector('.study:not([hidden]) .orbit'),original=img.dataset.original||img.src;
+  img.dataset.original=original;
+  if(original.startsWith('data:')){const [header,encoded]=original.split(',');img.src=header+','+btoa(atob(encoded)+'<!-- replay '+Date.now()+' -->')}
+  else img.src=original.split('?')[0]+'?replay='+Date.now();
+}
+for(const button of choices)button.addEventListener('click',()=>{
+  for(const item of choices)item.setAttribute('aria-pressed',String(item===button));
+  for(const study of document.querySelectorAll('.study'))study.hidden=study.id!==button.dataset.study;
+  replay();
+});
+for(const button of document.querySelectorAll('.zoom'))button.addEventListener('click',()=>{
+  const actual=button.closest('.study').querySelector('.screen').classList.toggle('actual');
+  button.setAttribute('aria-pressed',String(actual));button.textContent=actual?'Fit to view':'Inspect at 100%';
+});
+document.querySelector('.replay').addEventListener('click',replay);
+</script>
+</body>
+</html>
