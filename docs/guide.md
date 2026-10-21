@@ -96,12 +96,16 @@ The run writes one or more candidates. Each card shows the seed, the triangle co
 size, and the wall time. Select **Inspect** to see a candidate in the 3D viewport.
 
 To keep a candidate, select **Save as canonical mesh**. This is the checkpoint. The other stages
-unlock.
+unlock. Saving preserves the candidate's geometry and textures exactly, and the viewport switches to
+the saved canonical mesh. Rig uses that same saved asset.
 
 Select **More like this** to run the same recipe again with a new seed.
 
 Two options apply at the moment you save: **reproject source detail** and **match source colours**.
-Both are on by default.
+Both are off by default. Enable them only when you want to change the generated texture using the
+reference. Reprojection paints the reference onto the front of the mesh; differences in pose or
+proportions can distort it. These changes are included in the undoable save; the candidate remains
+unchanged, so you can save it again with both options off to recover its generated texture.
 
 **The CLI twin:** `spritebook gen` and `spritebook pick`.
 

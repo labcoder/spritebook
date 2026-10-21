@@ -155,6 +155,11 @@ hash-verified cutout; missing or invalid files are prepared again. Preparation f
 its worker/VRAM lease before the generator claims memory. Missing prep weights return
 `model-missing`, with no automatic download or bypass of project pins and execution policy.
 
+`pick` copies the inspected candidate byte-for-byte by default. Source-colour matching and detail
+reprojection are explicit opt-ins in core, CLI and Studio. Requested passes stage their changes
+before the single journaled promotion, pin the image hash and retain the original result. Studio
+shows the saved canonical asset after picking; Rig reads the same saved asset.
+
 ## F1 persistence and execution policy
 
 The [workspace persistence protocol](workspace-persistence.md) defines the recoverable writer,

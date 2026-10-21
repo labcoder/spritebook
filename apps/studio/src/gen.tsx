@@ -761,8 +761,8 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
   const canonical = m.canonicalMesh !== undefined && m.canonicalMesh !== null;
 
   const [inspecting, setInspecting] = useState<string | null>(null);
-  const [reproject, setReproject] = useState(true);
-  const [colorMatch, setColorMatch] = useState(true);
+  const [reproject, setReproject] = useState(false);
+  const [colorMatch, setColorMatch] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [failures, setFailures] = useState<Record<string, JobFailure>>({});
 
@@ -782,8 +782,10 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
     setFailures({});
     const r = await bridge.runCli([...cliArgs, '--json']);
     setBusy(null);
-    if (r.exitCode === 0) onChanged();
-    else {
+    if (r.exitCode === 0) {
+      if (cliArgs[0] === 'pick') setInspecting(null);
+      onChanged();
+    } else {
       setFailures({ [cardId]: lastFailure(r.lines) ?? { code: null, message: '' } });
     }
   }, [bridge, onChanged, busy]);
@@ -912,6 +914,7 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
       </div>
       {results.length > 0 && (
         <div className='pickopts'>
+          <span>{t('Optional texture changes on save:')}</span>
           <label>
             <input
               type='checkbox'

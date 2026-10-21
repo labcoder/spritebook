@@ -142,9 +142,9 @@ test('CLI-twin parity: the GUI actions execute verbatim', async () => {
       'and the ladder is IN the recorded params',
     );
 
-    // 3. Save as canonical mesh — pick with the shipped defaults ON
+    // 3. Save as canonical mesh — preserve the candidate by default.
     await twin(
-      pickArgs(ws, 'r1', { reproject: true, colorMatch: true }),
+      pickArgs(ws, 'r1', { reproject: false, colorMatch: false }),
       'pick',
     );
     m = await manifestOf(ws);
@@ -156,6 +156,19 @@ test('CLI-twin parity: the GUI actions execute verbatim', async () => {
       m.canonicalMesh !== undefined,
       'the checkpoint the stage rail unlocks on',
     );
+    assertEquals(
+      await fs.readFile(`${ws}/canonical/model.glb`),
+      await fs.readFile(`${ws}/results/r1/model.glb`),
+      'the default save twin preserves the inspected mesh and texture',
+    );
+    await twin(
+      pickArgs(ws, 'r1', { reproject: true, colorMatch: true }),
+      'pick with texture changes',
+    );
+    m = await manifestOf(ws);
+    const modified = m.canonicalMesh as { reprojected: boolean; colorMatched?: boolean };
+    assertEquals(modified.reprojected, true);
+    assertEquals(modified.colorMatched, true);
 
     // 4. Record look — the Look stage's Apply, at a diverging elevation
     await twin(
@@ -316,7 +329,7 @@ test('CLI-twin parity: bake and export (GPU)', async (t) => {
       'gen',
     );
     await twin(
-      pickArgs(ws, 'r1', { reproject: true, colorMatch: true }),
+      pickArgs(ws, 'r1', { reproject: false, colorMatch: false }),
       'pick',
     );
 

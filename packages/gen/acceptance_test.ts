@@ -285,7 +285,7 @@ test('ACCEPTANCE: invalid --adjust params are refused core-side, no backend run'
   }
 });
 
-test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash', async (t) => {
+test('ACCEPTANCE: pick preserves the candidate unless texture changes are requested', async (t) => {
   if (!(await sidecarAvailable())) {
     t.skip('uv or sidecar unavailable');
     return;
@@ -295,11 +295,7 @@ test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash', asy
     const gen = await collect(runGenJob(genOpts(f)));
     assert(!gen.find((e) => e.t === 'error'), JSON.stringify(gen.at(-1)));
 
-    // A plain pick now runs BOTH fidelity passes by default (A2 + A3): an
-    // image-sourced character's texture is colour-matched to its source and
-    // the source is reprojected onto the front. Canonical is NOT a byte copy
-    // any more — that contract moved behind --no-color-match --no-reproject,
-    // and both directions are asserted here.
+    // Saving a candidate must preserve the model the user inspected.
     const picked = await collect(
       runPickJob({ jobId: 'itest-pick', workspace: f.workspace, resultId: 'r1' }),
     );
@@ -311,20 +307,23 @@ test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash', asy
       'CharacterManifest',
     );
     assertEquals(manifest.generation.pickedResultId, 'r1');
-    assertEquals(manifest.canonicalMesh?.reprojected, true, 'the default pick reprojects');
-    assertEquals(manifest.canonicalMesh?.colorMatched, true, 'the default pick colour-matches');
     assertEquals(
-      manifest.canonicalMesh?.imageSha256,
-      manifest.source.sha256,
-      'and pins the image it conditioned on - the stored source, since no --image was given',
+      new Uint8Array(await fs.readFile(canonicalPath)),
+      new Uint8Array(await fs.readFile(artifact(gen, 'gen-model'))),
+      'a default pick preserves the inspected candidate, including its texture',
     );
+    assertEquals(manifest.canonicalMesh?.reprojected, false);
+    assertEquals(manifest.canonicalMesh?.colorMatched, undefined);
+    assertEquals(manifest.canonicalMesh?.imageSha256, undefined);
 
-    // both opt-outs together restore the byte-copy contract
+    // Existing opt-out flags take precedence, even over an explicit opt-in.
     const plain = await collect(
       runPickJob({
         jobId: 'itest-plain',
         workspace: f.workspace,
         resultId: 'r1',
+        colorMatch: true,
+        reproject: true,
         noColorMatch: true,
         noReproject: true,
       }),
@@ -342,13 +341,14 @@ test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash', asy
     );
     const beforeHash = manifest.canonicalMesh!.gltfSha256;
 
-    // now with reprojection: bytes change, and the manifest follows them
+    // Explicit texture changes repaint the canonical asset and record provenance.
     const re = await collect(
       runPickJob({
         jobId: 'itest-reproject',
         workspace: f.workspace,
         resultId: 'r1',
         reproject: true,
+        colorMatch: true,
       }),
     );
     assert(!re.find((e) => e.t === 'error'), JSON.stringify(re.at(-1)));
@@ -359,6 +359,8 @@ test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash', asy
       'CharacterManifest',
     );
     assertEquals(manifest.canonicalMesh?.reprojected, true);
+    assertEquals(manifest.canonicalMesh?.colorMatched, true);
+    assertEquals(manifest.canonicalMesh?.imageSha256, manifest.source.sha256);
     assert(manifest.canonicalMesh!.gltfSha256 !== beforeHash, 'reprojection changed the bytes');
     const digest = await crypto.subtle.digest('SHA-256', after as BufferSource);
     const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -367,6 +369,19 @@ test('ACCEPTANCE: pick --reproject repaints and re-pins the canonical hash', asy
       hex,
       'the manifest pins the bytes that are ACTUALLY on disk after reprojection',
     );
+    const savedManifest = await fs.readFile(`${f.workspace}/character.json`, 'utf8');
+    for (const request of [{ reproject: true }, { colorMatch: true }]) {
+      const failed = await collect(runPickJob({
+        jobId: 'itest-missing-image',
+        workspace: f.workspace,
+        resultId: 'r1',
+        imagePath: `${f.workspace}/missing.png`,
+        ...request,
+      }));
+      assert(failed.some((e) => e.t === 'error' && e.code === 'no-source'));
+      assertEquals(new Uint8Array(await fs.readFile(canonicalPath)), after);
+      assertEquals(await fs.readFile(`${f.workspace}/character.json`, 'utf8'), savedManifest);
+    }
   } finally {
     await f.cleanup();
   }

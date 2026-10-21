@@ -197,6 +197,7 @@ export const es: Record<string, string> = {
   'seed': 'seed',
   'More like this': 'Más como este',
   'Save as canonical mesh': 'Guardar como malla canónica',
+  'Optional texture changes on save:': 'Cambios opcionales de textura al guardar:',
   'reproject source detail': 'reproyectar el detalle del origen',
   'match source colours': 'igualar los colores del origen',
   'nothing generated': 'nada generado',

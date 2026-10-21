@@ -45,9 +45,8 @@ export function pickArgs(
   opts: { reproject: boolean; colorMatch: boolean },
 ): string[] {
   const a = ['pick', '--workspace', workspace, '--result', resultId];
-  // both default ON in core; the flags are the opt-OUTS
-  if (!opts.reproject) a.push('--no-reproject');
-  if (!opts.colorMatch) a.push('--no-color-match');
+  if (opts.reproject) a.push('--reproject');
+  if (opts.colorMatch) a.push('--color-match');
   return a;
 }
 

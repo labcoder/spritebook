@@ -47,18 +47,13 @@ export interface PickJobOptions {
   workspace: string;
   /** result id to promote (`r1`, `r2`, ...) */
   resultId: string;
-  /** FORCE reprojection — for a mesh-sourced character with an `--image`, or
-   * any case where the default did not apply. Image-sourced characters
-   * reproject by default (A3: face recovery on 3/3 subjects, no back damage),
-   * so this flag is only needed to opt IN where the default is off. */
+  /** Opt in to painting the source image onto the generated texture. */
   reproject?: boolean;
-  /** skip the DEFAULT reprojection for an image-sourced character */
+  /** Opt in to matching the generated texture's colours to the source. */
+  colorMatch?: boolean;
+  /** Legacy opt-out; takes precedence over reproject. */
   noReproject?: boolean;
-  /** skip the DEFAULT colour-match pass (A2) — it otherwise runs for every
-   * image-sourced character, reconciling the texture's colour statistics with
-   * the source. Skipping is a choice worth recording, hence a flag and not an
-   * option that must be asserted. Both fidelity passes off
-   * (`--no-color-match --no-reproject`) is the plain byte-copy pick. */
+  /** Legacy opt-out; takes precedence over colorMatch. */
   noColorMatch?: boolean;
   /** source image override; defaults to the manifest's stored source */
   imagePath?: string;
@@ -172,18 +167,9 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
       };
     }
 
-    // colour-match runs BY DEFAULT for image-sourced characters: it is the
-    // designed fix for "the texture's colours do not match the image I gave
-    // you", and a default that must be asked for fixes nothing. A mesh-sourced
-    // character has no image to match and never runs it.
-    const wantColorMatch = manifest.source.kind === 'image' && opts.noColorMatch !== true;
-    // Reprojection is a DEFAULT for image-sourced characters too (A3: it
-    // returned the faces on 3/3 subjects with no back damage). `reproject`
-    // stays as the explicit opt-IN for the cases the default excludes — a
-    // mesh-sourced character handed an `--image`.
-    const wantReproject = manifest.source.kind === 'image'
-      ? opts.noReproject !== true
-      : opts.reproject === true;
+    // Saving preserves the inspected candidate unless a texture change was requested.
+    const wantColorMatch = opts.colorMatch === true && opts.noColorMatch !== true;
+    const wantReproject = opts.reproject === true && opts.noReproject !== true;
     const total = 2 + (wantColorMatch ? 1 : 0) + (wantReproject ? 1 : 0);
     let done = 0;
 
@@ -222,66 +208,53 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
       } catch {
         readable = false;
       }
-      if (!readable && opts.imagePath !== undefined) {
-        // an EXPLICIT image that does not exist is an error, not a soft skip
+      if (!readable) {
         throw Object.assign(
-          new Error(`Cannot color-match: no image at ${fidelityImage}`),
+          new Error(`Cannot color-match: no image at ${fidelityImage} - pass --image explicitly`),
           { code: 'no-source' },
         );
       }
-      if (!readable) {
+      const matched =
+        `${paths.canonicalDir}/pick-${crypto.randomUUID()}-${opts.resultId}-matched.tmp.glb`;
+      tmp.push(matched);
+      const stats = await colorMatchTexture({
+        modelPath: staged,
+        imagePath: fidelityImage,
+        outPath: matched,
+      });
+      if (stats.skipped === 'low-chroma') {
+        // the pass declined: a near-monochrome source has no palette worth
+        // matching to, and transferring its statistics would crush the
+        // texture toward grey. The STAGED file stays the untouched original —
+        // the skip path's output is a re-serialization, not the same bytes.
         yield {
           t: 'warn',
           jobId,
           at: at(),
           code: 'color-match-skipped',
-          message: `the stored source image is missing at ${fidelityImage}, so the default ` +
-            `colour-match pass did not run. The texture keeps the backend's own colours.`,
+          message: `the source image is nearly monochrome (mean chroma ` +
+            `${stats.sourceChroma.toFixed(3)} < 0.02), so colour-match declined to run - ` +
+            `matching to a grey palette would drain the texture's colour. Omit ` +
+            `--color-match to silence this; the texture is unchanged.`,
         };
       } else {
-        const matched =
-          `${paths.canonicalDir}/pick-${crypto.randomUUID()}-${opts.resultId}-matched.tmp.glb`;
-        tmp.push(matched);
-        const stats = await colorMatchTexture({
-          modelPath: staged,
-          imagePath: fidelityImage,
-          outPath: matched,
-        });
-        if (stats.skipped === 'low-chroma') {
-          // the pass declined: a near-monochrome source has no palette worth
-          // matching to, and transferring its statistics would crush the
-          // texture toward grey. The STAGED file stays the untouched original —
-          // the skip path's output is a re-serialization, not the same bytes.
-          yield {
-            t: 'warn',
-            jobId,
-            at: at(),
-            code: 'color-match-skipped',
-            message: `the source image is nearly monochrome (mean chroma ` +
-              `${stats.sourceChroma.toFixed(3)} < 0.02), so colour-match declined to run - ` +
-              `matching to a grey palette would drain the texture's colour. Pass ` +
-              `--no-color-match to silence this, or nothing: the texture is unchanged.`,
-          };
-        } else {
-          staged = matched;
-          colorMatched = true;
-          imageSha = await sha256Hex(new Uint8Array(await fs.readFile(fidelityImage)));
-          const clamp = stats.clamped.length > 0 ? ` clamped:${stats.clamped.join('')}` : '';
-          yield {
-            t: 'progress',
-            jobId,
-            at: at(),
-            step: `color-match:hue-${stats.hueDistBefore}->${stats.hueDistAfter}` +
-              `:L-${stats.lBefore}->${stats.lAfter}${clamp}`,
-            done: ++done,
-            total,
-          };
-        }
+        staged = matched;
+        colorMatched = true;
+        imageSha = await sha256Hex(new Uint8Array(await fs.readFile(fidelityImage)));
+        const clamp = stats.clamped.length > 0 ? ` clamped:${stats.clamped.join('')}` : '';
+        yield {
+          t: 'progress',
+          jobId,
+          at: at(),
+          step: `color-match:hue-${stats.hueDistBefore}->${stats.hueDistAfter}` +
+            `:L-${stats.lBefore}->${stats.lAfter}${clamp}`,
+          done: ++done,
+          total,
+        };
       }
     }
 
     let reprojected = false;
-    reproject:
     if (wantReproject) {
       const image = fidelityImage;
       let readable = true;
@@ -291,26 +264,12 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
         readable = false;
       }
       if (!readable) {
-        // an EXPLICIT ask (--reproject, or an --image that does not exist) is
-        // an error; the silent DEFAULT missing its stored source soft-skips
-        // with a warn, exactly like colour-match above
-        if (opts.reproject === true || opts.imagePath !== undefined) {
-          throw Object.assign(
-            new Error(
-              `Cannot reproject: the source image is missing at ${image} - pass --image explicitly`,
-            ),
-            { code: 'no-source' },
-          );
-        }
-        yield {
-          t: 'warn',
-          jobId,
-          at: at(),
-          code: 'reproject-skipped',
-          message: `the stored source image is missing at ${image}, so the default ` +
-            `reprojection did not run. The texture keeps its generated detail.`,
-        };
-        break reproject;
+        throw Object.assign(
+          new Error(
+            `Cannot reproject: the source image is missing at ${image} - pass --image explicitly`,
+          ),
+          { code: 'no-source' },
+        );
       }
       const painted =
         `${paths.canonicalDir}/pick-${crypto.randomUUID()}-${opts.resultId}-reprojected.tmp.glb`;

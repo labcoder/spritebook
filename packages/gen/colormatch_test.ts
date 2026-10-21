@@ -210,10 +210,10 @@ test('a pathological spread ratio is clamped, and says which channels', async ()
 });
 
 // ---------------------------------------------------------------------------
-// pick integration: ON by default, ordered before reproject, sha in the patch
+// pick integration: explicit colour-match, sha in the patch, reversible
 // ---------------------------------------------------------------------------
 
-test('pick colour-matches by default, pins the image sha, and one undo takes it back', async () => {
+test('pick colour-matches on request, pins the image sha, and one undo takes it back', async () => {
   const {
     appendGenerationResult,
     moveManifestCursor,
@@ -267,18 +267,15 @@ test('pick colour-matches by default, pins the image sha, and one undo takes it 
   };
   await appendGenerationResult(ws, receipt);
 
-  // noReproject: this fixture is one synthetic triangle, which the real
-  // reprojection pass rightly refuses; the reproject DEFAULT is covered by the
-  // acceptance test on the fixture backend's actual geometry
   const events: unknown[] = [];
   for await (
-    const e of runPickJob({ jobId: 'pick', workspace: ws, resultId: 'r1', noReproject: true })
+    const e of runPickJob({ jobId: 'pick', workspace: ws, resultId: 'r1', colorMatch: true })
   ) {
     events.push(e);
   }
   const steps = (events as Array<{ t: string; step?: string }>).filter((e) => e.t === 'progress')
     .map((e) => e.step!);
-  assert(steps.some((s) => s.startsWith('color-match:')), `ran by default: ${steps}`);
+  assert(steps.some((s) => s.startsWith('color-match:')), `ran on request: ${steps}`);
 
   const m = parseWith(
     CharacterManifestSchema,
@@ -288,7 +285,7 @@ test('pick colour-matches by default, pins the image sha, and one undo takes it 
   assertEquals(m.canonicalMesh?.colorMatched, true, 'recorded in the manifest');
   assertEquals(m.canonicalMesh?.imageSha256, sha, 'the matched image is pinned');
   assert(
-    m.canonicalMesh?.gltfSha256 !== 'a'.repeat(64),
+    m.canonicalMesh?.gltfSha256 !== receipt.output.gltfSha256,
     'the hash was re-pinned to the repainted bytes',
   );
 
@@ -307,6 +304,7 @@ test('pick colour-matches by default, pins the image sha, and one undo takes it 
       jobId: 'pick2',
       workspace: ws,
       resultId: 'r1',
+      colorMatch: true,
       noColorMatch: true,
       noReproject: true,
     })

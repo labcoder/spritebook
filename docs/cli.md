@@ -97,15 +97,23 @@ catalog your machine actually runs. A refused `--adjust` prints the roster too.
 spritebook pick --workspace ./characters/hero --result r1
 ```
 
-| Flag               | Meaning                                              |
-| ------------------ | ---------------------------------------------------- |
-| `--result <rN>`    | the result to promote to `canonical/model.glb`       |
-| `--no-reproject`   | skip source-detail reprojection; it is ON by default |
-| `--no-color-match` | skip source-colour matching; it is ON by default     |
-| `--image <file>`   | a different reference image for the reprojection     |
+| Flag               | Meaning                                             |
+| ------------------ | --------------------------------------------------- |
+| `--result <rN>`    | the result to promote to `canonical/model.glb`      |
+| `--reproject`      | opt in to painting source detail onto the texture   |
+| `--color-match`    | opt in to matching texture colours to the source    |
+| `--no-reproject`   | legacy opt-out; overrides `--reproject`             |
+| `--no-color-match` | legacy opt-out; overrides `--color-match`           |
+| `--image <file>`   | reference override for the requested texture passes |
 
-The pick is a journaled decision. `spritebook undo` takes it back. The pick unlocks every later
-stage.
+A plain pick copies the candidate byte-for-byte, preserving its geometry, materials and textures.
+Texture passes are off by default. Reprojection assumes an aligned front reference; differences in
+pose or proportions can distort the texture. Requested passes use the prepared cutout when present,
+record the conditioning image hash, and fail without changing the canonical asset if that image is
+missing. `--image` alone does not enable either pass.
+
+The pick is one journaled decision, including any requested texture changes. `spritebook undo`
+restores the previous canonical revision. The pick unlocks every later stage.
 
 ## rig — a skeleton for the canonical mesh
 

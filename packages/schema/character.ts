@@ -168,8 +168,8 @@ export const CharacterManifestSchema = z.strictObject({
     texturedBy: z.enum(['backend', 'texture-substage']),
     reprojected: z.boolean(),
     /** the colour-match pass ran (A2): the texture's Oklab statistics were
-     * reconciled with the source image's. Absent = did not run (results picked
-     * before the pass existed, `--no-color-match`, or a low-chroma skip). */
+     * reconciled with the source image's. Absent = did not run (no opt-in,
+     * a legacy opt-out, or a low-chroma skip). */
     colorMatched: z.boolean().optional(),
     /** The image the fidelity passes (colour-match, reprojection) conditioned
      * on. Pinned because `pick --image` can override the stored source, and

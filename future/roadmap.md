@@ -390,6 +390,13 @@ RTX 3090 replay of that opaque RGB reference completed both 16-step, 800,000-pol
 390.02 seconds; the one-body second candidate ranked ahead of the two-body first. This verifies the
 core generation flow, with native UI/release qualification still open.
 
+**F5-T1 candidate-save correction, 2026-10-20:** saving a generated candidate now preserves its
+bytes by default in core, CLI and Studio. Source-colour matching and detail reprojection remain
+explicit texture-change options. A successful save shows the canonical asset immediately. The
+reported Bulma mismatch had identical r1 geometry but a repainted colour texture; acceptance and
+CLI-twin checks cover byte preservation, explicit repainting and reversible promotion. This does not
+qualify the remaining rig, animation or native release paths.
+
 The [remote-history review](remote-main-review.md) carries useful requirements into these tasks
 without adopting another core, project format, renderer or provisioning stack:
 
