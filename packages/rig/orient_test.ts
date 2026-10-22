@@ -12,7 +12,7 @@ import { join } from 'node:path';
  * whose toes stick out the front. If the detector were secretly relying on
  * something else, this fixture would not satisfy it.
  */
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import { Document, NodeIO } from '@gltf-transform/core';
 import {
   applyOrientationFixes,
@@ -227,6 +227,13 @@ test('upright repairs a rolled and pitched humanoid before facing and grounding'
     const src = join(dir, 'tilted.glb'), out = join(dir, 'fixed.glb');
     await writeGlb(src, tilted);
     await applyOrientationFixes(src, out, ['upright', 'face-front', 'feet-ground', 'center']);
+    const repeat = join(dir, 'repeat.glb');
+    await applyOrientationFixes(src, repeat, ['upright', 'face-front', 'feet-ground', 'center']);
+    assertEquals(
+      await fs.readFile(out),
+      await fs.readFile(repeat),
+      'alignment writes deterministically',
+    );
     const positions = worldPositions(await new NodeIO().read(out));
     const center = (boxIndex: number) => {
       const result = [0, 0, 0];
@@ -245,6 +252,25 @@ test('upright repairs a rolled and pitched humanoid before facing and grounding'
       Math.abs((after.max[1] - after.min[1]) - (before.max[1] - before.min[1])) < 1e-6,
       'declared height preserved',
     );
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('ambiguous upright alignment refuses before writing output', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-upright-ambiguous-'));
+  try {
+    const positions = Float32Array.from(box(0, 0, 0, 1, 1.02, 0.3));
+    const angle = Math.PI / 6;
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i], y = positions[i + 1];
+      positions[i] = x * Math.cos(angle) - y * Math.sin(angle);
+      positions[i + 1] = x * Math.sin(angle) + y * Math.cos(angle);
+    }
+    const src = join(dir, 'square.glb'), out = join(dir, 'fixed.glb');
+    await writeGlb(src, positions);
+    await assertRejects(() => applyOrientationFixes(src, out, ['upright']), Error, 'uncertain');
+    await assertRejects(() => fs.access(out), Error, 'ENOENT');
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }
