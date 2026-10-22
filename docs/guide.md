@@ -123,40 +123,47 @@ recover its generated texture.
 
 Rig gives the mesh a skeleton, so the animation clips can move it.
 
-There are two tracks:
+Choose the method by what should happen to your mesh:
 
-- **Track A — canonical body fit.** SpriteBook fits a bundled body to your mesh. Use this for a
-  humanoid character. It is fast and it needs no model download.
-- **Track B — predicted skeleton.** The UniRig model predicts a skeleton. Use this when the
-  character is not a standard humanoid.
+- **Rig this model — UniRig.** Keeps your generated geometry and textures, predicts joints and skin
+  weights on the GPU. This is the default for generated humanoids as well as other characters.
+- **Fit a template body.** Replaces generated geometry with a fitted, already rigged body. It uses
+  the CPU and needs no model download. Keep `ubc-male` under **Template body** for the bundled
+  default; other bodies take explicit bundle directories. This changes the character's geometry.
 
-To rig a character:
+Select **Build rig**. These methods are called Track B and Track A respectively in the CLI; **About
+these methods** explains those names. After a rig exists, **Rebuild method** keeps the choices
+disclosed so orientation and repair controls have room.
 
-1. Select the track. Use the arrow keys to move between the two cards.
+The mesh stays left and the inspector stays right. The skeleton overlay includes joint markers; blue
+means not flagged by the deformation tests, amber means flagged, and white means selected. **Through
+mesh** keeps the skeleton visible through the surface. **Front**, **Side** and **Rear** move the
+camera; they do not alter the model or rebuild anything.
 
-2. For Track A, keep `ubc-male` for the portable bundled default, or enter an explicit body
-   directory. The bundled `ubc-female` is available by its directory path; its name is not a
-   portable CLI alias.
+For UniRig, choose **Model facing**, grounding and centering together. A numeric turn previews the
+orientation. **Detect front when rebuilding**, grounding and centering take effect on rebuild.
+**Apply orientation and rebuild rig** submits the choices in one command. This runs prediction and
+skinning again; undo restores the prior recorded rig. Template fitting uses the template skeleton
+and does not accept these repair switches.
 
-3. Select **Run rig**.
+The **Deform check** below the canvas retains every reported finding, worst stretch first. Click a
+joint name to select and frame it. A joint without a flag has only passed those numerical tests;
+inspect its anatomy too. **Preview selected joint bend** writes a CPU-generated ±30° diagnostic
+animation using the same pose axis as the check. Pause or scrub it in the viewport; **Return to rest
+pose** returns to the saved model. Previewing does not change the rig or its acceptance.
 
-The mesh stays on the left and the rig controls stay on the right. The **Deform check** section
-beneath the mesh reports the result. It shows the worst tear first and states how many joints are
-clean.
+On a UniRig rig at rest, drag the move handles to draft a position edit. **W** selects move and
+**Q** changes local/world axes; rotation and scale handles are not offered because the edit contract
+carries positions. Mirroring is optional. Applying edits runs the rig again. **Repair tools**
+discloses automatic position hints and an edits-file path. Hints can help placement; they cannot fix
+a wrong hierarchy, detached geometry or missing prediction detail.
 
-Six orientation buttons fix a mesh that faces the wrong way: **Face front**, **Feet to ground**,
-**Center**, and **Rotate 90**, **Rotate 180**, **Rotate 270**. Each one runs the rig again.
+**Accept rig** records your review. It does not repair the model or certify its anatomy. A bake with
+an unaccepted rig warns but still runs. Review the skeleton, diagnostic motion and report before
+accepting.
 
-**Accept rig** records that you looked at the report and the result is good. Acceptance is your act,
-not a default. A bake with an unaccepted rig raises a warning but still runs.
-
-CAUTION: acceptance costs nothing to record, but a rig you never checked can produce bad skinning in
-every frame of every clip. Read the deform report before you accept.
-
-To repair a rig, use **Auto-hint from this report and re-run**, or open **Joint edits file** to
-supply a patch.
-
-**The CLI twin:** `spritebook rig`.
+**The CLI twin:** `spritebook rig`. See
+[rig flags and diagnostic previews](cli.md#rig--a-skeleton-for-the-canonical-mesh).
 
 ## 4. Stage 03 — Animate
 

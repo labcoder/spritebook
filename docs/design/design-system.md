@@ -107,6 +107,18 @@ selected". Show stale-frame cost before recording a changed look. Display licens
 VRAM gates before download or execution. Running actions stay focusable with `aria-busy`; errors
 preserve the CLI reason and recovery path.
 
+## Rig inspection
+
+Use outcome names for the two methods: UniRig preserves geometry; template fitting replaces it.
+After the first rig, disclose the rebuild method so the orientation controls have room. Group
+facing, grounding and centering into one explicit rebuild. Camera views remain separate from model
+transforms. Position hints and raw edits-file paths stay under Repair tools.
+
+Skeleton lines and joint markers render through the mesh by default. Blue is not flagged, amber is
+flagged, white is selected; a text legend and the unchanged report carry the same meaning. Report
+rows select and frame joints. Diagnostic motion comes from core; the GUI only plays it. Acceptance
+remains a deliberate review action. Never label an unflagged joint anatomically correct.
+
 ## Implementation verification
 
 The identity implementation has 67 Studio tests, alongside TypeScript and production web-build

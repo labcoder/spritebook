@@ -359,3 +359,22 @@ cells at integer nearest-neighbor zoom; scrolling never trims or resamples them.
 - Don't add decorative mascots, the rejected ASCII torus, notched buttons or entrance animation.
 - Don't present a changed recipe as newly baked output or browser resizing as mobile/native
   qualification.
+
+### Rig inspection and orientation (2026-10-21)
+
+The initial method cards lead with outcomes: Rig this model (UniRig, preserves geometry) and Fit a
+template body (CPU, replaces geometry). On an existing rig, Rebuild method is a compact native
+disclosure. Group facing/ground/center into one staged rebuild. Numeric yaw previews are
+inspection-only; camera presets do not change geometry. Repairs and raw file paths are advanced.
+
+The scene-root skeleton overlay includes colored joint markers and an explicit through-mesh switch.
+Report rows frame the selected joint; blue/amber/white mean unflagged/flagged/selected. A diagnostic
+bend button above the canvas plays the core-produced preview GLB with pause/scrub. Joint edits offer
+translation only, matching the CLI contract; preview and template inspection hide edit handles. The
+report retains all warnings and uses "not flagged by these tests".
+
+Resize changes are applied immediately before a draw, with no unchanged-size buffer reset. Inspector
+width persists at drag end. Asset loads depend on path/content revision, not bridge wrapper
+identity, and superseded loads cannot replace the current model. Unmount cancels input and drawing
+immediately; expensive resource release follows off the navigation commit. Frame cadence, resize
+paint continuity and Gallery latency require measured hardware evidence.

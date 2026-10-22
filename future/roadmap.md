@@ -370,6 +370,37 @@ F4/F7 migration work, even when they touch the same modules as these later impro
 | **F6-T3**        | Higher roster throughput and resource efficiency                                                                                 | Cold/warm/single-edit/style-pivot predictions and 8-hour soak pass; preserve palette scope and temporal frame order while profiling before parallelism                        |
 | **F6-T4**        | End-to-end production workflow qualification                                                                                     | Props, asymmetric animated characters, roster recovery and engine playback pass with setup/inference/bake costs reported separately                                           |
 
+### Rig correctness and interaction follow-through
+
+**F5-T2, 2026-10-21:** orientation switches now reach CLI validation as switches, and a grouped
+inspector action combines facing, grounding and centering into one rebuild. UniRig and template
+fitting explain their geometry difference; unsupported template repair options refuse explicitly.
+The scene-root overlay exposes skeleton lines, joint markers, selection, flags and through-mesh
+inspection. Diagnostic ±30° previews are core-generated glTF, with no GUI pose synthesis. Humanoid
+naming uses anatomical chains; uncertain finger names remain generic. Skin transfer uses nearby
+sample distances instead of a median that could erase thin influences. Thresholds remain unchanged
+and acceptance stays explicit. Resize/lifecycle changes avoid redundant buffer clears, asset reloads
+and synchronous teardown during navigation.
+
+After GPU use was cleared, two real UniRig runs completed on isolated Bulma assets. Final adapter
+1.2.1 also diffuses on exact geometric vertices and scatters weights back across UV/normal seams:
+all 231,088 coincident copies now agree exactly. The final output has finite normalized weights,
+zero unweighted vertices, correct major humanoid chains, and **13 remaining deformation findings**
+(12 stretch, one finger joint without influence). Rechecking the original with the same stable
+cardinal-axis diagnostic gives 24 findings. Keep F5-T2 open for remaining rig/retarget quality;
+these warnings are not waived or hidden. Uncertain fingers retain generic names.
+
+On the RTX 3090, the visible browser WebGPU workbench at 1280×840 drew the actual ~800k-triangle
+asset with its skeleton: ~144 FPS idle; final continuous-resize pass ~142 FPS, 7ms P95, 14ms worst
+frame over five seconds, no >16.7ms frames, no long tasks and no asset reloads. The earlier resize
+pass averaged ~138 FPS with a 20.8ms worst frame, so this is measured headroom, not a universal
+minimum guarantee. Warm Gallery appeared by the second animation frame in 15.4ms; leaving the
+character returned renderer geometries/textures to zero. Inspector keyboard resize/collapse
+preserved its viewport and asset load. Dark 1280×840 and Spanish light 960×600 layouts had no page
+overflow and no checked WCAG A/AA violations. Native mesh reads now leave the event thread; `cargo
+check` passes, but browser timings do not certify native Tauri, other GPUs or platforms. Private
+evidence is under `.render-bench/rig-workbench/`; the working Bulma project is unchanged.
+
 ### Retained model and editor cases
 
 **F5-T1 inspector refinement, 2026-10-21:** the character name now heads one full-height,

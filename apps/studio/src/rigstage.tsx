@@ -5,7 +5,7 @@ import { Inspector } from './workbench';
  * every bake warning has been pointing at since P3. The report table is the
  * report verbatim: flags, stretch, displacement; nothing summarized away.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StudioBridge } from './bridge';
 import { projectReport, type RigReportView, rigRunArgs } from './rig';
 import { t } from './i18n';
@@ -25,7 +25,7 @@ interface RunState {
   args: string[];
 }
 
-function useRigRun(bridge: StudioBridge, onChanged: () => void) {
+function useRigRun(bridge: StudioBridge, onChanged: (args: string[]) => void) {
   const [run, setRun] = useState<RunState | null>(null);
   const [failure, setFailure] = useState<JobFailure | null>(null);
   const [canceled, setCanceled] = useState(false);
@@ -45,7 +45,7 @@ function useRigRun(bridge: StudioBridge, onChanged: () => void) {
       if (progress) setRun({ running: true, progress, args });
     });
     setRun({ running: false, progress: null, args });
-    if (r.exitCode === 0) onChanged();
+    if (r.exitCode === 0) onChanged(args);
     else if (r.exitCode === 130) setCanceled(true);
     else {setFailure(
         lastFailure(r.lines) ??
@@ -56,100 +56,202 @@ function useRigRun(bridge: StudioBridge, onChanged: () => void) {
   return { run, failure, canceled, exec };
 }
 
-/* ---------------- no rig yet: the run panel ---------------- */
+interface OrientationDraft {
+  front: string;
+  ground: boolean;
+  center: boolean;
+}
+const REST_ORIENTATION: OrientationDraft = { front: 'keep', ground: false, center: false };
 
-function RunRig({ bridge, dir, onChanged }: {
-  bridge: StudioBridge;
-  dir: string;
-  onChanged: () => void;
+function orientationFixes(draft: OrientationDraft): string[] {
+  return [
+    ...(draft.front === 'detect'
+      ? ['face-front']
+      : draft.front === 'keep'
+      ? []
+      : [`rotate-${draft.front}`]),
+    ...(draft.ground ? ['feet-ground'] : []),
+    ...(draft.center ? ['center'] : []),
+  ];
+}
+
+function RigMethod({ trackA, body, onTrack, onBody, busy, disclosed = false }: {
+  disclosed?: boolean;
+  trackA: boolean;
+  body: string;
+  onTrack: (v: boolean) => void;
+  onBody: (v: string) => void;
+  busy: boolean;
 }) {
-  const [trackA, setTrackA] = useState(false);
-  const [bodyDir, setBodyDir] = useState(BUNDLED_BODY);
-  const { run, failure, canceled, exec } = useRigRun(bridge, onChanged);
-  const args = rigRunArgs(dir, trackA ? { trackA: true, bodyDir } : {});
+  const choices = (
+    <fieldset className='settings-group' disabled={busy}>
+      <div className='backends' role='radiogroup' aria-label={t('Rigging method')}>
+        <label className={`backend ${!trackA ? 'on' : ''}`}>
+          <input
+            type='radio'
+            name='rig-method'
+            checked={!trackA}
+            onChange={() => onTrack(false)}
+          />
+          <span className='backend-copy'>
+            <span className='bname'>{t('Rig this model')}</span>
+            <span className='backend-meta'>UniRig · {t('GPU required')}</span>
+            <span className='inote'>
+              {t('Keeps your mesh and textures. Predicts joints and how they move the surface.')}
+            </span>
+          </span>
+        </label>
+        <label className={`backend ${trackA ? 'on' : ''}`}>
+          <input type='radio' name='rig-method' checked={trackA} onChange={() => onTrack(true)} />
+          <span className='backend-copy'>
+            <span className='bname'>{t('Fit a template body')}</span>
+            <span className='backend-meta'>{t('CPU only')}</span>
+            <span className='inote'>
+              {t('Replaces the generated geometry with a fitted body that already has a rig.')}
+            </span>
+          </span>
+        </label>
+      </div>
+      {trackA && (
+        <details className='panel-disclosure'>
+          <summary>{t('Template body')}</summary>
+          <label className='rig-field'>
+            {t('Body bundle')}
+            <input
+              className='rootinput'
+              value={body}
+              onChange={(e) => onBody(e.target.value)}
+              spellCheck={false}
+            />
+          </label>
+        </details>
+      )}
+      <details className='panel-disclosure'>
+        <summary>{t('About these methods')}</summary>
+        <p className='inote'>
+          {t(
+            'CLI Track B is UniRig. Track A fits the bundled body. Both need inspection before acceptance.',
+          )}
+        </p>
+      </details>
+    </fieldset>
+  );
+  return (
+    <section className='gensec rig-method'>
+      <h2 className='hud'>{disclosed ? t('Rebuild method') : t('Rigging method')}</h2>
+      {disclosed
+        ? (
+          <details className='rig-method-disclosure'>
+            <summary>
+              <span className='bname'>
+                {trackA ? t('Fit a template body') : t('Rig this model')}
+              </span>
+              <span className='inote'>{trackA ? t('CPU only') : 'UniRig'}</span>
+            </summary>
+            {choices}
+          </details>
+        )
+        : choices}
+    </section>
+  );
+}
 
+function Orientation({ draft, onChange, busy }: {
+  draft: OrientationDraft;
+  onChange: (v: OrientationDraft) => void;
+  busy: boolean;
+}) {
+  return (
+    <fieldset className='settings-group rig-orientation' disabled={busy}>
+      <label className='rig-field'>
+        {t('Model facing')}
+        <select value={draft.front} onChange={(e) => onChange({ ...draft, front: e.target.value })}>
+          <option value='keep'>{t('Keep current direction')}</option>
+          <option value='detect'>{t('Detect front when rebuilding')}</option>
+          <option value='90'>{t('Turn')} 90°</option>
+          <option value='180'>{t('Turn')} 180°</option>
+          <option value='270'>{t('Turn')} 270°</option>
+        </select>
+      </label>
+      <div className='rig-checks'>
+        <label className='check-field'>
+          <input
+            type='checkbox'
+            checked={draft.ground}
+            onChange={(e) => onChange({ ...draft, ground: e.target.checked })}
+          />
+          {t('Place feet on the ground')}
+        </label>
+        <label className='check-field'>
+          <input
+            type='checkbox'
+            checked={draft.center}
+            onChange={(e) => onChange({ ...draft, center: e.target.checked })}
+          />
+          {t('Center the model')}
+        </label>
+      </div>
+      <p className='inote'>
+        {t(
+          'Turn previews the model; other fixes apply on rebuild. Camera views only move the camera.',
+        )}
+      </p>
+    </fieldset>
+  );
+}
+
+function RunRig(
+  { bridge, dir, onChanged }: { bridge: StudioBridge; dir: string; onChanged: () => void },
+) {
+  const [trackA, setTrackA] = useState(false);
+  const [body, setBody] = useState(BUNDLED_BODY);
+  const [orientation, setOrientation] = useState(REST_ORIENTATION);
+  const { run, failure, canceled, exec } = useRigRun(bridge, onChanged);
+  const args = rigRunArgs(
+    dir,
+    trackA ? { trackA: true, bodyDir: body } : { fixes: orientationFixes(orientation) },
+  );
+  const busy = run?.running === true;
   return (
     <div className='rigstage rig-setup'>
       <div className='rigcols'>
         <div className='rigside asset-workspace'>
           <section className='gensec'>
-            <div className='gensechead'>
-              <span className='hud'>{t('Canonical mesh')}</span>
-              <span className='inote'>
-                {t('what the rig will be fitted to — the mesh you just picked')}
-              </span>
-            </div>
-            {
-              /* F12: the pre-rig screen was two-thirds blank while the mesh the
-              user picked ten seconds earlier sat unseen on disk */
-            }
-            <Viewport bridge={bridge} meshPath={`${dir}/canonical/model.glb`} />
+            <Viewport
+              bridge={bridge}
+              meshPath={`${dir}/canonical/model.glb`}
+              previewYaw={trackA ? 0 : Number(orientation.front) || 0}
+            />
           </section>
         </div>
         <Inspector className='rigmain'>
-          <section className='gensec rig-controls' tabIndex={0} aria-label={t('Rig track')}>
-            <div className='gensechead'>
-              <span className='hud'>{t('Rig this character')}</span>
-            </div>
-            <fieldset className='settings-group' disabled={run?.running}>
-              <div className='backends' role='radiogroup' aria-label={t('Rig track')}>
-                <label className={`backend ${!trackA ? 'on' : ''}`}>
-                  <input
-                    type='radio'
-                    name='rig-track'
-                    checked={!trackA}
-                    onChange={() => setTrackA(false)}
-                  />
-                  <span className='backend-copy'>
-                    <span className='bname'>{t('Track B — predicted skeleton (UniRig)')}</span>
-                    <span className='inote'>
-                      {t('GPU-based skeleton prediction and skinning.')}
-                    </span>
-                  </span>
-                </label>
-                <label className={`backend ${trackA ? 'on' : ''}`}>
-                  <input
-                    type='radio'
-                    name='rig-track'
-                    checked={trackA}
-                    onChange={() => setTrackA(true)}
-                  />
-                  <span className='backend-copy'>
-                    <span className='bname'>{t('Track A — canonical body fit')}</span>
-                    <span className='inote'>
-                      {t('the bundled body fitted to the mesh — deterministic, no GPU')}
-                    </span>
-                  </span>
-                </label>
-              </div>
-              {trackA && (
-                <div className='genrow'>
-                  <label htmlFor='rigbody'>{t('Body')}</label>
-                  <input
-                    id='rigbody'
-                    className='rootinput'
-                    value={bodyDir}
-                    onChange={(e) => setBodyDir(e.target.value)}
-                    spellCheck={false}
-                  />
-                </div>
-              )}
-            </fieldset>
-          </section>
+          <div className='rig-controls'>
+            <RigMethod
+              trackA={trackA}
+              body={body}
+              onTrack={setTrackA}
+              onBody={setBody}
+              busy={busy}
+            />
+            {!trackA && (
+              <section className='gensec'>
+                <h2 className='hud'>{t('Orientation')}</h2>
+                <Orientation draft={orientation} onChange={setOrientation} busy={busy} />
+              </section>
+            )}
+          </div>
           <section className='gensec action-section'>
-            <div className='genrow'>
-              <button
-                type='button'
-                className='btn primary'
-                aria-busy={run?.running === true}
-                onClick={() => exec(args)}
-              >
-                {run?.running ? t('Rigging…') : t('Run rig')}
-              </button>
-              {run?.running && <JobActivity progress={run.progress} verb='rig' />}
-              {failure && <FailureNote failure={failure} />}
-              {canceled && <p className='inote job-canceled' role='status'>{t('Job canceled')}</p>}
-            </div>
+            <button
+              type='button'
+              className='btn primary'
+              aria-busy={busy}
+              onClick={() => exec(args)}
+            >
+              {busy ? t('Rigging…') : t('Build rig')}
+            </button>
+            {busy && <JobActivity progress={run.progress} verb='rig' />}
+            {failure && <FailureNote failure={failure} />}
+            {canceled && <p className='inote job-canceled' role='status'>{t('Job canceled')}</p>}
             <CliTwin args={args} />
           </section>
         </Inspector>
@@ -174,7 +276,7 @@ function ReportTable({ view, onFocusJoint }: {
       <div className='inote'>
         {view.flagged.length} {t('of')} {view.totalJoints} {t('joints flagged under test poses')}
         {' '}
-        ({view.poses.join(', ')}) · {view.cleanCount} {t('clean')}
+        ({view.poses.join(', ')}) · {view.cleanCount} {t('not flagged by these tests')}
       </div>
       <table className='rigtable'>
         <thead>
@@ -244,8 +346,28 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
   // re-run silently flipped a track-A character back to track B
   const [rerunTrackA, setRerunTrackA] = useState((rig?.track ?? 'B') === 'A');
   const [rerunBody, setRerunBody] = useState(BUNDLED_BODY);
-  const rerunOpts = rerunTrackA ? { trackA: true as const, bodyDir: rerunBody } : {};
-  const { run, failure, canceled, exec } = useRigRun(bridge, onChanged);
+  const [revision, setRevision] = useState(0);
+  const [orientation, setOrientation] = useState(REST_ORIENTATION);
+  const [preview, setPreview] = useState(false);
+  const [previewRevision, setPreviewRevision] = useState(0);
+  const rerunOpts = rerunTrackA
+    ? { trackA: true as const, bodyDir: rerunBody }
+    : { fixes: orientationFixes(orientation) };
+  const changed = useCallback((args: string[]) => {
+    if (
+      !args.includes('--preview-joint') && !args.includes('--accept') &&
+      !args.includes('--unaccept')
+    ) {
+      setRevision((n) => n + 1);
+      setOrientation(REST_ORIENTATION);
+      setPreview(false);
+      setEdits([]);
+    }
+    onChanged();
+  }, [onChanged]);
+  const { run, failure, canceled, exec } = useRigRun(bridge, changed);
+  const flaggedJoints = useMemo(() => report?.flagged.map((j) => j.joint) ?? [], [report]);
+  const readRigReport = bridge.readRigReport;
 
   // the first successful run unmounts RunRig under the focused button — land
   // on the deform report that replaced it
@@ -257,14 +379,14 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
   useEffect(() => {
     let live = true;
     setReport(null);
-    bridge.readRigReport(dir).then(
+    readRigReport(dir).then(
       (r) => live && setReport(projectReport(r)),
       () => {},
     );
     return () => {
       live = false;
     };
-  }, [bridge, dir, rig?.accepted]);
+  }, [readRigReport, dir, rig?.accepted, revision]);
 
   // the nudges become a patch file core reads, then the rig re-runs with it:
   // the GUI never edits a skeleton itself (invariant 1)
@@ -302,52 +424,88 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           )}
 
           <section className='gensec'>
+            <div className='rig-posebar'>
+              <button
+                type='button'
+                className='btn mbtn'
+                disabled={!selectedJoint || busy || edits.length > 0}
+                onClick={async () => {
+                  if (
+                    selectedJoint &&
+                    await exec(['rig', '--workspace', dir, '--preview-joint', selectedJoint]) === 0
+                  ) {
+                    setPreviewRevision((n) => n + 1);
+                    setPreview(true);
+                  }
+                }}
+              >
+                {t('Preview selected joint bend')}
+              </button>
+              {preview && (
+                <button
+                  type='button'
+                  className='btn mbtn'
+                  onClick={() => setPreview(false)}
+                >
+                  {t('Return to rest pose')}
+                </button>
+              )}
+            </div>
             <div className='gensechead'>
-              <span className='hud'>{t('Joints')}</span>
               <span className='inote'>
-                {t(
-                  'click a joint, drag the gizmo — W move · E rotate · Q local/world',
-                )}
+                {preview || rig.track === 'A'
+                  ? t('Select a joint or a report finding to inspect its bend.')
+                  : t('Click a joint to inspect it. Drag the move handles to draft an edit.')}
               </span>
             </div>
             <Viewport
               bridge={bridge}
-              meshPath={`${dir}/rig/rigged.glb`}
-              contentKey={String(
-                (m.canonicalMesh as { gltfSha256?: string } | undefined)
-                  ?.gltfSha256 ?? '',
-              )}
+              meshPath={preview ? `${dir}/rig/deform-preview.glb` : `${dir}/canonical/model.glb`}
+              contentKey={`${
+                (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? ''
+              }:${preview ? previewRevision : 0}`}
               focusJoint={focusJoint}
               showSkeleton
-              onNudge={(e) =>
-                setEdits((cur) =>
-                  mergeEdits(cur, {
-                    joint: e.joint,
-                    delta: e.delta,
-                    mirrored: mirror,
-                  })
-                )}
+              flaggedJoints={flaggedJoints}
+              previewYaw={preview || rerunTrackA ? 0 : Number(orientation.front) || 0}
+              onNudge={preview || rig.track === 'A'
+                ? undefined
+                : (e) =>
+                  setEdits((cur) =>
+                    mergeEdits(cur, {
+                      joint: e.joint,
+                      delta: e.delta,
+                      mirrored: mirror,
+                    })
+                  )}
               onJointSelected={setSelectedJoint}
             />
-            <div className='genrow'>
-              <label className='bindhold'>
-                <input
-                  type='checkbox'
-                  checked={mirror}
-                  onChange={(e) => setMirror(e.target.checked)}
-                />
-                {t('mirror to the other side')}
-              </label>
-              {selectedJoint && (
-                <span className='mono dimtext'>
-                  {mirror && mirrorPartner(selectedJoint)
-                    ? `${selectedJoint} + ${mirrorPartner(selectedJoint)}`
-                    : mirror
-                    ? `${selectedJoint} · ${t('no side partner — this joint moves alone')}`
-                    : selectedJoint}
-                </span>
-              )}
-            </div>
+            {selectedJoint && (
+              <CliTwin args={['rig', '--workspace', dir, '--preview-joint', selectedJoint]} />
+            )}
+            {selectedJoint && !preview && rig.track !== 'A' && (
+              <div className='genrow'>
+                <label className='bindhold'>
+                  <input
+                    type='checkbox'
+                    disabled={preview || rig.track === 'A'}
+                    checked={mirror}
+                    onChange={(e) => setMirror(e.target.checked)}
+                  />
+                  {t('mirror to the other side')}
+                </label>
+                {selectedJoint && (
+                  <span className='mono dimtext'>
+                    {mirror && mirrorPartner(selectedJoint)
+                      ? `${selectedJoint} + ${mirrorPartner(selectedJoint)}`
+                      : mirror
+                      ? `${selectedJoint} · ${t('no side partner — this joint moves alone')}`
+                      : selectedJoint}
+                  </span>
+                )}
+              </div>
+            )}
+            <p className='inote'>{t('Blue: not flagged · amber: flagged · white: selected')}</p>
             {edits.length > 0 && (
               <>
                 <div className='bindrows'>
@@ -415,7 +573,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
               : report.flagged.length === 0
               ? (
                 <div className='inote'>
-                  {t('every joint passed the test poses')}
+                  {t('No joints were flagged. Inspect the skeleton and motion before accepting.')}
                 </div>
               )
               : (
@@ -429,153 +587,110 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
         <Inspector className='rigmain'>
           {run?.running && (
             <div className='rig-activity'>
-              <JobActivity progress={run.progress} verb='rig' />
+              <JobActivity
+                progress={run.progress}
+                verb={run.args.includes('--preview-joint') ? 'rig-preview' : 'rig'}
+              />
               <CliTwin args={run.args} />
             </div>
           )}
           {failure && <FailureNote failure={failure} />}
           {canceled && <p className='inote job-canceled' role='status'>{t('Job canceled')}</p>}
           <div className='rig-controls'>
-            <section className='gensec'>
-              <div className='gensechead'>
-                <span className='hud'>{t('Orientation')}</span>
-                <span className='inote'>
-                  {t('Each fix re-runs the rig.')}
-                </span>
-              </div>
-              <div className='candacts'>
+            <RigMethod
+              disclosed
+              trackA={rerunTrackA}
+              body={rerunBody}
+              onTrack={setRerunTrackA}
+              onBody={setRerunBody}
+              busy={busy}
+            />
+            {!rerunTrackA && (
+              <section className='gensec'>
+                <h2 className='hud'>{t('Orientation')}</h2>
+                <Orientation
+                  draft={orientation}
+                  onChange={setOrientation}
+                  busy={busy || preview || edits.length > 0}
+                />
                 <button
                   type='button'
                   className='btn mbtn'
-                  aria-busy={busy}
-                  onClick={() => exec(rigRunArgs(dir, { fixes: ['face-front'] }))}
+                  disabled={busy || preview || edits.length > 0 ||
+                    orientationFixes(orientation).length === 0}
+                  onClick={() => exec(rigRunArgs(dir, { fixes: orientationFixes(orientation) }))}
                 >
-                  {t('Face front')}
+                  {t('Apply orientation and rebuild rig')}
                 </button>
-                <button
-                  type='button'
-                  className='btn mbtn'
-                  aria-busy={busy}
-                  onClick={() => exec(rigRunArgs(dir, { fixes: ['feet-ground'] }))}
-                >
-                  {t('Feet to ground')}
-                </button>
-                <button
-                  type='button'
-                  className='btn mbtn'
-                  aria-busy={busy}
-                  onClick={() => exec(rigRunArgs(dir, { fixes: ['center'] }))}
-                >
-                  {t('Center')}
-                </button>
-                {(['90', '180', '270'] as const).map((deg) => (
-                  <button
-                    key={deg}
-                    type='button'
-                    className='btn mbtn'
-                    aria-busy={busy}
-                    onClick={() => exec(rigRunArgs(dir, { fixes: [`rotate-${deg}`] }))}
-                  >
-                    {t('Rotate')} {deg}°
-                  </button>
-                ))}
-              </div>
-              <div className='inote'>
-                {t(
-                  'face-front first: every direction is derived from the front, so a wrong front makes all eight wrong',
-                )}
-              </div>
-            </section>
-
-            <section className='gensec'>
-              <div className='gensechead'>
-                <span className='hud'>{t('Repair')}</span>
-                <span className='inote'>
+                <p className='inote'>
                   {t(
-                    'auto-hint turns this report into joint-position hints and re-runs; re-run repeats with no hints',
+                    'Rebuilds joints and weights on the GPU. The current rig is replaced; undo restores it.',
                   )}
-                </span>
-              </div>
-              <div className='genrow'>
-                <span className='m-seg' role='group' aria-label={t('Re-run track')}>
-                  <button
-                    type='button'
-                    className='btn mbtn'
-                    aria-pressed={!rerunTrackA}
-                    onClick={() => setRerunTrackA(false)}
-                  >
-                    {t('Track B')}
-                  </button>
-                  <button
-                    type='button'
-                    className='btn mbtn'
-                    aria-pressed={rerunTrackA}
-                    onClick={() => setRerunTrackA(true)}
-                  >
-                    {t('Track A')}
-                  </button>
-                </span>
-                {rerunTrackA && (
-                  <input
-                    className='rootinput'
-                    aria-label={t('Body')}
-                    value={rerunBody}
-                    onChange={(e) => setRerunBody(e.target.value)}
-                    spellCheck={false}
-                  />
+                </p>
+                {orientationFixes(orientation).length > 0 && (
+                  <CliTwin args={rigRunArgs(dir, { fixes: orientationFixes(orientation) })} />
                 )}
-              </div>
-              <div className='candacts'>
-                <button
-                  type='button'
-                  className='btn mbtn'
-                  aria-busy={busy}
-                  onClick={() => exec(rigRunArgs(dir, { ...rerunOpts, autoHints: true }))}
-                >
-                  {t('Auto-hint from this report and re-run')}
-                </button>
-                <button
-                  type='button'
-                  className='btn mbtn rigrerun'
-                  aria-busy={busy}
-                  onClick={() => exec(rigRunArgs(dir, { ...rerunOpts }))}
-                >
-                  {t('Re-run rig')}
-                </button>
-              </div>
-              <details className='panel-disclosure'>
-                <summary>{t('Joint edits file')}</summary>
-                <div className='genrow'>
-                  <label htmlFor='editspath'>{t('Joint edits file')}</label>
-                  <input
-                    id='editspath'
-                    className='rootinput'
-                    value={editsPath}
-                    onChange={(e) => setEditsPath(e.target.value)}
-                    placeholder='patch.json'
-                    spellCheck={false}
-                  />
+              </section>
+            )}
+            <section className='gensec'>
+              <h2 className='hud'>{t('Rebuild and repair')}</h2>
+              <button
+                type='button'
+                className='btn mbtn rigrerun'
+                aria-busy={busy}
+                onClick={() => exec(rigRunArgs(dir, rerunOpts))}
+              >
+                {t('Rebuild rig')}
+              </button>
+              <CliTwin args={rigRunArgs(dir, rerunOpts)} />
+              {!rerunTrackA && (
+                <details className='panel-disclosure'>
+                  <summary>{t('Repair tools')}</summary>
+                  <p className='inote'>
+                    {t(
+                      'Position hints can help misplaced joints. They cannot fix a wrong joint hierarchy or guarantee better skin weights.',
+                    )}
+                  </p>
                   <button
                     type='button'
                     className='btn mbtn'
-                    disabled={editsPath.length === 0}
+                    disabled={orientationFixes(orientation).length > 0 || edits.length > 0}
                     aria-busy={busy}
-                    onClick={() => exec(rigRunArgs(dir, { ...rerunOpts, editsPath }))}
+                    onClick={() => exec(rigRunArgs(dir, { autoHints: true }))}
                   >
-                    {t('Apply edits')}
+                    {t('Derive position hints and rebuild')}
                   </button>
-                  <button
-                    type='button'
-                    className='btn mbtn'
-                    disabled={editsPath.length === 0}
-                    aria-busy={busy}
-                    onClick={() =>
-                      exec(rigRunArgs(dir, { ...rerunOpts, editsPath, rerunWithHints: true }))}
-                  >
-                    {t('Re-run with edits as hints')}
-                  </button>
-                </div>
-              </details>
+                  <CliTwin args={rigRunArgs(dir, { autoHints: true })} />
+                  <label className='rig-field'>
+                    {t('Joint edits file')}
+                    <input
+                      className='rootinput'
+                      value={editsPath}
+                      onChange={(e) => setEditsPath(e.target.value)}
+                      placeholder='patch.json'
+                      spellCheck={false}
+                    />
+                  </label>
+                  <div className='candacts'>
+                    <button
+                      type='button'
+                      className='btn mbtn'
+                      disabled={editsPath.length === 0 || busy}
+                      onClick={() => exec(rigRunArgs(dir, { editsPath }))}
+                    >
+                      {t('Apply edits')}
+                    </button>
+                    <button
+                      type='button'
+                      className='btn mbtn'
+                      disabled={editsPath.length === 0 || busy}
+                      onClick={() => exec(rigRunArgs(dir, { editsPath, rerunWithHints: true }))}
+                    >
+                      {t('Re-run with edits as hints')}
+                    </button>
+                  </div>
+                </details>
+              )}
             </section>
           </div>
           <section className='gensec action-section'>
@@ -587,7 +702,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
             {!accepted && (
               <div className='inote'>
                 {t(
-                  'acceptance is yours, not a default: if you have looked and the sprites are fine, record it — the bake stops warning',
+                  'Review flagged joints and preview the bend before accepting.',
                 )}
               </div>
             )}

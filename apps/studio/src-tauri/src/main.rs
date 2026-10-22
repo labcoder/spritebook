@@ -299,36 +299,41 @@ fn read_image(path: String) -> Result<Option<(String, String)>, String> {
 /// scale. The extension allowlist enforces it, and the size ceiling keeps a
 /// pathological file from wedging the IPC channel it rides on.
 #[tauri::command]
-fn read_mesh(path: String) -> Result<Option<String>, String> {
-    use base64::Engine;
-    const MAX_BYTES: u64 = 128 * 1024 * 1024;
-    let p = PathBuf::from(&path);
-    match p
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase())
-        .as_deref()
-    {
-        Some("glb") | Some("gltf") => {}
-        _ => return Ok(None),
-    }
-    let meta = match std::fs::metadata(&p) {
-        Ok(m) => m,
-        Err(_) => return Ok(None),
-    };
-    if meta.len() > MAX_BYTES {
-        return Err(format!(
-            "{path} is {:.1} MB; the viewport reads up to {} MB over the IPC channel",
-            meta.len() as f64 / 1_048_576.0,
-            MAX_BYTES / 1_048_576
-        ));
-    }
-    match std::fs::read(&p) {
-        Ok(bytes) => Ok(Some(
-            base64::engine::general_purpose::STANDARD.encode(bytes),
-        )),
-        Err(e) => Err(format!("could not read {path}: {e}")),
-    }
+async fn read_mesh(path: String) -> Result<Option<String>, String> {
+    // Large reads and base64 encoding must not block the desktop event thread.
+    tauri::async_runtime::spawn_blocking(move || {
+        use base64::Engine;
+        const MAX_BYTES: u64 = 128 * 1024 * 1024;
+        let p = PathBuf::from(&path);
+        match p
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .as_deref()
+        {
+            Some("glb") | Some("gltf") => {}
+            _ => return Ok(None),
+        }
+        let meta = match std::fs::metadata(&p) {
+            Ok(m) => m,
+            Err(_) => return Ok(None),
+        };
+        if meta.len() > MAX_BYTES {
+            return Err(format!(
+                "{path} is {:.1} MB; the viewport reads up to {} MB over the IPC channel",
+                meta.len() as f64 / 1_048_576.0,
+                MAX_BYTES / 1_048_576
+            ));
+        }
+        match std::fs::read(&p) {
+            Ok(bytes) => Ok(Some(
+                base64::engine::general_purpose::STANDARD.encode(bytes),
+            )),
+            Err(e) => Err(format!("could not read {path}: {e}")),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Write a joint-edits patch the `rig --edits` verb will read back. The ONLY

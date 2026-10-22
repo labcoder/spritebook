@@ -15,18 +15,18 @@ const INSP_MIN = 280;
 const INSP_MAX = 560;
 const INSP_DEFAULT = 360;
 
-function useInspectorWidth(): [number, (w: number) => void] {
+function useInspectorWidth(): [number, (w: number, persist?: boolean) => void] {
   const [w, setW] = useState(() => prefs.inspectorWidth(INSP_DEFAULT, INSP_MIN, INSP_MAX));
-  const set = useCallback((next: number) => {
+  const set = useCallback((next: number, persist = true) => {
     const clamped = Math.min(INSP_MAX, Math.max(INSP_MIN, Math.round(next)));
     setW(clamped);
-    prefs.setInspectorWidth(clamped);
+    if (persist) prefs.setInspectorWidth(clamped);
   }, []);
   return [w, set];
 }
 
 function Grip(
-  { width, setWidth }: { width: number; setWidth: (w: number) => void },
+  { width, setWidth }: { width: number; setWidth: (w: number, persist?: boolean) => void },
 ) {
   const dragging = useRef<{ startX: number; startW: number } | null>(null);
 
@@ -48,6 +48,7 @@ function Grip(
         if (!dragging.current) return;
         setWidth(
           dragging.current.startW + (dragging.current.startX - e.clientX),
+          false,
         );
       }}
       onPointerCancel={() => {
@@ -56,7 +57,10 @@ function Grip(
       onLostPointerCapture={() => {
         dragging.current = null;
       }}
-      onPointerUp={() => {
+      onPointerUp={(e) => {
+        if (dragging.current) {
+          setWidth(dragging.current.startW + dragging.current.startX - e.clientX);
+        }
         dragging.current = null;
       }}
       onDoubleClick={() => setWidth(INSP_DEFAULT)}
@@ -76,7 +80,7 @@ const PanelContext = createContext<
   {
     title: string;
     width: number;
-    setWidth: (width: number) => void;
+    setWidth: (width: number, persist?: boolean) => void;
     collapsed: boolean;
     toggle: () => void;
     actions?: ReactNode;

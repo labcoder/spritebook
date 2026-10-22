@@ -36,7 +36,9 @@ export function JobActivity({ progress, verb }: { progress: ProgressState | null
     : step === 'deform' || step === 'validate'
     ? t('Checking deformation')
     : step || t('Starting…');
-  const title = verb === 'rig'
+  const title = verb === 'rig-preview'
+    ? t('Preparing joint preview')
+    : verb === 'rig'
     ? t('Rigging character')
     : verb === 'pick'
     ? t('Saving canonical mesh')
@@ -53,7 +55,11 @@ export function JobActivity({ progress, verb }: { progress: ProgressState | null
       </div>
       <div role='status'>{phase}</div>
       <progress aria-label={title} />
-      <p className='inote'>{t('Timing varies with the model and settings.')}</p>
+      <p className='inote'>
+        {verb === 'rig-preview'
+          ? t('CPU only. The saved rig is unchanged.')
+          : t('Timing varies with the model and settings.')}
+      </p>
       {progress && (
         <details className='activity-detail'>
           <summary>{t('Stage details')}</summary>

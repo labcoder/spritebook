@@ -12,7 +12,18 @@ import { scrollIntoViewPolitely } from '../focus';
 const MODES: ViewMode[] = ['textured', 'clay', 'wire'];
 
 export function Viewport(
-  { bridge, meshPath, contentKey, focusJoint, showSkeleton, onNudge, onJointSelected, height }: {
+  {
+    bridge,
+    meshPath,
+    contentKey,
+    focusJoint,
+    showSkeleton,
+    flaggedJoints,
+    previewYaw = 0,
+    onNudge,
+    onJointSelected,
+    height,
+  }: {
     bridge: StudioBridge;
     /** canonical glTF in the workspace — never a raw upload */
     meshPath: string | null;
@@ -27,6 +38,8 @@ export function Viewport(
      * second click as "no change". */
     focusJoint?: { name: string; n: number } | null;
     showSkeleton?: boolean;
+    flaggedJoints?: readonly string[];
+    previewYaw?: number;
     onNudge?: (e: NudgeEvent) => void;
     onJointSelected?: (joint: string | null) => void;
     height?: number;
@@ -34,6 +47,9 @@ export function Viewport(
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
   const vpRef = useRef<MeshViewport | null>(null);
+  const [skeletonVisible, setSkeletonVisible] = useState(true);
+  const [throughMesh, setThroughMesh] = useState(true);
+  const readMesh = bridge.readMesh;
   const [mode, setMode] = useState<ViewMode>('textured');
   const [vpReady, setVpReady] = useState(false);
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -48,6 +64,15 @@ export function Viewport(
   nudgeRef.current = onNudge;
   const selRef = useRef(onJointSelected);
   selRef.current = onJointSelected;
+
+  useEffect(() => {
+    vpRef.current?.setJointEditing(onNudge !== undefined);
+  }, [onNudge !== undefined, vpReady]);
+
+  useEffect(() => {
+    vpRef.current?.setPreviewYaw(previewYaw);
+    vpRef.current?.renderOnce();
+  }, [previewYaw, vpReady, state]);
 
   useEffect(() => {
     let live = true;
@@ -94,7 +119,7 @@ export function Viewport(
     let live = true;
     setState('loading');
     setError(null);
-    bridge.readMesh(meshPath).then(async (b64) => {
+    readMesh(meshPath).then(async (b64) => {
       if (!live) return;
       if (b64 === null) {
         setState('error');
@@ -105,7 +130,8 @@ export function Viewport(
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       try {
-        await vp.load(bytes.buffer);
+        const loaded = await vp.load(bytes.buffer);
+        if (!live || !loaded) return;
         vp.renderOnce();
         if (live) {
           setState('ready');
@@ -125,15 +151,18 @@ export function Viewport(
     });
     return () => {
       live = false;
+      vp.cancelLoad();
     };
     // contentKey re-runs the load when the bytes behind an UNCHANGED path
     // change (in-place canonical rewrites) - see the prop's comment
-  }, [bridge, meshPath, contentKey, vpReady]);
+  }, [readMesh, meshPath, contentKey, vpReady]);
 
   useEffect(() => {
-    vpRef.current?.setSkeletonVisible(showSkeleton === true);
+    vpRef.current?.setSkeletonVisible(showSkeleton === true && skeletonVisible);
+    vpRef.current?.setThroughMesh(throughMesh);
+    vpRef.current?.setFlaggedJoints(flaggedJoints ?? []);
     vpRef.current?.renderOnce();
-  }, [showSkeleton, vpReady, state]);
+  }, [showSkeleton, skeletonVisible, throughMesh, flaggedJoints, vpReady, state]);
 
   // the deform report drives the canvas: a row's activation lands here. The
   // polite scroll makes the gesture VISIBLE when the layout has stacked the
@@ -203,9 +232,44 @@ export function Viewport(
         >
           {t('Frame')}
         </button>
+        <span className='m-seg' role='group' aria-label={t('Camera view')}>
+          <button
+            type='button'
+            className='btn mbtn'
+            onClick={() => vpRef.current?.setView('front')}
+          >
+            {t('Front')}
+          </button>
+          <button type='button' className='btn mbtn' onClick={() => vpRef.current?.setView('side')}>
+            {t('Side')}
+          </button>
+          <button type='button' className='btn mbtn' onClick={() => vpRef.current?.setView('back')}>
+            {t('Rear')}
+          </button>
+        </span>
         {showSkeleton && (
+          <>
+            <label className='check-field'>
+              <input
+                type='checkbox'
+                checked={skeletonVisible}
+                onChange={(e) => setSkeletonVisible(e.target.checked)}
+              />
+              {t('Skeleton')}
+            </label>
+            <label className='check-field'>
+              <input
+                type='checkbox'
+                checked={throughMesh}
+                onChange={(e) => setThroughMesh(e.target.checked)}
+              />
+              {t('Through mesh')}
+            </label>
+          </>
+        )}
+        {showSkeleton && selected && (
           <span className='mono dimtext'>
-            {selected ? `${t('joint')}: ${selected}` : t('click a joint to select it')}
+            {`${t('joint')}: ${selected}`}
           </span>
         )}
         <span className='mono dimtext vphint'>{t('orbit drag · dolly wheel · F frames')}</span>

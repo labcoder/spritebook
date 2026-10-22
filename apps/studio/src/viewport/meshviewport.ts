@@ -15,6 +15,8 @@ import CameraControls from 'camera-controls';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { pickJoint, type ScreenJoint } from './picking';
+import { SkeletonOverlay } from './skeleton';
+import { applyViewportSize, type ViewportSize } from './size';
 import { disposeTree, type MaterialLike, type TreeNode } from './dispose';
 
 export type ViewMode = 'textured' | 'clay' | 'wire';
@@ -62,13 +64,22 @@ export class MeshViewport {
 
   /** the loaded glTF root, replaced wholesale on each load */
   #model: THREE.Object3D | null = null;
+  #modelRotation = new THREE.Quaternion();
+  #previewYaw = 0;
   #originalMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
   #mode: ViewMode = 'textured';
 
   // --- bone overlay ---
-  #skeletonHelper: THREE.SkeletonHelper | null = null;
+  #overlay: SkeletonOverlay | null = null;
+  #skeletonVisible = false;
+  #throughMesh = true;
+  #flaggedJoints: readonly string[] = [];
+  #size: ViewportSize | undefined;
+  #resizePending = true;
+  #loadEpoch = 0;
   #bones: THREE.Bone[] = [];
   #selected: string | null = null;
+  #jointEditing = false;
   #mixer: THREE.AnimationMixer | null = null;
   #animPlaying = false;
   #animDuration = 0;
@@ -119,7 +130,7 @@ export class MeshViewport {
     canvas.style.width = '100%';
     canvas.style.height = '100%';
     canvas.style.display = 'block';
-    canvas.tabIndex = 0; // keyboard reachable: the gizmo has W/E/R/Q
+    canvas.tabIndex = 0; // W move, Q axes, F frame/Q
     this.#container.appendChild(canvas);
 
     this.#controls = new CameraControls(this.#camera, canvas);
@@ -143,13 +154,16 @@ export class MeshViewport {
     canvas.addEventListener('pointerdown', this.#onPointerDown);
     canvas.addEventListener('keydown', this.#onKeyDown);
 
-    this.#resize = new ResizeObserver(() => this.#applySize());
+    this.#resize = new ResizeObserver(() => {
+      this.#resizePending = true;
+    });
     this.#resize.observe(this.#container);
     this.#applySize();
 
     const loop = () => {
       if (this.#disposed) return;
       this.#raf = requestAnimationFrame(loop);
+      this.#applySize();
       this.#frames++;
       this.#timer.update();
       const dt = this.#timer.getDelta();
@@ -157,6 +171,7 @@ export class MeshViewport {
       // playback rides the SAME loop the camera does - no second clock, and
       // the hidden-window pause applies to motion exactly as it does to draws
       if (this.#mixer && this.#animPlaying) this.#mixer.update(dt);
+      this.#overlay?.update();
       try {
         this.#renderer.render(this.#scene, this.#camera);
       } catch (err) {
@@ -170,39 +185,53 @@ export class MeshViewport {
   }
 
   #applySize(): void {
-    const w = this.#container.clientWidth || 1;
-    const h = this.#container.clientHeight || 1;
-    this.#renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, 2));
-    this.#renderer.setSize(w, h, false); // CSS-sized canvas
-    this.#camera.aspect = w / h;
-    this.#camera.updateProjectionMatrix();
+    const ratio = Math.min(globalThis.devicePixelRatio ?? 1, 2);
+    if (!this.#resizePending && this.#size?.ratio === ratio) return;
+    this.#resizePending = false;
+    this.#size = applyViewportSize(this.#renderer, this.#camera, {
+      width: this.#container.clientWidth,
+      height: this.#container.clientHeight,
+      ratio,
+    }, this.#size);
   }
 
   /** Load canonical glTF bytes (asset-store only, per the skill). */
-  async load(bytes: ArrayBuffer): Promise<void> {
-    this.#clearModel();
+  async load(bytes: ArrayBuffer): Promise<boolean> {
+    const epoch = ++this.#loadEpoch;
     const loader = new GLTFLoader();
     const gltf = await loader.parseAsync(bytes, '');
+    if (this.#disposed || epoch !== this.#loadEpoch) {
+      disposeTree(gltf.scene as unknown as TreeNode, undefined, SHARED);
+      return false;
+    }
+    const selected = this.#selected;
+    this.#gizmo?.detach();
+    this.#clearModel();
     this.#model = gltf.scene;
+    this.#modelRotation.copy(this.#model.quaternion);
+    this.setPreviewYaw(this.#previewYaw);
     this.#scene.add(this.#model);
 
     this.#originalMaterials.clear();
     this.#bones = [];
-    let skinnedRoot: THREE.Object3D | null = null;
     this.#model.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) {
         const mesh = o as THREE.Mesh;
         this.#originalMaterials.set(mesh, mesh.material);
       }
       if ((o as THREE.Bone).isBone) this.#bones.push(o as THREE.Bone);
-      if ((o as THREE.SkinnedMesh).isSkinnedMesh && skinnedRoot === null) skinnedRoot = o;
     });
     if (this.#bones.length > 0) {
-      this.#skeletonHelper = new THREE.SkeletonHelper(skinnedRoot ?? this.#model);
-      this.#skeletonHelper.visible = false;
-      this.#scene.add(this.#skeletonHelper);
+      this.#overlay = new SkeletonOverlay(this.#model);
+      this.#overlay.group.visible = this.#skeletonVisible;
+      this.#overlay.setThroughMesh(this.#throughMesh);
+      this.#overlay.setFlags(this.#flaggedJoints);
+      this.#scene.add(this.#overlay.group);
     }
     this.setMode(this.#mode);
+    this.selectJoint(
+      selected !== null && this.#bones.some((b) => b.name === selected) ? selected : null,
+    );
     if (gltf.animations.length > 0) {
       this.#mixer = new THREE.AnimationMixer(this.#model);
       const clip = gltf.animations[0]!;
@@ -211,6 +240,7 @@ export class MeshViewport {
       this.#animPlaying = true; // the preview exists to SHOW motion
     }
     this.frame();
+    return true;
   }
 
   /* ---- animation transport (D-038: playback, never synthesis) ---- */
@@ -252,6 +282,8 @@ export class MeshViewport {
    */
   renderOnce(): void {
     if (this.#disposed) return;
+    this.#applySize();
+    this.#overlay?.update();
     this.#frames++;
     try {
       this.#renderer.render(this.#scene, this.#camera);
@@ -281,8 +313,44 @@ export class MeshViewport {
   }
 
   setSkeletonVisible(visible: boolean): void {
-    if (this.#skeletonHelper) this.#skeletonHelper.visible = visible;
+    this.#skeletonVisible = visible;
+    if (this.#overlay) this.#overlay.group.visible = visible;
     if (!visible) this.selectJoint(null);
+  }
+
+  setJointEditing(editable: boolean): void {
+    this.#jointEditing = editable;
+    this.selectJoint(this.#selected);
+  }
+
+  cancelLoad(): void {
+    this.#loadEpoch++;
+  }
+
+  setThroughMesh(through: boolean): void {
+    this.#throughMesh = through;
+    this.#overlay?.setThroughMesh(through);
+  }
+
+  setFlaggedJoints(names: readonly string[]): void {
+    this.#flaggedJoints = names;
+    this.#overlay?.setFlags(names);
+  }
+
+  setView(view: 'front' | 'side' | 'back'): void {
+    const angles = { front: 0, side: Math.PI / 2, back: Math.PI };
+    this.#controls?.rotateTo(angles[view], Math.PI / 2, false);
+    this.renderOnce();
+  }
+
+  /** Inspection only; the Apply command bakes orientation in core. */
+  setPreviewYaw(degrees: number): void {
+    this.#previewYaw = degrees;
+    if (!this.#model) return;
+    this.#model.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), degrees * Math.PI / 180)
+      .multiply(this.#modelRotation);
+    this.#model.updateMatrixWorld(true);
+    if (this.#selected) this.selectJoint(this.#selected);
   }
 
   get jointNames(): string[] {
@@ -291,8 +359,9 @@ export class MeshViewport {
 
   selectJoint(name: string | null): void {
     this.#selected = name;
+    this.#overlay?.setSelection(name);
     const bone = name === null ? null : this.#bones.find((b) => b.name === name) ?? null;
-    if (bone === null) {
+    if (bone === null || !this.#jointEditing) {
       this.#gizmo?.detach();
       if (this.#gizmoHelper) this.#gizmoHelper.visible = false;
     } else {
@@ -348,7 +417,7 @@ export class MeshViewport {
   }
 
   #handlePick(e: PointerEvent): void {
-    if (this.#skeletonHelper?.visible !== true) return;
+    if (this.#overlay?.group.visible !== true) return;
     if (this.#gizmo?.dragging) return;
     const rect = this.#renderer.domElement.getBoundingClientRect();
     const hit = pickJoint(this.screenJoints(), e.clientX - rect.left, e.clientY - rect.top, 14);
@@ -361,8 +430,6 @@ export class MeshViewport {
     const k = e.key.toLowerCase();
     // the editor keys users arrive with (Blender/Unity/three's own editor)
     if (k === 'w') this.#gizmo.setMode('translate');
-    else if (k === 'e') this.#gizmo.setMode('rotate');
-    else if (k === 'r') this.#gizmo.setMode('scale');
     else if (k === 'q') {
       this.#gizmo.setSpace(this.#gizmo.space === 'local' ? 'world' : 'local');
     } else if (k === 'f') this.frame();
@@ -416,10 +483,10 @@ export class MeshViewport {
   }
 
   #clearModel(): void {
-    if (this.#skeletonHelper) {
-      this.#scene.remove(this.#skeletonHelper);
-      this.#skeletonHelper.dispose();
-      this.#skeletonHelper = null;
+    if (this.#overlay) {
+      this.#scene.remove(this.#overlay.group);
+      this.#overlay.dispose();
+      this.#overlay = null;
     }
     if (this.#mixer) {
       this.#mixer.stopAllAction();
@@ -458,18 +525,24 @@ export class MeshViewport {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#loadEpoch++;
     cancelAnimationFrame(this.#raf);
     this.#resize?.disconnect();
     const canvas = this.#renderer.domElement;
     canvas.removeEventListener('pointerdown', this.#onPointerDown);
     canvas.removeEventListener('keydown', this.#onKeyDown);
     this.#gizmo?.detach();
-    this.#gizmo?.dispose();
-    if (this.#gizmoHelper) this.#scene.remove(this.#gizmoHelper);
     this.#controls?.dispose();
-    this.#clearModel();
-    this.#renderer.dispose();
     canvas.remove();
     for (const k of Object.keys(this.#listeners) as (keyof Events)[]) this.#listeners[k] = [];
+    // Let the replacement surface paint before releasing large GPU allocations.
+    const release = () => {
+      this.#gizmo?.dispose();
+      if (this.#gizmoHelper) this.#scene.remove(this.#gizmoHelper);
+      this.#clearModel();
+      this.#renderer.dispose();
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(release, { timeout: 200 });
+    else setTimeout(release, 0);
   }
 }

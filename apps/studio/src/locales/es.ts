@@ -6,6 +6,62 @@
  * purpose — they match the CLI the GUI mirrors.
  */
 export const es: Record<string, string> = {
+  'Rear': 'Posterior',
+  'Preparing joint preview': 'Preparando vista previa de la articulación',
+  'CPU only. The saved rig is unchanged.': 'Solo CPU. El rig guardado no cambia.',
+  'Rebuild method': 'Método de reconstrucción',
+  'Turn previews the model; other fixes apply on rebuild. Camera views only move the camera.':
+    'El giro previsualiza el modelo; las demás correcciones se aplican al reconstruir. Las vistas de cámara solo mueven la cámara.',
+  'Review flagged joints and preview the bend before accepting.':
+    'Revisa las articulaciones con alertas y previsualiza la flexión antes de aceptar.',
+  'Select a joint or a report finding to inspect its bend.':
+    'Selecciona una articulación o una alerta del informe para revisar su flexión.',
+  'About these methods': 'Acerca de estos métodos',
+  'Apply orientation and rebuild rig': 'Aplicar orientación y reconstruir rig',
+  'Blue: not flagged · amber: flagged · white: selected':
+    'Azul: sin alertas · ámbar: con alertas · blanco: seleccionado',
+  'Body bundle': 'Paquete de cuerpo',
+  'Build rig': 'Crear rig',
+  'CLI Track B is UniRig. Track A fits the bundled body. Both need inspection before acceptance.':
+    'En la CLI, Track B es UniRig. Track A ajusta el cuerpo incluido. Ambos necesitan revisión antes de aceptarlos.',
+  'CPU only': 'Solo CPU',
+  'Camera view': 'Vista de cámara',
+  'Center the model': 'Centrar el modelo',
+  'Click a joint to inspect it. Drag the move handles to draft an edit.':
+    'Selecciona una articulación para revisarla. Arrastra los controles para preparar un ajuste.',
+  'Derive position hints and rebuild': 'Calcular indicaciones de posición y reconstruir',
+  'Detect front when rebuilding': 'Detectar el frente al reconstruir',
+  'Fit a template body': 'Ajustar un cuerpo de plantilla',
+  'Front': 'Frente',
+  'GPU required': 'Requiere GPU',
+  'Keep current direction': 'Mantener la dirección actual',
+  'Keeps your mesh and textures. Predicts joints and how they move the surface.':
+    'Conserva la malla y las texturas. Predice las articulaciones y cómo mueven la superficie.',
+  'Model facing': 'Orientación del modelo',
+  'No joints were flagged. Inspect the skeleton and motion before accepting.':
+    'No se detectaron alertas. Revisa el esqueleto y el movimiento antes de aceptar.',
+  'Place feet on the ground': 'Colocar los pies en el suelo',
+  'Position hints can help misplaced joints. They cannot fix a wrong joint hierarchy or guarantee better skin weights.':
+    'Las indicaciones de posición pueden ayudar a colocar articulaciones. No corrigen una jerarquía incorrecta ni garantizan mejores pesos de skinning.',
+  'Preview selected joint bend': 'Previsualizar flexión de la articulación',
+  'Rebuild and repair': 'Reconstruir y reparar',
+  'Rebuild rig': 'Reconstruir rig',
+  'Rebuilds joints and weights on the GPU. The current rig is replaced; undo restores it.':
+    'Reconstruye articulaciones y pesos en la GPU. Reemplaza el rig actual; deshacer lo restaura.',
+  'Repair tools': 'Herramientas de reparación',
+  'Replaces the generated geometry with a fitted body that already has a rig.':
+    'Reemplaza la geometría generada por un cuerpo ajustado que ya tiene rig.',
+  'Return to rest pose': 'Volver a la pose de reposo',
+  'Rig this model': 'Crear rig para este modelo',
+  'Rigging method': 'Método de rigging',
+  'Side': 'Lateral',
+  'Skeleton': 'Esqueleto',
+  'Template body': 'Cuerpo de plantilla',
+  'Through mesh': 'A través de la malla',
+  'Turn': 'Girar',
+  'Turn previews the model. Grounding, centering and automatic facing take effect on rebuild. Camera views only change your view.':
+    'El giro previsualiza el modelo. El suelo, el centrado y el frente automático se aplican al reconstruir. Las vistas de cámara solo cambian la vista.',
+  'not flagged by these tests': 'sin alertas en estas pruebas',
   'Collapse inspector': 'Contraer inspector',
   'Expand inspector': 'Expandir inspector',
   'Development tools': 'Herramientas de desarrollo',

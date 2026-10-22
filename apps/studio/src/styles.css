@@ -1723,7 +1723,7 @@ textarea {
 .rigstage .rigside .vpwrap {
   display: flex;
   flex-direction: column;
-  height: max(340px, calc(100vh - 410px));
+  height: clamp(360px, calc(100vh - 260px), 720px);
 }
 .rig-setup .rigside {
   display: flex;
@@ -1750,6 +1750,48 @@ textarea {
 .rigstage .inspector-content > .gensec:last-child {
   border-bottom: 0;
 }
+
+/* Rig: one method, staged orientation, then deliberate repair/acceptance. */
+.rig-controls h2.hud {
+  margin: 0 0 16px;
+  font-size: 12px;
+}
+.rig-method-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+.rig-method-disclosure > summary::after { content: '⌄'; margin-left: auto; }
+.rig-method-disclosure[open] > summary { margin-bottom: 16px; }
+.rig-method-disclosure .bname { font: 500 21px/1.1 'Barlow Condensed', sans-serif; }
+.rig-method-disclosure > summary:hover { color: var(--sb-action); }
+.rig-method .backends { gap: 8px; }
+.rig-method .backend { padding: 14px 10px; }
+.rig-method .backend-copy { gap: 7px; }
+.rig-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+.rig-field > :is(input, select) { width: 100%; min-width: 0; }
+.rig-orientation select { min-height: 36px; }
+.rig-checks { display: grid; gap: 12px; }
+.rig-checks .check-field { margin: 0; }
+.rig-orientation > .inote { margin: 16px 0; }
+.rig-posebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 0;
+}
+.rig-posebar .inote { flex-basis: 100%; }
+.vpbar .check-field { align-items: center; margin: 0; font-size: 12px; }
+.vpbar .check-field input { margin: 0; }
 
 .rig-controls {
   flex: 1;
