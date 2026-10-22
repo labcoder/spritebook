@@ -40,6 +40,8 @@ within a small fraction of its bbox diagonal the stage fails loudly.
 then UniRig's edge diffusion, directly on the CANONICAL vertices. A componentwise
 median erases thin fingers when their samples are a minority among neighbours;
 distance weighting preserves a close sample and varies continuously between samples.
+Diffusion uses exact geometric vertices so UV/normal seam copies cannot acquire different
+weights; the result is scattered back to the unchanged canonical vertex ordering.
 The final normalization is guarded: upstream divides by the row
 sum unguarded, which is exactly the NaN factory P0-T4 catalogued (item 5). Here
 zero-weight rows are left at zero and COUNTED; the caller decides what to say
@@ -205,10 +207,12 @@ def reskin(
     """Per-vertex weights for ``vertices`` from the model's sampled prediction.
 
     Interpolate nearby samples, then UniRig's (MIT) hotter-to-cooler diffusion,
-    accumulated up
-    the joint chain so a child's influence bleeds into its parent rather than
+    accumulated up the joint chain so a child's influence bleeds into its parent rather than
     across the body. Zero-weight rows survive as zeros (see module docstring).
     """
+    # Diffuse on geometric vertices, then scatter back across UV/normal seams.
+    vertices, seam_vertices = np.unique(vertices, axis=0, return_inverse=True)
+    triangles = seam_vertices[triangles]
     n_vertices = int(vertices.shape[0])
     n_joints = int(sampled_skin.shape[1])
     k = min(NEAREST_SAMPLES, int(sampled_vertices.shape[0]))
@@ -273,7 +277,7 @@ def reskin(
     # have something real left afterwards
     strong = (skin >= WEIGHT_FLOOR).any(axis=-1, keepdims=True)
     skin = np.where((skin < WEIGHT_FLOOR) & strong, 0.0, skin)
-    return skin
+    return skin[seam_vertices]
 
 
 def top_influences(skin: np.ndarray, k: int = INFLUENCES) -> tuple[np.ndarray, np.ndarray]:

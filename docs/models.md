@@ -164,7 +164,7 @@ packages/core/native/Cargo.toml`; clean any custom Cargo target directories with
 
 ## UniRig quality checks
 
-Adapter 1.2.0 checks humanoid naming against leg, trunk and arm ancestry as well as position. A
+Adapter 1.2.1 checks humanoid naming against leg, trunk and arm ancestry as well as position. A
 close reference match cannot place a thigh in the spine; contradictory finger-chain labels stay
 generic and produce a warning. Corrections and rejected names are recorded in `rig/rig-run.json`. A
 named joint or finite, normalized weight row does not prove correct anatomy.
@@ -176,4 +176,5 @@ hints can recover detail missing from the model prediction. Deformation threshol
 
 Existing rigs retain their saved bytes. Rebuilding uses the updated adapter without downloading
 checkpoints again. The saved Bulma skeleton reproduces the corrected hip/trunk/leg naming on CPU;
-fresh GPU inference and visual deformation review remain pending the maintainer's GPU availability.
+fresh GPU runs, remaining deformation findings and viewport measurements are recorded in the
+[roadmap follow-through](../future/roadmap.md#rig-correctness-and-interaction-follow-through).

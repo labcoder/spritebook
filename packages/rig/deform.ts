@@ -222,11 +222,12 @@ export function boneDirection(world: ArrayLike<number>): Vec3 {
 
 /**
  * The world basis axis most perpendicular to `d`, orthogonalized against it.
- * Ties break X < Y < Z, so the answer is a deterministic function of the rig.
+ * Ties within Float32 noise break X < Y < Z, avoiding unstable cardinal bend planes.
  */
 export function dominantPerpendicularAxis(d: Vec3): Vec3 {
   let best = 0;
-  for (let a = 1; a < 3; a++) if (Math.abs(d[a]) < Math.abs(d[best])) best = a;
+  // Equivalent cardinal directions must not switch bend planes on Float32 noise.
+  for (let a = 1; a < 3; a++) if (Math.abs(d[a]) < Math.abs(d[best]) - 1e-6) best = a;
   const e: Vec3 = [0, 0, 0];
   e[best] = 1;
   const p = vDot(d, e);

@@ -162,6 +162,10 @@ test('dominantPerpendicularAxis picks the most perpendicular world axis', () => 
   // a bone along X: Y wins the tie against Z
   assertEquals([...dominantPerpendicularAxis([1, 0, 0])], [0, 1, 0]);
   assertEquals([...dominantPerpendicularAxis([0, 0, 1])], [1, 0, 0]);
+  const noisyVertical = dominantPerpendicularAxis([1e-8, 1, 0]);
+  assertAlmostEquals(noisyVertical[0], 1, 1e-6);
+  assertAlmostEquals(noisyVertical[1], 0, 1e-6);
+  assertEquals(noisyVertical[2], 0, 'roundoff must not change the bend from X to Z');
 
   // a slanted bone: the axis it leans on least, orthogonalized to exactly 90
   const d: [number, number, number] = [0.6, 0.8, 0];

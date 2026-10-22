@@ -103,7 +103,7 @@ from . import Adapter, AdapterError, Emitter, validate_params
 from ..glb import read_scene_geometry
 from .unirig_humanoid_ref import HUMANOID_REFERENCE, HUMANOID_REFERENCE_SOURCE
 
-UNIRIG_ADAPTER_VERSION = "1.2.0"
+UNIRIG_ADAPTER_VERSION = "1.2.1"
 
 # --- mirrors packages/schema/rig.ts (FROZEN) ----------------------------------
 RIG_SKELETON_FILE = "rig.json"
@@ -739,6 +739,9 @@ def _constrain_humanoid_names(
     """Anatomical chains outrank a close positional match on stylized bodies."""
     by_name = {n: i for i, n in enumerate(names)}
     assigned: dict[int, str] = {}
+    degree = np.bincount(parents[parents >= 0], minlength=len(names))
+    height = float(np.ptp(points[:, 1]))
+    midline = float(points[:, 0].mean())
 
     def ancestors(index: int, count: int) -> list[int]:
         chain = [index]
@@ -779,12 +782,19 @@ def _constrain_humanoid_names(
                     assigned.update(zip(trunk, trunk_names))
 
     for side, sign in (("l", 1), ("r", -1)):
-        hand = by_name.get(f"hand_{side}")
-        arm = ancestors(hand, 4) if hand is not None else []
-        if arm and all(sign * (points[a, 0] - points[b, 0]) > 0 for a, b in zip(arm, arm[1:])):
+        # A wrist branches into fingers; positional matching can pick a knuckle instead.
+        hands = [i for i in range(len(names)) if degree[i] >= 3 and sign * (points[i, 0] - midline) > height * .15]
+        for hand in hands:
+            arm = ancestors(hand, 4)
+            attach = int(parents[arm[-1]]) if arm else -1
+            if not arm or attach < 0 or degree[attach] < 2:
+                continue
+            if not all(sign * (points[a, 0] - points[b, 0]) > 0 for a, b in zip(arm, arm[1:])):
+                continue
             assigned.update(zip(arm, (
                 f"hand_{side}", f"lowerarm_{side}", f"upperarm_{side}", f"clavicle_{side}"
             )))
+            break
 
     changed = {
         str(i): {"from": names[i], "to": name}
@@ -799,7 +809,7 @@ def _constrain_humanoid_names(
 
     # A finger label must follow its own finger chain on the named hand.
     rejected: list[str] = []
-    for i, name in enumerate(list(names)):
+    for i, name in enumerate(names):
         parts = name.split("_")
         if len(parts) < 3 or parts[0] not in ("thumb", "index", "middle", "ring", "pinky"):
             continue
@@ -808,6 +818,11 @@ def _constrain_humanoid_names(
         parent = int(parents[i])
         if parent < 0 or names[parent] != expected:
             rejected.append(name)
+    uncertain_sides = {name.split("_")[-1] for name in rejected}
+    for i, name in enumerate(names):
+        if name.startswith(("thumb_", "index_", "middle_", "ring_", "pinky_")) and name.split("_")[-1] in uncertain_sides:
+            if name not in rejected:
+                rejected.append(name)
             names[i] = fallback[i]
     return {"topologyCorrections": changed, "rejectedNames": rejected}
 

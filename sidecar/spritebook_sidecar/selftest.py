@@ -951,6 +951,7 @@ def test_unirig_stylized_chains() -> None:
     ok(names[0] == "pelvis", f"the shared leg parent is the pelvis: {stats}")
     ok(names[leg_start] == "thigh_l" and names[leg_start+4] == "thigh_r", "both thighs follow the actual leg chains")
     ok(names[1] == "spine_01" and names[2] == "spine_02", "the short trunk follows ancestry, not reference height")
+    ok(names[25] == "clavicle_r" and names[26] == "upperarm_r" and names[28] == "hand_r", "a finger knuckle cannot shift the whole arm chain")
     ok(len(set(names)) == len(names), "semantic corrections never duplicate joint names")
     ok(bool(stats["topologyCorrections"]), "corrections remain visible in provenance")
     for i, name in enumerate(names):
@@ -976,6 +977,16 @@ def test_unirig_weight_transfer() -> None:
     ok(np.isfinite(final).all() and np.allclose(final.sum(axis=1), 1), "final rows remain finite and normalized")
     zero = reskin(samples, np.zeros_like(weights), vertices, np.empty((0, 3), dtype=np.int64), np.array([-1, 0]))
     ok(not zero.any(), "missing influence is preserved, never fabricated")
+
+    # UV/normal seams duplicate geometric points. Diffusing each copy independently opens cracks.
+    vertices = np.array([[0.,0,0], [1.,0,0], [0,1.,0], [0.,0,0], [-1.,0,0], [0,-1.,0]])
+    samples = vertices[[0,1,2,4,5]]
+    weights = np.array([[.5,.5], [1.,0], [1.,0], [0.,1], [0.,1]])
+    triangles = np.array([[0,1,2], [3,4,5]])
+    result = reskin(samples, weights, vertices, triangles, np.array([-1,0]))
+    ok(np.array_equal(result[0], result[3]), "coincident seam vertices receive identical weights")
+    ok(result.shape == (6,2), "seam welding preserves the canonical vertex order and count")
+    ok(result[1,0] > result[4,0], "the scatter retains the original side of each vertex")
 
 
 def test_unirig_environment(tmp: Path) -> None:
