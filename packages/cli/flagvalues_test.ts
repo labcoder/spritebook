@@ -26,7 +26,7 @@ test('template fitting refuses orientation and repair options instead of silentl
 test('Studio orientation switches reach catalog validation without requiring values', async () => {
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-rig-flags-'));
   try {
-    for (const fix of ['face-front', 'feet-ground', 'center']) {
+    for (const fix of ['upright', 'face-front', 'feet-ground', 'center']) {
       const lines: string[] = [];
       const code = await runCli([
         ...rigRunArgs(join(root, 'hero'), { fixes: [fix] }),

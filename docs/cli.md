@@ -125,22 +125,22 @@ spritebook rig --workspace ./characters/hero \
 Two tracks. The default (no flag) is Track B: UniRig predicts a fresh skeleton on the GPU, about two
 minutes. `--track-a` fits a bundled rigged body instead: deterministic, no GPU, no model download.
 
-| Flag                                                       | Meaning                                                                      |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `--model <glb>`                                            | the mesh to rig. CAUTION: the skinned result is promoted back onto this path |
-| `--out <dir>`                                              | where the rig artifacts land                                                 |
-| `--track-a`                                                | canonical body fit instead of the UniRig prediction                          |
-| `--body <dir\|ubc-male>`                                   | Track A body; `ubc-male` is portable, other bodies take explicit directories |
-| `--height <metres>`                                        | standing height for the fit                                                  |
-| `--face-front` `--feet-ground` `--center` `--rotate <deg>` | combine orientation fixes in one UniRig rebuild; rotate takes 90, 180 or 270 |
-| `--edits <patch.json>`                                     | apply joint-position edits from the viewport's gizmo                         |
-| `--auto-hints`                                             | turn the deform report into joint hints and re-run                           |
-| `--rerun-with-hints`                                       | re-run with `--edits` as position hints                                      |
-| `--backend <id>`                                           | the rig model; `unirig` is the default                                       |
-| `--seed <n>`                                               | prediction seed (Track B)                                                    |
-| `--no-deform-check`                                        | skip the test-pose deform report                                             |
-| `--accept` / `--unaccept`                                  | record that you reviewed the rig (needs `--workspace`)                       |
-| `--preview-joint <name>`                                   | CPU-only diagnostic bend on the workspace's canonical rig; no inference      |
+| Flag                                                                   | Meaning                                                                                |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `--model <glb>`                                                        | the mesh to rig. CAUTION: the skinned result is promoted back onto this path           |
+| `--out <dir>`                                                          | where the rig artifacts land                                                           |
+| `--track-a`                                                            | canonical body fit instead of the UniRig prediction                                    |
+| `--body <dir\|ubc-male>`                                               | Track A body; `ubc-male` is portable, other bodies take explicit directories           |
+| `--height <metres>`                                                    | standing height for the fit                                                            |
+| `--upright` `--face-front` `--feet-ground` `--center` `--rotate <deg>` | straighten, face, ground and center in one UniRig rebuild; rotate takes 90, 180 or 270 |
+| `--edits <patch.json>`                                                 | apply joint-position edits from the viewport's gizmo                                   |
+| `--auto-hints`                                                         | turn the deform report into joint hints and re-run                                     |
+| `--rerun-with-hints`                                                   | re-run with `--edits` as position hints                                                |
+| `--backend <id>`                                                       | the rig model; `unirig` is the default                                                 |
+| `--seed <n>`                                                           | prediction seed (Track B)                                                              |
+| `--no-deform-check`                                                    | skip the test-pose deform report                                                       |
+| `--accept` / `--unaccept`                                              | record that you reviewed the rig (needs `--workspace`)                                 |
+| `--preview-joint <name>`                                               | CPU-only diagnostic bend on the workspace's canonical rig; no inference                |
 
 Read the deform report before you accept. A bake with an unaccepted rig warns but still runs.
 Acceptance is journaled; `undo` takes it back.

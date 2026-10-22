@@ -638,6 +638,7 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
   clone: ['workspace', 'to', 'id', 'name'],
   rig: [
     'preview-joint',
+    'upright',
     'catalog',
     'model',
     'out',
@@ -680,6 +681,7 @@ const BOOLEAN_FLAGS: Record<string, readonly string[]> = {
   pick: ['reproject', 'color-match', 'no-reproject', 'no-color-match'],
   rig: [
     'track-a',
+    'upright',
     'rerun-with-hints',
     'auto-hints',
     'accept',
@@ -2148,7 +2150,16 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     // skeleton via UniRig; --track-a is the roster path.
     if (args.includes('--track-a')) {
       if (
-        ['face-front', 'feet-ground', 'center', 'rotate', 'edits', 'rerun-with-hints', 'auto-hints']
+        [
+          'upright',
+          'face-front',
+          'feet-ground',
+          'center',
+          'rotate',
+          'edits',
+          'rerun-with-hints',
+          'auto-hints',
+        ]
           .some((f) => args.includes(`--${f}`))
       ) {
         return fail(
@@ -2195,7 +2206,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     const { runRigJob } = await import('@spritebook/rig');
     try {
       const fixes: OrientationFix[] = [];
-      for (const f of ['face-front', 'feet-ground', 'center'] as const) {
+      for (const f of ['upright', 'face-front', 'feet-ground', 'center'] as const) {
         if (args.includes(`--${f}`)) fixes.push(f);
       }
       const rotate = flag(args, 'rotate');

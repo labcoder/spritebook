@@ -103,6 +103,7 @@ export type RigAdapterParams = z.output<typeof RigAdapterParamsSchema>;
 
 /** Tier-2 structural fixes — whole-model transforms, recorded for provenance. */
 export const ORIENTATION_FIXES = [
+  'upright',
   'face-front',
   'feet-ground',
   'center',

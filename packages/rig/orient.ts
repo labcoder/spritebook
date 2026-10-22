@@ -31,6 +31,7 @@ import { promises as fs } from 'node:fs';
  */
 import { type Document, type Node, NodeIO } from '@gltf-transform/core';
 import type { FacingReport, OrientationFix } from '@spritebook/schema';
+import { qAxisAngle, qToMat4 } from '@spritebook/anim/quat';
 
 /** Every position in the document, in world space, as a flat XYZ array. */
 export function worldPositions(doc: Document): Float32Array {
@@ -169,9 +170,9 @@ export function fixFor(facing: FacingReport['facing']): OrientationFix | undefin
     case '-Z':
       return 'rotate-180';
     case '+X':
-      return 'rotate-90';
-    case '-X':
       return 'rotate-270';
+    case '-X':
+      return 'rotate-90';
     default:
       return undefined;
   }
@@ -186,6 +187,71 @@ export async function detectFacingFile(path: string): Promise<FacingReport> {
 // ---------------------------------------------------------------------------
 // Tier-2 repairs
 // ---------------------------------------------------------------------------
+
+/** Closest clear principal axis to +Y; ambiguous shapes must not be guessed upright. */
+function uprightMatrix(positions: Float32Array): number[] | null {
+  const count = positions.length / 3;
+  if (count < 8) throw new Error('Not enough geometry to estimate upright alignment.');
+  const mean = [0, 0, 0];
+  for (let i = 0; i < positions.length; i++) mean[i % 3] += positions[i] / count;
+  const covariance = new Array<number>(9).fill(0);
+  for (let i = 0; i < positions.length; i += 3) {
+    for (let a = 0; a < 3; a++) {
+      for (let b = 0; b < 3; b++) {
+        covariance[a * 3 + b] += (positions[i + a] - mean[a]) * (positions[i + b] - mean[b]) /
+          count;
+      }
+    }
+  }
+  const vectors = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  // Jacobi diagonalization of the symmetric 3×3 covariance matrix.
+  for (let step = 0; step < 24; step++) {
+    let p = 0, q = 1;
+    for (const [a, b] of [[0, 2], [1, 2]]) {
+      if (Math.abs(covariance[a * 3 + b]) > Math.abs(covariance[p * 3 + q])) [p, q] = [a, b];
+    }
+    const pp = covariance[p * 3 + p], qq = covariance[q * 3 + q], pq = covariance[p * 3 + q];
+    if (Math.abs(pq) < 1e-12) break;
+    const angle = 0.5 * Math.atan2(2 * pq, qq - pp), c = Math.cos(angle), s = Math.sin(angle);
+    for (let r = 0; r < 3; r++) {
+      const vp = vectors[r * 3 + p], vq = vectors[r * 3 + q];
+      vectors[r * 3 + p] = c * vp - s * vq;
+      vectors[r * 3 + q] = s * vp + c * vq;
+      if (r === p || r === q) continue;
+      const rp = covariance[r * 3 + p], rq = covariance[r * 3 + q];
+      covariance[r * 3 + p] = covariance[p * 3 + r] = c * rp - s * rq;
+      covariance[r * 3 + q] = covariance[q * 3 + r] = s * rp + c * rq;
+    }
+    covariance[p * 3 + p] = c * c * pp - 2 * s * c * pq + s * s * qq;
+    covariance[q * 3 + q] = s * s * pp + 2 * s * c * pq + c * c * qq;
+    covariance[p * 3 + q] = covariance[q * 3 + p] = 0;
+  }
+  const axes = [0, 1, 2].sort((a, b) => Math.abs(vectors[3 + b]) - Math.abs(vectors[3 + a]));
+  const index = axes[0], sign = Math.sign(vectors[3 + index]) || 1;
+  const up = [vectors[index] * sign, vectors[3 + index] * sign, vectors[6 + index] * sign];
+  if (up[1] > 0.99999) return null;
+  const variance = covariance[index * 3 + index];
+  const ambiguous = axes.slice(1).some((i) =>
+    Math.abs(variance - covariance[i * 3 + i]) < Math.max(variance, covariance[i * 3 + i]) * 0.1
+  );
+  if (up[1] < 0.7 || Math.abs(vectors[3 + axes[1]]) > up[1] - 0.1 || ambiguous) {
+    throw new Error(
+      'Upright alignment is uncertain for this mesh. Turn off "Stand model upright" to keep its current pose.',
+    );
+  }
+  const length = Math.hypot(up[0], up[2]);
+  const matrix = [...qToMat4(qAxisAngle([-up[2] / length, 0, up[0] / length], Math.acos(up[1])))];
+  let low = Infinity, high = -Infinity;
+  for (let i = 0; i < positions.length; i += 3) {
+    const y = matrix[1] * positions[i] + matrix[5] * positions[i + 1] +
+      matrix[9] * positions[i + 2];
+    low = Math.min(low, y);
+    high = Math.max(high, y);
+  }
+  const bounds = boundsOf(positions), scale = (bounds.max[1] - bounds.min[1]) / (high - low);
+  for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) matrix[c * 4 + r] *= scale;
+  return matrix;
+}
 
 /** Yaw rotation about +Y, in degrees, as a column-major 4x4. */
 function yawMatrix(deg: number): number[] {
@@ -218,9 +284,8 @@ function mul(a: number[], b: number[]): number[] {
  * silently evaporated: measured, a body 1 m below the ground plane got a node
  * matrix of +1 and vertices still at -1. Baking is what makes a fix real.
  *
- * Every fix here is a yaw rotation and/or a translation — rigid and orthonormal
- * — so NORMAL and TANGENT take the rotation directly, without the
- * inverse-transpose a non-uniform scale would need, and their lengths survive.
+ * Fixes use rotations, translations and uniform scale to preserve declared height.
+ * NORMAL and TANGENT take the rotation and are normalized to discard that scale.
  * TANGENT.w is handedness, not geometry, so it is copied through.
  */
 function bakeNodeTransforms(doc: Document): void {
@@ -275,9 +340,13 @@ function bakeNodeTransforms(doc: Document): void {
         const stride = acc.getElementSize();
         for (let i = 0; i < a.length; i += stride) {
           const x = a[i], y = a[i + 1], z = a[i + 2];
-          a[i] = m[0] * x + m[4] * y + m[8] * z;
-          a[i + 1] = m[1] * x + m[5] * y + m[9] * z;
-          a[i + 2] = m[2] * x + m[6] * y + m[10] * z;
+          const nx = m[0] * x + m[4] * y + m[8] * z;
+          const ny = m[1] * x + m[5] * y + m[9] * z;
+          const nz = m[2] * x + m[6] * y + m[10] * z;
+          const length = Math.hypot(nx, ny, nz) || 1;
+          a[i] = nx / length;
+          a[i + 1] = ny / length;
+          a[i + 2] = nz / length;
         }
         acc.setArray(a);
       }
@@ -317,6 +386,9 @@ export async function applyOrientationFixes(
     const b = boundsOf(positions);
     let m: number[] | null = null;
     switch (fix) {
+      case 'upright':
+        m = uprightMatrix(positions);
+        break;
       case 'rotate-90':
         m = yawMatrix(90);
         break;

@@ -102,8 +102,8 @@ test('facing: every quarter-turn is detected with the verb that undoes it', () =
   for (
     const [deg, expectFacing, expectFix] of [
       [180, '-Z', 'rotate-180'],
-      [90, '+X', 'rotate-90'],
-      [270, '-X', 'rotate-270'],
+      [90, '+X', 'rotate-270'],
+      [270, '-X', 'rotate-90'],
     ] as Array<[number, string, string]>
   ) {
     const r = detectFacing(rotateY(base, deg));
@@ -172,6 +172,20 @@ test('face-front is idempotent and never rotates an already-correct mesh', async
   }
 });
 
+test('face-front fixes both sideways facings in the written geometry', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-facing-'));
+  try {
+    for (const degrees of [90, 270]) {
+      const src = join(dir, `side-${degrees}.glb`), out = join(dir, `front-${degrees}.glb`);
+      await writeGlb(src, rotateY(humanoidPositions(), degrees));
+      const { facingAfter } = await applyOrientationFixes(src, out, ['face-front']);
+      assertEquals(facingAfter.facing, '+Z', `sideways ${degrees} becomes front-facing`);
+    }
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('feet-ground and center place the body without fighting each other', async () => {
   const dir = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   try {
@@ -194,6 +208,45 @@ test('feet-ground and center place the body without fighting each other', async 
     assert(Math.abs((b.min[2] + b.max[2]) / 2) < 1e-4, 'centred on Z');
   } finally {
     await fs.rm(dir, { recursive: true });
+  }
+});
+
+test('upright repairs a rolled and pitched humanoid before facing and grounding', async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-upright-'));
+  try {
+    const tilted = humanoidPositions();
+    const roll = 30 * Math.PI / 180, pitch = 12 * Math.PI / 180;
+    for (let i = 0; i < tilted.length; i += 3) {
+      const x = tilted[i], y = tilted[i + 1], z = tilted[i + 2];
+      const xx = x * Math.cos(roll) - y * Math.sin(roll);
+      const yy = x * Math.sin(roll) + y * Math.cos(roll);
+      tilted[i] = xx;
+      tilted[i + 1] = yy * Math.cos(pitch) - z * Math.sin(pitch);
+      tilted[i + 2] = yy * Math.sin(pitch) + z * Math.cos(pitch);
+    }
+    const src = join(dir, 'tilted.glb'), out = join(dir, 'fixed.glb');
+    await writeGlb(src, tilted);
+    await applyOrientationFixes(src, out, ['upright', 'face-front', 'feet-ground', 'center']);
+    const positions = worldPositions(await new NodeIO().read(out));
+    const center = (boxIndex: number) => {
+      const result = [0, 0, 0];
+      for (let i = boxIndex * 96; i < (boxIndex + 1) * 96; i++) result[i % 3] += positions[i] / 32;
+      return result;
+    };
+    const head = center(0), torso = center(2);
+    assert(
+      Math.hypot(head[0] - torso[0], head[2] - torso[2]) < 0.04,
+      `head stands above torso within four degrees: ${head} vs ${torso}`,
+    );
+    assert(head[1] > torso[1], 'head remains above the feet');
+    assert(Math.abs(boundsOf(positions).min[1]) < 1e-6, 'feet grounded after straightening');
+    const before = boundsOf(tilted), after = boundsOf(positions);
+    assert(
+      Math.abs((after.max[1] - after.min[1]) - (before.max[1] - before.min[1])) < 1e-6,
+      'declared height preserved',
+    );
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
   }
 });
 

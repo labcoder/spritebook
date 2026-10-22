@@ -108,7 +108,15 @@ export const RigStateSchema = z.strictObject({
   })),
   /** tier-2 structural fixes, recorded for provenance */
   orientationFixes: z.array(
-    z.enum(['face-front', 'feet-ground', 'center', 'rotate-90', 'rotate-180', 'rotate-270']),
+    z.enum([
+      'upright',
+      'face-front',
+      'feet-ground',
+      'center',
+      'rotate-90',
+      'rotate-180',
+      'rotate-270',
+    ]),
   ),
   boneMask: z.record(z.string(), z.string()).optional(),
   sockets: z.array(z.strictObject({
