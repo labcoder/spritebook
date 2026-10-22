@@ -36,12 +36,12 @@ within a small fraction of its bbox diagonal the stage fails loudly.
 
 ## Weight transfer
 
-``reskin`` uses inverse-square interpolation of the 7 nearest sampled points,
-then UniRig's edge diffusion, directly on the CANONICAL vertices. A componentwise
-median erases thin fingers when their samples are a minority among neighbours;
-distance weighting preserves a close sample and varies continuously between samples.
-Diffusion uses exact geometric vertices so UV/normal seam copies cannot acquire different
-weights; the result is scattered back to the unchanged canonical vertex ordering.
+``reskin`` interpolates the 7 nearest sampled points, attenuates distant bone
+leakage, and regularizes along canonical mesh edges with anchored convex updates.
+A componentwise median erases thin fingers; asymmetric hierarchical diffusion can
+create negative parent weights. Exact geometric seam copies share one result, then
+scatter back to the unchanged canonical vertex ordering. Influence reduction fades
+the discarded tail rather than popping nonzero weights at fourth/fifth-rank crossings.
 The final normalization is guarded: upstream divides by the row
 sum unguarded, which is exactly the NaN factory P0-T4 catalogued (item 5). Here
 zero-weight rows are left at zero and COUNTED; the caller decides what to say
@@ -56,17 +56,17 @@ from typing import Any
 
 import numpy as np
 from scipy.spatial import cKDTree
+from scipy.sparse import coo_matrix
 
 #: glTF's JOINTS_0/WEIGHTS_0 hold four influences per vertex.
 INFLUENCES = 4
 #: reskin tuning, from UniRig's own quick-inference call site
 NEAREST_SAMPLES = 7
-DIFFUSION_ALPHA = 2.0
-DIFFUSION_STEPS = 1
-WEIGHT_FLOOR = 0.03
+SMOOTH_STEPS = 150
+SMOOTH_RADIUS_FRACTION = 0.015
+BONE_SUPPORT_FRACTION = 0.02
 #: rows processed per block, so a 200k-vertex character cannot blow up memory
 VERTEX_BLOCK = 16384
-EDGE_BLOCK = 262144
 
 #: right-handed axis maps tried when fitting UniRig space onto the glb's.
 AXIS_MAPS: dict[str, np.ndarray] = {
@@ -202,13 +202,14 @@ def reskin(
     sampled_skin: np.ndarray,
     vertices: np.ndarray,
     triangles: np.ndarray,
-    parents: np.ndarray,
+    joints: np.ndarray,
+    tails: np.ndarray,
 ) -> np.ndarray:
     """Per-vertex weights for ``vertices`` from the model's sampled prediction.
 
-    Interpolate nearby samples, then UniRig's (MIT) hotter-to-cooler diffusion,
-    accumulated up the joint chain so a child's influence bleeds into its parent rather than
-    across the body. Zero-weight rows survive as zeros (see module docstring).
+    Interpolate samples, attenuate remote bones, then smooth along mesh edges.
+    The anchored, convex updates preserve nonnegative weights and do not diffuse
+    between disconnected surfaces. An all-zero prediction remains zero.
     """
     # Diffuse on geometric vertices, then scatter back across UV/normal seams.
     vertices, seam_vertices = np.unique(vertices, axis=0, return_inverse=True)
@@ -231,58 +232,46 @@ def reskin(
         coefficients /= coefficients.sum(axis=1, keepdims=True)
         skin[start : start + VERTEX_BLOCK] = np.einsum("nk,nkj->nj", coefficients, sampled_skin[nearest])
 
+    extent = float(np.ptp(vertices, axis=0).max())
+    support = max(extent * BONE_SUPPORT_FRACTION, 1e-10)
+    bones = tails - joints
+    lengths_sq = np.maximum((bones * bones).sum(axis=1), 1e-20)
+    for start in range(0, n_vertices, VERTEX_BLOCK):
+        block = skin[start : start + VERTEX_BLOCK]
+        relative = vertices[start : start + VERTEX_BLOCK, None, :] - joints
+        t = np.clip(np.einsum("nkj,kj->nk", relative, bones) / lengths_sq, 0.0, 1.0)
+        distances = np.linalg.norm(relative - t[:, :, None] * bones, axis=-1)
+        # Keep the prediction's support; distant head/leg leakage must not drive a sleeve.
+        block *= ((distances.min(axis=1, keepdims=True) + support) / (distances + support)) ** 4
+        total = block.sum(axis=1, keepdims=True)
+        block /= np.where(total > 0, total, 1.0)
+
     edges = np.concatenate(
         [triangles[:, [0, 1]], triangles[:, [1, 2]], triangles[:, [2, 0]]], axis=0
     )
     edges = np.concatenate([edges, edges[:, [1, 0]]], axis=0)
-    edge_len = np.linalg.norm(vertices[edges[:, 1]] - vertices[edges[:, 0]], axis=1, keepdims=True)
-    co_all = np.exp(-edge_len * DIFFUSION_ALPHA).astype(np.float32)
-
-    # parents[i] < i is guaranteed upstream (RawData.check), so accumulating up
-    # the chain is a single reversed sweep and restoring it a forward one.
-    for _ in range(DIFFUSION_STEPS):
-        acc = skin.copy()
-        for i in range(n_joints - 1, -1, -1):
-            p = int(parents[i])
-            if p >= 0:
-                acc[:, p] += acc[:, i]
-        neighbor = np.zeros_like(acc)
-        neighbor_co = np.zeros((n_vertices, n_joints), dtype=np.float32)
-        for start in range(0, edges.shape[0], EDGE_BLOCK):
-            e = edges[start : start + EDGE_BLOCK]
-            co = co_all[start : start + EDGE_BLOCK, 0]
-            src = acc[e[:, 0]]
-            mask = acc[e[:, 1]] < src
-            target = e[:, 1]
-            # a scatter-add per joint column: np.bincount is C-speed where
-            # np.add.at on a (E, J) block is not
-            for j in range(n_joints):
-                sel = mask[:, j]
-                neighbor[:, j] += np.bincount(
-                    target, weights=src[:, j] * co * sel, minlength=n_vertices
-                ).astype(np.float32)
-                neighbor_co[:, j] += np.bincount(
-                    target, weights=co * sel, minlength=n_vertices
-                ).astype(np.float32)
-        acc = (acc + neighbor) / (1.0 + neighbor_co)
-        for i in range(n_joints):
-            p = int(parents[i])
-            if p >= 0:
-                acc[:, p] -= acc[:, i]
-        total = acc.sum(axis=-1, keepdims=True)
-        live = np.abs(total) > 0
-        skin = np.where(live, acc / np.where(live, total, 1.0), 0.0).astype(np.float32)
-
-    # upstream's "avoid 0-skin" pass: drop dust weights, but only for rows that
-    # have something real left afterwards
-    strong = (skin >= WEIGHT_FLOOR).any(axis=-1, keepdims=True)
-    skin = np.where((skin < WEIGHT_FLOOR) & strong, 0.0, skin)
+    edges = np.unique(edges, axis=0)
+    edges = edges[edges[:, 0] != edges[:, 1]]
+    radius = max(extent * SMOOTH_RADIUS_FRACTION, 1e-10)
+    edge_len = np.linalg.norm(vertices[edges[:, 1]] - vertices[edges[:, 0]], axis=1)
+    coefficients = (radius / np.maximum(edge_len, radius * 0.01)) ** 2
+    adjacency = coo_matrix(
+        (coefficients.astype(np.float32), (edges[:, 0], edges[:, 1])),
+        shape=(n_vertices, n_vertices),
+    ).tocsr()
+    denominator = 1.0 + np.asarray(adjacency.sum(axis=1))
+    initial = skin.copy()
+    for _ in range(SMOOTH_STEPS):
+        skin = (initial + adjacency @ skin) / denominator
     return skin[seam_vertices]
 
 
 def top_influences(skin: np.ndarray, k: int = INFLUENCES) -> tuple[np.ndarray, np.ndarray]:
-    """The k strongest joints per vertex, values UNCHANGED.
+    """The k strongest joints, fading the discarded tail before normalization.
 
+    A hard cutoff pops a nonzero influence when ranks k/k+1 cross, tearing tiny
+    mesh edges. Subtract rank k+1 so that influence reaches zero at the boundary.
+    Exact uniform ties retain their original weights rather than losing the row.
     No normalization and no NaN scrubbing happen here: the caller's census has
     to see what the model actually produced (sidecar-vram law).
     """
@@ -291,8 +280,12 @@ def top_influences(skin: np.ndarray, k: int = INFLUENCES) -> tuple[np.ndarray, n
     # rank on a finite copy so NaN columns sort LAST, but read the values back
     # out of the ORIGINAL array so a NaN still reaches the caller's census
     ranked = np.where(np.isfinite(skin), skin, -np.inf)
-    order = np.argsort(-ranked, axis=1, kind="stable")[:, :take]
+    order = np.argsort(-ranked, axis=1, kind="stable")[:, : min(k + 1, n_joints)]
     values = np.take_along_axis(skin, order, axis=1)
+    if n_joints > k:
+        reduced = values[:, :k] - np.maximum(values[:, k : k + 1], 0.0)
+        values = np.where(reduced.sum(axis=1, keepdims=True) > 1e-10, reduced, values[:, :k])
+    order = order[:, :take]
     if take < k:  # fewer joints than influence slots: pad with empty slots
         pad = k - take
         order = np.concatenate([order, np.zeros((order.shape[0], pad), dtype=order.dtype)], axis=1)
@@ -394,7 +387,7 @@ def run_weights(args: argparse.Namespace) -> dict[str, Any]:
     sampled_c = to_canonical(sampled_unirig)
 
     # 3. weights, straight onto the canonical vertices
-    dense = reskin(sampled_c, sampled_skin, canonical, triangles, skel["parents"])
+    dense = reskin(sampled_c, sampled_skin, canonical, triangles, joints_c, tails_c)
     row_sums = dense.astype(np.float64).sum(axis=1)
     indices, weights = top_influences(dense)
 

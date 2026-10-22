@@ -103,7 +103,7 @@ from . import Adapter, AdapterError, Emitter, validate_params
 from ..glb import read_scene_geometry
 from .unirig_humanoid_ref import HUMANOID_REFERENCE, HUMANOID_REFERENCE_SOURCE
 
-UNIRIG_ADAPTER_VERSION = "1.2.1"
+UNIRIG_ADAPTER_VERSION = "1.3.0"
 
 # --- mirrors packages/schema/rig.ts (FROZEN) ----------------------------------
 RIG_SKELETON_FILE = "rig.json"

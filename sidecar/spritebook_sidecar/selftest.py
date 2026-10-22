@@ -962,20 +962,25 @@ def test_unirig_stylized_chains() -> None:
 
 
 def test_unirig_weight_transfer() -> None:
-    from .adapters.unirig_merge import reskin, top_influences
+    from .adapters.unirig_merge import reskin as transfer, top_influences
     from .adapters.unirig import finalize_weights
+
+    def reskin(samples, weights, vertices, triangles):
+        # Equal bone distances isolate interpolation/smoothing from the spatial prior.
+        bones = np.zeros((weights.shape[1], 3))
+        return transfer(samples, weights, vertices, triangles, bones, bones)
 
     # One nearby thin-finger sample among six palm samples. A median erases the finger entirely.
     samples = np.array([[0., 0, 0]] + [[1.+i*.1, 0, 0] for i in range(6)])
     weights = np.array([[0., 1.]] + [[1., 0.]] * 6)
     vertices = np.array([[0., 0, 0], [.01, 0, 0], [.02, 0, 0]])
-    result = reskin(samples, weights, vertices, np.empty((0, 3), dtype=np.int64), np.array([-1, 0]))
+    result = reskin(samples, weights, vertices, np.empty((0, 3), dtype=np.int64))
     ok(result[0, 1] == 1, "an exact sample retains its joint influence")
     ok(np.all(result[:, 1] > .99), "a close finger sample survives a majority of distant palm samples")
     indices, values = top_influences(result)
     _, final, _ = finalize_weights(indices, values, result.sum(axis=1), 2)
     ok(np.isfinite(final).all() and np.allclose(final.sum(axis=1), 1), "final rows remain finite and normalized")
-    zero = reskin(samples, np.zeros_like(weights), vertices, np.empty((0, 3), dtype=np.int64), np.array([-1, 0]))
+    zero = reskin(samples, np.zeros_like(weights), vertices, np.empty((0, 3), dtype=np.int64))
     ok(not zero.any(), "missing influence is preserved, never fabricated")
 
     # UV/normal seams duplicate geometric points. Diffusing each copy independently opens cracks.
@@ -983,10 +988,32 @@ def test_unirig_weight_transfer() -> None:
     samples = vertices[[0,1,2,4,5]]
     weights = np.array([[.5,.5], [1.,0], [1.,0], [0.,1], [0.,1]])
     triangles = np.array([[0,1,2], [3,4,5]])
-    result = reskin(samples, weights, vertices, triangles, np.array([-1,0]))
+    result = reskin(samples, weights, vertices, triangles)
     ok(np.array_equal(result[0], result[3]), "coincident seam vertices receive identical weights")
     ok(result.shape == (6,2), "seam welding preserves the canonical vertex order and count")
     ok(result[1,0] > result[4,0], "the scatter retains the original side of each vertex")
+
+    # A branch fan must not create negative parent weights as children diffuse independently.
+    vertices = .01 * np.array([[0.,0,0], [1.,0,0], [-.5,1.,0], [-.5,-1.,0]])
+    triangles = np.array([[0,1,2], [0,2,3], [0,3,1]])
+    result = reskin(vertices, np.eye(4), vertices, triangles)
+    ok(np.all(result >= 0), "smoothing a branch cannot produce negative skin weights")
+    ok(np.allclose(result.sum(axis=1), 1), "smoothing conserves each vertex's influence mass")
+
+    # Crossing the fourth/fifth ranking must fade the discarded influence, not pop it off.
+    dense = np.array([[.6,.15,.1,.08+1e-6,.08-1e-6], [.6,.15,.1,.08-1e-6,.08+1e-6]])
+    indices, values = top_influences(dense)
+    indices, final, _ = finalize_weights(indices, values, dense.sum(axis=1), 5)
+    expanded = np.zeros_like(dense)
+    np.put_along_axis(expanded, indices, final, axis=1)
+    ok(np.abs(expanded[0]-expanded[1]).sum() < 1e-4, "four-influence reduction stays continuous at a ranking boundary")
+    _, values = top_influences(np.full((1,5), .2))
+    ok(values.sum() > 0, "uniform ties cannot erase every influence")
+
+    vertices = np.array([[.02,0,0], [.05,0,0]])
+    result = transfer(vertices, np.full((2,2), .5), vertices, np.empty((0,3), dtype=np.int64),
+                      np.array([[0.,0,0], [1.,0,0]]), np.array([[.1,0,0], [1.,1,0]]))
+    ok(np.all(result[:,1] < 1e-3), "remote bone leakage cannot outweigh the nearby bone")
 
 
 def test_unirig_environment(tmp: Path) -> None:

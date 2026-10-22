@@ -164,15 +164,19 @@ packages/core/native/Cargo.toml`; clean any custom Cargo target directories with
 
 ## UniRig quality checks
 
-Adapter 1.2.1 checks humanoid naming against leg, trunk and arm ancestry as well as position. A
+Adapter 1.3.0 checks humanoid naming against leg, trunk and arm ancestry as well as position. A
 close reference match cannot place a thigh in the spine; contradictory finger-chain labels stay
 generic and produce a warning. Corrections and rejected names are recorded in `rig/rig-run.json`. A
 named joint or finite, normalized weight row does not prove correct anatomy.
 
-The CPU merge transfers sampled skin weights with inverse-square distance interpolation before edge
-diffusion and the existing top-four normalization. The former componentwise median could erase a
-thin finger when its sample was outnumbered by nearby palm samples. Neither transfer nor position
-hints can recover detail missing from the model prediction. Deformation thresholds are unchanged.
+The CPU merge interpolates nearby samples, attenuates influence from distant bones, and smooths
+weights along mesh edges with nonnegative, anchored updates. Geometric seam copies share weights;
+disconnected surfaces do not exchange them. The four-influence reduction fades the discarded tail
+so neighboring vertices do not suddenly lose a substantial influence when rankings cross. The
+former hierarchical diffusion could produce negative parent weights; clipping those and applying
+a hard influence cutoff created jagged shoulders during motion. Smoothing uses SciPy already in
+the runtime, with no additional download. Neither transfer nor position hints can recover detail
+missing from the model prediction. Deformation thresholds are unchanged.
 
 Existing rigs retain their saved bytes. Rebuilding uses the updated adapter without downloading
 checkpoints again. The saved Bulma skeleton reproduces the corrected hip/trunk/leg naming on CPU;
