@@ -171,12 +171,12 @@ named joint or finite, normalized weight row does not prove correct anatomy.
 
 The CPU merge interpolates nearby samples, attenuates influence from distant bones, and smooths
 weights along mesh edges with nonnegative, anchored updates. Geometric seam copies share weights;
-disconnected surfaces do not exchange them. The four-influence reduction fades the discarded tail
-so neighboring vertices do not suddenly lose a substantial influence when rankings cross. The
-former hierarchical diffusion could produce negative parent weights; clipping those and applying
-a hard influence cutoff created jagged shoulders during motion. Smoothing uses SciPy already in
-the runtime, with no additional download. Neither transfer nor position hints can recover detail
-missing from the model prediction. Deformation thresholds are unchanged.
+disconnected surfaces do not exchange them. The four-influence reduction fades the discarded tail so
+neighboring vertices do not suddenly lose a substantial influence when rankings cross. The former
+hierarchical diffusion could produce negative parent weights; clipping those and applying a hard
+influence cutoff created jagged shoulders during motion. Smoothing uses SciPy already in the
+runtime, with no additional download. Neither transfer nor position hints can recover detail missing
+from the model prediction. Deformation thresholds are unchanged.
 
 Existing rigs retain their saved bytes. Rebuilding uses the updated adapter without downloading
 checkpoints again. The saved Bulma skeleton reproduces the corrected hip/trunk/leg naming on CPU;
