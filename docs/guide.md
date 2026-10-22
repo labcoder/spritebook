@@ -140,17 +140,31 @@ means not flagged by the deformation tests, amber means flagged, and white means
 mesh** keeps the skeleton visible through the surface. **Front**, **Side** and **Rear** move the
 camera; they do not alter the model or rebuild anything.
 
-For UniRig, choose **Model facing**, grounding and centering together. A numeric turn previews the
-orientation. **Detect front when rebuilding**, grounding and centering take effect on rebuild.
-**Apply orientation and rebuild rig** submits the choices in one command. This runs prediction and
-skinning again; undo restores the prior recorded rig. Template fitting uses the template skeleton
-and does not accept these repair switches.
+The first UniRig build enables **Stand model upright**, front detection, grounding and centering.
+Uncheck upright alignment to preserve an intentional lean. Upright corrects the dominant body axis
+while retaining the declared height; ground and center only change position. An ambiguous upright
+estimate refuses with an instruction to turn it off. Front detection can also be uncertain: inspect
+the result and use a numeric turn when needed.
 
-The **Deform check** below the canvas retains every reported finding, worst stretch first. Click a
-joint name to select and frame it. A joint without a flag has only passed those numerical tests;
-inspect its anatomy too. **Preview selected joint bend** writes a CPU-generated ±30° diagnostic
-animation using the same pose axis as the check. Pause or scrub it in the viewport; **Return to rest
-pose** returns to the saved model. Previewing does not change the rig or its acceptance.
+For an existing rig, **Auto align and rebuild rig** combines those four operations. **Adjust
+alignment** exposes individual choices and **Apply orientation and rebuild rig** submits them. A
+numeric turn previews the rotation; the other changes take effect on rebuild. This runs prediction
+and skinning again; undo restores the prior recorded rig. Template fitting uses the template
+skeleton and does not accept these repair switches.
+
+The **Bend checks** below the canvas retain every reported finding, worst stretch first. Amber means
+the surface needs review under a test bend, even when the joint is well placed. **Edges stretched**
+gives the affected fraction as well as the worst edge. A joint can drive several valid mesh parts,
+including clothing or accessories; that count alone does not mean a tear. Click a joint name to
+select and frame it. A joint without a flag has only passed those numerical tests; inspect its
+anatomy too. **Preview selected joint bend** writes a CPU-generated ±30° diagnostic animation using
+the same pose axis as the check. Pause or scrub it in the viewport; **Return to rest pose** returns
+to the saved model. Previewing does not change the rig or its acceptance.
+
+Predicted joint counts and hand detail vary between characters. A wrist with one branch is not five
+independently mapped fingers. When separate finger motion is unavailable, the screen says so and
+hands follow the wrists. Check both walking and an arms-raised pose: hands resting against clothing
+can receive incorrect weights that become obvious only when the limbs separate.
 
 On a UniRig rig at rest, drag the move handles to draft a position edit. **W** selects move and
 **Q** changes local/world axes; rotation and scale handles are not offered because the edit contract

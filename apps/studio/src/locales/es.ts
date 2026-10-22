@@ -566,4 +566,29 @@ export const es: Record<string, string> = {
     'seleccionar y encuadrar esta articulación en el lienzo',
   'the log drawer has the verbatim reason': 'el cajón de registro tiene la razón literal',
   'this workspace records no source image': 'este workspace no registra imagen fuente',
+  'Adjust alignment': 'Ajustar alineación',
+  'Auto align and rebuild rig': 'Alinear automáticamente y reconstruir rig',
+  'Bend checks': 'Pruebas de flexión',
+  'Blue: no warning · amber: review surface movement · white: selected':
+    'Azul: sin aviso · ámbar: revisar movimiento de la superficie · blanco: seleccionado',
+  'Branches at each wrist': 'Ramificaciones en cada muñeca',
+  'Edges stretched': 'Aristas estiradas',
+  'Left hand': 'Mano izquierda',
+  'Right hand': 'Mano derecha',
+  'Little surface movement': 'Poco movimiento de la superficie',
+  'No surface attached': 'Sin superficie asociada',
+  'Separate finger motion is not mapped. Hands move with the wrists.':
+    'No hay movimiento independiente de dedos asignado. Las manos se mueven con las muñecas.',
+  'Separate surfaces can include clothing or accessories; this alone does not mean the rig is broken.':
+    'Las superficies separadas pueden ser ropa o accesorios; esto por sí solo no indica que el rig esté mal.',
+  'Stand model upright': 'Enderezar modelo',
+  'Surface stretches in test': 'La superficie se estira en la prueba',
+  'These checks bend one joint at a time. A joint can be well placed while the surface stretches around it. Select a joint, then preview its bend.':
+    'Estas pruebas flexionan una articulación a la vez. Puede estar bien colocada aunque la superficie se estire a su alrededor. Selecciona una articulación y previsualiza su flexión.',
+  'Upright corrects a lean. Ground and center change position. Front, Side and Rear only move the camera.':
+    'Enderezar corrige la inclinación. Apoyar y centrar cambian la posición. Frente, lateral y trasera solo mueven la cámara.',
+  'Worst edge': 'Peor arista',
+  'mesh parts': 'partes de la malla',
+  'named joints': 'articulaciones con nombre',
+  'predicted joints': 'articulaciones predichas',
 };

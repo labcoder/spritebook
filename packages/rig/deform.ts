@@ -300,6 +300,7 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
     if (verts.length === 0) {
       stats.push({
         joint,
+        parent: asset.jointParents[j] < 0 ? null : asset.jointNames[asset.jointParents[j]],
         influencedVertices: 0,
         influencedEdges: 0,
         stretchedEdges: 0,
@@ -397,6 +398,7 @@ export async function deformCheck(opts: DeformCheckOptions): Promise<DeformRepor
     if (stretchedEdges >= seamFloor && influencedEdges > 0) flags.push('excessive-stretch');
     stats.push({
       joint,
+      parent: asset.jointParents[j] < 0 ? null : asset.jointNames[asset.jointParents[j]],
       influencedVertices: verts.length,
       influencedEdges,
       stretchedEdges,

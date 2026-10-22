@@ -111,13 +111,19 @@ preserve the CLI reason and recovery path.
 
 Use outcome names for the two methods: UniRig preserves geometry; template fitting replaces it.
 After the first rig, disclose the rebuild method so the orientation controls have room. Group
-facing, grounding and centering into one explicit rebuild. Camera views remain separate from model
-transforms. Position hints and raw edits-file paths stay under Repair tools.
+upright alignment, facing, grounding and centering into one explicit rebuild. First builds enable
+these choices with an upright opt-out; existing rigs lead with Auto align and rebuild rig and
+disclose manual adjustments. Camera views remain separate from model transforms. Position hints and
+raw edits-file paths stay under Repair tools.
 
 Skeleton lines and joint markers render through the mesh by default. Blue is not flagged, amber is
-flagged, white is selected; a text legend and the unchanged report carry the same meaning. Report
-rows select and frame joints. Diagnostic motion comes from core; the GUI only plays it. Acceptance
-remains a deliberate review action. Never label an unflagged joint anatomically correct.
+flagged for surface review, white is selected; a text legend and the unchanged report carry the same
+meaning. Report rows select and frame joints. Diagnostic motion comes from core; the GUI only plays
+it. Acceptance remains a deliberate review action. Never label an unflagged joint anatomically
+correct. Call the report Bend checks, explain that joint placement and surface motion differ, and
+show the fraction of stretched edges beside the worst edge. Separate mesh parts are neutral
+information; clothing is not automatically broken. Show predicted/named joint counts and limited
+hand mapping without promising articulated fingers from a GPU run.
 
 ## Implementation verification
 

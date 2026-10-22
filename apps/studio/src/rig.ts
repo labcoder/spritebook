@@ -11,8 +11,10 @@ export interface JointRow {
   /** ×1.0 = no stretch; the report's own number */
   maxEdgeStretch: number;
   meanDisplacementM: number;
-  /** >1 means the joint drives detached pieces — no hint can repair it */
+  /** Separate surfaces, including valid clothing/accessories. */
   spannedComponents: number;
+  influencedEdges: number;
+  stretchedEdges: number;
 }
 
 export interface RigReportView {
@@ -20,6 +22,9 @@ export interface RigReportView {
   totalJoints: number;
   flagged: JointRow[];
   cleanCount: number;
+  namedCount: number;
+  fingerCount: number;
+  handBranches: { left: number | null; right: number | null };
 }
 
 export function projectReport(report: unknown): RigReportView | null {
@@ -27,6 +32,9 @@ export function projectReport(report: unknown): RigReportView | null {
   const r = report as Record<string, unknown>;
   const joints = Array.isArray(r.joints) ? r.joints : null;
   if (!joints) return null;
+  const entries = joints.map((j) =>
+    (j !== null && typeof j === 'object' ? j : {}) as Record<string, unknown>
+  );
   const rows: JointRow[] = [];
   let clean = 0;
   for (const j of joints) {
@@ -42,6 +50,8 @@ export function projectReport(report: unknown): RigReportView | null {
       maxEdgeStretch: typeof o.maxEdgeStretch === 'number' ? o.maxEdgeStretch : 0,
       meanDisplacementM: typeof o.meanDisplacementM === 'number' ? o.meanDisplacementM : 0,
       spannedComponents: typeof o.spannedComponents === 'number' ? o.spannedComponents : 1,
+      influencedEdges: typeof o.influencedEdges === 'number' ? o.influencedEdges : 0,
+      stretchedEdges: typeof o.stretchedEdges === 'number' ? o.stretchedEdges : 0,
     });
   }
   rows.sort((a, b) => b.maxEdgeStretch - a.maxEdgeStretch);
@@ -50,6 +60,20 @@ export function projectReport(report: unknown): RigReportView | null {
     totalJoints: joints.length,
     flagged: rows,
     cleanCount: clean,
+    namedCount:
+      entries.filter((j) => typeof j.joint === 'string' && !/^bone_\d+$/.test(j.joint)).length,
+    fingerCount:
+      entries.filter((j) =>
+        typeof j.joint === 'string' && /^(thumb|index|middle|ring|pinky)_/.test(j.joint)
+      ).length,
+    handBranches: {
+      left: entries.some((j) => j.joint === 'hand_l' && j.parent !== undefined)
+        ? entries.filter((j) => j.parent === 'hand_l').length
+        : null,
+      right: entries.some((j) => j.joint === 'hand_r' && j.parent !== undefined)
+        ? entries.filter((j) => j.parent === 'hand_r').length
+        : null,
+    },
   };
 }
 

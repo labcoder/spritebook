@@ -58,13 +58,26 @@ function useRigRun(bridge: StudioBridge, onChanged: (args: string[]) => void) {
 
 interface OrientationDraft {
   front: string;
+  upright: boolean;
   ground: boolean;
   center: boolean;
 }
-const REST_ORIENTATION: OrientationDraft = { front: 'keep', ground: false, center: false };
+const REST_ORIENTATION: OrientationDraft = {
+  front: 'keep',
+  upright: false,
+  ground: false,
+  center: false,
+};
+const INITIAL_ORIENTATION: OrientationDraft = {
+  front: 'detect',
+  upright: true,
+  ground: true,
+  center: true,
+};
 
 function orientationFixes(draft: OrientationDraft): string[] {
   return [
+    ...(draft.upright ? ['upright'] : []),
     ...(draft.front === 'detect'
       ? ['face-front']
       : draft.front === 'keep'
@@ -177,6 +190,14 @@ function Orientation({ draft, onChange, busy }: {
         <label className='check-field'>
           <input
             type='checkbox'
+            checked={draft.upright}
+            onChange={(e) => onChange({ ...draft, upright: e.target.checked })}
+          />
+          {t('Stand model upright')}
+        </label>
+        <label className='check-field'>
+          <input
+            type='checkbox'
             checked={draft.ground}
             onChange={(e) => onChange({ ...draft, ground: e.target.checked })}
           />
@@ -193,7 +214,7 @@ function Orientation({ draft, onChange, busy }: {
       </div>
       <p className='inote'>
         {t(
-          'Turn previews the model; other fixes apply on rebuild. Camera views only move the camera.',
+          'Upright corrects a lean. Ground and center change position. Front, Side and Rear only move the camera.',
         )}
       </p>
     </fieldset>
@@ -205,7 +226,7 @@ function RunRig(
 ) {
   const [trackA, setTrackA] = useState(false);
   const [body, setBody] = useState(BUNDLED_BODY);
-  const [orientation, setOrientation] = useState(REST_ORIENTATION);
+  const [orientation, setOrientation] = useState(INITIAL_ORIENTATION);
   const { run, failure, canceled, exec } = useRigRun(bridge, onChanged);
   const args = rigRunArgs(
     dir,
@@ -266,6 +287,13 @@ function flagClass(flag: string): string {
   return flag === 'excessive-stretch' ? 'sun' : 'signal';
 }
 
+function flagLabel(flag: string): string {
+  if (flag === 'excessive-stretch') return t('Surface stretches in test');
+  if (flag === 'no-influence') return t('No surface attached');
+  if (flag === 'dead-joint') return t('Little surface movement');
+  return flag;
+}
+
 function ReportTable({ view, onFocusJoint }: {
   view: RigReportView;
   /** a row's activation selects and frames that joint in the canvas */
@@ -283,7 +311,7 @@ function ReportTable({ view, onFocusJoint }: {
           <tr>
             <th scope='col'>{t('joint')}</th>
             <th scope='col'>{t('finding')}</th>
-            <th scope='col' className='num'>{t('max stretch')}</th>
+            <th scope='col' className='num'>{t('Edges stretched')}</th>
             <th scope='col' className='num'>{t('mean move')}</th>
           </tr>
         </thead>
@@ -301,18 +329,29 @@ function ReportTable({ view, onFocusJoint }: {
                 </button>
               </td>
               <td>
-                {j.flags.map((f) => <span key={f} className={`mbadge ${flagClass(f)}`}>{f}</span>)}
+                {j.flags.map((f) => (
+                  <span key={f} title={f} className={`mbadge ${flagClass(f)}`}>{flagLabel(f)}</span>
+                ))}
                 {j.spannedComponents > 1 && (
                   <span
-                    className='mbadge signal'
-                    title={t('no placement hint can repair this')}
+                    className='inote'
+                    title={t(
+                      'Separate surfaces can include clothing or accessories; this alone does not mean the rig is broken.',
+                    )}
                   >
-                    {j.spannedComponents} {t('detached pieces')}
+                    {j.spannedComponents} {t('mesh parts')}
                   </span>
                 )}
               </td>
               <td className='mono num'>
-                {j.maxEdgeStretch > 0 ? `×${j.maxEdgeStretch.toFixed(2)}` : '—'}
+                <div title={`${j.stretchedEdges} / ${j.influencedEdges}`}>
+                  {j.influencedEdges > 0
+                    ? `${(100 * j.stretchedEdges / j.influencedEdges).toFixed(1)}%`
+                    : '—'}
+                </div>
+                <span className='inote'>
+                  {t('Worst edge')} {j.maxEdgeStretch > 0 ? `×${j.maxEdgeStretch.toFixed(2)}` : '—'}
+                </span>
               </td>
               <td className='mono num'>
                 {(j.meanDisplacementM * 1000).toFixed(0)} mm
@@ -333,7 +372,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
 }) {
   const m = (manifest ?? {}) as Record<string, unknown>;
   const rig = m.rig as
-    | { track?: string; accepted?: boolean; jointCount?: number }
+    | { track?: string; accepted?: boolean; jointCount?: number; orientationFixes?: string[] }
     | undefined;
   const [report, setReport] = useState<RigReportView | null>(null);
   const [editsPath, setEditsPath] = useState('');
@@ -505,7 +544,9 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                 )}
               </div>
             )}
-            <p className='inote'>{t('Blue: not flagged · amber: flagged · white: selected')}</p>
+            <p className='inote'>
+              {t('Blue: no warning · amber: review surface movement · white: selected')}
+            </p>
             {edits.length > 0 && (
               <>
                 <div className='bindrows'>
@@ -562,8 +603,33 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           {/* .rigdeform is the landing target above — keep it stable */}
           <section className='gensec rigdeform'>
             <div className='gensechead'>
-              <span className='hud'>{t('Deform check')}</span>
+              <span className='hud'>{t('Bend checks')}</span>
             </div>
+            <p className='inote'>
+              {t(
+                'These checks bend one joint at a time. A joint can be well placed while the surface stretches around it. Select a joint, then preview its bend.',
+              )}
+            </p>
+            {report && (
+              <>
+                <p className='inote'>
+                  {report.totalJoints} {t('predicted joints')} · {report.namedCount}{' '}
+                  {t('named joints')}
+                </p>
+                {report.fingerCount === 0 && (
+                  <p className='inote'>
+                    {t('Separate finger motion is not mapped. Hands move with the wrists.')}
+                  </p>
+                )}
+                {(report.handBranches.left !== null || report.handBranches.right !== null) && (
+                  <p className='inote'>
+                    {t('Branches at each wrist')} · {t('Left hand')}:{' '}
+                    {report.handBranches.left ?? '—'} · {t('Right hand')}:{' '}
+                    {report.handBranches.right ?? '—'}
+                  </p>
+                )}
+              </>
+            )}
             {report === null
               ? (
                 <div className='inote'>
@@ -608,28 +674,41 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
             {!rerunTrackA && (
               <section className='gensec'>
                 <h2 className='hud'>{t('Orientation')}</h2>
-                <Orientation
-                  draft={orientation}
-                  onChange={setOrientation}
-                  busy={busy || preview || edits.length > 0}
-                />
                 <button
                   type='button'
                   className='btn mbtn'
-                  disabled={busy || preview || edits.length > 0 ||
-                    orientationFixes(orientation).length === 0}
-                  onClick={() => exec(rigRunArgs(dir, { fixes: orientationFixes(orientation) }))}
+                  disabled={busy || preview || edits.length > 0}
+                  onClick={() =>
+                    exec(rigRunArgs(dir, { fixes: orientationFixes(INITIAL_ORIENTATION) }))}
                 >
-                  {t('Apply orientation and rebuild rig')}
+                  {t('Auto align and rebuild rig')}
                 </button>
-                <p className='inote'>
-                  {t(
-                    'Rebuilds joints and weights on the GPU. The current rig is replaced; undo restores it.',
+                <details className='panel-disclosure'>
+                  <summary>{t('Adjust alignment')}</summary>
+                  <Orientation
+                    draft={orientation}
+                    onChange={setOrientation}
+                    busy={busy || preview || edits.length > 0}
+                  />
+                  <button
+                    type='button'
+                    className='btn mbtn'
+                    disabled={busy || preview || edits.length > 0 ||
+                      orientationFixes(orientation).length === 0}
+                    onClick={() => exec(rigRunArgs(dir, { fixes: orientationFixes(orientation) }))}
+                  >
+                    {t('Apply orientation and rebuild rig')}
+                  </button>
+                  <p className='inote'>
+                    {t(
+                      'Rebuilds joints and weights on the GPU. The current rig is replaced; undo restores it.',
+                    )}
+                  </p>
+                  {orientationFixes(orientation).length > 0 && (
+                    <CliTwin args={rigRunArgs(dir, { fixes: orientationFixes(orientation) })} />
                   )}
-                </p>
-                {orientationFixes(orientation).length > 0 && (
-                  <CliTwin args={rigRunArgs(dir, { fixes: orientationFixes(orientation) })} />
-                )}
+                </details>
+                <CliTwin args={rigRunArgs(dir, { fixes: orientationFixes(INITIAL_ORIENTATION) })} />
               </section>
             )}
             <section className='gensec'>

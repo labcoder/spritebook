@@ -176,14 +176,15 @@ export type FacingReport = z.output<typeof FacingReportSchema>;
  */
 export const DeformJointStatSchema = z.strictObject({
   joint: z.string().min(1),
+  /** Parent name for inspection; absent in reports from older builds. */
+  parent: z.string().nullable().optional(),
   /** vertices this joint influences above the weight floor */
   influencedVertices: z.int().nonnegative(),
   /** edges with BOTH endpoints influenced — the denominator of the seam rule */
   influencedEdges: z.int().nonnegative(),
   /** of those, edges whose length ratio exceeded the stretch threshold */
   stretchedEdges: z.int().nonnegative(),
-  /** DETACHED shells this joint's influence set spans. >1 means the joint is
-   * asked to drive geometry it does not touch, which no placement hint fixes */
+  /** Separate mesh surfaces influenced, including clothing and accessories. */
   spannedComponents: z.int().nonnegative(),
   /** mean/max displacement of those vertices across the pose set, metres */
   meanDisplacementM: z.number().nonnegative(),

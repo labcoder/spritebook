@@ -47,6 +47,23 @@ test('garbage reports project to null, never a crash', () => {
   }
 });
 
+test('hand detail distinguishes reported branches, mapped fingers and older unknown topology', () => {
+  const view = projectReport({
+    joints: [
+      { joint: 'hand_l', parent: 'lowerarm_l' },
+      { joint: 'bone_1', parent: 'hand_l' },
+      { joint: 'bone_2', parent: 'hand_l' },
+      { joint: 'hand_r', parent: 'lowerarm_r' },
+      { joint: 'thumb_01_r', parent: 'hand_r' },
+    ],
+  })!;
+  assertEquals(view.handBranches, { left: 2, right: 1 });
+  assertEquals(view.fingerCount, 1);
+  assertEquals(view.namedCount, 3);
+  assertEquals(projectReport({ joints: [{ joint: 'hand_l' }] })!.handBranches.left, null);
+  assertEquals(projectReport({ joints: [null, 12, {}] })!.namedCount, 0);
+});
+
 test('the arg builder speaks the exit script dialect exactly', () => {
   assertEquals(rigRunArgs('W', {}), [
     'rig',

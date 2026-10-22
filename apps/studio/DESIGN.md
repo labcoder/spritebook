@@ -373,6 +373,12 @@ bend button above the canvas plays the core-produced preview GLB with pause/scru
 translation only, matching the CLI contract; preview and template inspection hide edit handles. The
 report retains all warnings and uses "not flagged by these tests".
 
+First builds now enable upright/front/ground/center together, with an upright opt-out. Existing rigs
+lead with Auto align and rebuild rig; Adjust alignment discloses the individual choices. Bend checks
+separate surface stretching from joint placement, show affected edge fractions and preserve all
+flags. Separate mesh-part counts stay neutral. Predicted/named counts and wrist branches explain
+limited finger mapping without implying that more GPU joints guarantee better anatomy.
+
 Resize changes are applied immediately before a draw, with no unchanged-size buffer reset. Inspector
 width persists at drag end. Asset loads depend on path/content revision, not bridge wrapper
 identity, and superseded loads cannot replace the current model. Unmount cancels input and drawing
