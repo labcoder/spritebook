@@ -421,6 +421,34 @@ checks pass. Private evidence: `.render-bench/animation-deform/`. F5-T2 stays op
 fingers hold their rest pose, garment deformation still needs review, and native/runtime
 qualification remains a separate gate. Nothing was pushed.
 
+**F5-T2 Amy follow-through, 2026-10-22:** the saved canonical geometry leans 31.8°; grounding and
+centering cannot straighten it, and camera Front never changes geometry. Core now offers `rig
+--upright`, preserves declared height, refuses ambiguous alignment and applies upright before
+front/ground/center. Sideways front repairs also use the corrected inverse yaw. Studio enables
+alignment on the first UniRig build with an upright opt-out; saved rigs have Auto align and rebuild
+plus disclosed manual choices. Adapter 1.3.1 anchors paired arms at the trunk even with fused hand
+chains. Core aligns large arm bind-pose differences before animation transfer, avoiding a second arm
+drop on arms-down models; the shared renderer/cache namespace is now 0.6.1.
+
+The isolated seed-0 Amy rebuild is upright at 1.70 m, has 28 predicted/22 named joints and one
+branch per wrist, and retains six bend findings. Seed 1 produces 34 joints and eleven findings.
+Walking alone understates the defect: raised arms expose trouser vertices following the hands. The
+raw prediction already assigns more than 80% arm weight to 818 of 836 samples in the measured
+outer-trouser region, before SpriteBook's weight transfer. Geometric, surface-normal, visibility and
+heat-weight experiments were rejected rather than shipped. **This is an unresolved skin-weight
+ownership case**, not proof that the source clip or rig overlay is wrong. The working Amy project
+remains unchanged; private replay evidence lives under `.render-bench/amy-rig/`. Fix weight
+ownership across contacting limbs/clothes, qualify an arms-down/A/T-pose set with raised-arm and
+walking motion, and expose an honest recovery path before closing F5-T2. More predicted joints or
+fewer test flags cannot substitute for that check.
+
+The UI calls the report Bend checks, distinguishes surface warnings from placement, shows the
+affected edge fraction and wrist branching, and keeps separate mesh parts neutral. Thresholds and
+acceptance are unchanged. Validation: 210 animation/rig/Studio/CLI tests, six cache tests, 568
+sidecar checks, TypeScript, production web and owned-runtime builds pass. Upright tests also cover
+ambiguous shape refusal and deterministic writes. No experimental weights are applied to a user's
+project and nothing is pushed.
+
 ### Retained model and editor cases
 
 **F5-T1 inspector refinement, 2026-10-21:** the character name now heads one full-height,
