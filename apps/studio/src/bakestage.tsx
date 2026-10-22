@@ -1,3 +1,4 @@
+import { Inspector } from './workbench';
 /**
  * Stage 05 (P4-T2): run the bake, then REVIEW it. Segmented progress in
  * core's own steps, cache % and flicker from the manifest's metrics, an ETA
@@ -206,176 +207,175 @@ export function BakeStage({ bridge, dir, manifest, onChanged, onGoToStage }: {
   }, [bridge, args, loadBake, pass, onChanged, running]);
 
   return (
-    <div className='bakestage'>
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Bake')}</span>
-          <span className='ieyebrow mono'>05// BAKE</span>
-        </div>
-        <div className='genrow'>
-          {
-            /* not disabled while running — disabling the focused button drops
-              keyboard focus to <body> for the whole run (walkthrough finding);
-              aria-busy + the handler guard cover it instead */
-          }
-          <button type='button' className='btn primary' aria-busy={running} onClick={runBake}>
-            {running ? t('Baking…') : summary ? t('Re-bake') : t('Bake sheet')}
-          </button>
-          {running && progress && (
-            <span className='bakeprogress' role='status'>
-              <span className='segbar' aria-hidden='true'>
-                {Array.from(
-                  { length: 20 },
-                  (_, i) => <i key={i} className={i / 20 < progress.fraction ? 'f' : ''} />,
-                )}
-              </span>
-              <span className='mono'>
-                {progress.step} · {Math.round(progress.fraction * 100)}%
-                {eta !== null ? ` · ~${eta}s ${t('left')}` : ''}
-              </span>
-            </span>
-          )}
-          {failed && (
-            <span className='mv-exit mono' role='status'>
-              {t('failed — the log drawer has the verbatim reason')}
-            </span>
-          )}
-        </div>
-        <CliTwin args={args} />
-      </section>
-
-      {summary === null
-        ? (
-          <section className='gensec'>
-            <div className='inote'>{t('no bake yet — run one to review it here')}</div>
-          </section>
-        )
-        : (
-          <>
+    <div className='bakestage workbench-stage'>
+      <div className='asset-workspace'>
+        {summary === null
+          ? (
             <section className='gensec'>
-              <div className='gensechead'>
-                <span className='hud'>{t('Review')}</span>
-                <span className='mono dimtext'>
-                  {t('bake')} {summary.bakeId} · {summary.frames.length} {t('frames')} ·{' '}
-                  {t('cache')} {Math.round(summary.cacheHitPct)}% · {t('flicker')}{' '}
-                  {summary.flickerPct.toFixed(2)}% · {summary.wallTimeS.toFixed(1)}s
-                </span>
-              </div>
-
-              <div className='genrow'>
-                <label htmlFor='playclip'>{t('Clip')}</label>
-                <select
-                  id='playclip'
-                  className='optnum mono'
-                  value={clip}
-                  onChange={(e) => setClip(e.target.value)}
-                >
-                  {summary.clips.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <label id='dirlabel'>{t('Direction')}</label>
-                <span className='m-seg' role='group' aria-labelledby='dirlabel'>
-                  {summary.directions.map((d) => (
-                    <button
-                      key={d}
-                      type='button'
-                      className='btn mbtn'
-                      aria-pressed={direction === d}
-                      onClick={() => setDirection(d)}
-                    >
-                      d{d}
-                    </button>
-                  ))}
-                </span>
-              </div>
-
-              <div className='genrow'>
-                <button type='button' className='btn mbtn' onClick={() => setPlaying((v) => !v)}>
-                  {playing ? `⏸ ${t('Pause')}` : `▶ ${t('Play')}`}
-                </button>
-                <label htmlFor='playfps'>{t('fps')}</label>
-                <input
-                  id='playfps'
-                  type='number'
-                  className='optnum mono cellnum'
-                  min={1}
-                  max={60}
-                  value={fps}
-                  onChange={(e) => setFps(Number(e.target.value) || 1)}
-                />
-                <div className='zoom' role='group' aria-label={t('Zoom')}>
-                  {[1, 2, 4].map((z) => (
-                    <button
-                      key={z}
-                      type='button'
-                      aria-pressed={zoom === z}
-                      onClick={() => setZoom(z)}
-                    >
-                      {z}×
-                    </button>
-                  ))}
-                </div>
-                <span className='m-seg' role='group' aria-label={t('Pass')}>
-                  {PASSES.filter((p) => summary.passes.includes(p)).map((p) => (
-                    <button
-                      key={p}
-                      type='button'
-                      className='btn mbtn'
-                      aria-pressed={pass === p}
-                      onClick={() => setPass(p)}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </span>
-              </div>
-
-              {atlasPng && (
-                <Player
-                  summary={summary}
-                  atlasPng={atlasPng}
-                  pass={pass}
-                  dir={direction}
-                  clip={clip}
-                  playing={playing}
-                  fps={fps}
-                  zoom={zoom}
-                />
-              )}
-              <div className='inote'>
-                {t('nearest-neighbor · integer zoom · AOV pages share the lit layout')}
-              </div>
+              <div className='inote'>{t('no bake yet — run one to review it here')}</div>
             </section>
+          )
+          : (
+            <>
+              <section className='gensec'>
+                <div className='gensechead'>
+                  <span className='hud'>{t('Review')}</span>
+                  <span className='mono dimtext'>
+                    {t('bake')} {summary.bakeId} · {summary.frames.length} {t('frames')} ·{' '}
+                    {t('cache')} {Math.round(summary.cacheHitPct)}% · {t('flicker')}{' '}
+                    {summary.flickerPct.toFixed(2)}% · {summary.wallTimeS.toFixed(1)}s
+                  </span>
+                </div>
 
-            <section className='gensec'>
-              <div className='gensechead'>
-                <span className='hud'>{t('Quality flags')}</span>
-              </div>
-              {summary.flags.length === 0
-                ? <div className='inote'>{t('this bake raised no flags')}</div>
-                : (
-                  <div className='qaflags'>
-                    {summary.flags.map((f, i) => (
-                      <div key={`${f.code}-${i}`} className='qaflag'>
-                        <span
-                          className={`mbadge ${f.severity === 'error' ? 'signal' : 'gate'}`}
-                        >
-                          {f.code}
-                        </span>
-                        <span className='qamsg'>{f.message}</span>
-                        <button
-                          type='button'
-                          className='btn mbtn'
-                          onClick={() => onGoToStage(flagStage(f) as StageKey)}
-                        >
-                          {t('Open')} {flagStage(f)}
-                        </button>
-                      </div>
+                <div className='genrow'>
+                  <label htmlFor='playclip'>{t('Clip')}</label>
+                  <select
+                    id='playclip'
+                    className='optnum mono'
+                    value={clip}
+                    onChange={(e) => setClip(e.target.value)}
+                  >
+                    {summary.clips.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <label id='dirlabel'>{t('Direction')}</label>
+                  <span className='m-seg' role='group' aria-labelledby='dirlabel'>
+                    {summary.directions.map((d) => (
+                      <button
+                        key={d}
+                        type='button'
+                        className='btn mbtn'
+                        aria-pressed={direction === d}
+                        onClick={() => setDirection(d)}
+                      >
+                        d{d}
+                      </button>
+                    ))}
+                  </span>
+                </div>
+
+                <div className='genrow'>
+                  <button type='button' className='btn mbtn' onClick={() => setPlaying((v) => !v)}>
+                    {playing ? `⏸ ${t('Pause')}` : `▶ ${t('Play')}`}
+                  </button>
+                  <label htmlFor='playfps'>{t('fps')}</label>
+                  <input
+                    id='playfps'
+                    type='number'
+                    className='optnum mono cellnum'
+                    min={1}
+                    max={60}
+                    value={fps}
+                    onChange={(e) => setFps(Number(e.target.value) || 1)}
+                  />
+                  <div className='zoom' role='group' aria-label={t('Zoom')}>
+                    {[1, 2, 4].map((z) => (
+                      <button
+                        key={z}
+                        type='button'
+                        aria-pressed={zoom === z}
+                        onClick={() => setZoom(z)}
+                      >
+                        {z}×
+                      </button>
                     ))}
                   </div>
+                  <span className='m-seg' role='group' aria-label={t('Pass')}>
+                    {PASSES.filter((p) => summary.passes.includes(p)).map((p) => (
+                      <button
+                        key={p}
+                        type='button'
+                        className='btn mbtn'
+                        aria-pressed={pass === p}
+                        onClick={() => setPass(p)}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </span>
+                </div>
+
+                {atlasPng && (
+                  <Player
+                    summary={summary}
+                    atlasPng={atlasPng}
+                    pass={pass}
+                    dir={direction}
+                    clip={clip}
+                    playing={playing}
+                    fps={fps}
+                    zoom={zoom}
+                  />
                 )}
-            </section>
-          </>
-        )}
+                <div className='inote'>
+                  {t('nearest-neighbor · integer zoom · AOV pages share the lit layout')}
+                </div>
+              </section>
+
+              <section className='gensec'>
+                <div className='gensechead'>
+                  <span className='hud'>{t('Quality flags')}</span>
+                </div>
+                {summary.flags.length === 0
+                  ? <div className='inote'>{t('this bake raised no flags')}</div>
+                  : (
+                    <div className='qaflags'>
+                      {summary.flags.map((f, i) => (
+                        <div key={`${f.code}-${i}`} className='qaflag'>
+                          <span
+                            className={`mbadge ${f.severity === 'error' ? 'signal' : 'gate'}`}
+                          >
+                            {f.code}
+                          </span>
+                          <span className='qamsg'>{f.message}</span>
+                          <button
+                            type='button'
+                            className='btn mbtn'
+                            onClick={() => onGoToStage(flagStage(f) as StageKey)}
+                          >
+                            {t('Open')} {flagStage(f)}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </section>
+            </>
+          )}
+      </div>
+      <Inspector>
+        <section className='gensec action-section'>
+          <div className='genrow'>
+            {
+              /* not disabled while running — disabling the focused button drops
+              keyboard focus to <body> for the whole run (walkthrough finding);
+              aria-busy + the handler guard cover it instead */
+            }
+            <button type='button' className='btn primary' aria-busy={running} onClick={runBake}>
+              {running ? t('Baking…') : summary ? t('Re-bake') : t('Bake sheet')}
+            </button>
+            {running && progress && (
+              <span className='bakeprogress' role='status'>
+                <span className='segbar' aria-hidden='true'>
+                  {Array.from(
+                    { length: 20 },
+                    (_, i) => <i key={i} className={i / 20 < progress.fraction ? 'f' : ''} />,
+                  )}
+                </span>
+                <span className='mono'>
+                  {progress.step} · {Math.round(progress.fraction * 100)}%
+                  {eta !== null ? ` · ~${eta}s ${t('left')}` : ''}
+                </span>
+              </span>
+            )}
+            {failed && (
+              <span className='mv-exit mono' role='status'>
+                {t('failed — the log drawer has the verbatim reason')}
+              </span>
+            )}
+          </div>
+          <CliTwin args={args} />
+        </section>
+      </Inspector>
     </div>
   );
 }

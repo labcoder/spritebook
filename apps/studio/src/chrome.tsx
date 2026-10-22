@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import { t } from './i18n';
+import { type Locale, t } from './i18n';
 import { log, type Severity } from './log';
 import type { StudioBridge } from './bridge';
 
@@ -28,10 +28,9 @@ export function MenuBar(
   {
     theme,
     locale,
-    gpu,
     canEdit,
     onThemeChange,
-    onToggleLocale,
+    onLocaleChange,
     onReload,
     onExam,
     onPalette,
@@ -40,12 +39,11 @@ export function MenuBar(
     onRedo,
   }: {
     theme: 'light' | 'dark';
-    locale: string;
-    gpu: string | null;
+    locale: Locale;
     /** a character tab is active — undo/redo have a manifest to act on */
     canEdit: boolean;
     onThemeChange: (theme: 'light' | 'dark') => void;
-    onToggleLocale: () => void;
+    onLocaleChange: (locale: Locale) => void;
     onReload: () => void;
     onExam: () => void;
     onPalette: () => void;
@@ -64,6 +62,7 @@ export function MenuBar(
         <Menu.Portal>
           <Menu.Positioner sideOffset={4}>
             <Menu.Popup className='menupop'>
+              <MenuEntry label={t('Shortcuts…')} hint='Ctrl+K' onClick={onPalette} />
               <MenuEntry label={t('Reload gallery')} onClick={onReload} />
               <MenuEntry label={t('Run health exam')} onClick={onExam} />
               <MenuEntry
@@ -92,6 +91,47 @@ export function MenuBar(
                 onClick={onRedo}
                 disabled={!canEdit}
               />
+              <Menu.SubmenuRoot>
+                <Menu.SubmenuTrigger className='menuitem submenu-trigger'>
+                  {t('Language')}
+                  <svg viewBox='0 0 20 20' aria-hidden='true'>
+                    <path d='m8 5 5 5-5 5' />
+                  </svg>
+                </Menu.SubmenuTrigger>
+                <Menu.Portal>
+                  <Menu.Positioner sideOffset={4}>
+                    <Menu.Popup className='menupop'>
+                      <Menu.RadioGroup
+                        value={locale}
+                        onValueChange={onLocaleChange}
+                        aria-label={t('Language')}
+                      >
+                        {([
+                          'en',
+                          'es',
+                          ...(import.meta.env.DEV ? ['pseudo' as const] : []),
+                        ] as Locale[]).map((value) => (
+                          <Menu.RadioItem
+                            key={value}
+                            value={value}
+                            closeOnClick
+                            className='menuitem language-item'
+                          >
+                            <span>
+                              {value === 'en' ? 'English' : value === 'es' ? 'Español' : 'Pseudo'}
+                            </span>
+                            <Menu.RadioItemIndicator>
+                              <svg viewBox='0 0 20 20' aria-hidden='true'>
+                                <path d='m4 10 4 4 8-8' />
+                              </svg>
+                            </Menu.RadioItemIndicator>
+                          </Menu.RadioItem>
+                        ))}
+                      </Menu.RadioGroup>
+                    </Menu.Popup>
+                  </Menu.Positioner>
+                </Menu.Portal>
+              </Menu.SubmenuRoot>
             </Menu.Popup>
           </Menu.Positioner>
         </Menu.Portal>
@@ -102,33 +142,22 @@ export function MenuBar(
       <div className='menur'>
         <button
           type='button'
-          className='chip'
-          onClick={onPalette}
-          aria-label={t('Command palette')}
+          className='icon-button'
+          onClick={() => onThemeChange(theme === 'light' ? 'dark' : 'light')}
+          aria-label={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')}
+          title={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')}
         >
-          Ctrl+K
+          <svg viewBox='0 0 20 20' aria-hidden='true'>
+            {theme === 'dark'
+              ? (
+                <>
+                  <circle cx='10' cy='10' r='3.5' />
+                  <path d='M10 1v2m0 14v2M1 10h2m14 0h2M3.6 3.6 5 5m10 10 1.4 1.4M3.6 16.4 5 15M15 5l1.4-1.4' />
+                </>
+              )
+              : <path d='M16.8 12.2A7.2 7.2 0 0 1 7.8 3.2a7.2 7.2 0 1 0 9 9Z' />}
+          </svg>
         </button>
-        <button
-          type='button'
-          className='chip'
-          onClick={onToggleLocale}
-          aria-label={t('Switch language')}
-        >
-          {t('lang')}: {locale}
-        </button>
-        <label className='themecontrol'>
-          {t('Theme')}
-          <select
-            value={theme}
-            onChange={(e) => onThemeChange(e.target.value === 'light' ? 'light' : 'dark')}
-          >
-            <option value='light'>{t('Light')}</option>
-            <option value='dark'>{t('Dark')}</option>
-          </select>
-        </label>
-        <span className='chip gpuchip' title={gpu ?? undefined}>
-          {gpu ? <b>{gpu}</b> : t('gpu: unexamined')}
-        </span>
       </div>
     </header>
   );
@@ -387,13 +416,14 @@ export function LogDrawer(
   );
 }
 
-export function StatusBar({ exam, counts, drawerOpen, onToggleDrawer }: {
+export function StatusBar({ exam, counts, gpu, drawerOpen, onToggleDrawer }: {
   exam: {
     report: Record<string, unknown> | null;
     running: boolean;
     exitCode: number | null;
   };
   counts: { characters: number | null; bridge: string };
+  gpu: string | null;
   drawerOpen: boolean;
   onToggleDrawer: () => void;
 }) {
@@ -441,6 +471,7 @@ export function StatusBar({ exam, counts, drawerOpen, onToggleDrawer }: {
           </span>
         )}
       <span className='right'>
+        <span className='gpu-status' title={gpu ?? undefined}>{gpu ?? t('gpu: unexamined')}</span>
         <span>
           {counts.characters !== null ? `${counts.characters} ${t('characters')}` : ''}
         </span>

@@ -1,3 +1,4 @@
+import { Inspector } from './workbench';
 /**
  * Stage 04 (P4-T2): the look as a choice with a stated cost. Camera controls
  * (elevation detents, directions, px/m, cell), style presets carrying
@@ -5,7 +6,7 @@
  * atlas at INTEGER zoom, and "marks N frames stale" before Apply — every
  * frame key embeds the whole recipe, so a look change invalidates all of it.
  */
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StudioBridge } from './bridge';
 import {
   type CameraPresetRow,
@@ -28,13 +29,11 @@ import { summarize } from './bakeprogress';
 
 /* ---------------- the stage ---------------- */
 
-export function LookStage({ bridge, dir, manifest, onChanged, heading, inspectorToggle }: {
+export function LookStage({ bridge, dir, manifest, onChanged }: {
   bridge: StudioBridge;
   dir: string;
   manifest: unknown;
   onChanged: () => void;
-  heading: ReactNode;
-  inspectorToggle: ReactNode;
 }) {
   const m = (manifest ?? {}) as Record<string, unknown>;
   const look = m.look as LookRecord | undefined;
@@ -184,87 +183,27 @@ export function LookStage({ bridge, dir, manifest, onChanged, heading, inspector
 
   if (error) {
     return (
-      <div className='lookstage'>
-        <header className='editorhead'>{heading}{inspectorToggle}</header>
-        <div className='mdl-error mono'>{error}</div>
+      <div className='lookstage workbench-stage'>
+        <div className='asset-workspace' />
+        <Inspector>
+          <p className='control-section mdl-error mono' role='alert'>{error}</p>
+        </Inspector>
       </div>
     );
   }
   if (!draft) {
     return (
-      <div className='lookstage'>
-        <header className='editorhead'>{heading}{inspectorToggle}</header>
-        <div className='inote'>…</div>
+      <div className='lookstage workbench-stage'>
+        <div className='asset-workspace' />
+        <Inspector>
+          <p className='control-section inote' role='status'>…</p>
+        </Inspector>
       </div>
     );
   }
 
   return (
-    <div className='lookstage'>
-      <header className='editorhead'>
-        {heading}
-        <div className='lookapply'>
-          <div className='gensechead'>
-            {dirty && stale > 0 && (
-              <span className='stalecost mono' role='status'>
-                {t('marks')} {stale} {t('frames stale')}
-              </span>
-            )}
-            {dirty && stale === 0 && (
-              <span className='inote'>{t('nothing baked yet — no frames to invalidate')}</span>
-            )}
-          </div>
-          <div className='genrow'>
-            {
-              /* !dirty is a real input blocker; busy is not — disabling the
-              focused button while the run flies drops keyboard focus to
-              <body> */
-            }
-            <button
-              type='button'
-              className='btn primary'
-              disabled={!dirty}
-              aria-busy={busy}
-              onClick={apply}
-            >
-              {busy ? t('Recording…') : t('Record look')}
-            </button>
-            {dirty && (
-              <button
-                type='button'
-                className='btn mbtn'
-                onClick={() => {
-                  if (busy) return; // the run in flight is recording this draft
-                  setDraft(recorded);
-                  // the reset clears `dirty`, which unmounts THIS button - land
-                  // at the top of the stage rather than dropping to <body>
-                  requestAnimationFrame(() => {
-                    document.querySelector<HTMLElement>('#lookcam')?.focus();
-                  });
-                }}
-              >
-                {t('Reset to recorded')}
-              </button>
-            )}
-            {!dirty && (
-              <span className='inote'>
-                {look !== undefined
-                  ? t('this is the recorded look')
-                  // F11: the note claimed a recording that did not exist while
-                  // the inspector said "no look recorded" one panel over
-                  : t('nothing recorded yet — Record look writes these values')}
-              </span>
-            )}
-          </div>
-          {failed && (
-            <span className='mv-exit mono' role='status'>
-              {t('failed — the log drawer has the verbatim reason')}
-            </span>
-          )}
-          <CliTwin args={args} />
-        </div>
-        {inspectorToggle}
-      </header>
+    <div className='lookstage workbench-stage'>
       <div className='lookcomparison'>
         <section className='referencepane'>
           <div className='gensechead'>
@@ -356,191 +295,257 @@ export function LookStage({ bridge, dir, manifest, onChanged, heading, inspector
             )}
         </section>
       </div>
-      <section className='lookrecipe' aria-label={t('Look recipe')}>
-        <h2>{t('Look recipe')}</h2>
-        <div className='lookfields'>
-          <div className='lookfield'>
-            <label htmlFor='lookcam'>{t('Camera')}</label>
-            <select
-              id='lookcam'
-              value={draft.cameraPresetId}
-              onChange={(e) => {
-                const base = cameras.find((c) => c.id === e.target.value);
-                set(
-                  base
-                    ? {
-                      cameraPresetId: base.id,
-                      elevationDeg: base.elevationDeg,
-                      directions: base.directions,
-                      pixelsPerMeter: base.pixelsPerMeter,
-                      cellW: base.cellPx.w,
-                      cellH: base.cellPx.h,
-                    }
-                    : { cameraPresetId: e.target.value },
-                );
-              }}
-            >
-              {cameras.map((c) => <option key={c.id} value={c.id}>{c.id}</option>)}
-            </select>
-          </div>
-          <div className='lookfield'>
-            <label htmlFor='lookdirs'>{t('Directions')}</label>
-            <select
-              id='lookdirs'
-              value={draft.directions}
-              onChange={(e) => set({ directions: Number(e.target.value) })}
-            >
-              {DIRECTION_CHOICES.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div className='lookfield'>
-            <label htmlFor='lookcellw'>{t('Cell')}</label>
-            <div className='lookcell'>
-              <input
-                id='lookcellw'
-                type='number'
-                min={1}
-                value={draft.cellW}
-                aria-label={t('Cell width')}
-                onChange={(e) => set({ cellW: Number(e.target.value) || 1 })}
-              />
-              <span aria-hidden='true'>×</span>
-              <input
-                type='number'
-                min={1}
-                value={draft.cellH}
-                aria-label={t('Cell height')}
-                onChange={(e) => set({ cellH: Number(e.target.value) || 1 })}
-              />
-            </div>
-          </div>
-          <div className='lookfield'>
-            <label htmlFor='lookstyle'>{t('Style')}</label>
-            <select
-              id='lookstyle'
-              value={draft.stylePresetId}
-              onChange={(e) => {
-                const style = styles.find((s) => s.id === e.target.value);
-                if (style) {
-                  set({
-                    stylePresetId: style.id,
-                    maxColors: style.maxColors,
-                    outlineWidthPx: style.outlineWidthPx,
-                  });
-                }
-              }}
-            >
-              {styles.map((s) => <option key={s.id} value={s.id}>{s.id}</option>)}
-            </select>
-          </div>
-          <div className='lookfield'>
-            {styleBase?.maxColors !== undefined
-              ? (
-                <>
-                  <label htmlFor='lookcolors'>{t('Colours')}</label>
-                  <input
-                    id='lookcolors'
-                    type='number'
-                    min={2}
-                    max={256}
-                    value={draft.maxColors ?? styleBase.maxColors}
-                    onChange={(e) => set({ maxColors: Number(e.target.value) || 2 })}
-                  />
-                </>
-              )
-              : (
-                <>
-                  <span>{t('Colours')}</span>
-                  <span className='inote'>{t('no palette')}</span>
-                </>
-              )}
-          </div>
-          <div className='lookfield'>
-            {styleBase?.outlineWidthPx !== undefined
-              ? (
-                <>
-                  <label htmlFor='lookoutline'>{t('Outline px')}</label>
-                  <input
-                    id='lookoutline'
-                    type='number'
-                    min={0.25}
-                    max={8}
-                    step={0.25}
-                    value={draft.outlineWidthPx ?? styleBase.outlineWidthPx}
-                    onChange={(e) => set({ outlineWidthPx: Number(e.target.value) || 0.25 })}
-                  />
-                </>
-              )
-              : (
-                <>
-                  <span>{t('Outline px')}</span>
-                  <span className='inote'>{t('no outline')}</span>
-                </>
-              )}
-          </div>
-        </div>
-        <details className='lookadvanced'>
-          <summary>{t('Camera and style details')}</summary>
-          <div className='genrow'>
-            <label htmlFor='lookelev'>{t('Elevation')}</label>
-            <input
-              id='lookelev'
-              type='range'
-              min={0}
-              max={89}
-              step={0.001}
-              value={draft.elevationDeg}
-              className='lookslider'
-              onChange={(e) => set({ elevationDeg: Number(e.target.value) })}
-              onKeyDown={(e) => {
-                const by = e.key === 'ArrowUp' || e.key === 'ArrowRight'
-                  ? 0.5
-                  : e.key === 'ArrowDown' || e.key === 'ArrowLeft'
-                  ? -0.5
-                  : e.key === 'PageUp'
-                  ? 5
-                  : e.key === 'PageDown'
-                  ? -5
-                  : null;
-                if (by === null) return;
-                e.preventDefault();
-                set({ elevationDeg: Math.min(89, Math.max(0, draft.elevationDeg + by)) });
-              }}
-            />
-            <span className='mono lookval'>{draft.elevationDeg.toFixed(3)}°</span>
-            <span className='detents'>
-              {ELEVATION_DETENTS.map((d) => (
-                <button
-                  key={d.deg}
-                  type='button'
-                  className='btn mbtn'
-                  aria-pressed={Math.abs(draft.elevationDeg - d.deg) < 0.0005}
-                  onClick={() => set({ elevationDeg: d.deg })}
+      <Inspector>
+        <div className='inspector-scroll'>
+          <section className='lookrecipe' aria-label={t('Look recipe')}>
+            <h2>{t('Look recipe')}</h2>
+            <div className='lookfields'>
+              <div className='lookfield'>
+                <label htmlFor='lookcam'>{t('Camera')}</label>
+                <select
+                  id='lookcam'
+                  value={draft.cameraPresetId}
+                  onChange={(e) => {
+                    const base = cameras.find((c) => c.id === e.target.value);
+                    set(
+                      base
+                        ? {
+                          cameraPresetId: base.id,
+                          elevationDeg: base.elevationDeg,
+                          directions: base.directions,
+                          pixelsPerMeter: base.pixelsPerMeter,
+                          cellW: base.cellPx.w,
+                          cellH: base.cellPx.h,
+                        }
+                        : { cameraPresetId: e.target.value },
+                    );
+                  }}
                 >
-                  {d.label}
-                </button>
-              ))}
-            </span>
+                  {cameras.map((c) => <option key={c.id} value={c.id}>{c.id}</option>)}
+                </select>
+              </div>
+              <div className='lookfield'>
+                <label htmlFor='lookdirs'>{t('Directions')}</label>
+                <select
+                  id='lookdirs'
+                  value={draft.directions}
+                  onChange={(e) => set({ directions: Number(e.target.value) })}
+                >
+                  {DIRECTION_CHOICES.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div className='lookfield'>
+                <label htmlFor='lookcellw'>{t('Cell')}</label>
+                <div className='lookcell'>
+                  <input
+                    id='lookcellw'
+                    type='number'
+                    min={1}
+                    value={draft.cellW}
+                    aria-label={t('Cell width')}
+                    onChange={(e) => set({ cellW: Number(e.target.value) || 1 })}
+                  />
+                  <span aria-hidden='true'>×</span>
+                  <input
+                    type='number'
+                    min={1}
+                    value={draft.cellH}
+                    aria-label={t('Cell height')}
+                    onChange={(e) => set({ cellH: Number(e.target.value) || 1 })}
+                  />
+                </div>
+              </div>
+              <div className='lookfield'>
+                <label htmlFor='lookstyle'>{t('Style')}</label>
+                <select
+                  id='lookstyle'
+                  value={draft.stylePresetId}
+                  onChange={(e) => {
+                    const style = styles.find((s) => s.id === e.target.value);
+                    if (style) {
+                      set({
+                        stylePresetId: style.id,
+                        maxColors: style.maxColors,
+                        outlineWidthPx: style.outlineWidthPx,
+                      });
+                    }
+                  }}
+                >
+                  {styles.map((s) => <option key={s.id} value={s.id}>{s.id}</option>)}
+                </select>
+              </div>
+              <div className='lookfield'>
+                {styleBase?.maxColors !== undefined
+                  ? (
+                    <>
+                      <label htmlFor='lookcolors'>{t('Colours')}</label>
+                      <input
+                        id='lookcolors'
+                        type='number'
+                        min={2}
+                        max={256}
+                        value={draft.maxColors ?? styleBase.maxColors}
+                        onChange={(e) => set({ maxColors: Number(e.target.value) || 2 })}
+                      />
+                    </>
+                  )
+                  : (
+                    <>
+                      <span>{t('Colours')}</span>
+                      <span className='inote'>{t('no palette')}</span>
+                    </>
+                  )}
+              </div>
+              <div className='lookfield'>
+                {styleBase?.outlineWidthPx !== undefined
+                  ? (
+                    <>
+                      <label htmlFor='lookoutline'>{t('Outline px')}</label>
+                      <input
+                        id='lookoutline'
+                        type='number'
+                        min={0.25}
+                        max={8}
+                        step={0.25}
+                        value={draft.outlineWidthPx ?? styleBase.outlineWidthPx}
+                        onChange={(e) => set({ outlineWidthPx: Number(e.target.value) || 0.25 })}
+                      />
+                    </>
+                  )
+                  : (
+                    <>
+                      <span>{t('Outline px')}</span>
+                      <span className='inote'>{t('no outline')}</span>
+                    </>
+                  )}
+              </div>
+            </div>
+            <details className='lookadvanced'>
+              <summary>{t('Camera and style details')}</summary>
+              <div className='genrow'>
+                <label htmlFor='lookelev'>{t('Elevation')}</label>
+                <input
+                  id='lookelev'
+                  type='range'
+                  min={0}
+                  max={89}
+                  step={0.001}
+                  value={draft.elevationDeg}
+                  className='lookslider'
+                  onChange={(e) => set({ elevationDeg: Number(e.target.value) })}
+                  onKeyDown={(e) => {
+                    const by = e.key === 'ArrowUp' || e.key === 'ArrowRight'
+                      ? 0.5
+                      : e.key === 'ArrowDown' || e.key === 'ArrowLeft'
+                      ? -0.5
+                      : e.key === 'PageUp'
+                      ? 5
+                      : e.key === 'PageDown'
+                      ? -5
+                      : null;
+                    if (by === null) return;
+                    e.preventDefault();
+                    set({ elevationDeg: Math.min(89, Math.max(0, draft.elevationDeg + by)) });
+                  }}
+                />
+                <span className='mono lookval'>{draft.elevationDeg.toFixed(3)}°</span>
+                <span className='detents'>
+                  {ELEVATION_DETENTS.map((d) => (
+                    <button
+                      key={d.deg}
+                      type='button'
+                      className='btn mbtn'
+                      aria-pressed={Math.abs(draft.elevationDeg - d.deg) < 0.0005}
+                      onClick={() => set({ elevationDeg: d.deg })}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </span>
+              </div>
+              <div className='genrow'>
+                <label htmlFor='lookppm'>{t('Pixels per metre')}</label>
+                <input
+                  id='lookppm'
+                  type='number'
+                  className='optnum mono'
+                  min={1}
+                  value={draft.pixelsPerMeter}
+                  onChange={(e) => set({ pixelsPerMeter: Number(e.target.value) || 1 })}
+                />
+                {styleBase && (
+                  <span className='inote'>
+                    {styleBase.mode}
+                    {styleBase.superSample
+                      ? ` · ${styleBase.superSample}× ${t('supersample')}`
+                      : ''}
+                  </span>
+                )}
+              </div>
+            </details>
+          </section>
+        </div>
+        <div className='lookapply control-section action-section'>
+          <div className='gensechead'>
+            {dirty && stale > 0 && (
+              <span className='stalecost mono' role='status'>
+                {t('marks')} {stale} {t('frames stale')}
+              </span>
+            )}
+            {dirty && stale === 0 && (
+              <span className='inote'>{t('nothing baked yet — no frames to invalidate')}</span>
+            )}
           </div>
           <div className='genrow'>
-            <label htmlFor='lookppm'>{t('Pixels per metre')}</label>
-            <input
-              id='lookppm'
-              type='number'
-              className='optnum mono'
-              min={1}
-              value={draft.pixelsPerMeter}
-              onChange={(e) => set({ pixelsPerMeter: Number(e.target.value) || 1 })}
-            />
-            {styleBase && (
+            {
+              /* !dirty is a real input blocker; busy is not — disabling the
+              focused button while the run flies drops keyboard focus to
+              <body> */
+            }
+            <button
+              type='button'
+              className='btn primary'
+              disabled={!dirty}
+              aria-busy={busy}
+              onClick={apply}
+            >
+              {busy ? t('Recording…') : t('Record look')}
+            </button>
+            {dirty && (
+              <button
+                type='button'
+                className='btn mbtn'
+                onClick={() => {
+                  if (busy) return; // the run in flight is recording this draft
+                  setDraft(recorded);
+                  // the reset clears `dirty`, which unmounts THIS button - land
+                  // at the top of the stage rather than dropping to <body>
+                  requestAnimationFrame(() => {
+                    document.querySelector<HTMLElement>('#lookcam')?.focus();
+                  });
+                }}
+              >
+                {t('Reset to recorded')}
+              </button>
+            )}
+            {!dirty && (
               <span className='inote'>
-                {styleBase.mode}
-                {styleBase.superSample ? ` · ${styleBase.superSample}× ${t('supersample')}` : ''}
+                {look !== undefined
+                  ? t('this is the recorded look')
+                  // F11: the note claimed a recording that did not exist while
+                  // the inspector said "no look recorded" one panel over
+                  : t('nothing recorded yet — Record look writes these values')}
               </span>
             )}
           </div>
-        </details>
-      </section>
+          {failed && (
+            <span className='mv-exit mono' role='status'>
+              {t('failed — the log drawer has the verbatim reason')}
+            </span>
+          )}
+          <CliTwin args={args} />
+        </div>
+      </Inspector>
     </div>
   );
 }

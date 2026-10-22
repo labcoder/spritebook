@@ -1,3 +1,4 @@
+import { Inspector } from './workbench';
 /**
  * Stage 06 (P4-T2): targets over ONE BakeManifest (exporters are pure
  * projections, D-010 — so this stage picks formats, never re-renders), the
@@ -83,101 +84,102 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
     setSelected((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
 
   return (
-    <div className='exportstage'>
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Export')}</span>
-          <span className='ieyebrow mono'>06// EXPORT</span>
-        </div>
-        {bakeId === null
-          ? <div className='inote'>{t('nothing to export — bake a sheet first')}</div>
-          : (
-            <div className='inote'>
-              {t('one bake, many formats')}: {t('bake')} {bakeId}
-              {frames !== null ? ` · ${frames} ${t('frames')}` : ''}
-            </div>
-          )}
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Targets')}</span>
-        </div>
-        <div className='targets' role='group' aria-label={t('Targets')}>
-          {TARGETS.map((id) => (
-            <label key={id} className='target'>
-              <input
-                type='checkbox'
-                checked={selected.includes(id)}
-                onChange={() => toggle(id)}
-              />
-              <span className='targetname mono'>{id}</span>
-              <span className='inote'>{targetNote(id)}</span>
-            </label>
-          ))}
-        </div>
-      </section>
-
-      <section className='gensec'>
-        <div className='genrow'>
-          {
-            /* disabled only for the INPUT blockers — disabling while running
-              drops keyboard focus to <body> (walkthrough finding) */
-          }
-          <button
-            type='button'
-            className='btn primary'
-            disabled={bakeId === null || selected.length === 0}
-            aria-busy={running}
-            onClick={runExport}
-          >
-            {running ? t('Exporting…') : t('Export selected')}
-          </button>
-          {selected.length === 0 && <span className='inote'>{t('pick at least one target')}</span>}
-          {failed && (
-            <span className='mv-exit mono' role='status'>
-              {t('failed — the log drawer has the verbatim reason')}
-            </span>
-          )}
-        </div>
-        <CliTwin args={args} />
-      </section>
-
-      {artifacts.length > 0 && (
+    <div className='exportstage workbench-stage'>
+      <div className='asset-workspace'>
         <section className='gensec'>
-          <div className='gensechead'>
-            <span className='hud'>{t('Done')}</span>
-            {
-              /* core emits ONE artifact per target, and it is a FOLDER — the
+          {bakeId === null
+            ? <div className='inote'>{t('nothing to export — bake a sheet first')}</div>
+            : (
+              <div className='inote'>
+                {t('one bake, many formats')}: {t('bake')} {bakeId}
+                {frames !== null ? ` · ${frames} ${t('frames')}` : ''}
+              </div>
+            )}
+        </section>
+
+        {artifacts.length > 0 && (
+          <section className='gensec'>
+            <div className='gensechead'>
+              <span className='hud'>{t('Done')}</span>
+              {
+                /* core emits ONE artifact per target, and it is a FOLDER — the
                 list says so rather than implying a file count it never gave */
+              }
+              <span className='mono dimtext'>
+                {artifacts.length} {t('folders')}
+              </span>
+              <button
+                type='button'
+                className='btn mbtn openfolder'
+                onClick={() => bridge.openFolder(outDir)}
+              >
+                {t('Open folder')}
+              </button>
+            </div>
+            <div className='filelist mono'>
+              {artifacts.map((p) => (
+                <div key={p} className='fileline'>
+                  <span className='filepath' title={p}>{p}</span>
+                  <button
+                    type='button'
+                    className='btn mbtn'
+                    onClick={() => bridge.openFolder(p)}
+                  >
+                    {t('Open')}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+      <Inspector>
+        <div className='inspector-scroll'>
+          <section className='gensec'>
+            <div className='gensechead'>
+              <span className='hud'>{t('Targets')}</span>
+            </div>
+            <div className='targets' role='group' aria-label={t('Targets')}>
+              {TARGETS.map((id) => (
+                <label key={id} className='target'>
+                  <input
+                    type='checkbox'
+                    checked={selected.includes(id)}
+                    onChange={() => toggle(id)}
+                  />
+                  <span className='targetname mono'>{id}</span>
+                  <span className='inote'>{targetNote(id)}</span>
+                </label>
+              ))}
+            </div>
+          </section>
+        </div>
+        <section className='gensec action-section'>
+          <div className='genrow'>
+            {
+              /* disabled only for the INPUT blockers — disabling while running
+              drops keyboard focus to <body> (walkthrough finding) */
             }
-            <span className='mono dimtext'>
-              {artifacts.length} {t('folders')}
-            </span>
             <button
               type='button'
-              className='btn mbtn openfolder'
-              onClick={() => bridge.openFolder(outDir)}
+              className='btn primary'
+              disabled={bakeId === null || selected.length === 0}
+              aria-busy={running}
+              onClick={runExport}
             >
-              {t('Open folder')}
+              {running ? t('Exporting…') : t('Export selected')}
             </button>
+            {selected.length === 0 && <span className='inote'>{t('pick at least one target')}
+            </span>}
+            {failed && (
+              <span className='mv-exit mono' role='status'>
+                {t('failed — the log drawer has the verbatim reason')}
+              </span>
+            )}
           </div>
-          <div className='filelist mono'>
-            {artifacts.map((p) => (
-              <div key={p} className='fileline'>
-                <span className='filepath' title={p}>{p}</span>
-                <button
-                  type='button'
-                  className='btn mbtn'
-                  onClick={() => bridge.openFolder(p)}
-                >
-                  {t('Open')}
-                </button>
-              </div>
-            ))}
-          </div>
+          <CliTwin args={args} />
         </section>
-      )}
+      </Inspector>
     </div>
   );
 }

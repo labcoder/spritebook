@@ -1,3 +1,4 @@
+import { Inspector } from './workbench';
 /**
  * Stage 02 (P4-T2): run/re-run the rig, read the deform report the way core
  * wrote it, repair with the real verbs, and ACCEPT — the explicit user act
@@ -85,7 +86,7 @@ function RunRig({ bridge, dir, onChanged }: {
             <Viewport bridge={bridge} meshPath={`${dir}/canonical/model.glb`} />
           </section>
         </div>
-        <div className='rigmain control-panel'>
+        <Inspector className='rigmain'>
           <section className='gensec rig-controls' tabIndex={0} aria-label={t('Rig track')}>
             <div className='gensechead'>
               <span className='hud'>{t('Rig this character')}</span>
@@ -151,7 +152,7 @@ function RunRig({ bridge, dir, onChanged }: {
             </div>
             <CliTwin args={args} />
           </section>
-        </div>
+        </Inspector>
       </div>
     </div>
   );
@@ -289,17 +290,17 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
 
   return (
     <div className='rigstage'>
-      {accepted && (
-        <div className='checkpoint'>
-          <span className='hud'>{t('rig accepted')}</span>
-          <span className='mono'>
-            {rig.jointCount} {t('joints')} · {t('track')} {rig.track} · {t('Anim is next')}
-          </span>
-        </div>
-      )}
-
       <div className='rigcols'>
         <div className='rigside asset-workspace'>
+          {accepted && (
+            <div className='checkpoint'>
+              <span className='hud'>{t('rig accepted')}</span>
+              <span className='mono'>
+                {rig.jointCount} {t('joints')} · {t('track')} {rig.track} · {t('Anim is next')}
+              </span>
+            </div>
+          )}
+
           <section className='gensec'>
             <div className='gensechead'>
               <span className='hud'>{t('Joints')}</span>
@@ -425,7 +426,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
               )}
           </section>
         </div>
-        <div className='rigmain control-panel'>
+        <Inspector className='rigmain'>
           {run?.running && (
             <div className='rig-activity'>
               <JobActivity progress={run.progress} verb='rig' />
@@ -602,7 +603,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
             </div>
             <CliTwin args={acceptArgs} />
           </section>
-        </div>
+        </Inspector>
       </div>
     </div>
   );

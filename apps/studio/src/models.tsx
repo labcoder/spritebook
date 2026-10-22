@@ -1,3 +1,4 @@
+import { discoverableModels } from './genmodels';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ListedModel, ListedVersion } from '@spritebook/registry';
 import type { StudioBridge } from './bridge';
@@ -298,7 +299,7 @@ export function ManageModels(
       return;
     }
     try {
-      setRows(JSON.parse(r.lines.at(-1)!).models ?? []);
+      setRows(discoverableModels(JSON.parse(r.lines.at(-1)!).models ?? [], import.meta.env.DEV));
     } catch {
       setError(t('catalog output was not JSON'));
     }

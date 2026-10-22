@@ -6,6 +6,14 @@
  * purpose — they match the CLI the GUI mirrors.
  */
 export const es: Record<string, string> = {
+  'Collapse inspector': 'Contraer inspector',
+  'Expand inspector': 'Expandir inspector',
+  'Development tools': 'Herramientas de desarrollo',
+  'Language': 'Idioma',
+  'Shortcuts…': 'Atajos…',
+  'Switch to dark theme': 'Cambiar a tema oscuro',
+  'Switch to light theme': 'Cambiar a tema claro',
+
   'Create a character from a reference image to begin.':
     'Crea un personaje a partir de una imagen de referencia para empezar.',
   'Each fix re-runs the rig.': 'Cada corrección vuelve a crear el rig.',
@@ -69,8 +77,6 @@ export const es: Record<string, string> = {
   'Camera and style details': 'Detalles de cámara y estilo',
   'Animate': 'Animar',
   'Character index': 'Índice de personajes',
-  'Dark': 'Oscuro',
-  'Light': 'Claro',
   'Loading reference...': 'Cargando referencia...',
   'Look recipe': 'Receta de estilo',
   'No source image for this character.': 'Este personaje no tiene una imagen de origen.',
@@ -80,7 +86,6 @@ export const es: Record<string, string> = {
   'Reference unavailable. Check the source file in the workspace.':
     'La referencia no está disponible. Revisa el archivo de origen en el espacio de trabajo.',
   'Saved output': 'Resultado guardado',
-  'Theme': 'Tema',
   'Cancel job': 'Cancelar tarea',
   'VRAM depends on configuration': 'La VRAM depende de la configuración',
   // gallery
@@ -101,9 +106,7 @@ export const es: Record<string, string> = {
   'Undo': 'Deshacer',
   'Redo': 'Rehacer',
   'Command palette': 'Paleta de comandos',
-  'Switch language': 'Cambiar idioma',
   'Switch theme': 'Cambiar tema',
-  'lang': 'idioma',
   'theme': 'tema',
   'gpu: unexamined': 'gpu: sin examinar',
 
@@ -144,9 +147,6 @@ export const es: Record<string, string> = {
     'vecino más cercano · zoom entero · salida del core',
 
   // inspector
-  'Inspector': 'Inspector',
-  'nothing recorded': 'nada registrado',
-  'read-only — every value here is the manifest': 'solo lectura — cada valor aquí es el manifiesto',
   'Resize inspector': 'Redimensionar el inspector',
 
   // log drawer + status bar
@@ -492,7 +492,6 @@ export const es: Record<string, string> = {
     'Comparar backends — un trabajo por backend instalado, el número repartido entre ellos',
   'Effort (polygon budget)': 'Esfuerzo (presupuesto de polígonos)',
   'Generate': 'Generar',
-  'Generate more': 'Generar más',
   'Re-run track': 'Track de re-ejecución',
   'Re-texture': 'Re-texturizar',
   'Track A': 'Track A',

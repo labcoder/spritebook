@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLingui } from '@lingui/react';
 import { makeBridge, type RawWorkspace } from './bridge';
 import { type CharacterCard, toCard } from './manifest';
-import { activateLocale, cycleLocale, type Locale, t } from './i18n';
+import { activateLocale, t } from './i18n';
 import { prefs } from './prefs';
 import { Gallery } from './gallery';
 import { Editor } from './editor';
@@ -72,9 +72,6 @@ export default function App() {
     prefs.setTheme(theme);
   }, [theme]);
 
-  const toggleLocale = useCallback(() => {
-    setLocaleState((cur: Locale) => cycleLocale(cur));
-  }, []);
   useEffect(() => {
     activateLocale(locale);
     prefs.setLocale(locale);
@@ -242,12 +239,6 @@ export default function App() {
     },
     { id: 'theme', title: t('Switch theme'), enabled: true, run: toggleTheme },
     {
-      id: 'locale',
-      title: t('Switch language'),
-      enabled: true,
-      run: toggleLocale,
-    },
-    {
       id: 'drawer',
       title: t('Toggle session log'),
       enabled: true,
@@ -300,10 +291,9 @@ export default function App() {
       <MenuBar
         theme={theme}
         locale={locale}
-        gpu={adapter?.description ?? null}
         canEdit={activeWs !== undefined}
         onThemeChange={setThemeState}
-        onToggleLocale={toggleLocale}
+        onLocaleChange={setLocaleState}
         onReload={load}
         onExam={runExam}
         onPalette={() => setPaletteOpen(true)}
@@ -456,6 +446,7 @@ export default function App() {
         }}
       />
       <StatusBar
+        gpu={adapter?.description ?? null}
         exam={exam}
         counts={{ characters: workspaces?.length ?? null, bridge: bridge.name }}
         drawerOpen={drawerOpen}

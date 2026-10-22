@@ -33,10 +33,6 @@ export function activateLocale(locale: Locale): void {
   i18n.activate(locale);
 }
 
-export function cycleLocale(cur: Locale): Locale {
-  return cur === 'en' ? 'es' : cur === 'es' ? 'pseudo' : 'en';
-}
-
 /** Translate. The id IS the English copy — extraction-ready callsites. */
 export function t(id: string): string {
   return i18n._(id);
