@@ -366,6 +366,24 @@ export function retargetClip(
   const unmappedTarget = tgt.order.filter((n) => !source.tracks.has(srcNameOf(n)));
   const unmappedSource = [...source.tracks.keys()].filter((n) => !tgt.local.has(tgtNameOf(n)));
 
+  // Names drive motion; a thigh mislabeled as pelvis must not receive root motion.
+  for (const n of mapped) {
+    let ancestor = src.local.get(srcNameOf(n))?.parent ?? '';
+    while (ancestor && !mappedSet.has(tgtNameOf(ancestor))) {
+      ancestor = src.local.get(ancestor)?.parent ?? '';
+    }
+    if (!ancestor) continue;
+    const expected = tgtNameOf(ancestor);
+    let parent = tgt.local.get(n)!.parent;
+    while (parent && parent !== expected) parent = tgt.local.get(parent)!.parent;
+    if (!parent) {
+      throw new Error(
+        `retarget: joint "${n}" must descend from "${expected}"; its names contradict ` +
+          'the animation skeleton. Rebuild the rig in the Rig stage before previewing or baking.',
+      );
+    }
+  }
+
   // one shared key-time grid: union of the mapped source tracks' key times
   const timeSet = new Set<number>();
   for (const n of mapped) for (const t of source.tracks.get(srcNameOf(n))!.times) timeSet.add(t);

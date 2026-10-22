@@ -178,3 +178,7 @@ Existing rigs retain their saved bytes. Rebuilding uses the updated adapter with
 checkpoints again. The saved Bulma skeleton reproduces the corrected hip/trunk/leg naming on CPU;
 fresh GPU runs, remaining deformation findings and viewport measurements are recorded in the
 [roadmap follow-through](../future/roadmap.md#rig-correctness-and-interaction-follow-through).
+
+Animation preview and bake check mapped bone ancestry before transferring motion. Contradictory
+names (for example, a thigh named `pelvis`) refuse with a request to rebuild the rig. Accepting a
+deformation report records review; it does not rename bones or repair saved weights.

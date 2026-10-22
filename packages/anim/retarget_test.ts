@@ -486,6 +486,15 @@ function renamed(rest: SkeletonRest, ren: Record<string, string>): SkeletonRest 
   return { parents, locals };
 }
 
+test('anatomically contradictory joint names refuse before retargeting', async () => {
+  const f = await fx();
+  const normal = f.targets[0][1];
+  const mislabeled = renamed(normal, { pelvis: 'thigh_r', thigh_r: 'pelvis' });
+  const err = assertThrows(() => retargetClip(f.walk, f.ualRest, mislabeled, UAL_HUMANOID), Error);
+  assert(err.message.includes('Rebuild the rig'), err.message);
+  assert(err.message.includes('pelvis'), err.message);
+});
+
 test('D-040: a hips/head dialect target maps through aliases, keeping its own names', async () => {
   const f = await fx();
   const canonical = f.targets.find(([n]) => n === 'normal')![1];
