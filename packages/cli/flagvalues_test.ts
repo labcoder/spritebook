@@ -6,6 +6,23 @@ import { assert, assertEquals } from '@std/assert';
 import { runCli } from './dist/mod.js';
 import { rigRunArgs } from '../../apps/studio/src/rig.ts';
 
+test('template fitting refuses orientation and repair options instead of silently ignoring them', async () => {
+  for (const flag of ['--face-front', '--auto-hints']) {
+    const lines: string[] = [];
+    assertEquals(
+      await runCli(
+        ['rig', '--track-a', '--model', 'unused.glb', '--out', 'unused', flag, '--json'],
+        {
+          stdout: (line) => lines.push(line),
+          stderr: (line) => lines.push(line),
+        },
+      ),
+      1,
+    );
+    assert(lines.some((line) => line.includes('require UniRig (Track B)')), lines.join('\n'));
+  }
+});
+
 test('Studio orientation switches reach catalog validation without requiring values', async () => {
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-rig-flags-'));
   try {

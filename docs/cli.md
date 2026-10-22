@@ -132,7 +132,7 @@ minutes. `--track-a` fits a bundled rigged body instead: deterministic, no GPU, 
 | `--track-a`                                                | canonical body fit instead of the UniRig prediction                          |
 | `--body <dir\|ubc-male>`                                   | Track A body; `ubc-male` is portable, other bodies take explicit directories |
 | `--height <metres>`                                        | standing height for the fit                                                  |
-| `--face-front` `--feet-ground` `--center` `--rotate <deg>` | orientation fixes; each re-runs the rig                                      |
+| `--face-front` `--feet-ground` `--center` `--rotate <deg>` | combine orientation fixes in one UniRig rebuild; rotate takes 90, 180 or 270 |
 | `--edits <patch.json>`                                     | apply joint-position edits from the viewport's gizmo                         |
 | `--auto-hints`                                             | turn the deform report into joint hints and re-run                           |
 | `--rerun-with-hints`                                       | re-run with `--edits` as position hints                                      |
@@ -140,9 +140,25 @@ minutes. `--track-a` fits a bundled rigged body instead: deterministic, no GPU, 
 | `--seed <n>`                                               | prediction seed (Track B)                                                    |
 | `--no-deform-check`                                        | skip the test-pose deform report                                             |
 | `--accept` / `--unaccept`                                  | record that you reviewed the rig (needs `--workspace`)                       |
+| `--preview-joint <name>`                                   | CPU-only diagnostic bend on the workspace's canonical rig; no inference      |
 
 Read the deform report before you accept. A bake with an unaccepted rig warns but still runs.
 Acceptance is journaled; `undo` takes it back.
+
+Orientation switches need no value except `--rotate`. They and joint-repair options apply to UniRig
+only; template fitting refuses them rather than silently ignoring them. A rebuild uses the current
+canonical mesh, and promotes its result through the journal.
+
+To inspect the same ±30° joint bend used by the deform check:
+
+```sh
+spritebook rig --workspace ./characters/hero --preview-joint thigh_l --json
+```
+
+This writes `rig/deform-preview.glb`, with a four-second rest/positive/rest/negative/rest loop. It
+needs no model installation or GPU, preserves the canonical rig and acceptance, and reports an
+unknown joint without writing a preview. The GUI plays this core-generated animation and provides
+pause and scrub controls. Passing this diagnostic does not prove anatomical correctness.
 
 ## anim — the clip library and your bindings
 

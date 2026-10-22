@@ -40,6 +40,7 @@ export {
 export { DEFAULT_MIN_HINT_OFFSET_M, deriveAutoHints } from './autohints.ts';
 export type { AutoHintOptions, AutoHints } from './autohints.ts';
 export type { DeformCheckOptions } from './deform.ts';
+export { jointBendClip, writeDeformPreview } from './preview.ts';
 
 export { isIntegerDType, parseNpy, readNpz, readNpzFile } from './npz.ts';
 export type { NpyArray, NpyData, NpyDType } from './npz.ts';

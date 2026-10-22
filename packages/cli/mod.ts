@@ -637,6 +637,7 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
   rename: ['workspace', 'name'],
   clone: ['workspace', 'to', 'id', 'name'],
   rig: [
+    'preview-joint',
     'catalog',
     'model',
     'out',
@@ -2109,6 +2110,30 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         );
       }
     }
+    const previewJoint = flag(args, 'preview-joint');
+    if (previewJoint !== undefined) {
+      const workspace = flag(args, 'workspace');
+      if (!workspace) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'missing-arg',
+          '--preview-joint needs --workspace <dir>',
+        );
+      }
+      try {
+        const { writeDeformPreview } = await import('@spritebook/rig');
+        const outPath = `${workspace}/rig/deform-preview.glb`;
+        await writeDeformPreview(`${workspace}/canonical/model.glb`, previewJoint, outPath);
+        io.stdout(JSON.stringify({ joint: previewJoint, path: outPath }));
+        return 0;
+      } catch (err) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'preview-failed',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
     const model = flag(args, 'model');
     const out = flag(args, 'out');
     if (!model || !out) {
@@ -2122,6 +2147,16 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     // sidecar, no GPU, no registry backend. Track B (below) predicts a fresh
     // skeleton via UniRig; --track-a is the roster path.
     if (args.includes('--track-a')) {
+      if (
+        ['face-front', 'feet-ground', 'center', 'rotate', 'edits', 'rerun-with-hints', 'auto-hints']
+          .some((f) => args.includes(`--${f}`))
+      ) {
+        return fail(
+          'rig' as JobEvent['jobId'],
+          'bad-args',
+          'Orientation and joint repair options require UniRig (Track B). Template fitting (Track A) uses the template skeleton.',
+        );
+      }
       const body = flag(args, 'body');
       const target = flag(args, 'target') ?? model;
       if (!body) {
