@@ -103,7 +103,7 @@ from . import Adapter, AdapterError, Emitter, validate_params
 from ..glb import read_scene_geometry
 from .unirig_humanoid_ref import HUMANOID_REFERENCE, HUMANOID_REFERENCE_SOURCE
 
-UNIRIG_ADAPTER_VERSION = "1.1.0"
+UNIRIG_ADAPTER_VERSION = "1.2.0"
 
 # --- mirrors packages/schema/rig.ts (FROZEN) ----------------------------------
 RIG_SKELETON_FILE = "rig.json"
@@ -733,6 +733,85 @@ def _greedy_assign(
     return pairs, score
 
 
+def _constrain_humanoid_names(
+    points: np.ndarray, parents: np.ndarray, names: list[str], fallback: list[str]
+) -> dict[str, Any]:
+    """Anatomical chains outrank a close positional match on stylized bodies."""
+    by_name = {n: i for i, n in enumerate(names)}
+    assigned: dict[int, str] = {}
+
+    def ancestors(index: int, count: int) -> list[int]:
+        chain = [index]
+        while len(chain) < count:
+            parent = int(parents[chain[-1]])
+            if parent < 0 or parent >= len(names) or parent in chain:
+                return []
+            chain.append(parent)
+        return chain
+
+    legs = [
+        ancestors(by_name[f"foot_{side}"], 4) if f"foot_{side}" in by_name else []
+        for side in ("l", "r")
+    ]
+    if all(legs) and legs[0][3] == legs[1][3]:
+        hips = legs[0][3]
+        # Both legs descend from one pelvis, on opposite sides, toward the floor.
+        descending = all(
+            points[c[0], 1] < points[c[1], 1] < points[c[2], 1] <= points[hips, 1]
+            for c in legs
+        )
+        if descending and points[legs[0][2], 0] > points[hips, 0] > points[legs[1][2], 0]:
+            assigned[hips] = "pelvis"
+            for side, chain in zip(("l", "r"), legs):
+                assigned.update(
+                    zip(chain[:3], (f"foot_{side}", f"calf_{side}", f"thigh_{side}"))
+                )
+            head = by_name.get("head")
+            if head is not None:
+                chain = [head]
+                while chain[-1] != hips and int(parents[chain[-1]]) >= 0 and len(chain) <= len(names):
+                    chain.append(int(parents[chain[-1]]))
+                trunk = list(reversed(chain[:-1]))
+                ascending = all(points[b, 1] > points[a, 1] for a, b in zip([hips] + trunk, trunk))
+                if chain[-1] == hips and 3 <= len(trunk) <= 5 and ascending:
+                    trunk_names = [f"spine_{i:02d}" for i in range(1, len(trunk) - 1)]
+                    trunk_names += ["neck_01", "head"]
+                    assigned.update(zip(trunk, trunk_names))
+
+    for side, sign in (("l", 1), ("r", -1)):
+        hand = by_name.get(f"hand_{side}")
+        arm = ancestors(hand, 4) if hand is not None else []
+        if arm and all(sign * (points[a, 0] - points[b, 0]) > 0 for a, b in zip(arm, arm[1:])):
+            assigned.update(zip(arm, (
+                f"hand_{side}", f"lowerarm_{side}", f"upperarm_{side}", f"clavicle_{side}"
+            )))
+
+    changed = {
+        str(i): {"from": names[i], "to": name}
+        for i, name in assigned.items() if names[i] != name
+    }
+    # Release a name before assigning it elsewhere: never duplicate a semantic joint.
+    for i, name in enumerate(names):
+        if name in assigned.values() and assigned.get(i) != name:
+            names[i] = fallback[i]
+    for i, name in assigned.items():
+        names[i] = name
+
+    # A finger label must follow its own finger chain on the named hand.
+    rejected: list[str] = []
+    for i, name in enumerate(list(names)):
+        parts = name.split("_")
+        if len(parts) < 3 or parts[0] not in ("thumb", "index", "middle", "ring", "pinky"):
+            continue
+        number, side = int(parts[1]), parts[-1]
+        expected = f"hand_{side}" if number == 1 else f"{parts[0]}_{number - 1:02d}_{side}"
+        parent = int(parents[i])
+        if parent < 0 or names[parent] != expected:
+            rejected.append(name)
+            names[i] = fallback[i]
+    return {"topologyCorrections": changed, "rejectedNames": rejected}
+
+
 def semantic_names(
     joints: np.ndarray, fallback: list[str], parents: np.ndarray | None = None
 ) -> tuple[list[str], dict[str, Any]]:
@@ -814,6 +893,15 @@ def semantic_names(
                     rescued["pelvis"] = round(d, 4)
                     stats["pelvisByTopology"] = {"replaced": replaced}
 
+    if parents is not None and len(pairs) >= SEMANTIC_MIN_FRACTION * stats["total"]:
+        # Side checks use canonical +X = left; a mirrored positional guess cannot change anatomy.
+        stats.update(_constrain_humanoid_names(np.asarray(joints), parents, names, fallback))
+        for name in list(rescued):
+            if name in names:
+                distance = np.linalg.norm(probe[names.index(name)] - reference[ref_names.index(name)])
+                rescued[name] = round(float(distance), 4)
+            else:
+                del rescued[name]
     stats.update(
         # the truth of the final assignment, whatever path produced it - the
         # topology rescue can REPLACE a positional name, so counting pairs
@@ -1226,9 +1314,16 @@ def run(params: dict[str, Any], emit: Emitter) -> None:
         emit.warn(
             "generic-joint-names",
             f"Only {result['naming']['matched']} of {result['naming']['total']} predicted joints "
-            "matched the humanoid reference, so the skeleton keeps UniRig's positional names. "
+            "matched the humanoid reference; uncertain joints keep UniRig's positional names. "
             "Name-based tools (retarget profiles, `rig --edits <joint>`) will need a manual "
             "mapping for this character.",
+        )
+    if result["naming"].get("rejectedNames"):
+        emit.warn(
+            "uncertain-joint-names",
+            "Anatomical chain checks rejected these positional labels: "
+            + ", ".join(result["naming"]["rejectedNames"])
+            + ". These joints retain generic names; inspect the skeleton before accepting it.",
         )
     if result["zeroWeightVertices"]:
         emit.warn(

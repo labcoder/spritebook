@@ -36,11 +36,11 @@ within a small fraction of its bbox diagonal the stage fails loudly.
 
 ## Weight transfer
 
-``reskin`` mirrors ``src/system/skin.py:reskin`` (UniRig, MIT) — median of the 7
-nearest sampled points, then one diffusion pass along mesh edges from hotter to
-cooler joints — targeted directly at the CANONICAL vertices instead of at the
-decimated intermediate, so there is one resampling hop rather than two. The one
-deliberate difference is the final normalization: upstream divides by the row
+``reskin`` uses inverse-square interpolation of the 7 nearest sampled points,
+then UniRig's edge diffusion, directly on the CANONICAL vertices. A componentwise
+median erases thin fingers when their samples are a minority among neighbours;
+distance weighting preserves a close sample and varies continuously between samples.
+The final normalization is guarded: upstream divides by the row
 sum unguarded, which is exactly the NaN factory P0-T4 catalogued (item 5). Here
 zero-weight rows are left at zero and COUNTED; the caller decides what to say
 about them.
@@ -204,21 +204,28 @@ def reskin(
 ) -> np.ndarray:
     """Per-vertex weights for ``vertices`` from the model's sampled prediction.
 
-    Mirrors UniRig's ``reskin`` (MIT): median over the nearest sampled points,
-    then one hotter-to-cooler diffusion pass along mesh edges, accumulated up
+    Interpolate nearby samples, then UniRig's (MIT) hotter-to-cooler diffusion,
+    accumulated up
     the joint chain so a child's influence bleeds into its parent rather than
     across the body. Zero-weight rows survive as zeros (see module docstring).
     """
     n_vertices = int(vertices.shape[0])
     n_joints = int(sampled_skin.shape[1])
     k = min(NEAREST_SAMPLES, int(sampled_vertices.shape[0]))
+    if k == 0 or n_joints == 0:
+        raise MergeError("the skin prediction contains no samples or joints")
     tree = cKDTree(sampled_vertices)
     skin = np.zeros((n_vertices, n_joints), dtype=np.float32)
     for start in range(0, n_vertices, VERTEX_BLOCK):
         block = vertices[start : start + VERTEX_BLOCK]
-        _, nearest = tree.query(block, k=k)
+        distances, nearest = tree.query(block, k=k)
         nearest = np.asarray(nearest).reshape(block.shape[0], -1)
-        skin[start : start + VERTEX_BLOCK] = np.median(sampled_skin[nearest], axis=1)
+        distances = np.asarray(distances).reshape(block.shape[0], -1)
+        exact = distances <= 1e-10
+        coefficients = 1.0 / np.maximum(distances, 1e-10) ** 2
+        coefficients = np.where(exact.any(axis=1, keepdims=True), exact, coefficients)
+        coefficients /= coefficients.sum(axis=1, keepdims=True)
+        skin[start : start + VERTEX_BLOCK] = np.einsum("nk,nkj->nj", coefficients, sampled_skin[nearest])
 
     edges = np.concatenate(
         [triangles[:, [0, 1]], triangles[:, [1, 2]], triangles[:, [2, 0]]], axis=0

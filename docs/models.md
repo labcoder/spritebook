@@ -161,3 +161,19 @@ model files and run the declared setup. Rust build cleanup is separate: contribu
 clean --manifest-path apps/studio/src-tauri/Cargo.toml` and `cargo clean --manifest-path
 packages/core/native/Cargo.toml`; clean any custom Cargo target directories with their explicit
 `--target-dir` as well.
+
+## UniRig quality checks
+
+Adapter 1.2.0 checks humanoid naming against leg, trunk and arm ancestry as well as position. A
+close reference match cannot place a thigh in the spine; contradictory finger-chain labels stay
+generic and produce a warning. Corrections and rejected names are recorded in `rig/rig-run.json`. A
+named joint or finite, normalized weight row does not prove correct anatomy.
+
+The CPU merge transfers sampled skin weights with inverse-square distance interpolation before edge
+diffusion and the existing top-four normalization. The former componentwise median could erase a
+thin finger when its sample was outnumbered by nearby palm samples. Neither transfer nor position
+hints can recover detail missing from the model prediction. Deformation thresholds are unchanged.
+
+Existing rigs retain their saved bytes. Rebuilding uses the updated adapter without downloading
+checkpoints again. The saved Bulma skeleton reproduces the corrected hip/trunk/leg naming on CPU;
+fresh GPU inference and visual deformation review remain pending the maintainer's GPU availability.

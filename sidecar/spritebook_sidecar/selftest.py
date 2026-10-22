@@ -926,6 +926,58 @@ def test_unirig_naming() -> None:
     ok(flat_names == ["bone_0", "bone_1", "bone_2"], "and the fallback names survive intact")
 
 
+def test_unirig_stylized_chains() -> None:
+    from .adapters.unirig import semantic_names
+
+    # Short torso, large head and long hands: distance matching puts a thigh in the spine.
+    points = [[0, .63, .08], [0, .67, .08], [0, .72, .09], [0, .77, .09], [0, .82, .09], [0, .88, .09]]
+    parents = [-1, 0, 1, 2, 3, 4]
+    for side in (1, -1):
+        arm = len(points)
+        points.extend([[side*.03, .81, .09], [side*.10, .78, .09], [side*.23, .78, .09], [side*.38, .77, .09]])
+        parents.extend([3, arm, arm+1, arm+2])
+        for digit in range(5):
+            finger = len(points)
+            for segment in range(3):
+                points.append([side*(.40+.016*segment), .76-.008*segment*(digit == 0), .11-.013*digit])
+                parents.append(arm+3 if segment == 0 else finger+segment-1)
+    leg_start = len(points)
+    for side in (1, -1):
+        leg = len(points)
+        points.extend([[side*.05, .61, .09], [side*.05, .34, .07], [side*.05, .067, .04], [side*.06, .006, .11]])
+        parents.extend([0, leg, leg+1, leg+2])
+    fallback = [f"bone_{i}" for i in range(len(points))]
+    names, stats = semantic_names(np.array(points), fallback, np.array(parents))
+    ok(names[0] == "pelvis", f"the shared leg parent is the pelvis: {stats}")
+    ok(names[leg_start] == "thigh_l" and names[leg_start+4] == "thigh_r", "both thighs follow the actual leg chains")
+    ok(names[1] == "spine_01" and names[2] == "spine_02", "the short trunk follows ancestry, not reference height")
+    ok(len(set(names)) == len(names), "semantic corrections never duplicate joint names")
+    ok(bool(stats["topologyCorrections"]), "corrections remain visible in provenance")
+    for i, name in enumerate(names):
+        if name.startswith(("thumb_", "index_", "middle_", "ring_", "pinky_")):
+            digit, number, *_, side = name.split("_")
+            expected = f"hand_{side}" if int(number) == 1 else f"{digit}_{int(number)-1:02d}_{side}"
+            ok(names[parents[i]] == expected, "a named finger cannot jump between digit chains")
+
+
+def test_unirig_weight_transfer() -> None:
+    from .adapters.unirig_merge import reskin, top_influences
+    from .adapters.unirig import finalize_weights
+
+    # One nearby thin-finger sample among six palm samples. A median erases the finger entirely.
+    samples = np.array([[0., 0, 0]] + [[1.+i*.1, 0, 0] for i in range(6)])
+    weights = np.array([[0., 1.]] + [[1., 0.]] * 6)
+    vertices = np.array([[0., 0, 0], [.01, 0, 0], [.02, 0, 0]])
+    result = reskin(samples, weights, vertices, np.empty((0, 3), dtype=np.int64), np.array([-1, 0]))
+    ok(result[0, 1] == 1, "an exact sample retains its joint influence")
+    ok(np.all(result[:, 1] > .99), "a close finger sample survives a majority of distant palm samples")
+    indices, values = top_influences(result)
+    _, final, _ = finalize_weights(indices, values, result.sum(axis=1), 2)
+    ok(np.isfinite(final).all() and np.allclose(final.sum(axis=1), 1), "final rows remain finite and normalized")
+    zero = reskin(samples, np.zeros_like(weights), vertices, np.empty((0, 3), dtype=np.int64), np.array([-1, 0]))
+    ok(not zero.any(), "missing influence is preserved, never fabricated")
+
+
 def test_unirig_environment(tmp: Path) -> None:
     """Missing backend and missing weights both fail EARLY and actionably."""
     from .adapters import unirig
@@ -1741,6 +1793,8 @@ def main() -> int:
             test_unirig_params()
             test_unirig_validation()
             test_unirig_naming()
+            test_unirig_stylized_chains()
+            test_unirig_weight_transfer()
             test_unirig_environment(tmp)
             test_events_module()
             test_shutdown(port, server_thread)
