@@ -13,6 +13,9 @@
  *     tgtLocal_j(t) = conj(tgtWorldParent_j(t)) ⊗ tgtWorld_j(t)
  *
  *   Unrolled: tgtWorld = Y ⊗ srcWorld ⊗ conj(srcRestWorld) ⊗ conj(Y) ⊗ tgtRestWorld.
+ *   For arm bind-pose differences over 15°, tgtRestWorld uses a measured
+ *   swing-aligned reference; wrists/digits inherit the forearm correction.
+ *   This makes arms-down/A/T binds follow the clip without doubling the pose.
  *   Y is the facing-yaw conjugation quat: a rotation about world +Y by
  *   (targetRestYaw − sourceRestYaw), each yaw MEASURED from the rest skeleton
  *   (explicit side-pair anchors -> left axis -> forward = left × up; see
@@ -84,6 +87,8 @@ import {
   qSlerp,
   type Quat,
   vAdd,
+  vCross,
+  vDot,
   type Vec3,
   vLen,
   vNormalize,
@@ -384,6 +389,40 @@ export function retargetClip(
     }
   }
 
+  // Large arm bind-pose differences (T/A/arms-down) are pose, not anatomy.
+  const referenceRot = new Map(tgt.worldRot);
+  for (const side of ['l', 'r']) {
+    let handCorrection = qIdentity();
+    for (
+      const [head, tail] of [[`upperarm_${side}`, `lowerarm_${side}`], [
+        `lowerarm_${side}`,
+        `hand_${side}`,
+      ]]
+    ) {
+      const th = tgtNameOf(head), tt = tgtNameOf(tail);
+      if (!mappedSet.has(th) || !src.worldPos.has(tail) || !tgt.worldPos.has(tt)) continue;
+      const from = vSub(tgt.worldPos.get(tt)!, tgt.worldPos.get(th)!);
+      const to = qRotate(yawQ, vSub(src.worldPos.get(tail)!, src.worldPos.get(head)!));
+      if (vLen(from) < 1e-6 || vLen(to) < 1e-6) continue;
+      const a = vNormalize(from), b = vNormalize(to);
+      const angle = Math.acos(Math.max(-1, Math.min(1, vDot(a, b))));
+      if (angle < Math.PI / 12) continue;
+      let axis = vCross(a, b);
+      if (vLen(axis) < 1e-6) axis = vCross(a, Math.abs(a[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]);
+      const correction = qAxisAngle(vNormalize(axis), angle);
+      referenceRot.set(th, qNormalize(qMul(correction, tgt.worldRot.get(th)!)));
+      if (head === `lowerarm_${side}`) handCorrection = correction;
+    }
+    const hand = tgtNameOf(`hand_${side}`);
+    for (const n of tgt.order) {
+      let ancestor = n;
+      while (ancestor && ancestor !== hand) ancestor = tgt.local.get(ancestor)!.parent;
+      if (ancestor === hand) {
+        referenceRot.set(n, qNormalize(qMul(handCorrection, tgt.worldRot.get(n)!)));
+      }
+    }
+  }
+
   // one shared key-time grid: union of the mapped source tracks' key times
   const timeSet = new Set<number>();
   for (const n of mapped) for (const t of source.tracks.get(srcNameOf(n))!.times) timeSet.add(t);
@@ -421,7 +460,7 @@ export function retargetClip(
         // tgtWorld = Y ⊗ (srcWorld ⊗ conj(srcRestWorld)) ⊗ conj(Y) ⊗ tgtRestWorld
         const sn = srcNameOf(n);
         const delta = qMul(pose.rot.get(sn)!, qConj(src.worldRot.get(sn)!));
-        const tgtWorld = qMul(yawQ, qMul(delta, qMul(yawQInv, tgt.worldRot.get(n)!)));
+        const tgtWorld = qMul(yawQ, qMul(delta, qMul(yawQInv, referenceRot.get(n)!)));
         localRot = qNormalize(qMul(qConj(pRot), tgtWorld));
         rotOut.get(n)!.set(localRot, f * 4);
         if (n === tgtHips) {

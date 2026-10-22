@@ -960,6 +960,24 @@ def test_unirig_stylized_chains() -> None:
             expected = f"hand_{side}" if int(number) == 1 else f"{digit}_{int(number)-1:02d}_{side}"
             ok(names[parents[i]] == expected, "a named finger cannot jump between digit chains")
 
+    # Arms down with one fused hand chain or two digit chains still need real arm names.
+    for chain_count in (1,2):
+        removed = set(range(10+3*chain_count,25)) | set(range(29+3*chain_count,44))
+        kept = [i for i in range(len(points)) if i not in removed]
+        old_to_new = {old: new for new, old in enumerate(kept)}
+        lowered = np.array(points, dtype=np.float64)
+        for sign, start in ((1,6), (-1,25)):
+            angle = -sign * np.deg2rad(65)
+            rotation = np.array([[np.cos(angle),-np.sin(angle),0], [np.sin(angle),np.cos(angle),0], [0,0,1]])
+            lowered[start:start+19] = (lowered[start:start+19]-lowered[start]) @ rotation.T + lowered[start]
+        lowered = lowered[kept]
+        compact_parents = np.array([old_to_new.get(parents[i], -1) for i in kept])
+        compact_fallback = [f"bone_{i}" for i in range(len(kept))]
+        compact_names, _ = semantic_names(lowered, compact_fallback, compact_parents)
+        for side, start in (("l",6), ("r",25)):
+            for offset, stem in enumerate(("clavicle", "upperarm", "lowerarm", "hand")):
+                ok(compact_names[old_to_new[start+offset]] == f"{stem}_{side}", "arms-down topology retains each real arm joint")
+
 
 def test_unirig_weight_transfer() -> None:
     from .adapters.unirig_merge import reskin as transfer, top_influences

@@ -133,7 +133,8 @@ export const REQUIRED_LIMITS: Record<string, number> = {
 // 0.4.0: materials honoured (factor x texture, alpha cutout); median cut
 // reaches maxColors DISTINCT colours; area average weights colour by coverage.
 // 0.6.0: Node/Dawn and native PNG bytes get a new cache namespace.
-export const RENDERER_VERSION = 'spritebook-render@0.6.0';
+// 0.6.1: arm bind-pose alignment changes animated pixels; invalidate prior poses/frames.
+export const RENDERER_VERSION = 'spritebook-render@0.6.1';
 
 // ---------------------------------------------------------------------------
 // AOV contract (aov.ts + shaders.wgsl). One MRT pass, five color attachments,

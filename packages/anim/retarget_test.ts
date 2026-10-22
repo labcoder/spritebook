@@ -26,11 +26,13 @@ import { loadClip, loadSkeletonRest, UAL_HUMANOID } from './dist/profile.js';
 import { CONTACT_EPS_M, measureRestFacingYaw, retargetClip } from './dist/retarget.js';
 import {
   qAngle,
+  qAxisAngle,
   qFromMat4,
   qMul,
   qNormalize,
   qRotate,
   qSlerp,
+  qToMat4,
   type Quat,
   vAdd,
   type Vec3,
@@ -249,6 +251,35 @@ test('Walk_Loop: knee flexion transfers onto all three bodies (a static result f
       );
       // measured per-frame ceiling 0.0732 rad — the rigs' rest-direction mismatch
       assert(maxDiff < 0.12, `${name}/${side}: per-frame flexion tracks source (max ${maxDiff})`);
+    }
+  }
+});
+
+test('Walk_Loop: an arms-down bind pose follows the clip instead of doubling the arm drop', async () => {
+  const f = await fx();
+  const normal = f.targets[0][1];
+  const rest: SkeletonRest = { parents: new Map(normal.parents), locals: new Map(normal.locals) };
+  for (const [side, sign] of [['l', 1], ['r', -1]] as const) {
+    const name = `upperarm_${side}`, matrix = rest.locals.get(name)!;
+    const rotated = qToMat4(qMul(qAxisAngle([0, 0, 1], -sign * Math.PI / 3), qFromMat4(matrix)));
+    rotated.set(matrix.subarray(12, 15), 12);
+    rest.locals.set(name, rotated);
+  }
+  const result = retargetClip(f.walk, f.ualRest, rest, UAL_HUMANOID);
+  const target = fkRest(rest);
+  for (const t of result.clip.tracks.get('pelvis')!.times) {
+    const src = samplePose(f.walk, f.srcSk, t).pos, tgt = samplePose(result.clip, target, t).pos;
+    for (const side of ['l', 'r']) {
+      const direction = (pose: Map<string, Vec3>) => {
+        const a = pose.get(`upperarm_${side}`)!, b = pose.get(`lowerarm_${side}`)!;
+        const d = b.map((v, i) => v - a[i]);
+        return d.map((v) => v / Math.hypot(...d));
+      };
+      const a = direction(src), b = direction(tgt);
+      assert(
+        a.reduce((sum, v, i) => sum + v * b[i], 0) > 0.99,
+        `${side}: arm direction matches the clip at ${t}`,
+      );
     }
   }
 });

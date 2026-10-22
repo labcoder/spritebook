@@ -103,7 +103,7 @@ from . import Adapter, AdapterError, Emitter, validate_params
 from ..glb import read_scene_geometry
 from .unirig_humanoid_ref import HUMANOID_REFERENCE, HUMANOID_REFERENCE_SOURCE
 
-UNIRIG_ADAPTER_VERSION = "1.3.0"
+UNIRIG_ADAPTER_VERSION = "1.3.1"
 
 # --- mirrors packages/schema/rig.ts (FROZEN) ----------------------------------
 RIG_SKELETON_FILE = "rig.json"
@@ -781,9 +781,36 @@ def _constrain_humanoid_names(
                     trunk_names += ["neck_01", "head"]
                     assigned.update(zip(trunk, trunk_names))
 
+    # Arms can end in one fused hand chain. Anchor both at the trunk fork,
+    # rather than requiring the model to predict several separate fingers.
+    trunk = {i for i, name in assigned.items() if name in {
+        "pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head"
+    }}
+    for attach in sorted(trunk):
+        branches = [i for i in range(len(names)) if parents[i] == attach and i not in trunk]
+        arms: dict[str, list[int]] = {}
+        for base in branches:
+            chain = [base]
+            while len(chain) < 4 and degree[chain[-1]] == 1:
+                chain.append(int(np.flatnonzero(parents == chain[-1])[0]))
+            if len(chain) != 4 or abs(points[base, 0] - midline) > height * .12:
+                continue
+            sign = 1 if points[chain[-1], 0] > midline else -1
+            if not all(sign * (points[b, 0] - points[a, 0]) > 0 for a, b in zip(chain, chain[1:])):
+                continue
+            if sign * (points[chain[-1], 0] - midline) < height * .15:
+                continue
+            arms["l" if sign > 0 else "r"] = chain
+        if set(arms) == {"l", "r"}:
+            for side, chain in arms.items():
+                assigned.update(zip(chain, (f"clavicle_{side}", f"upperarm_{side}", f"lowerarm_{side}", f"hand_{side}")))
+            break
+
     for side, sign in (("l", 1), ("r", -1)):
+        if f"hand_{side}" in assigned.values():
+            continue
         # A wrist branches into fingers; positional matching can pick a knuckle instead.
-        hands = [i for i in range(len(names)) if degree[i] >= 3 and sign * (points[i, 0] - midline) > height * .15]
+        hands = [i for i in range(len(names)) if degree[i] >= 2 and sign * (points[i, 0] - midline) > height * .15]
         for hand in hands:
             arm = ancestors(hand, 4)
             attach = int(parents[arm[-1]]) if arm else -1

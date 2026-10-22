@@ -128,6 +128,12 @@ and authentication; no Hugging Face desktop app is required.
 | `apps/studio`      | Tauri/React shell; framework-agnostic inspection viewport classes                               |
 | `sidecar` (Python) | Adapters: rembg, gen backends, rig backends                                                     |
 
+Humanoid retargeting validates mapped ancestry before sampling. Arm bind-pose differences above 15°
+receive a measured rest-reference swing; wrists and digits inherit the forearm correction. Joint
+translations and bone lengths still come from the target. This applies in core to both preview and
+bake. The animated-pixel change advances the shared renderer cache namespace to
+`spritebook-render@0.6.1`; old frame caches are not reused for the changed poses.
+
 ## Non-goals of the architecture
 
 No cloud services in the core path; no telemetry; no plugin system in 1.0 (exporters are in-tree

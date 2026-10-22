@@ -164,10 +164,11 @@ packages/core/native/Cargo.toml`; clean any custom Cargo target directories with
 
 ## UniRig quality checks
 
-Adapter 1.3.0 checks humanoid naming against leg, trunk and arm ancestry as well as position. A
-close reference match cannot place a thigh in the spine; contradictory finger-chain labels stay
-generic and produce a warning. Corrections and rejected names are recorded in `rig/rig-run.json`. A
-named joint or finite, normalized weight row does not prove correct anatomy.
+Adapter 1.3.1 checks humanoid naming against leg, trunk and arm ancestry as well as position. Paired
+arm branches are anchored at the trunk, including arms-down predictions with only one or two hand
+branches. A close reference match cannot place a thigh in the spine; contradictory finger-chain
+labels stay generic and produce a warning. Corrections and rejected names are recorded in
+`rig/rig-run.json`. A named joint or finite, normalized weight row does not prove correct anatomy.
 
 The CPU merge interpolates nearby samples, attenuates influence from distant bones, and smooths
 weights along mesh edges with nonnegative, anchored updates. Geometric seam copies share weights;
@@ -186,3 +187,16 @@ fresh GPU runs, remaining deformation findings and viewport measurements are rec
 Animation preview and bake check mapped bone ancestry before transferring motion. Contradictory
 names (for example, a thigh named `pelvis`) refuse with a request to rebuild the rig. Accepting a
 deformation report records review; it does not rename bones or repair saved weights.
+
+Joint counts vary with the prediction. GPU execution does not guarantee five separate fingers:
+generic `bone_N` joints remain at rest relative to their parent during semantic animation. The Rig
+screen reports mapped finger detail and branches at each named wrist; these counts are not an
+anatomy certificate. Arms-down/A/T bind poses now receive a measured arm-reference alignment in core
+before motion transfers, shared by preview and bake.
+
+The Amy qualification still exposes a real limitation: a plausible skeleton can have trouser
+vertices weighted to nearby hands. Two fresh seeds retain deformation findings; the arms-raised
+preview exposes leakage more clearly than walking. Distance, surface-normal, visibility and Blender
+heat-weight experiments did not produce a safe replacement and are not shipping. For generated
+humanoids, separated limbs in an A/T pose remain the safer source; accepting a report does not fix
+weight ownership. F5-T2 remains open for that repair.
