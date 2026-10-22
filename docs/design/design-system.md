@@ -55,7 +55,7 @@ expressed through labels, current-step semantics, dots and lock explanations.
 
 ## Type and texture
 
-- **Barlow Condensed 500**: 28px SpriteBook wordmark and stage heading and character names.
+- **Barlow Condensed 500**: 28px SpriteBook wordmark and character names.
 - **Geist Mono 400–600**: 13px UI body, controls, measurements, paths and CLI/log lines; compact
   annotations remain at least 12px. Use system fallbacks for unsupported glyphs.
 - Both faces are self-hosted under SIL OFL 1.1 with complete notices and source/SHA pins in
@@ -65,28 +65,33 @@ expressed through labels, current-step semantics, dots and lock explanations.
 
 ## Components and copy
 
-The 48px title bar holds File/Edit, model access, palette, locale and theme controls. The gallery
-uses the full window. When editing, the 168px character index lists the loaded roster at left;
-opened characters retain close/Delete and focus behavior. Up/Down moves between index entries. The
-six stages run horizontally and retain lock explanations.
+The 48px title bar centers File/Edit, model access and a sun/moon theme toggle. Choose language
+under Edit → Language; File → Shortcuts opens the existing command palette (Ctrl+K). GPU
+identification is plain status text beside the bottom log handle. The gallery uses the full window;
+editing adds the 168px character index. The flush six-stage rail provides the stage name, without a
+duplicate title row.
 
-The stage heading is 28px. Inspector is a disclosure beside the stage; its existing width and
-keyboard resize controls remain available on wide windows. Below 1100px it stacks beneath the stage,
-where horizontal resize is unnecessary. Below 760px the browser preview stacks the index and
-content; the Tauri window still has a 960×600 minimum.
+Each stage has assets/output left and one property inspector right, extending from the rail to the
+bottom. Its heading is the character name. The 360px default width persists locally and resizes
+between 280–560px by drag or keyboard (Left/Right, Home/End; double-click resets). The edge chevron
+collapses it to 40px without resetting drafts/jobs. The old separate manifest-summary column is
+removed. At the 960×600 desktop minimum these remain two columns; below 760px browser panels stack.
 
-Generate and Rig place the inspection/reference canvas left and a 360px settings panel right.
-Settings and assets scroll independently, with the creation/generation action and CLI twin kept
-visible. The stage rail fills the editing region without outer insets. Native radio choices,
-label/value rows and progressive disclosure carry dense options. Candidates sit beneath their
-canvas; the rig's deformation report sits beneath its mesh. Unknown job durations use named phases
-and elapsed time, without a fabricated percentage or ETA. Cancellation and errors retain focus and
-clear status. Below 760px these panels stack for browser verification.
+Settings and assets scroll independently; generation, Rig, Look and Export keep action/CLI footers
+visible. Native model radio choices emphasize names, install state and memory needs. Advanced
+settings and selected terms are disclosed. The synthetic fixture is under Development tools in dev
+builds and absent from production generation/model-management lists. Core catalog/CLI access and
+existing project provenance are retained. Generation chooses an installed visible backend by
+default; explicit choices and visible prior-result backends win.
 
-Look shows the actual source image beside saved sprites, followed by a horizontal recipe. The
-comparison reuses Bake's atlas player with one clock for its directions. Clip and 1×/2×/4×/6× zoom
-are view controls, not manifest changes. Look opens at 4x, positioning each scrollable full cell
-around its recorded pivot. Subsequent user panning is preserved during playback. The bridge
+Candidates stay below their canvas, deformation reports below the rig mesh, and clip/library
+controls beside core-retargeted motion. Generate/Rig activity shows actual phases and elapsed time
+without fabricated percentages or ETAs. Cancellation and errors retain clear status and focus.
+
+Look shows source and saved sprites on the left, with its recipe and recording action on the right.
+The comparison reuses Bake's atlas player with one clock for its directions. Clip and 1×/2×/4×/6×
+zoom are view controls, not manifest changes. Look opens at 4x, positioning each scrollable full
+cell around its recorded pivot. Subsequent user panning is preserved during playback. The bridge
 currently supplies page 1 of the saved atlas; only frames on that page are shown. Large integer zoom
 scrolls within the well rather than resampling pixels. Missing sources and absent bakes have
 explicit empty states. Extra camera controls remain under "Camera and style details"; stale-frame
@@ -104,15 +109,16 @@ preserve the CLI reason and recovery path.
 
 ## Implementation verification
 
-The identity implementation has 65 Studio tests, alongside TypeScript and production web-build
+The identity implementation has 67 Studio tests, alongside TypeScript and production web-build
 checks. Browser checks cover the six stages, gallery, models, command palette, logs, locked/error
-states and locale growth. Automated WCAG A/AA scans found no violations in those checked states.
-Final light/dark Look captures fit 1440, 1280, 960 and 390px browser widths without horizontal page
-overflow; playback, integer zoom, recipe/reset behavior and theme-invariant canvas pixels were
-checked separately.
+states and locale growth. Automated WCAG A/AA scans found no violations in those checked states. The
+shared inspector was checked at 1440×900 and the 960×600 desktop minimum without horizontal page
+overflow, including expanded locale text; playback, integer zoom, recipe/reset behavior and
+theme-invariant canvas pixels were checked separately.
 
 The guide includes current [light](../img/stage-04-look.png) and
-[dark](../img/stage-04-look-dark.png) captures replaying the preserved `acc25412` bake, not new
-model inference. Native Tauri packaging, platform accessibility and hardware qualification were not
-rerun; F7 remains open. This is the F5-T1 visual slice, not completion of the full F5 editor
-roadmap.
+[dark](../img/stage-04-look-dark.png) UI captures from the explicitly synthetic production browser
+demo. The private saved-asset replay separately checks character layouts without writing project
+files or running inference. Native Tauri packaging, platform accessibility and hardware
+qualification were not rerun; F7 remains open. This is an F5-T1 layout refinement, not completion of
+the full editor roadmap.

@@ -218,13 +218,13 @@ Workspace texture stays outside images and canvases.
 Font:** Geist Mono (system-ui/sans-serif for body; monospace for compact labels), self-hosted at
 weights 400–600.
 
-The condensed face gives character names and stage titles a clear silhouette; the mono face aligns
-controls, paths, measurements and CLI/log output. The hierarchy uses explicit sizes rather than a
-computed type scale.
+The condensed face gives character names and inspector titles a clear silhouette; the mono face
+aligns controls, paths, measurements and CLI/log output. The hierarchy uses explicit sizes rather
+than a computed type scale.
 
 ### Hierarchy
 
-- **Display:** stage heading (`display`).
+- **Display:** character inspector heading (`display`).
 - **Headline:** compact SpriteBook wordmark (`headline`).
 - **Title:** character names in the index and gallery (`title`).
 - **Body:** general UI and controls (`body`); selected emphasis uses the existing 500/600 weights.
@@ -233,39 +233,40 @@ computed type scale.
 
 ## Layout
 
-The 48px title bar uses a 28px wordmark. The gallery occupies the window without repeating its cards
-in a character index; the 168px index appears only when editing. Stage headings are 28px. The
-six-stage rail is flush with the editing region and divides its full width evenly. New character
-shows that same rail with the later stages locked. Primary navigation retains keyboard focus when
-changing surfaces.
+The 48px title bar vertically centers the compact wordmark, File/Edit menus, model access and a
+sun/moon theme toggle. Language is chosen directly under Edit → Language. File → Shortcuts opens the
+existing command palette; Ctrl+K still works. GPU identification is plain text beside the bottom log
+handle. The gallery occupies the window; the 168px character index appears when editing. The flush
+six-stage rail supplies the stage name, without a second title row.
 
-Generate and Rig use a large canvas/reference region on the left and a 360px property panel on the
-right. Each region scrolls independently. Creation and additional generation keep their action/CLI
-footer visible while settings scroll. Native radio choices show an explicit selection marker;
-installation state and VRAM stay beside names, while selected license details are disclosed.
-Character, backend and generation controls form separate sections. Common generation controls stay
-visible, advanced schema fields and comparison stay under Advanced options. All options still map to
-the catalog and the existing CLI arguments.
+Every stage places its assets or saved output on the left and one full-height property inspector on
+the right, directly beneath the rail. The inspector heading is the character name. It starts open at
+360px, shares its machine-local width between stages, and resizes from 280–560px. Drag the boundary
+or use Left/Right, Home/End; double-click resets the width. A chevron collapses it to a 40px right
+edge and reopens it. Hidden controls retain their drafts and running jobs. The former separate
+manifest-summary inspector is removed.
 
-Candidates occupy a shelf beneath their inspection canvas. Inspect and canonical promotion remain
-visible; recipe variants and per-candidate CLI commands live under More actions. Optional texture
-changes stay under Canonical mesh options. Rig places its actual deform report beneath the mesh;
-orientation, re-run/repair and explicit acceptance occupy the property panel. File-based repairs are
-disclosed. Canvas wells stay dark and source/output pixels are unchanged.
+Settings and assets scroll independently. Creation/generation, Rig, Look and Export retain an
+action/CLI footer while settings scroll. Native model radio choices use a condensed name,
+installation state and memory requirement; only the selected model's terms are disclosed. Common
+properties stay visible and advanced schema fields remain available. Fixture discovery is dev-only,
+last under Development tools, and hidden from production model management. New generation prefers an
+installed visible backend; an explicit selection or a visible prior-result backend is preserved.
+Core catalog entries, historical results and the fixture CLI remain unchanged.
 
-Running jobs show the reported stage and elapsed time. Their units have different costs, so the
-activity indicator is indeterminate and supplies no invented job percentage or ETA. Stage details
-retain raw counts. Cancellation has its own message and receives keyboard focus; failures keep their
-reason. A disabled settings group remains scrollable by keyboard.
+Candidates occupy a shelf beneath the inspection canvas. Rig keeps its deform report beneath the
+mesh. Animation keeps core-retargeted motion on the left, with bindings/library on the right. Look
+retains its source/saved-output comparison and integer pixel zoom, with recipe controls in the
+inspector. Bake reviews and exported folders occupy the asset side. Canvas wells stay dark.
 
-Inspector starts closed; on wide windows its existing resize range is 240–480px, with a 300px
-default. Below 1100px it stacks beneath the stage. Below 760px the workbench panels stack, and the
-rail uses two rows. These browser-preview adaptations do not add mobile platform support: the Tauri
-window minimum remains 960×600.
+Running generation and rig jobs show the reported phase and elapsed time. Their units have different
+costs, so activity remains indeterminate without an invented percentage or ETA. Raw counts stay
+under Stage details. Cancellation has a distinct focused message; failures preserve their reason.
+Disabled settings remain keyboard-scrollable.
 
-Look retains its reference/saved-output comparison and recipe layout. Gallery cards retain their
-fixed width and reflow without stretching sprite pixels. The typography, semantic palette and
-workspace hatch/dither are preserved.
+The two-column layout remains at the 960×600 Tauri minimum. Below 760px, browser preview panels
+stack and the rail uses two rows. This does not add mobile platform support. Typography, semantic
+colors, texture and core-produced pixels are preserved.
 
 ## Elevation & Depth
 
@@ -297,9 +298,9 @@ running actions remain focusable with `aria-busy` and show the functional ring.
 
 ### Chips
 
-Command and locale chips use panel/dim, a strong border and compact padding; hover raises the fill.
-Status tags use thin borders and the semantic outcome roles. Selected segmented controls use the
-selection pair; integer zoom controls use the action pair.
+Header controls share a centered 32px target; sun/moon and inspector chevrons use authored stroke
+SVGs. Status tags use thin borders and the semantic outcome roles. Selected segmented controls use
+the selection pair; integer zoom controls use the action pair.
 
 ### Cards / Containers
 
@@ -328,8 +329,8 @@ padding. Preserve the global focus outline and native select behavior.
 
 The roster uses condensed character names and a selection fill; Up/Down retains its existing
 selection behavior. Stage buttons combine number, label and state dot. The active stage has a solid
-current fill plus an underline; locked stages stay keyboard-reachable and explain their lock.
-Inspector is a disclosure, not a permanently competing column.
+current fill plus an underline; locked stages stay keyboard-reachable and explain their lock. The
+property inspector collapses at its right edge without resetting the stage.
 
 ### Reference and saved output
 

@@ -372,6 +372,14 @@ F4/F7 migration work, even when they touch the same modules as these later impro
 
 ### Retained model and editor cases
 
+**F5-T1 inspector refinement, 2026-10-21:** the character name now heads one full-height,
+resizable/collapsible property inspector across all stages. The stage rail supplies the title;
+assets and candidate choices stay left. Header menus align with the wordmark, language is selected
+under Edit, theme is an icon toggle, shortcuts live under File, and GPU identification is plain
+footer status. Fixture discovery is dev-only, disclosed last; production choices prefer an installed
+visible model while preserving explicit selections and prior-result provenance. Core/CLI/catalog
+contracts are unchanged. Browser and unit checks do not close F5-T3 or F7 native qualification.
+
 **F5-T1 visual slice, 2026-10-20:** the maintainer approved Imprint for implementation on main.
 Studio now has paired light/dark roles, a compact title bar, loaded-character index, horizontal
 six-stage navigation, a disclosed inspector and source/saved-sprite comparison before Look's recipe.

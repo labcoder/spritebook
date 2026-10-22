@@ -16,9 +16,8 @@ button shows the exact command it runs. To work in the terminal instead, read
 This guide is about the app. Read the quickstart first if you want the shortest path to a
 spritesheet.
 
-The gallery image shows the current workbench in browser-demo mode. The Look images show the earlier
-Imprint composition and replay the preserved Pixal3D bake `acc25412` and its original source; they
-are not a new model run. Other examples use synthetic demo data. See the
+The gallery and Look images show the current production browser-demo UI with synthetic data; the
+colored demo frames illustrate controls, not generated character output. See the
 [dark theme](img/stage-04-look-dark.png) as well.
 
 ## 1. Open a project
@@ -39,11 +38,12 @@ workspace. Select **New character** in the gallery header to make another. The l
 appears when editing, where it lets you switch characters without returning to the gallery.
 
 While editing, the character index holds the gallery and the loaded roster. Opened entries can be
-closed with their close control or the Delete key; this leaves the character's files intact. Use
-**Theme** in the compact title bar to select Imprint's light or dark appearance. The status bar at
-the bottom shows the character count, the bridge (which engine runs your commands: `tauri` is the
-real CLI, a browser preview is a demo), and the log handle (opens the session log — every line the
-CLI writes).
+closed with their close control or the Delete key; this leaves the character's files intact. Use the
+sun/moon icon in the compact title bar to switch between light and dark appearances. Choose **Edit →
+Language** for a language; **File → Shortcuts** opens the command palette. The status bar at the
+bottom shows GPU identification, the character count, the bridge (which engine runs your commands:
+`tauri` is the real CLI, a browser preview is a demo), and the log handle (opens the session log —
+every line the CLI writes).
 
 To check your machine, select **Run health exam**. It reports the GPU, the sidecar (the local Python
 helper process that runs the AI models), and the installed models.
@@ -73,9 +73,9 @@ To make a character:
    runtimes replace the historical evaluation-only rasterizers; component terms still apply.
    [Models and local runtimes](models.md) lists each role, hardware requirement and setup.
 
-   Set your expectation for `fixture-gen`. It turns the image's outline into a lathe-like stand-in
-   body. It proves the pipeline without a GPU; it does not produce a likeness. A likeness needs a
-   real backend such as TRELLIS.2 or Pixal3D and an NVIDIA card.
+   Development builds expose `fixture-gen` last under **Development tools**. This synthetic stand-in
+   proves the pipeline without a GPU and does not produce a likeness. Production UI omits it; the
+   CLI remains available for development and existing fixture projects.
 
 5. Check the **Height (m)** field. The default is 1.7. CAUTION: this is the size every later stage
    believes. Sprites frame at pixels-per-metre, so a character that keeps the backend's own scale
@@ -209,8 +209,11 @@ The comparison shows the original source image beside sprites from the saved bak
 nearest-neighbor at 1×, 2×, 4× or 6×; large cells scroll within the dark well. This preview
 currently shows the first atlas page, as labeled. Bake retains its full review controls.
 
-Select **Inspector** to inspect recorded manifest values and the workspace path. Its resize grip
-supports arrow keys on wide windows; on narrower windows the panel stacks below the stage.
+The right-hand inspector is headed by the character name and reaches from the stage rail to the
+bottom. Drag its boundary to resize, or focus the grip and use Left/Right, Home/End; double-click
+resets to 360px. Its chevron collapses/reopens the panel without losing draft settings or stopping
+jobs. Width persists locally (280–560px). This layout applies to every stage; assets and candidate
+choices remain on the left.
 
 CAUTION: every frame key holds the whole recipe, so a look change makes every baked frame stale. The
 stage states the exact frame count before you record. This is all-or-none: there is no partial
