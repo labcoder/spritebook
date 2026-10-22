@@ -55,7 +55,7 @@ expressed through labels, current-step semantics, dots and lock explanations.
 
 ## Type and texture
 
-- **Barlow Condensed 500**: 36px SpriteBook wordmark, 44px stage heading and character names.
+- **Barlow Condensed 500**: 28px SpriteBook wordmark and stage heading and character names.
 - **Geist Mono 400–600**: 13px UI body, controls, measurements, paths and CLI/log lines; compact
   annotations remain at least 12px. Use system fallbacks for unsupported glyphs.
 - Both faces are self-hosted under SIL OFL 1.1 with complete notices and source/SHA pins in
@@ -65,14 +65,23 @@ expressed through labels, current-step semantics, dots and lock explanations.
 
 ## Components and copy
 
-The 56px title bar holds File/Edit, model access, palette, locale and theme controls. The character
-index lists the loaded roster at left; opened characters retain close/Delete and focus behavior.
-Up/Down moves between index entries. The six stages run horizontally and retain lock explanations.
+The 48px title bar holds File/Edit, model access, palette, locale and theme controls. The gallery
+uses the full window. When editing, the 168px character index lists the loaded roster at left;
+opened characters retain close/Delete and focus behavior. Up/Down moves between index entries. The
+six stages run horizontally and retain lock explanations.
 
-The stage heading is 44px. Inspector is a disclosure beside the stage; its existing width and
+The stage heading is 28px. Inspector is a disclosure beside the stage; its existing width and
 keyboard resize controls remain available on wide windows. Below 1100px it stacks beneath the stage,
 where horizontal resize is unnecessary. Below 760px the browser preview stacks the index and
 content; the Tauri window still has a 960×600 minimum.
+
+Generate and Rig place the inspection/reference canvas left and a 360px settings panel right.
+Settings and assets scroll independently, with the creation/generation action and CLI twin kept
+visible. The stage rail fills the editing region without outer insets. Native radio choices,
+label/value rows and progressive disclosure carry dense options. Candidates sit beneath their
+canvas; the rig's deformation report sits beneath its mesh. Unknown job durations use named phases
+and elapsed time, without a fabricated percentage or ETA. Cancellation and errors retain focus and
+clear status. Below 760px these panels stack for browser verification.
 
 Look shows the actual source image beside saved sprites, followed by a horizontal recipe. The
 comparison reuses Bake's atlas player with one clock for its directions. Clip and 1×/2×/4×/6× zoom
@@ -95,11 +104,12 @@ preserve the CLI reason and recovery path.
 
 ## Implementation verification
 
-The implementation passes 65 Studio tests, TypeScript checks and the production web build. Browser
-checks cover the six stages, gallery, models, command palette, logs, locked/error states and locale
-growth. Automated WCAG A/AA scans found no violations in those checked states. Final light/dark Look
-captures fit 1440, 1280, 960 and 390px browser widths without horizontal page overflow; playback,
-integer zoom, recipe/reset behavior and theme-invariant canvas pixels were checked separately.
+The identity implementation has 65 Studio tests, alongside TypeScript and production web-build
+checks. Browser checks cover the six stages, gallery, models, command palette, logs, locked/error
+states and locale growth. Automated WCAG A/AA scans found no violations in those checked states.
+Final light/dark Look captures fit 1440, 1280, 960 and 390px browser widths without horizontal page
+overflow; playback, integer zoom, recipe/reset behavior and theme-invariant canvas pixels were
+checked separately.
 
 The guide includes current [light](../img/stage-04-look.png) and
 [dark](../img/stage-04-look-dark.png) captures replaying the preserved `acc25412` bake, not new

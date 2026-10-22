@@ -12,6 +12,7 @@ import { Palette, type PaletteAction } from './palette';
 import { ManageModels } from './models';
 import { GenerateNew } from './gen';
 import { journalArgs } from './args';
+import { useLandFocus } from './focus';
 
 const bridge = makeBridge();
 
@@ -53,6 +54,12 @@ export default function App() {
   // bumped when Manage models closes, so the + tab's backend cards re-read
   // the catalog in the very flow that installs
   const [catalogEpoch, setCatalogEpoch] = useState(0);
+  useLandFocus(activeTab === '__new__', '#gname');
+  useLandFocus(activeTab === 'gallery', '.library-head button');
+  useLandFocus(
+    activeTab !== 'gallery' && activeTab !== '__new__',
+    '[data-tabid][aria-selected="true"]',
+  );
 
   // side effects OUTSIDE the updaters: i18n.activate() sets state in
   // I18nProvider, and an updater runs during render — React refuses a
@@ -167,7 +174,7 @@ export default function App() {
   // (invariant 7: journaled patches; the GUI is just a caller). The drawer
   // carries the verbatim result; a changed manifest re-projects on reload.
   const runJournal = useCallback(async (verb: 'undo' | 'redo') => {
-    if (activeTab === 'gallery') return;
+    if (activeTab === 'gallery' || activeTab === '__new__') return;
     const r = await bridge.runCli([...journalArgs(activeTab, verb), '--json']);
     if (activeOwner.current !== activeTab) return;
     if (r.exitCode === 0) await load();
@@ -250,14 +257,14 @@ export default function App() {
       id: 'undo',
       title: t('Undo'),
       hint: 'Ctrl+Z',
-      enabled: activeTab !== 'gallery',
+      enabled: activeWs !== undefined,
       run: () => runJournal('undo'),
     },
     {
       id: 'redo',
       title: t('Redo'),
       hint: 'Ctrl+Shift+Z',
-      enabled: activeTab !== 'gallery',
+      enabled: activeWs !== undefined,
       run: () => runJournal('redo'),
     },
     {
@@ -294,7 +301,7 @@ export default function App() {
         theme={theme}
         locale={locale}
         gpu={adapter?.description ?? null}
-        canEdit={activeTab !== 'gallery'}
+        canEdit={activeWs !== undefined}
         onThemeChange={setThemeState}
         onToggleLocale={toggleLocale}
         onReload={load}
@@ -321,59 +328,76 @@ export default function App() {
         }}
       />
       <div className='workbench'>
-        <Tabs
-          tabs={tabs}
-          active={activeTab}
-          onSelect={(id) => {
-            if (id === 'gallery' || id === '__new__') setActiveTab(id);
-            else openCharacter(id);
-          }}
-          onClose={closeTab}
-          onNew={openNew}
-        />
+        {activeTab !== 'gallery' && activeTab !== '__new__' && (
+          <Tabs
+            tabs={tabs}
+            active={activeTab}
+            onSelect={(id) => {
+              if (id === 'gallery' || id === '__new__') setActiveTab(id);
+              else openCharacter(id);
+            }}
+            onClose={closeTab}
+            onNew={openNew}
+          />
+        )}
         <div className='workarea'>
           {activeTab === 'gallery' && (
-            <div className='toolbar'>
-              {
-                /* NOT id='root': index.html mounts React on <div id="root">, and
+            <div className='library-chrome'>
+              <header className='library-head'>
+                <div>
+                  <h1>{t('Characters')}</h1>
+                  <p>{t('Open a character or start with a reference image.')}</p>
+                </div>
+                <button type='button' className='btn primary' onClick={openNew}>
+                  {t('New character')}
+                </button>
+              </header>
+              <div className='toolbar'>
+                {
+                  /* NOT id='root': index.html mounts React on <div id="root">, and
               the duplicate id made querySelector('#root') answer with the
               mount div - found when a driver tried to type into it */
-              }
-              <label htmlFor='projectsroot'>{t('Projects root')}</label>
-              <input
-                id='projectsroot'
-                className='rootinput'
-                value={root}
-                onChange={(e) => setRoot(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') load();
-                }}
-                spellCheck={false}
-              />
-              <button type='button' className='btn' onClick={load}>
-                {t('Load')}
-              </button>
-              {
-                /* aria-busy, not disabled: disabling the focused button drops
+                }
+                <label htmlFor='projectsroot'>{t('Projects root')}</label>
+                <input
+                  id='projectsroot'
+                  className='rootinput'
+                  value={root}
+                  onChange={(e) => setRoot(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') load();
+                  }}
+                  spellCheck={false}
+                />
+                <button type='button' className='btn' onClick={load}>
+                  {t('Load')}
+                </button>
+                {
+                  /* aria-busy, not disabled: disabling the focused button drops
               keyboard focus to <body> for the whole exam (walkthrough) */
-              }
-              <button
-                type='button'
-                className='btn primary'
-                onClick={() => {
-                  if (!exam.running) runExam();
-                }}
-                aria-busy={exam.running}
-              >
-                {exam.running ? t('Examining…') : t('Run health exam')}
-              </button>
+                }
+                <button
+                  type='button'
+                  className='btn'
+                  onClick={() => {
+                    if (!exam.running) runExam();
+                  }}
+                  aria-busy={exam.running}
+                >
+                  {exam.running ? t('Examining…') : t('Run health exam')}
+                </button>
+              </div>
             </div>
           )}
 
           <main
             id='main-panel'
-            role='tabpanel'
-            aria-label={activeTab === 'gallery' ? t('Gallery') : activeWs?.card.displayName}
+            role={activeTab === 'gallery' || activeTab === '__new__' ? undefined : 'tabpanel'}
+            aria-label={activeTab === 'gallery'
+              ? t('Gallery')
+              : activeTab === '__new__'
+              ? t('New character')
+              : activeWs?.card.displayName}
             className='mainpanel'
           >
             {activeTab === 'gallery'
@@ -393,6 +417,7 @@ export default function App() {
                   bridge={bridge}
                   projectsRoot={root}
                   onCreated={onCreated}
+                  onBack={() => closeTab('__new__')}
                   onOpenModels={() => setModelsOpen(true)}
                   catalogEpoch={catalogEpoch}
                   vramGb={typeof exam.report?.vramGb === 'number' ? exam.report.vramGb : null}

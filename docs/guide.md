@@ -16,9 +16,10 @@ button shows the exact command it runs. To work in the terminal instead, read
 This guide is about the app. Read the quickstart first if you want the shortest path to a
 spritesheet.
 
-The images show the current Imprint UI in browser-demo mode. The Look comparison replays the
-preserved Pixal3D bake `acc25412` and its original source; it is not a new model run. Other examples
-use synthetic demo data. See the [dark theme](img/stage-04-look-dark.png) as well.
+The gallery image shows the current workbench in browser-demo mode. The Look images show the earlier
+Imprint composition and replay the preserved Pixal3D bake `acc25412` and its original source; they
+are not a new model run. Other examples use synthetic demo data. See the
+[dark theme](img/stage-04-look-dark.png) as well.
 
 ## 1. Open a project
 
@@ -34,14 +35,15 @@ exports. A **projects root** is a folder that holds many workspaces.
 3. Select **Load**, or press Enter.
 
 The gallery shows one card for each character in the root. Select a card to open that character in a
-workspace. You can also select a character directly in the left index. Select **New character** to
-make another.
+workspace. Select **New character** in the gallery header to make another. The left character index
+appears when editing, where it lets you switch characters without returning to the gallery.
 
-The character index holds the gallery and the loaded roster. Opened entries can be closed with their
-close control or the Delete key; this leaves the character's files intact. Use **Theme** in the
-compact title bar to select Imprint's light or dark appearance. The status bar at the bottom shows
-the character count, the bridge (which engine runs your commands: `tauri` is the real CLI, a browser
-preview is a demo), and the log handle (opens the session log — every line the CLI writes).
+While editing, the character index holds the gallery and the loaded roster. Opened entries can be
+closed with their close control or the Delete key; this leaves the character's files intact. Use
+**Theme** in the compact title bar to select Imprint's light or dark appearance. The status bar at
+the bottom shows the character count, the bridge (which engine runs your commands: `tauri` is the
+real CLI, a browser preview is a demo), and the log handle (opens the session log — every line the
+CLI writes).
 
 To check your machine, select **Run health exam**. It reports the GPU, the sidecar (the local Python
 helper process that runs the AI models), and the installed models.
@@ -55,15 +57,16 @@ it.
 
 To make a character:
 
-1. Select **New character** in the character index.
+1. Select **New character** in the gallery header or character index.
 
 2. Type a name. Studio makes the character id below the box. The id is lowercase letters, digits,
    and dashes.
 
 3. Type the path of your source image, or drop the image on the window.
 
-4. Select a backend. The cards come from the model catalog and show each backend's license, VRAM
-   need, and install state.
+4. Select a backend using the radio choices in the right settings panel. They come from the model
+   catalog and show VRAM needs and install state. **Model details** discloses the selected license;
+   installation requirements remain visible.
 
    Complete TRELLIS.2 and Pixal3D recipes include a separately gated DINOv3 conditioner. Review
    [licensing](licensing.md) and accept the declared terms before installation. The selected Windows
@@ -79,8 +82,9 @@ To make a character:
    bakes about 30 px tall. Clear the field only when you want the backend scale; the job then warns
    and states the measured height.
 
-6. Change the options if you need to. The form comes from the backend's own schema. Only the values
-   you change travel to the command.
+6. Change the common generation settings if needed. **Advanced options** holds the remaining schema
+   fields and backend comparison. Only values that differ from the backend's defaults travel to the
+   command. The reference stays on the left; settings scroll above the fixed action footer.
 
 7. Select **Generate model**.
 
@@ -90,7 +94,11 @@ model. This uses the installed **U²-Net** (`rembg-u2net`) model; if it is missi
 job progress and runs once for the candidate batch; retries reuse the verified cutout. Your original
 reference is retained, and preparation is recorded as an undoable source edit.
 
-The button stays disabled until the form is complete. The text beside it names what is missing.
+The button stays disabled until the form is complete. The text below it names what is missing.
+During generation, an activity panel shows elapsed time and the stage reported by core. Different
+stages have different costs, so there is no overall percentage or time estimate. **Stage details**
+shows the raw progress units. **Cancel job** stops the owned job and reports cancellation separately
+from failure.
 
 The run writes one or more candidates. Each card shows the seed, the triangle count, the texture
 size, and the wall time. Select **Inspect** to see a candidate in the 3D viewport.
@@ -99,13 +107,15 @@ To keep a candidate, select **Save as canonical mesh**. This is the checkpoint. 
 unlock. Saving preserves the candidate's geometry and textures exactly, and the viewport switches to
 the saved canonical mesh. Rig uses that same saved asset.
 
-Select **More like this** to run the same recipe again with a new seed.
+Open a candidate's **More actions** for **More like this** (the same recipe with a new seed),
+**Re-texture**, and that candidate's canonical-save CLI command.
 
-Two options apply at the moment you save: **reproject source detail** and **match source colours**.
-Both are off by default. Enable them only when you want to change the generated texture using the
-reference. Reprojection paints the reference onto the front of the mesh; differences in pose or
-proportions can distort it. These changes are included in the undoable save; the candidate remains
-unchanged, so you can save it again with both options off to recover its generated texture.
+Under **Canonical mesh options**, two options apply at the moment you save: **reproject source
+detail** and **match source colours**. Both are off by default. Enable them only when you want to
+change the generated texture using the reference. Reprojection paints the reference onto the front
+of the mesh; differences in pose or proportions can distort it. These changes are included in the
+undoable save; the candidate remains unchanged, so you can save it again with both options off to
+recover its generated texture.
 
 **The CLI twin:** `spritebook gen` and `spritebook pick`.
 
@@ -130,8 +140,9 @@ To rig a character:
 
 3. Select **Run rig**.
 
-The **Deform check** section reports the result. It shows the worst tear first and states how many
-joints are clean.
+The mesh stays on the left and the rig controls stay on the right. The **Deform check** section
+beneath the mesh reports the result. It shows the worst tear first and states how many joints are
+clean.
 
 Six orientation buttons fix a mesh that faces the wrong way: **Face front**, **Feet to ground**,
 **Center**, and **Rotate 90**, **Rotate 180**, **Rotate 270**. Each one runs the rig again.
@@ -142,7 +153,8 @@ not a default. A bake with an unaccepted rig raises a warning but still runs.
 CAUTION: acceptance costs nothing to record, but a rig you never checked can produce bad skinning in
 every frame of every clip. Read the deform report before you accept.
 
-To repair a rig, use **Auto-hint from this report and re-run**, or supply a joint-edits file.
+To repair a rig, use **Auto-hint from this report and re-run**, or open **Joint edits file** to
+supply a patch.
 
 **The CLI twin:** `spritebook rig`.
 

@@ -6,6 +6,64 @@
  * purpose — they match the CLI the GUI mirrors.
  */
 export const es: Record<string, string> = {
+  'Create a character from a reference image to begin.':
+    'Crea un personaje a partir de una imagen de referencia para empezar.',
+  'Each fix re-runs the rig.': 'Cada corrección vuelve a crear el rig.',
+  'Loading source image…': 'Cargando imagen de origen…',
+  'Source preview unavailable. Check the image path.':
+    'Vista previa no disponible. Comprueba la ruta de la imagen.',
+  'Triangle budget': 'Límite de triángulos',
+  'Field of view': 'Campo de visión',
+  'Resolution': 'Resolución',
+  'Pipeline': 'Pipeline',
+  'Texture guidance': 'Guía de textura',
+  'Texture guidance rescale': 'Reajuste de guía de textura',
+  'Texture retries': 'Reintentos de textura',
+  'Job canceled': 'Tarea cancelada',
+  'Advanced options': 'Opciones avanzadas',
+  'Back to gallery': 'Volver a la galería',
+  'Calculating skin weights': 'Calculando pesos de skinning',
+  'Canonical mesh options': 'Opciones de la malla canónica',
+  'Character': 'Personaje',
+  'Checking deformation': 'Comprobando deformación',
+  'Checking orientation': 'Comprobando orientación',
+  'Effort': 'Esfuerzo',
+  'Elapsed': 'Transcurrido',
+  'Encoding model': 'Codificando modelo',
+  'Fitting rig to mesh': 'Ajustando el rig a la malla',
+  'GPU-based skeleton prediction and skinning.': 'Predicción de esqueleto y skinning mediante GPU.',
+  'Generating geometry': 'Generando geometría',
+  'Generating model': 'Generando modelo',
+  'Generation': 'Generación',
+  'Generation settings': 'Ajustes de generación',
+  'Guidance': 'Guía',
+  'High': 'Alto',
+  'Inspect a candidate to compare it here.': 'Inspecciona un candidato para compararlo aquí.',
+  'Loading characters…': 'Cargando personajes…',
+  'Loading generator': 'Cargando generador',
+  'Low': 'Bajo',
+  'Low VRAM mode': 'Modo de VRAM reducida',
+  'Medium': 'Medio',
+  'Model details': 'Detalles del modelo',
+  'Model preview': 'Vista previa del modelo',
+  'More actions': 'Más acciones',
+  'Open a character or start with a reference image.':
+    'Abre un personaje o empieza con una imagen de referencia.',
+  'Polygon budget': 'Límite de polígonos',
+  'Predicting skeleton': 'Prediciendo esqueleto',
+  'Preparing mesh for rigging': 'Preparando la malla para el rig',
+  'Preparing source image': 'Preparando imagen de origen',
+  'Re-texturing model': 'Creando nueva textura',
+  'Rigging character': 'Creando rig del personaje',
+  'Saving canonical mesh': 'Guardando malla canónica',
+  'Saving results': 'Guardando resultados',
+  'Seed': 'Semilla',
+  'Stage details': 'Detalles de la etapa',
+  'Start with a character reference': 'Empieza con una referencia del personaje',
+  'Steps': 'Pasos',
+  'Texture size': 'Tamaño de textura',
+  'Timing varies with the model and settings.': 'El tiempo varía según el modelo y los ajustes.',
+  'Validating and importing model': 'Validando e importando modelo',
   'Saved atlas page 1. Nearest-neighbor at integer zoom.':
     'Página 1 del atlas guardado. Vecino más cercano con zoom entero.',
   'Camera and style details': 'Detalles de cámara y estilo',
@@ -33,8 +91,6 @@ export const es: Record<string, string> = {
   'baked': 'bake',
   'Could not read that root.': 'No se pudo leer esa carpeta raíz.',
   'No characters under this root.': 'No hay personajes en esta raíz.',
-  'a character is any directory holding a character.json':
-    'un personaje es cualquier carpeta con un character.json',
 
   // menu bar + chips
   'File': 'Archivo',
@@ -75,8 +131,6 @@ export const es: Record<string, string> = {
   'Bake': 'Bake',
   'Export': 'Exportar',
   'locked': 'bloqueada',
-  'stages unlock when a canonical mesh is saved':
-    'las etapas se desbloquean al guardar una malla canónica',
 
   // canvas well
   'preview': 'vista previa',
@@ -220,13 +274,10 @@ export const es: Record<string, string> = {
   'drop an image anywhere, or paste a path': 'suelta una imagen aquí, o pega una ruta',
   'Backend': 'Backend',
   'this backend is not installed': 'este backend no está instalado',
-  'Options': 'Opciones',
   'defaults are the catalog’s — only changes travel':
     'los valores por defecto son del catálogo — solo viajan los cambios',
   'Generate model': 'Generar modelo',
   'Generating…': 'Generando…',
-  'starting…': 'empezando…',
-  'events': 'eventos',
   'browser preview: generate needs the desktop shell':
     'vista de navegador: generar necesita la app de escritorio',
   'canonical mesh saved': 'malla canónica guardada',
@@ -272,8 +323,6 @@ export const es: Record<string, string> = {
   'Rig track': 'Vía de rig',
   'Track B — predicted skeleton (UniRig)': 'Vía B — esqueleto predicho (UniRig)',
   'Track A — canonical body fit': 'Vía A — ajuste del cuerpo canónico',
-  'a fresh skeleton fitted to this mesh on the GPU — about two minutes':
-    'un esqueleto nuevo ajustado a esta malla en la GPU — unos dos minutos',
   'the bundled body fitted to the mesh — deterministic, no GPU':
     'el cuerpo incluido ajustado a la malla — determinista, sin GPU',
   'Body': 'Cuerpo',
@@ -293,7 +342,6 @@ export const es: Record<string, string> = {
   'detached pieces': 'piezas sueltas',
   'no placement hint can repair this': 'ninguna pista de posición puede reparar esto',
   'Orientation': 'Orientación',
-  'each fix re-runs the rig (~2 min)': 'cada arreglo vuelve a ejecutar el rig (~2 min)',
   'Face front': 'Mirar al frente',
   'Feet to ground': 'Pies al suelo',
   'Center': 'Centrar',
@@ -455,8 +503,6 @@ export const es: Record<string, string> = {
     'cada backend corre con sus propios valores; las tarjetas etiquetan cada resultado',
   'effort': 'esfuerzo',
   'failed': 'falló',
-  'full control — the source image is the one this character was made from':
-    'control total — la imagen fuente es la que creó este personaje',
   'keeps this mesh, paints a new texture — a new card appears':
     'conserva esta malla, pinta una textura nueva — aparece una tarjeta nueva',
   'one job - the model loads once; candidate 2 runs at seed + 1000':

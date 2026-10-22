@@ -67,9 +67,9 @@ textarea {
 .menubar {
   display: flex;
   align-items: center;
-  gap: 24px;
-  min-height: 56px;
-  padding: 0 26px;
+  gap: 16px;
+  min-height: 48px;
+  padding: 0 16px;
   background: var(--sb-chrome);
   border-bottom: 1px solid var(--sb-line);
   flex: none;
@@ -80,7 +80,7 @@ textarea {
   gap: 8px;
 }
 .wordmark {
-  font: 500 36px/1 'Barlow Condensed', sans-serif;
+  font: 500 28px/1 'Barlow Condensed', sans-serif;
   letter-spacing: -0.025em;
   color: var(--sb-accent);
 }
@@ -240,7 +240,7 @@ textarea {
 .gallery {
   flex: 1;
   overflow-y: auto;
-  padding: 18px;
+  padding: 24px 28px;
   display: grid;
   /* FIXED card width: a window resize reflows columns but never stretches a
    * card — pixel content must not breathe with the window (maintainer, from
@@ -309,6 +309,8 @@ textarea {
   color: var(--sb-dim);
   padding: 4px 6px;
 }
+.gallery .tag { border: 0; padding: 0; line-height: 1.5; }
+.gallery .tags { gap: 4px 12px; }
 .tag.style {
   color: var(--sb-accent);
   border-color: var(--sb-accent);
@@ -376,7 +378,7 @@ textarea {
 .tabsrow {
   display: flex;
   flex-direction: column;
-  width: 184px;
+  width: 168px;
   min-height: 0;
   background: var(--sb-chrome);
   border-right: 1px solid var(--sb-line);
@@ -390,7 +392,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 10px 12px;
   color: var(--sb-dim);
   text-align: left;
   width: 100%;
@@ -409,7 +411,7 @@ textarea {
 }
 .ctab-name {
   display: block;
-  font: 500 28px/1.1 'Barlow Condensed', sans-serif;
+  font: 500 22px/1.1 'Barlow Condensed', sans-serif;
   overflow-wrap: anywhere;
 }
 .ctab-detail {
@@ -471,7 +473,7 @@ textarea {
   align-items: center;
   flex-wrap: wrap;
   gap: 18px;
-  padding: 16px 28px;
+  padding: 12px 18px;
   flex: none;
 }
 .editorheading {
@@ -482,7 +484,7 @@ textarea {
 }
 .editorheading h1 {
   margin: 0;
-  font: 500 44px/1 'Barlow Condensed', sans-serif;
+  font: 500 28px/1.1 'Barlow Condensed', sans-serif;
   letter-spacing: -0.025em;
   color: var(--sb-accent);
 }
@@ -501,23 +503,25 @@ textarea {
 .rail {
   flex: none;
   border-bottom: 1px solid var(--sb-line);
-  margin: 0 28px;
-  display: flex;
-  flex-wrap: wrap;
+  background: var(--sb-chrome);
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  min-width: 0;
 }
 .stage {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  flex: 1;
-  min-width: 112px;
-  min-height: 52px;
-  padding: 12px 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 8px;
+  border-right: 1px solid var(--sb-line);
   color: var(--sb-dim);
   position: relative;
   text-align: left;
 }
+.stage:last-of-type { border-right: 0; }
 .stage .n {
   font-size: 12px;
 }
@@ -564,16 +568,6 @@ textarea {
 }
 .stage.st-locked {
   cursor: default;
-}
-.railnote {
-  width: 100%;
-  padding: 6px 10px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--sb-dim);
-}
-.railnote:empty {
-  display: none;
 }
 .sr-only {
   position: absolute;
@@ -1160,15 +1154,201 @@ textarea {
   border-color: var(--sb-line);
 }
 
-/* ---- generate surface ---- */
-.gennew {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px;
-  /* the FORM keeps a readable measure; the page is no longer capped */
+/* ---- generation and rig workbenches ---- */
+.library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 28px 16px;
 }
-.gennew .gensec {
-  max-width: 860px;
+.library-head h1 {
+  margin: 0;
+  font:
+    500 32px / 1.1 "Barlow Condensed",
+    sans-serif;
+  color: var(--sb-accent);
+}
+.library-head p {
+  margin: 8px 0 0;
+  color: var(--sb-dim);
+}
+.library-chrome .toolbar {
+  padding: 12px 28px;
+  background: var(--sb-chrome);
+}
+.library-chrome .rootinput {
+  max-width: none;
+  min-width: 0;
+}
+.newcharacter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.editor-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.workbench-stage,
+.rigstage .rigcols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+.asset-workspace {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+.source-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.panel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.panel-heading h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.source-workspace .panel-heading {
+  margin-bottom: 0;
+}
+.source-well,
+.model-empty {
+  background:
+    repeating-conic-gradient(var(--sb-check-a) 0% 25%, var(--sb-check-b) 0% 50%) 0 0 / 16px 16px;
+  color: var(--sb-well-text);
+}
+.source-well {
+  flex: 1;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.source-well img {
+  width: 100%;
+  height: 100%;
+  max-height: calc(100vh - 300px);
+  object-fit: contain;
+}
+.well-empty {
+  padding: 40px 24px;
+  text-align: center;
+}
+.well-empty h2 {
+  font:
+    500 28px / 1.15 "Barlow Condensed",
+    sans-serif;
+  margin: 0 0 12px;
+}
+.well-empty p {
+  max-width: 46ch;
+  margin: 0 auto;
+  font-size: 12px;
+}
+.model-empty {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.control-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--sb-panel);
+  border-left: 1px solid var(--sb-line);
+}
+.newcharacter .control-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.settings-group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.settings-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.control-section,
+.rigstage .rigmain .gensec {
+  padding: 16px;
+  border-bottom: 1px solid var(--sb-line);
+}
+.control-section > h2,
+.control-section .gensechead h2 {
+  margin: 0 0 14px;
+  font:
+    500 13px / 1.4 "Geist Mono",
+    monospace;
+}
+.action-section {
+  flex: none;
+  border-bottom: 0;
+  border-top: 1px solid var(--sb-line);
+}
+.action-section .genbtn,
+.control-panel .genrow > .primary {
+  width: 100%;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+.field:last-child {
+  margin-bottom: 0;
+}
+.field > label,
+.field > .optkey {
+  font-size: 12px;
+  color: var(--sb-dim);
+}
+.field :is(.rootinput, .optnum) {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  flex: none;
+}
+.settings-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+.settings-pair .field {
+  margin: 0;
+}
+.effort-field {
+  grid-column: 1 / -1;
 }
 .gensec {
   padding: 14px 0 16px;
@@ -1178,162 +1358,270 @@ textarea {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .gensechead .hud {
-  font-size: 12px;
+  font-size: 13px;
 }
 .genrow {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 8px 0;
+  margin: 12px 0;
   flex-wrap: wrap;
 }
 .genrow label {
   color: var(--sb-dim);
   font-size: 12px;
-  min-width: 92px;
 }
 .slugpreview {
   font-size: 12px;
-  color: var(--sb-ok);
+  color: var(--sb-dim);
 }
-.slugpreview.bad {
+.slugpreview.bad,
+.mv-exit {
   color: var(--sb-danger);
-}
-.genpreview {
-  margin: 10px 0 0 102px;
-  width: 128px;
-  height: 128px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--sb-line);
-  background: repeating-conic-gradient(var(--sb-check-a) 0% 25%, var(--sb-check-b) 0% 50%) 0 0 /
-    16px 16px;
-}
-.genpreview img {
-  max-width: 100%;
-  max-height: 100%;
-  image-rendering: pixelated;
 }
 .backends {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 .backend {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
   text-align: left;
-  background: var(--sb-raise);
+  background: var(--sb-panel);
   border: 1px solid var(--sb-line);
+  cursor: pointer;
+}
+.backend input {
+  margin: 3px 0 0;
+  width: 14px;
+  height: 14px;
+}
+.backend:hover {
+  border-color: var(--sb-line-strong);
+}
+.backend:focus-within {
+  outline: 2px solid var(--sb-focus);
+  outline-offset: 2px;
 }
 .backend.on {
-  border-color: var(--sb-accent);
+  border-color: var(--sb-line-strong);
   background: var(--sb-select-bg);
   color: var(--sb-select-text);
 }
-.backend .bname {
-  font-weight: 600;
-  font-size: 12.5px;
-}
-.backend .btags {
+.backend-copy {
   display: flex;
-  gap: 5px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.backend .bname {
+  font-weight: 500;
+  font-size: 12px;
+}
+.backend-meta {
+  display: flex;
+  gap: 5px 12px;
   flex-wrap: wrap;
+  color: var(--sb-dim);
+  font-size: 12px;
+}
+.panel-disclosure {
+  font-size: 12px;
+  margin-top: 14px;
+}
+.panel-disclosure > summary,
+.candidate-actions > summary {
+  cursor: pointer;
+  color: var(--sb-dim);
+  width: fit-content;
+}
+.panel-disclosure[open] > summary,
+.candidate-actions[open] > summary {
+  margin-bottom: 14px;
+}
+.panel-disclosure p {
+  margin: 10px 0;
+}
+.model-terms {
+  margin-top: 8px;
+}
+.check-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-size: 12px;
+}
+.check-field input {
+  flex: none;
+  margin: 3px 0 0;
 }
 .linkish {
   color: var(--sb-accent);
   text-decoration: underline;
   font-size: inherit;
 }
-:root[data-theme='light'] .linkish {
-  color: var(--sb-accent);
-}
 .optform {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 8px 18px;
+  gap: 12px 18px;
+}
+.control-panel .optform {
+  grid-template-columns: minmax(0, 1fr);
 }
 .optrow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  min-width: 0;
 }
 .optkey {
   font-size: 12px;
   color: var(--sb-dim);
+  overflow-wrap: anywhere;
 }
 .optnum {
   width: 110px;
+  min-width: 0;
   background: var(--sb-panel);
   color: var(--sb-text);
   border: 1px solid var(--sb-line-strong);
-  padding: 5px 8px;
+  padding: 7px 8px;
   font-size: 12px;
 }
-.genbtn {
-  margin-right: 12px;
-}
-.genprogress {
-  font-size: 12px;
-  color: var(--sb-accent);
+.optrow .optnum {
+  flex: 0 0 110px;
 }
 .clitwin {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
+  min-width: 0;
+  margin-top: 12px;
   font-size: 12px;
   color: var(--sb-dim);
 }
 .clitwincmd {
   overflow-x: auto;
   white-space: nowrap;
-  max-width: 560px;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1;
 }
-
-/* ---- candidates (editor gen stage) ---- */
+.clitwin > button {
+  flex: none;
+}
+.mv-exit,
+.mv-warn {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  margin-top: 12px;
+}
+.mv-warn,
+.warning {
+  color: var(--sb-warning);
+}
+.job-activity {
+  padding: 14px 16px;
+  background: var(--sb-panel);
+  border: 1px solid var(--sb-line);
+  font-size: 12px;
+  margin: 0 0 14px;
+  width: 100%;
+}
+.activity-head {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.activity-head > span {
+  color: var(--sb-dim);
+}
+.job-activity progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  accent-color: var(--sb-action);
+  margin: 12px 0;
+}
+.job-activity p {
+  margin: 0;
+}
+.activity-detail {
+  margin-top: 8px;
+  color: var(--sb-dim);
+}
+.activity-detail summary {
+  cursor: pointer;
+}
+.activity-detail code {
+  display: block;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
 .genstage {
   overflow-y: auto;
 }
-.cands {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.stage-gen,
+.stage-rig {
+  overflow: hidden;
 }
 .checkpoint {
   display: flex;
   align-items: baseline;
-  gap: 12px;
-  padding: 10px 14px;
-  border: 1px solid var(--sb-ok);
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 10px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--sb-line);
   color: var(--sb-ok);
-}
-.checkpoint .hud {
   font-size: 12px;
 }
+.checkpoint .hud,
 .checkpoint .mono {
   font-size: 12px;
 }
+.candvplabel {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--sb-dim);
+}
+.candidate-shelf {
+  margin-top: 18px;
+  flex: none;
+  max-height: 270px;
+  overflow: auto;
+  border-top: 1px solid var(--sb-line);
+  padding-top: 12px;
+}
 .candgrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 10px;
+  display: flex;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: start;
+  overflow-x: auto;
+  padding: 2px;
 }
 .cand {
   border: 1px solid var(--sb-line);
   background: var(--sb-panel);
-  padding: 10px 12px;
-  display: flex;
+  padding: 10px;
+  display: grid;
   flex-direction: column;
-  gap: 8px;
+  gap: 8px 12px;
+  min-width: 0;
+  flex: 0 0 360px;
+  grid-template-columns: 96px minmax(0, 1fr);
 }
 .cand.picked {
   border-color: var(--sb-ok);
@@ -1341,6 +1629,7 @@ textarea {
 .candhead {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .candid {
@@ -1355,64 +1644,263 @@ textarea {
   gap: 6px;
   flex-wrap: wrap;
 }
-.pickopts {
+.cands .asset-workspace {
   display: flex;
-  align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
+  flex-direction: column;
+}
+.cands .checkpoint,
+.cands .job-activity {
+  flex-shrink: 0;
+}
+.candvp {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 260px;
+}
+.cands .candvp .vpwrap {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.candhead,
+.cand > .mv-exit {
+  grid-column: 1 / -1;
+}
+.cand .candthumb {
+  grid-column: 1;
+  grid-row: 2 / span 3;
+  width: 96px;
+  height: 112px;
+  object-fit: contain;
+}
+.candmeta,
+.cand > .candacts,
+.candidate-actions {
+  grid-column: 2;
+}
+.candidate-actions {
+  font-size: 12px;
+}
+.pickopts {
+  margin: 0;
   font-size: 12px;
 }
 .pickopts label {
   display: flex;
   align-items: center;
   gap: 7px;
+  margin: 12px 0;
 }
-
-/* ---- rig stage ---- */
+.cands > .control-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.generation-controls {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.gmore {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.cands .pickopts {
+  flex: none;
+  max-height: 50%;
+  overflow-y: auto;
+}
 .rigstage {
   flex: 1;
-  overflow-y: auto;
-  padding: 16px 18px;
-  /* no max-width: the UX pass showed a 760px column adrift in fullscreen
-     whitespace - the report reads left, the canvas LIVES right */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
-.rigcols {
+.rigstage > .checkpoint {
+  flex: none;
+  padding: 10px 18px;
+  margin: 0;
+}
+.rigstage .rigside .gensec:first-child {
+  border-bottom: 0;
+  padding-top: 0;
+}
+.rigstage .rigside .gensechead {
+  flex-direction: column;
+  gap: 6px;
+}
+.rigstage .rigside .vpwrap {
+  display: flex;
+  flex-direction: column;
+  height: max(340px, calc(100vh - 410px));
+}
+.rig-setup .rigside {
+  display: flex;
+  flex-direction: column;
+}
+.rig-setup .rigside > .gensec {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 0;
+}
+.rig-setup .vpwrap {
+  flex: 1;
+  height: auto;
+  min-height: 300px;
+}
+.rigstage .rigside .vphost,
+.candvp .vphost {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.rigstage .rigmain > .gensec:last-child {
+  border-bottom: 0;
+}
+.rigstage .rigmain.control-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.rig-controls {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.rig-controls.gensec,
+.rig-controls > .gensec:last-child { border-bottom: 0; }
+.rigstage .rigmain > .rig-activity {
+  width: auto;
+  flex-shrink: 0;
+  margin: 16px;
+}
+.rig-activity > .job-activity { margin-bottom: 0; }
+.rigstage .rigmain > :is(.mv-exit, .job-canceled) {
+  margin: 12px 16px;
+}
+.rigstage .rigmain .gensechead {
+  flex-direction: column;
+  gap: 6px;
+}
+.rigstage .rigmain .genrow > .rootinput {
+  min-width: 0;
+  width: 100%;
+  flex-basis: 100%;
+}
+.rigstage .rigmain .genrow > .job-activity {
+  margin-bottom: 0;
+}
+@media (max-width: 760px) {
+  .workbench-stage,
+  .rigstage .rigcols {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .asset-workspace,
+  .control-panel {
+    overflow: visible;
+    flex: none;
+  }
+  .candvp {
+    flex: none;
+  }
+  .cands .candvp .vpwrap {
+    flex: none;
+    height: 340px;
+  }
+  .candidate-shelf {
+    max-height: none;
+  }
+  .rigstage .rigmain.control-panel,
+  .rig-controls {
+    overflow: visible;
+  }
+  .control-panel {
+    border-left: 0;
+    border-top: 1px solid var(--sb-line);
+  }
+  .newcharacter .control-panel {
+    overflow: visible;
+  }
+  .settings-fields {
+    overflow: visible;
+  }
+  .cands > .control-panel {
+    overflow: visible;
+  }
+  .generation-controls,
+  .gmore {
+    overflow: visible;
+    flex: none;
+  }
+  .cands .pickopts {
+    max-height: none;
+    overflow: visible;
+  }
+  .gallery {
+    grid-template-columns: repeat(auto-fill, minmax(min(264px, 100%), 264px));
+    padding: 18px;
+  }
+  .library-head {
+    padding: 18px;
+    align-items: flex-start;
+  }
+  .library-head h1 {
+    font-size: 28px;
+  }
+  .library-head p {
+    font-size: 12px;
+  }
+  .library-chrome .toolbar {
+    padding: 12px 18px;
+  }
+  .source-well {
+    flex: none;
+    height: 320px;
+  }
+  .source-well img {
+    max-height: 320px;
+  }
+  .rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .stage {
+    border-bottom: 1px solid var(--sb-line);
+  }
+}
+.animstage.rigcols {
   display: grid;
   grid-template-columns: minmax(400px, 1fr) minmax(380px, 44%);
   gap: 0 22px;
   align-items: start;
 }
-.rigside {
+.animstage .rigside {
   position: sticky;
   top: 0;
 }
-.rigside .gensec {
-  border-bottom: none;
+.animstage .rigside .gensec {
+  border-bottom: 0;
 }
-.rigside .vpwrap {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 250px);
-  min-height: 340px;
+.animstage .rigside .vpwrap {
+  height: max(340px, calc(100vh - 250px));
 }
-.rigside .vphost {
-  flex: 1;
-  height: auto;
-}
-/* the rail and the inspector flank the stage, so the VIEWPORT breakpoint
-   must budget for them: below ~1560px of window the two columns would
-   overflow into a horizontal scrollbar (seen at 1280 in verification) */
+.animstage .rigside .vphost { flex: 1; height: auto; }
 @media (max-width: 1560px) {
-  .rigcols {
+  .animstage.rigcols {
     grid-template-columns: 1fr;
   }
-  .rigside {
+  .animstage .rigside {
     position: static;
-    /* stacked, the CANVAS comes first: the UX pass clicked deform rows and
-       ran previews against a viewport parked below the fold (F13) */
     order: -1;
   }
-  .rigside .vpwrap {
+  .animstage .rigside .vpwrap {
     height: 440px;
   }
 }
@@ -1729,7 +2217,7 @@ textarea {
 .lookadvanced[open] summary {
   margin-bottom: 12px;
 }
-.center > :is(.rigstage, .animstage, .bakestage, .exportstage) {
+.center > :is(.animstage, .bakestage, .exportstage) {
   flex: none;
   overflow: visible;
   max-width: none;
@@ -1953,6 +2441,8 @@ textarea {
     flex-wrap: wrap;
     overflow-y: auto;
   }
+  .workbench-body { display: block; }
+  .workbench-body > .center { height: 100%; }
   .editorbody .grip {
     display: none;
   }
@@ -2002,13 +2492,6 @@ textarea {
   }
   .toolbar .rootinput {
     min-width: 120px;
-  }
-  .rail {
-    margin: 0 12px;
-  }
-  .stage {
-    flex-basis: 30%;
-    min-width: 90px;
   }
   .editorhead {
     padding: 16px 12px;

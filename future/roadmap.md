@@ -407,6 +407,16 @@ runtime. An isolated Bulma rig completed in 187.64 seconds with 52 joints, finit
 zero-weight vertices; its 24 deformation flags remain a rig-quality review case for F5-T2. Native
 dialog/assistive-technology and clean-machine release qualification remain F7 work.
 
+**F5-T1 workbench polish, 2026-10-21:** retain Imprint's typography, semantic palette and textures;
+use the maintainer-approved canvas-left/settings-right arrangement through Rig. Gallery uses the
+full window without duplicating its cards in a roster. The flush stage rail also appears during
+creation. Grouped property panels, native model/track radios, advanced disclosures, visible action
+footers and a compact candidate filmstrip replace the loose forms. Rig keeps its actual deformation
+report below the canvas and explicit acceptance beside repairs. Generation/rig jobs show reported
+phases and elapsed time; unequal stage costs remain indeterminate. Cancellation has its own focused
+status. These changes preserve catalog defaults, core verbs, asset bytes and the later-stage feature
+scope. This UI pass does not resolve the existing deformation flags or close F5/F7 qualification.
+
 The [remote-history review](remote-main-review.md) carries useful requirements into these tasks
 without adopting another core, project format, renderer or provisioning stack:
 

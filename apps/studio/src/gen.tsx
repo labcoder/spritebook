@@ -4,7 +4,7 @@ import { useJobBridge } from './jobscope';
  *
  *  - GenerateNew: the "+ tab" — name→slug, image (drop or path), backend
  *    cards from the REAL catalog with their gates in context, the D-009
- *    options form rendered from paramsSchema, generate-one default. The
+ *    options form rendered from paramsSchema, two candidates by default. The
  *    button runs exactly the CLI line shown under it.
  *  - Candidates: the editor's Gen stage — per-result cards from the
  *    manifest, More-like-this, and pick with the reproject/colour-match
@@ -12,14 +12,18 @@ import { useJobBridge } from './jobscope';
  *
  * Read-only everywhere except the two verbs this stage exists for.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { CliRun, StudioBridge } from './bridge';
 import { slugify, slugProblem } from './slug';
 import { adjustArg, resolveOpDefaults, type SchemaField, schemaFields } from './schemaform';
 import { t } from './i18n';
 import { genArgs, moreLikeArgs, pickArgs, retextureArgs } from './args';
 import { Viewport } from './viewport/Viewport';
-import { useLandFocus, useRovingRadio } from './focus';
+import { useLandFocus } from './focus';
+import { StageRail } from './stagerail';
+import { stageStates } from './stages';
+import { JobActivity } from './jobactivity';
+import { type ProgressState, readProgress } from './bakeprogress';
 
 /** slugProblem returns one of three known sentences — literal per branch so
  * the extractor sees every id (t(variable) is a refused callsite). */
@@ -64,58 +68,59 @@ function BackendCards({ models, selectedId, onSelect, dimUnselected }: {
   models: CatalogModel[] | null;
   selectedId: string;
   onSelect: (id: string) => void;
-  /** compare mode: every installed card runs, so selection reads muted */
   dimUnselected?: boolean;
 }) {
-  const roving = useRovingRadio(
-    models?.length ?? 0,
-    models?.findIndex((m) => m.id === selectedId) ?? -1,
-    (i) => {
-      const m = models?.[i];
-      if (m) onSelect(m.id);
-    },
-  );
+  const group = useId();
+  const selected = models?.find((m) => m.id === selectedId);
+  const installed = selected?.versions.some((v) => v.installed);
   return (
-    <div
-      className={`backends ${dimUnselected ? 'compareall' : ''}`}
-      role='radiogroup'
-      aria-label={t('Backend')}
-    >
-      {models?.map((m, i) => {
-        const v = m.versions.find((x) => x.installed) ?? m.versions[0];
-        return (
-          <button
-            key={m.id}
-            type='button'
-            role='radio'
-            aria-checked={selectedId === m.id}
-            className={`backend ${selectedId === m.id ? 'on' : ''}`}
-            {...roving(i)}
-            onClick={() => onSelect(m.id)}
-          >
-            <span className='bname'>{m.displayName}</span>
-            <span className='btags'>
-              <span className='mbadge'>{m.license.spdx ?? m.license.name}</span>
-              {m.license.requiresAcceptance && (
-                <span className='mbadge gate'>{t('license acceptance required')}</span>
-              )}
-              {(m.license.excludedTerritories?.length ?? 0) > 0 && (
-                <span className='mbadge gate'>
-                  {t('not available in')}: {m.license.excludedTerritories!.join(', ')}
+    <div className={`model-choice ${dimUnselected ? 'compareall' : ''}`}>
+      <div role='radiogroup' aria-label={t('Backend')} className='backends'>
+        {models?.map((m) => {
+          const v = m.versions.find((x) => x.installed) ?? m.versions[0];
+          return (
+            <label key={m.id} className={`backend ${selectedId === m.id ? 'on' : ''}`}>
+              <input
+                type='radio'
+                aria-label={m.displayName}
+                name={group}
+                value={m.id}
+                checked={selectedId === m.id}
+                onChange={() => onSelect(m.id)}
+              />
+              <span className='backend-copy'>
+                <span className='bname'>{m.displayName}</span>
+                <span className='backend-meta'>
+                  <span>{v?.installed ? t('installed') : t('not installed')}</span>
+                  {v?.minVramGb !== undefined && (
+                    <span>
+                      {v.vramProfiles
+                        ? t('VRAM depends on configuration')
+                        : `≥${v.minVramGb} GiB VRAM`}
+                    </span>
+                  )}
                 </span>
-              )}
-              {v?.minVramGb !== undefined && (
-                <span className='mbadge'>
-                  {v.vramProfiles ? t('VRAM depends on configuration') : `≥${v.minVramGb} GiB VRAM`}
-                </span>
-              )}
-              {v?.installed
-                ? <span className='mbadge ok'>{t('installed')}</span>
-                : <span className='mbadge gate'>{t('not installed')}</span>}
-            </span>
-          </button>
-        );
-      })}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      {selected && (
+        <>
+          {selected.license.requiresAcceptance && !installed && (
+            <p className='inote warning'>{t('license acceptance required')}</p>
+          )}
+          {!!selected.license.excludedTerritories?.length && (
+            <p className='inote warning'>
+              {t('not available in')}: {selected.license.excludedTerritories.join(', ')}
+            </p>
+          )}
+          <details className='panel-disclosure model-terms'>
+            <summary>{t('Model details')}</summary>
+            <p>{selected.license.spdx ?? selected.license.name}</p>
+          </details>
+        </>
+      )}
     </div>
   );
 }
@@ -249,6 +254,39 @@ function useGenBackends(bridge: StudioBridge, open: boolean, catalogEpoch = 0) {
 
 /* ---------------- the options form ---------------- */
 
+function optionLabel(key: string): string {
+  switch (key) {
+    case 'seed':
+      return t('Seed');
+    case 'steps':
+      return t('Steps');
+    case 'guidanceStrength':
+      return t('Guidance');
+    case 'decimationTarget':
+      return t('Polygon budget');
+    case 'textureSize':
+      return t('Texture size');
+    case 'lowVram':
+      return t('Low VRAM mode');
+    case 'tris':
+      return t('Triangle budget');
+    case 'fov':
+      return t('Field of view');
+    case 'resolution':
+      return t('Resolution');
+    case 'pipelineType':
+      return t('Pipeline');
+    case 'textureGuidance':
+      return t('Texture guidance');
+    case 'textureGuidanceRescale':
+      return t('Texture guidance rescale');
+    case 'textureRetries':
+      return t('Texture retries');
+    default:
+      return key;
+  }
+}
+
 function OptionsForm({ fields, values, onChange }: {
   fields: SchemaField[];
   values: Record<string, unknown>;
@@ -261,7 +299,9 @@ function OptionsForm({ fields, values, onChange }: {
         const id = `opt-${f.key}`;
         return (
           <div className='optrow' key={f.key}>
-            <label htmlFor={id} className='optkey mono' title={f.description}>{f.key}</label>
+            <label htmlFor={id} className='optkey' title={f.description}>
+              {optionLabel(f.key)}
+            </label>
             {f.kind === 'boolean' && (
               <input
                 id={id}
@@ -345,12 +385,13 @@ export function CliTwin({ args }: { args: string[] }) {
 /* ---------------- GenerateNew (the + tab) ---------------- */
 
 export function GenerateNew(
-  { bridge: baseBridge, projectsRoot, onCreated, onOpenModels, catalogEpoch, vramGb }: {
+  { bridge: baseBridge, projectsRoot, onCreated, onBack, onOpenModels, catalogEpoch, vramGb }: {
     bridge: StudioBridge;
     projectsRoot: string;
     /** called with the new CHARACTER ID after gen exits 0 - the App re-reads
      * the list and resolves the workspace dir in the shell's own notation */
     onCreated: (characterId: string) => void;
+    onBack: () => void;
     onOpenModels: () => void;
     /** bumped when Manage models closes - the backend cards re-read the catalog */
     catalogEpoch?: number;
@@ -362,11 +403,16 @@ export function GenerateNew(
   const [name, setName] = useState('');
   const [imagePath, setImagePath] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const { models, error: catalogError } = useGenBackends(bridge, true, catalogEpoch);
   const [modelId, setModelId] = useState('fixture-gen');
   const [values, setValues] = useState<Record<string, unknown>>({});
-  const [run, setRun] = useState<{ running: boolean; lines: number; last: string } | null>(null);
+  const [run, setRun] = useState<{ running: boolean; progress: ProgressState | null } | null>(null);
   const [failure, setFailure] = useState<JobFailure | null>(null);
+  const [canceled, setCanceled] = useState(false);
+  useLandFocus(canceled, '.newcharacter .job-canceled');
+  useLandFocus(failure !== null, '.newcharacter .mv-exit');
   // DEFAULT 2: one job, candidate i at seed + 1000*i, the model loads once -
   // the UX pass asked for the choice up front, not buried in the options form
   const [count, setCount] = useState(2);
@@ -389,12 +435,21 @@ export function GenerateNew(
   }, [bridge]);
 
   useEffect(() => {
-    if (!imagePath) {
-      setPreview(null);
-      return;
-    }
+    setPreview(null);
+    setImageError(false);
+    setImageLoading(imagePath.length > 0);
+    if (!imagePath) return;
     let live = true;
-    bridge.readImage(imagePath).then((src) => live && setPreview(src), () => {});
+    bridge.readImage(imagePath).then((src) => {
+      if (!live) return;
+      setPreview(src);
+      setImageError(!src);
+      setImageLoading(false);
+    }, () => {
+      if (!live) return;
+      setImageError(true);
+      setImageLoading(false);
+    });
     return () => {
       live = false;
     };
@@ -469,23 +524,12 @@ export function GenerateNew(
   const generate = useCallback(async () => {
     if (!ready) return; // the button stays focusable while running (aria-busy)
     setFailure(null);
+    setCanceled(false);
     setScaleWarn(null);
-    setRun({ running: true, lines: 0, last: t('starting…') });
+    setRun({ running: true, progress: null });
     const onLine = (line: string) => {
-      let last = line;
-      try {
-        const e = JSON.parse(line);
-        // a progress event NAMES its step (download:model.ckpt, sample,
-        // border...) - "3 events · progress" told the user nothing (F5)
-        last = e.t === 'progress' && e.step
-          ? `${e.step} ${e.done}/${e.total}`
-          : e.message ?? e.stage ?? e.t ?? line;
-      } catch { /* verbatim */ }
-      setRun((cur) => ({
-        running: true,
-        lines: (cur?.lines ?? 0) + 1,
-        last: String(last),
-      }));
+      const progress = readProgress(line);
+      if (progress) setRun({ running: true, progress });
     };
     // compare mode: one job per installed backend, the count SPLIT across
     // them (first jobs take the remainder), each at its own defaults. The
@@ -509,13 +553,17 @@ export function GenerateNew(
     let warn: string | null = null;
     for (const jobArgs of jobs) {
       const r: CliRun = await bridge.runCli([...jobArgs, '--json'], onLine);
+      if (r.exitCode === 130) {
+        setCanceled(true);
+        break;
+      }
       if (r.exitCode === 0) created = true;
       else fail = lastFailure(r.lines) ?? { code: null, message: '' };
       // the scale warn is the one a user must SEE before they build five
       // stages on a unit-box character (wave 4's fifth finding)
       warn = lastWarnOf(r.lines, 'scale-undeclared') ?? warn;
     }
-    setRun({ running: false, lines: 0, last: '' });
+    setRun({ running: false, progress: null });
     if (fail) setFailure(fail);
     if (warn) setScaleWarn(warn);
     // any successful job made results worth looking at - navigate even when
@@ -537,187 +585,235 @@ export function GenerateNew(
   ]);
 
   return (
-    <div className='gennew'>
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('New character')}</span>
-          <span className='ieyebrow mono'>01// GEN</span>
+    <div className='newcharacter'>
+      <StageRail stages={stageStates({})} active='gen' onSelect={() => {}} />
+      <header className='editorhead'>
+        <div className='editorheading'>
+          <h1>{t('New character')}</h1>
         </div>
-        <div className='genrow'>
-          <label htmlFor='gname'>{t('Name')}</label>
-          <input
-            id='gname'
-            className='rootinput'
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            spellCheck={false}
-            autoComplete='off'
-          />
-          <span className={`slugpreview mono ${problem ? 'bad' : ''}`}>
-            {t('id')}: {slug || '—'}
-            {problem && name.length > 0 ? ` · ${problemText(problem)}` : ''}
-          </span>
-        </div>
-        <div className='genrow'>
-          <label htmlFor='gimage'>{t('Source image')}</label>
-          <input
-            id='gimage'
-            className='rootinput'
-            value={imagePath}
-            onChange={(e) => setImagePath(e.target.value)}
-            placeholder={t('drop an image anywhere, or paste a path')}
-            spellCheck={false}
-          />
-        </div>
-        <div className='genrow'>
-          <label htmlFor='gheight'>{t('Height (m)')}</label>
-          <input
-            id='gheight'
-            className='optnum mono'
-            value={heightM}
-            onChange={(e) => setHeightM(e.target.value)}
-            inputMode='decimal'
-            spellCheck={false}
-          />
-          <span className='inote'>
-            {t('the size every stage believes — sprites frame at pixels-per-metre')}
-          </span>
-        </div>
-        {preview && (
-          <div className='genpreview'>
-            <img src={preview} alt={t('Source image')} />
-          </div>
-        )}
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Backend')}</span>
-        </div>
-        {catalogError && <div className='mdl-error mono'>{catalogError}</div>}
-        {!models && !catalogError && <div className='inote'>…</div>}
-        <BackendCards
-          models={models}
-          selectedId={modelId}
-          onSelect={(id) => {
-            setModelId(id);
-            setValues({});
-          }}
-          dimUnselected={compare && installedGen.length > 1}
-        />
-        <div className='genrow'>
-          <label htmlFor='gencount'>{t('Candidates')}</label>
-          <input
-            id='gencount'
-            className='optnum mono'
-            type='number'
-            min={1}
-            max={8}
-            value={count}
-            onChange={(e) => setCount(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
-          />
-          <span className='inote'>
-            {t('one job - the model loads once; candidate 2 runs at seed + 1000')}
-          </span>
-        </div>
-        {installedGen.length > 1 && (
-          <div className='genrow'>
-            <label className='bindhold'>
-              <input
-                type='checkbox'
-                checked={compare}
-                onChange={(e) => setCompare(e.target.checked)}
-              />
-              {t('Compare backends — one job per installed backend, the count split across them')}
-            </label>
-            {compare && (
-              <span className='inote'>
-                {t('each backend runs its own defaults; the cards below label every result')}
-              </span>
-            )}
-          </div>
-        )}
-        {model && version && !version.installed && (
-          <div className='inote'>
-            {t('this backend is not installed')} —{' '}
-            <button type='button' className='linkish' onClick={onOpenModels}>
-              {t('Manage models…')}
+        <div className='editor-tools'>
+          {jobBusy && (
+            <button type='button' className='btn' onClick={cancel} title='CLI: Ctrl+C'>
+              {t('Cancel job')}
             </button>
-          </div>
-        )}
-      </section>
-
-      <section className='gensec'>
-        <div className='gensechead'>
-          <span className='hud'>{t('Options')}</span>
-          <span className='inote'>{t('defaults are the catalog’s — only changes travel')}</span>
+          )}
+          <button type='button' className='btn' onClick={onBack}>{t('Back to gallery')}</button>
         </div>
-        {fields.some((f) => f.key === 'decimationTarget') && (
-          <div className='genrow'>
-            <span className='optkey mono'>{t('effort')}</span>
-            <span className='m-seg' role='group' aria-label={t('Effort (polygon budget)')}>
-              {EFFORT_PRESETS.map((p) => (
-                <button
-                  key={p.key}
-                  type='button'
-                  className='btn mbtn'
-                  aria-pressed={values['decimationTarget'] === p.decimationTarget}
-                  onClick={() =>
-                    setValues((cur) => ({ ...cur, decimationTarget: p.decimationTarget }))}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </span>
+      </header>
+      <div className='gennew workbench-stage'>
+        <section className='asset-workspace source-workspace' aria-label={t('Source image')}>
+          <div className='panel-heading'>
+            <h2>{t('Source image')}</h2>
+            <span className='inote'>{t('Reference')}</span>
           </div>
-        )}
-        <OptionsForm
-          fields={fields}
-          values={values}
-          onChange={(k, v) => setValues((cur) => ({ ...cur, [k]: v }))}
-        />
-        {values['lowVram'] === false && resolved['lowVram'] === true && (
-          <span className='inote'>
-            {t('lowVram is off — the health exam found')} {vramGb} GiB
-          </span>
-        )}
-      </section>
-
-      <section className='gensec'>
-        {
-          /* disabled only for INPUT blockers. While the run is in flight the
-            button stays focusable with aria-busy - disabling the focused
-            element drops keyboard focus to <body> for the whole run, which
-            is the walkthrough's most-repeated finding */
-        }
-        <button
-          type='button'
-          className='btn primary genbtn'
-          disabled={blocker !== null}
-          aria-busy={run?.running === true}
-          onClick={generate}
-        >
-          {run?.running ? t('Generating…') : t('Generate model')}
-        </button>
-        {jobBusy && (
-          <button type='button' className='btn' onClick={cancel} title='CLI: Ctrl+C'>
-            {t('Cancel job')} <kbd>Ctrl+C</kbd>
-          </button>
-        )}
-        {!ready && blocker !== null && <span className='blocker mono' role='status'>{blocker}
-        </span>}
-        {run?.running && (
-          <span className='genprogress mono' role='status'>
-            {run.lines} {t('events')} · {run.last}
-          </span>
-        )}
-        {failure && <FailureNote failure={failure} onOpenModels={onOpenModels} />}
-        {scaleWarn && <span className='mv-warn mono' role='status'>{scaleWarn}</span>}
-        <CliTwin args={args} />
-        {bridge.name === 'browser-demo' && (
-          <div className='inote'>{t('browser preview: generate needs the desktop shell')}</div>
-        )}
-      </section>
+          <div className='source-well'>
+            {preview
+              ? (
+                <img
+                  src={preview}
+                  alt={t('Source image')}
+                  onError={() => {
+                    setPreview(null);
+                    setImageError(true);
+                  }}
+                />
+              )
+              : (
+                <div className='well-empty'>
+                  <h2>
+                    {imageLoading
+                      ? t('Loading source image…')
+                      : t('Start with a character reference')}
+                  </h2>
+                  <p role='status'>
+                    {imageError
+                      ? t('Source preview unavailable. Check the image path.')
+                      : t('drop an image anywhere, or paste a path')}
+                  </p>
+                </div>
+              )}
+          </div>
+          <div className='source-path field'>
+            <label htmlFor='gimage'>{t('Source image')}</label>
+            <input
+              id='gimage'
+              disabled={run?.running}
+              className='rootinput'
+              value={imagePath}
+              onChange={(e) => setImagePath(e.target.value)}
+              placeholder={t('drop an image anywhere, or paste a path')}
+              spellCheck={false}
+            />
+          </div>
+          {run?.running && <JobActivity progress={run.progress} verb='gen' />}
+          {failure && <FailureNote failure={failure} onOpenModels={onOpenModels} />}
+          {canceled && <p className='inote job-canceled' role='status'>{t('Job canceled')}</p>}
+          {scaleWarn && <span className='mv-warn mono' role='status'>{scaleWarn}</span>}
+        </section>
+        <aside className='control-panel' aria-label={t('Generation settings')}>
+          <div
+            className='settings-fields'
+            tabIndex={0}
+            role='region'
+            aria-label={t('Generation settings')}
+          >
+            <fieldset disabled={run?.running} className='settings-group'>
+              <section className='control-section'>
+                <h2>{t('Character')}</h2>
+                <div className='field'>
+                  <label htmlFor='gname'>{t('Name')}</label>
+                  <input
+                    id='gname'
+                    className='rootinput'
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    spellCheck={false}
+                    autoComplete='off'
+                  />
+                  <span className={`slugpreview mono ${problem && name ? 'bad' : ''}`}>
+                    {t('id')}: {slug || '—'}
+                    {problem && name.length > 0 ? ` · ${problemText(problem)}` : ''}
+                  </span>
+                </div>
+                <div className='field'>
+                  <label htmlFor='gheight'>{t('Height (m)')}</label>
+                  <input
+                    id='gheight'
+                    className='optnum mono'
+                    value={heightM}
+                    onChange={(e) => setHeightM(e.target.value)}
+                    inputMode='decimal'
+                    spellCheck={false}
+                    aria-describedby='height-note'
+                  />
+                  <span id='height-note' className='inote'>
+                    {t('the size every stage believes — sprites frame at pixels-per-metre')}
+                  </span>
+                </div>
+              </section>
+              <section className='control-section'>
+                <h2>{t('Backend')}</h2>
+                {catalogError && <div className='mdl-error mono'>{catalogError}</div>}
+                {!models && !catalogError && (
+                  <p className='inote' role='status'>{t('Loading models…')}</p>
+                )}
+                <BackendCards
+                  models={models}
+                  selectedId={modelId}
+                  onSelect={(id) => {
+                    setModelId(id);
+                    setValues({});
+                  }}
+                  dimUnselected={compare && installedGen.length > 1}
+                />
+                {model && version && !version.installed && (
+                  <p className='inote'>
+                    {t('this backend is not installed')} —{' '}
+                    <button type='button' className='linkish' onClick={onOpenModels}>
+                      {t('Manage models…')}
+                    </button>
+                  </p>
+                )}
+              </section>
+              <section className='control-section'>
+                <h2>{t('Generation')}</h2>
+                <div className='field'>
+                  <label htmlFor='gencount'>{t('Candidates')}</label>
+                  <input
+                    id='gencount'
+                    className='optnum mono'
+                    type='number'
+                    min={1}
+                    max={8}
+                    value={count}
+                    onChange={(e) =>
+                      setCount(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
+                  />
+                  <span className='inote'>
+                    {t('one job - the model loads once; candidate 2 runs at seed + 1000')}
+                  </span>
+                </div>
+                {fields.some((f) => f.key === 'decimationTarget') && (
+                  <div className='field'>
+                    <span className='optkey'>{t('Effort')}</span>
+                    <span className='m-seg' role='group' aria-label={t('Effort (polygon budget)')}>
+                      {EFFORT_PRESETS.map((p) => (
+                        <button
+                          key={p.key}
+                          type='button'
+                          className='btn mbtn'
+                          aria-pressed={(values['decimationTarget'] ??
+                            resolved['decimationTarget']) === p.decimationTarget}
+                          onClick={() =>
+                            setValues((cur) => ({ ...cur, decimationTarget: p.decimationTarget }))}
+                        >
+                          {p.label()}
+                        </button>
+                      ))}
+                    </span>
+                  </div>
+                )}
+                <OptionsForm
+                  fields={fields.filter((f) =>
+                    MORE_FIELDS.has(f.key) && f.key !== 'decimationTarget'
+                  )}
+                  values={values}
+                  onChange={(k, v) => setValues((cur) => ({ ...cur, [k]: v }))}
+                />
+                <details className='panel-disclosure'>
+                  <summary>{t('Advanced options')}</summary>
+                  <p className='inote'>{t('defaults are the catalog’s — only changes travel')}</p>
+                  <OptionsForm
+                    fields={fields.filter((f) =>
+                      !MORE_FIELDS.has(f.key) || f.key === 'decimationTarget'
+                    )}
+                    values={values}
+                    onChange={(k, v) => setValues((cur) => ({ ...cur, [k]: v }))}
+                  />
+                  {values['lowVram'] === false && resolved['lowVram'] === true && (
+                    <p className='inote'>
+                      {t('lowVram is off — the health exam found')} {vramGb} GiB
+                    </p>
+                  )}
+                  {installedGen.length > 1 && (
+                    <label className='check-field'>
+                      <input
+                        type='checkbox'
+                        checked={compare}
+                        onChange={(e) => setCompare(e.target.checked)}
+                      />
+                      {t(
+                        'Compare backends — one job per installed backend, the count split across them',
+                      )}
+                    </label>
+                  )}
+                  {compare && (
+                    <p className='inote'>
+                      {t('each backend runs its own defaults; the cards below label every result')}
+                    </p>
+                  )}
+                </details>
+              </section>
+            </fieldset>
+          </div>
+          <section className='control-section action-section'>
+            <button
+              type='button'
+              className='btn primary genbtn'
+              disabled={blocker !== null}
+              aria-busy={run?.running === true}
+              onClick={generate}
+            >
+              {run?.running ? t('Generating…') : t('Generate model')}
+            </button>
+            {!ready && blocker !== null && <p className='blocker mono' role='status'>{blocker}</p>}
+            <CliTwin args={args} />
+            {bridge.name === 'browser-demo' && (
+              <p className='inote'>{t('browser preview: generate needs the desktop shell')}</p>
+            )}
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }
@@ -760,10 +856,16 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
   const picked = typeof gen.pickedResultId === 'string' ? gen.pickedResultId : undefined;
   const canonical = m.canonicalMesh !== undefined && m.canonicalMesh !== null;
 
-  const [inspecting, setInspecting] = useState<string | null>(null);
+  const [inspecting, setInspecting] = useState<string | null>(() =>
+    canonical ? null : results[0]?.id ?? null
+  );
   const [reproject, setReproject] = useState(false);
   const [colorMatch, setColorMatch] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
+  const [verb, setVerb] = useState('gen');
+  const [canceled, setCanceled] = useState(false);
+  useLandFocus(canceled, '.cands .job-canceled');
   const [failures, setFailures] = useState<Record<string, JobFailure>>({});
 
   // When the pick lands the checkpoint banner appears - put keyboard focus on
@@ -779,24 +881,32 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
   const runFor = useCallback(async (key: string, cardId: string, cliArgs: string[]) => {
     if (busy !== null) return;
     setBusy(key);
+    setProgress(null);
+    setCanceled(false);
+    setVerb(cliArgs[0] ?? 'gen');
     setFailures({});
-    const r = await bridge.runCli([...cliArgs, '--json']);
+    const r = await bridge.runCli([...cliArgs, '--json'], (line) => {
+      const next = readProgress(line);
+      if (next) setProgress(next);
+    });
     setBusy(null);
     if (r.exitCode === 0) {
       if (cliArgs[0] === 'pick') setInspecting(null);
       onChanged();
+    } else if (r.exitCode === 130) {
+      setCanceled(true);
     } else {
       setFailures({ [cardId]: lastFailure(r.lines) ?? { code: null, message: '' } });
     }
   }, [bridge, onChanged, busy]);
 
   const doPick = useCallback(
-    (id: string) => runFor(id, id, pickFor(id)),
+    (id: string) => runFor(`pick:${id}`, id, pickFor(id)),
     [runFor, pickFor],
   );
   // gen ALWAYS requires --character (the field test's first error)
   const moreLike = useCallback(
-    (id: string) => runFor(id, id, moreLikeArgs(dir, characterId, id)),
+    (id: string) => runFor(`more:${id}`, id, moreLikeArgs(dir, characterId, id)),
     [runFor, dir, characterId],
   );
   // a NEW texture on this result's mesh - core appends a new result card
@@ -806,146 +916,169 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
   );
 
   return (
-    <div className='cands'>
-      {canonical && (
-        <div className='checkpoint'>
-          <span className='hud'>{t('canonical mesh saved')}</span>
-          <span className='mono'>
-            {picked ? `${t('pick')} ${picked}` : ''} · {t('stages 02–06 are unlocked')}
-          </span>
-        </div>
-      )}
-      {results.length === 0 && (
-        <div className='empty'>
-          <p>{t('nothing generated')}</p>
-        </div>
-      )}
-      {(inspecting !== null || canonical) && (
-        <div className='candvp'>
-          <div className='candvplabel mono' role='status'>
-            {t('inspecting')}: {inspecting ?? t('canonical mesh')}
+    <div className='cands workbench-stage'>
+      <div className='asset-workspace'>
+        {canonical && (
+          <div className='checkpoint'>
+            <span className='hud'>{t('canonical mesh saved')}</span>
+            <span className='mono'>
+              {picked ? `${t('pick')} ${picked}` : ''} · {t('stages 02–06 are unlocked')}
+            </span>
           </div>
-          <Viewport
-            bridge={bridge}
-            meshPath={inspecting !== null
-              ? `${dir}/results/${inspecting}/model.glb`
-              : `${dir}/canonical/model.glb`}
-            contentKey={String(
-              (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? '',
-            )}
-          />
-        </div>
-      )}
-      <div className='candgrid'>
-        {results.map((r) => (
-          <div
-            key={r.id}
-            className={`cand ${picked === r.id ? 'picked' : ''} ${
-              inspecting === r.id ? 'inspecting' : ''
-            }`}
-          >
-            <div className='candhead'>
-              <span className='mono candid'>{r.id}</span>
-              {picked === r.id && <span className='mbadge ok'>{t('picked')}</span>}
-              {inspecting === r.id && <span className='mbadge'>{t('inspecting')}</span>}
-              {r.discarded && <span className='mbadge'>{t('discarded')}</span>}
+        )}
+        {busy && <JobActivity key={busy} progress={progress} verb={verb} />}
+        {canceled && <p className='inote job-canceled' role='status'>{t('Job canceled')}</p>}
+        {(inspecting !== null || canonical) && (
+          <div className='candvp'>
+            <div className='candvplabel mono' role='status'>
+              {t('inspecting')}: {inspecting ?? t('canonical mesh')}
             </div>
-            <CandThumb bridge={bridge} path={`${dir}/results/${r.id}/thumb.png`} />
-            <div className='candmeta mono'>
-              {t('seed')} {r.seed}
-              {r.backend?.modelId ? ` · ${r.backend.modelId}` : ''}
-              {r.output?.tris !== undefined ? ` · ${(r.output.tris / 1000).toFixed(0)}k tris` : ''}
-              {r.output?.textureRes !== undefined ? ` · ${r.output.textureRes}px` : ''}
-              {r.wallTimeS !== undefined ? ` · ${Math.round(r.wallTimeS)}s` : ''}
-            </div>
-            <div className='candacts'>
-              <button
-                type='button'
-                className='btn mbtn'
-                aria-pressed={inspecting === r.id}
-                onClick={() => setInspecting(inspecting === r.id ? null : r.id)}
+            <Viewport
+              bridge={bridge}
+              meshPath={inspecting !== null
+                ? `${dir}/results/${inspecting}/model.glb`
+                : `${dir}/canonical/model.glb`}
+              contentKey={String(
+                (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? '',
+              )}
+            />
+          </div>
+        )}
+        {!canonical && inspecting === null && (
+          <div className='well-empty model-empty'>
+            <h2>{t('Model preview')}</h2>
+            <p>{t('Inspect a candidate to compare it here.')}</p>
+          </div>
+        )}
+        <section className='candidate-shelf' aria-label={t('Candidates')}>
+          <div className='panel-heading'>
+            <h2>{t('Candidates')}</h2>
+            <span className='inote'>{results.length}</span>
+          </div>
+          <div className='candgrid'>
+            {results.map((r) => (
+              <div
+                key={r.id}
+                className={`cand ${picked === r.id ? 'picked' : ''} ${
+                  inspecting === r.id ? 'inspecting' : ''
+                }`}
               >
-                {t('Inspect')}
-              </button>
-              <button
-                type='button'
-                className='btn mbtn'
-                disabled={busy !== null && busy !== r.id}
-                aria-busy={busy === r.id}
-                onClick={() => moreLike(r.id)}
-                title={t('re-runs this result’s recipe with a new seed')}
-              >
-                {busy === r.id ? t('Working…') : (
-                  // more-like reproduces the RECIPE, so a candidate ladder
-                  // yields that many again — the parity run found this
-                  (r.params?.candidates ?? 1) > 1
-                    ? `${t('More like this')} (×${r.params!.candidates})`
-                    : t('More like this')
+                <div className='candhead'>
+                  <span className='mono candid'>{r.id}</span>
+                  {picked === r.id && <span className='mbadge ok'>{t('picked')}</span>}
+                  {inspecting === r.id && <span className='mbadge'>{t('inspecting')}</span>}
+                  {r.discarded && <span className='mbadge'>{t('discarded')}</span>}
+                </div>
+                <CandThumb bridge={bridge} path={`${dir}/results/${r.id}/thumb.png`} />
+                <div className='candmeta mono'>
+                  {t('seed')} {r.seed}
+                  {r.backend?.modelId ? ` · ${r.backend.modelId}` : ''}
+                  {r.output?.tris !== undefined
+                    ? ` · ${(r.output.tris / 1000).toFixed(0)}k tris`
+                    : ''}
+                  {r.output?.textureRes !== undefined ? ` · ${r.output.textureRes}px` : ''}
+                  {r.wallTimeS !== undefined ? ` · ${Math.round(r.wallTimeS)}s` : ''}
+                </div>
+                <div className='candacts'>
+                  <button
+                    type='button'
+                    className='btn mbtn'
+                    aria-pressed={inspecting === r.id}
+                    onClick={() => setInspecting(inspecting === r.id ? null : r.id)}
+                  >
+                    {t('Inspect')}
+                  </button>
+                  <button
+                    type='button'
+                    className='btn mbtn primaryish'
+                    disabled={busy !== null && busy !== `pick:${r.id}`}
+                    aria-busy={busy === `pick:${r.id}`}
+                    onClick={() => doPick(r.id)}
+                  >
+                    {t('Save as canonical mesh')}
+                  </button>
+                </div>
+                <details className='candidate-actions'>
+                  <summary>{t('More actions')}</summary>
+                  <div className='candacts'>
+                    <button
+                      type='button'
+                      className='btn mbtn'
+                      disabled={busy !== null && busy !== `more:${r.id}`}
+                      aria-busy={busy === `more:${r.id}`}
+                      onClick={() => moreLike(r.id)}
+                      title={t('re-runs this result’s recipe with a new seed')}
+                    >
+                      {busy === `more:${r.id}` ? t('Working…') : (
+                        // more-like reproduces the RECIPE, so a candidate ladder
+                        // yields that many again — the parity run found this
+                        (r.params?.candidates ?? 1) > 1
+                          ? `${t('More like this')} (×${r.params!.candidates})`
+                          : t('More like this')
+                      )}
+                    </button>
+                    <button
+                      type='button'
+                      className='btn mbtn'
+                      disabled={busy !== null && busy !== `retex:${r.id}`}
+                      aria-busy={busy === `retex:${r.id}`}
+                      onClick={() => retexture(r.id)}
+                      title={t('keeps this mesh, paints a new texture — a new card appears')}
+                    >
+                      {t('Re-texture')}
+                    </button>
+                  </div>
+                  <CliTwin args={pickFor(r.id)} />
+                </details>
+                {failures[r.id] && (
+                  <FailureNote
+                    failure={failures[r.id]!}
+                    onOpenModels={onOpenModels}
+                  />
                 )}
-              </button>
-              <button
-                type='button'
-                className='btn mbtn'
-                disabled={busy !== null && busy !== `retex:${r.id}`}
-                aria-busy={busy === `retex:${r.id}`}
-                onClick={() => retexture(r.id)}
-                title={t('keeps this mesh, paints a new texture — a new card appears')}
-              >
-                {t('Re-texture')}
-              </button>
-              <button
-                type='button'
-                className='btn mbtn primaryish'
-                disabled={busy !== null && busy !== r.id}
-                aria-busy={busy === r.id}
-                onClick={() => doPick(r.id)}
-              >
-                {t('Save as canonical mesh')}
-              </button>
-            </div>
-            {failures[r.id] && (
-              <FailureNote
-                failure={failures[r.id]!}
-                onOpenModels={onOpenModels}
-              />
-            )}
+              </div>
+            ))}
           </div>
-        ))}
+          {results.length === 0 && <p className='inote'>{t('nothing generated')}</p>}
+        </section>
       </div>
-      {results.length > 0 && (
-        <div className='pickopts'>
-          <span>{t('Optional texture changes on save:')}</span>
-          <label>
-            <input
-              type='checkbox'
-              checked={reproject}
-              onChange={(e) => setReproject(e.target.checked)}
-            />
-            {t('reproject source detail')}
-          </label>
-          <label>
-            <input
-              type='checkbox'
-              checked={colorMatch}
-              onChange={(e) => setColorMatch(e.target.checked)}
-            />
-            {t('match source colours')}
-          </label>
-          <CliTwin args={pickFor(results[0]?.id ?? 'rN')} />
-        </div>
-      )}
-      <GenerateMore
-        bridge={bridge}
-        dir={dir}
-        m={m}
-        characterId={characterId}
-        results={results}
-        busy={busy}
-        runFor={runFor}
-        failure={failures['genmore'] ?? null}
-        onOpenModels={onOpenModels}
-        catalogEpoch={catalogEpoch}
-      />
+      <aside className='control-panel' aria-label={t('Generation settings')}>
+        <GenerateMore
+          bridge={bridge}
+          dir={dir}
+          m={m}
+          characterId={characterId}
+          results={results}
+          busy={busy}
+          runFor={runFor}
+          failure={failures['genmore'] ?? null}
+          onOpenModels={onOpenModels}
+          catalogEpoch={catalogEpoch}
+        />
+        {results.length > 0 && (
+          <details className='control-section pickopts panel-disclosure'>
+            <summary>{t('Canonical mesh options')}</summary>
+            <span>{t('Optional texture changes on save:')}</span>
+            <label>
+              <input
+                type='checkbox'
+                checked={reproject}
+                onChange={(e) => setReproject(e.target.checked)}
+              />
+              {t('reproject source detail')}
+            </label>
+            <label>
+              <input
+                type='checkbox'
+                checked={colorMatch}
+                onChange={(e) => setColorMatch(e.target.checked)}
+              />
+              {t('match source colours')}
+            </label>
+            <CliTwin args={pickFor(inspecting ?? picked ?? results[0]?.id ?? 'rN')} />
+          </details>
+        )}
+      </aside>
     </div>
   );
 }
@@ -956,9 +1089,9 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
  * field, which stays visible and editable - medium matches what the shipped
  * defaults have produced in practice (~200k tris on the reference images). */
 const EFFORT_PRESETS = [
-  { key: 'low', label: 'low', decimationTarget: 50_000 },
-  { key: 'medium', label: 'medium', decimationTarget: 200_000 },
-  { key: 'high', label: 'high', decimationTarget: 800_000 },
+  { key: 'low', label: () => t('Low'), decimationTarget: 50_000 },
+  { key: 'medium', label: () => t('Medium'), decimationTarget: 200_000 },
+  { key: 'high', label: () => t('High'), decimationTarget: 800_000 },
 ] as const;
 
 /** The curated knobs; everything else keeps its catalog default. */
@@ -1023,94 +1156,100 @@ function GenerateMore(
   const ready = source !== null && version?.installed === true && busy === null && heightOk;
 
   return (
-    <section className='gensec gmore'>
-      <div className='gensechead'>
-        <span className='hud'>{t('Generate more')}</span>
-        <span className='inote'>
-          {t('full control — the source image is the one this character was made from')}
-        </span>
-      </div>
-      {catalogError && <div className='mdl-error mono'>{catalogError}</div>}
-      {!models && !catalogError && <div className='inote'>…</div>}
-      <BackendCards
-        models={models}
-        selectedId={modelId}
-        onSelect={(id) => {
-          setModelId(id);
-          setValues({});
-        }}
-      />
-      <div className='genrow'>
-        <label htmlFor='gmcount'>{t('Candidates')}</label>
-        <input
-          id='gmcount'
-          className='optnum mono'
-          type='number'
-          min={1}
-          max={8}
-          value={count}
-          onChange={(e) => setCount(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
-        />
-        <label htmlFor='gmheight'>{t('Height (m)')}</label>
-        <input
-          id='gmheight'
-          className='optnum mono'
-          value={heightM}
-          onChange={(e) => setHeightM(e.target.value)}
-          inputMode='decimal'
-          spellCheck={false}
-        />
-        {hasDecimation && (
-          <>
-            <span className='optkey mono'>{t('effort')}</span>
-            <span className='m-seg' role='group' aria-label={t('Effort (polygon budget)')}>
-              {EFFORT_PRESETS.map((p) => (
-                <button
-                  key={p.key}
-                  type='button'
-                  className='btn mbtn'
-                  aria-pressed={values['decimationTarget'] === p.decimationTarget}
-                  onClick={() =>
-                    setValues((cur) => ({ ...cur, decimationTarget: p.decimationTarget }))}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </span>
-          </>
-        )}
-      </div>
-      <OptionsForm
-        fields={fields}
-        values={values}
-        onChange={(k, v) => setValues((cur) => ({ ...cur, [k]: v }))}
-      />
-      <div className='genrow'>
-        <button
-          type='button'
-          className='btn primary'
-          disabled={!ready && busy === null}
-          aria-busy={busy === 'genmore'}
-          onClick={() => {
-            if (ready) runFor('genmore', 'genmore', args);
+    <div className='generation-controls'>
+      <section className='control-section gmore'>
+        <div className='gensechead'>
+          <h2>{t('Generate more')}</h2>
+        </div>
+        {catalogError && <div className='mdl-error mono'>{catalogError}</div>}
+        {!models && !catalogError && <div className='inote'>…</div>}
+        <BackendCards
+          models={models}
+          selectedId={modelId}
+          onSelect={(id) => {
+            setModelId(id);
+            setValues({});
           }}
-        >
-          {busy === 'genmore' ? t('Generating…') : `${t('Generate')} ${count}`}
-        </button>
-        {source === null && (
-          <span className='inote'>{t('this workspace records no source image')}</span>
-        )}
-        {version !== null && !version.installed && (
-          <span className='inote'>
-            {t('this backend is not installed')} —{' '}
-            <button type='button' className='linkish' onClick={onOpenModels}>
-              {t('Manage models…')}
-            </button>
-          </span>
-        )}
-      </div>
-      {failure && <FailureNote failure={failure} onOpenModels={onOpenModels} />}
-      <CliTwin args={args} />
-    </section>
+        />
+        <div className='settings-pair'>
+          <div className='field'>
+            <label htmlFor='gmcount'>{t('Candidates')}</label>
+            <input
+              id='gmcount'
+              className='optnum mono'
+              type='number'
+              min={1}
+              max={8}
+              value={count}
+              onChange={(e) => setCount(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
+            />
+          </div>
+          <div className='field'>
+            <label htmlFor='gmheight'>{t('Height (m)')}</label>
+            <input
+              id='gmheight'
+              className='optnum mono'
+              value={heightM}
+              onChange={(e) => setHeightM(e.target.value)}
+              inputMode='decimal'
+              spellCheck={false}
+            />
+          </div>
+          {hasDecimation && (
+            <div className='field effort-field'>
+              <span className='optkey mono'>{t('effort')}</span>
+              <span className='m-seg' role='group' aria-label={t('Effort (polygon budget)')}>
+                {EFFORT_PRESETS.map((p) => (
+                  <button
+                    key={p.key}
+                    type='button'
+                    className='btn mbtn'
+                    aria-pressed={(values['decimationTarget'] ?? resolved['decimationTarget']) ===
+                      p.decimationTarget}
+                    onClick={() =>
+                      setValues((cur) => ({ ...cur, decimationTarget: p.decimationTarget }))}
+                  >
+                    {p.label()}
+                  </button>
+                ))}
+              </span>
+            </div>
+          )}
+        </div>
+        <OptionsForm
+          fields={fields}
+          values={values}
+          onChange={(k, v) => setValues((cur) => ({ ...cur, [k]: v }))}
+        />
+      </section>
+      <section className='control-section action-section'>
+        <div className='genrow'>
+          <button
+            type='button'
+            className='btn primary'
+            disabled={!ready && busy === null}
+            aria-busy={busy === 'genmore'}
+            onClick={() => {
+              if (ready) runFor('genmore', 'genmore', args);
+            }}
+          >
+            {busy === 'genmore' ? t('Generating…') : `${t('Generate')} ${count}`}
+          </button>
+          {source === null && (
+            <span className='inote'>{t('this workspace records no source image')}</span>
+          )}
+          {version !== null && !version.installed && (
+            <span className='inote'>
+              {t('this backend is not installed')} —{' '}
+              <button type='button' className='linkish' onClick={onOpenModels}>
+                {t('Manage models…')}
+              </button>
+            </span>
+          )}
+        </div>
+        {failure && <FailureNote failure={failure} onOpenModels={onOpenModels} />}
+        <CliTwin args={args} />
+      </section>
+    </div>
   );
 }

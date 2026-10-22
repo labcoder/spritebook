@@ -34,6 +34,11 @@ export function Card(
     onOpen: (dir: string) => void;
   },
 ) {
+  const meta = [
+    c.id !== c.displayName ? c.id : '',
+    c.heightM !== undefined ? `${c.heightM.toFixed(2)} m` : '',
+    c.pickedResultId ? `${t('pick')} ${c.pickedResultId}` : '',
+  ].filter(Boolean).join(' · ');
   return (
     <button
       type='button'
@@ -44,11 +49,7 @@ export function Card(
       <Thumb bridge={bridge} dir={c.dir} />
       <div className='cardbody'>
         <div className='cardname'>{c.displayName}</div>
-        <div className='cardid'>
-          {c.id}
-          {c.heightM !== undefined ? ` · ${c.heightM.toFixed(2)} m` : ''}
-          {c.pickedResultId ? ` · pick ${c.pickedResultId}` : ''}
-        </div>
+        {meta && <div className='cardid'>{meta}</div>}
         {c.problem
           ? (
             <div className='tags'>
@@ -86,6 +87,7 @@ export function Gallery({ bridge, cards, loadError, onOpen, onUseDefault }: {
 }) {
   return (
     <div className='gallery'>
+      {cards === null && !loadError && <p role='status'>{t('Loading characters…')}</p>}
       {loadError && (
         <div className='empty'>
           <p>{t('Could not read that root.')}</p>
@@ -104,7 +106,7 @@ export function Gallery({ bridge, cards, loadError, onOpen, onUseDefault }: {
         <div className='empty'>
           <p>{t('No characters under this root.')}</p>
           <p className='mono'>
-            {t('a character is any directory holding a character.json')}
+            {t('Create a character from a reference image to begin.')}
           </p>
         </div>
       )}

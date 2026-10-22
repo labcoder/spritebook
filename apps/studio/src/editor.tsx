@@ -10,78 +10,9 @@ import { LookStage } from './lookstage';
 import { BakeStage } from './bakestage';
 import { ExportStage } from './exportstage';
 import { type Stage, type StageKey, stageStates } from './stages';
+import { stageLabel, StageRail } from './stagerail';
 import { t } from './i18n';
 import { prefs } from './prefs';
-
-/* ---------------- stage rail ---------------- */
-
-/** Literal t() per key — the extractor refuses ids it cannot see statically. */
-function stageLabel(k: StageKey): string {
-  switch (k) {
-    case 'gen':
-      return t('Generate');
-    case 'rig':
-      return t('Rig');
-    case 'anim':
-      return t('Animate');
-    case 'look':
-      return t('Look');
-    case 'bake':
-      return t('Bake');
-    case 'export':
-      return t('Export');
-  }
-}
-
-function StageRail({ stages, active, onSelect, busy, onCancel }: {
-  stages: Stage[];
-  active: StageKey;
-  onSelect: (k: StageKey) => void;
-  busy: boolean;
-  onCancel: () => void;
-}) {
-  return (
-    <nav className='rail' aria-label={t('Pipeline stages')}>
-      {stages.map((s) => (
-        // aria-disabled, not disabled: a hard-disabled stage is skipped by
-        // Tab, so keyboard users could never reach the one place its lock
-        // REASON lives. Locked stages stay focusable, announce the reason,
-        // and simply do not switch (walkthrough finding).
-        <button
-          key={s.key}
-          type='button'
-          className={`stage st-${s.state} ${s.key === active ? 'on' : ''}`}
-          aria-current={s.key === active ? 'step' : undefined}
-          aria-disabled={s.state === 'locked'}
-          title={s.note}
-          onClick={() => {
-            if (s.state !== 'locked') onSelect(s.key);
-          }}
-        >
-          <span className='n mono'>{s.n}</span>
-          <span className='nm hud'>{stageLabel(s.key)}</span>
-          <i className={`dot ${s.state}`} aria-hidden='true' />
-          {s.state === 'locked' && <span className='sr-only'>{t('locked')} — {s.note}</span>}
-        </button>
-      ))}
-      {busy && (
-        <button
-          type='button'
-          className='btn'
-          onClick={onCancel}
-          title='CLI: Ctrl+C'
-        >
-          {t('Cancel job')} <kbd>Ctrl+C</kbd>
-        </button>
-      )}
-      <div className='railnote'>
-        {stages.some((s) => s.state === 'locked')
-          ? t('stages unlock when a canonical mesh is saved')
-          : ''}
-      </div>
-    </nav>
-  );
-}
 
 /* ---------------- inspector (read-only projections) ---------------- */
 
@@ -303,15 +234,22 @@ export function Editor(
     </div>
   );
   const inspectorToggle = (
-    <button
-      type='button'
-      className='btn inspector-toggle'
-      aria-expanded={inspectorOpen}
-      aria-controls='character-inspector'
-      onClick={() => setInspectorOpen((open) => !open)}
-    >
-      {t('Inspector')}
-    </button>
+    <div className='editor-tools'>
+      {busy && (
+        <button type='button' className='btn' onClick={cancel} title='CLI: Ctrl+C'>
+          {t('Cancel job')}
+        </button>
+      )}
+      <button
+        type='button'
+        className='btn inspector-toggle'
+        aria-expanded={inspectorOpen}
+        aria-controls='character-inspector'
+        onClick={() => setInspectorOpen((open) => !open)}
+      >
+        {t('Inspector')}
+      </button>
+    </div>
   );
 
   return (
@@ -320,11 +258,13 @@ export function Editor(
         stages={stages}
         active={effective}
         onSelect={setActive}
-        busy={busy}
-        onCancel={cancel}
       />
-      <div className='editorbody'>
-        <div className='center genstage'>
+      <div
+        className={`editorbody ${
+          effective === 'gen' || effective === 'rig' ? 'workbench-body' : ''
+        }`}
+      >
+        <div className={`center genstage stage-${effective}`}>
           {effective !== 'look' && (
             <header className='editorhead'>{heading}{inspectorToggle}</header>
           )}

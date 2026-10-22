@@ -52,13 +52,13 @@ colors:
 typography:
   display:
     fontFamily: "'Barlow Condensed', sans-serif"
-    fontSize: "44px"
+    fontSize: "28px"
     fontWeight: 500
     lineHeight: 1
     letterSpacing: "-0.025em"
   headline:
     fontFamily: "'Barlow Condensed', sans-serif"
-    fontSize: "36px"
+    fontSize: "28px"
     fontWeight: 500
     lineHeight: 1
     letterSpacing: "-0.025em"
@@ -111,7 +111,7 @@ components:
   stage-current-dark:
     backgroundColor: "{colors.dark-current}"
     textColor: "{colors.dark-on-current}"
-    padding: "12px 10px"
+    padding: "10px 8px"
   chip-dark:
     backgroundColor: "{colors.dark-panel}"
     textColor: "{colors.dark-dim}"
@@ -146,7 +146,7 @@ components:
   stage-current-light:
     backgroundColor: "{colors.light-current}"
     textColor: "{colors.light-on-current}"
-    padding: "12px 10px"
+    padding: "10px 8px"
   chip-light:
     backgroundColor: "{colors.light-panel}"
     textColor: "{colors.light-dim}"
@@ -233,21 +233,39 @@ computed type scale.
 
 ## Layout
 
-The desktop shell has a minimum-height title bar (56px), a character index (184px), a flexible stage
-region and a wrapping status bar. Six stages run horizontally above the stage heading. Inspector
-starts closed; on wide windows its existing resize range is 240–480px, with a 300px default. Spacing
-uses small measured gaps and insets rather than a strict modular grid; desktop stage content has
-28px side insets.
+The 48px title bar uses a 28px wordmark. The gallery occupies the window without repeating its cards
+in a character index; the 168px index appears only when editing. Stage headings are 28px. The
+six-stage rail is flush with the editing region and divides its full width evenly. New character
+shows that same rail with the later stages locked. Primary navigation retains keyboard focus when
+changing surfaces.
 
-Look places the reference and saved output in a two-column comparison (0.8fr / 1.2fr), then the
-compact recipe. Its wells are 380px high; each saved-cell viewport is 280px high and scrolls
-independently. Gallery cards retain their fixed width and reflow without stretching.
+Generate and Rig use a large canvas/reference region on the left and a 360px property panel on the
+right. Each region scrolls independently. Creation and additional generation keep their action/CLI
+footer visible while settings scroll. Native radio choices show an explicit selection marker;
+installation state and VRAM stay beside names, while selected license details are disclosed.
+Character, backend and generation controls form separate sections. Common generation controls stay
+visible, advanced schema fields and comparison stay under Advanced options. All options still map to
+the catalog and the existing CLI arguments.
 
-At the 1560px maximum-width breakpoint, Rig's report and inspection viewport stack. At 1100px,
-comparison directions stack inside their well, recipe fields use three columns, and the disclosed
-inspector stacks below the stage. At 760px, the browser preview stacks the index and comparison,
-wraps the stages, uses two recipe columns and reduces side insets. These browser-preview adaptations
-do not add mobile platform support: the Tauri window minimum remains 960×600.
+Candidates occupy a shelf beneath their inspection canvas. Inspect and canonical promotion remain
+visible; recipe variants and per-candidate CLI commands live under More actions. Optional texture
+changes stay under Canonical mesh options. Rig places its actual deform report beneath the mesh;
+orientation, re-run/repair and explicit acceptance occupy the property panel. File-based repairs are
+disclosed. Canvas wells stay dark and source/output pixels are unchanged.
+
+Running jobs show the reported stage and elapsed time. Their units have different costs, so the
+activity indicator is indeterminate and supplies no invented job percentage or ETA. Stage details
+retain raw counts. Cancellation has its own message and receives keyboard focus; failures keep their
+reason. A disabled settings group remains scrollable by keyboard.
+
+Inspector starts closed; on wide windows its existing resize range is 240–480px, with a 300px
+default. Below 1100px it stacks beneath the stage. Below 760px the workbench panels stack, and the
+rail uses two rows. These browser-preview adaptations do not add mobile platform support: the Tauri
+window minimum remains 960×600.
+
+Look retains its reference/saved-output comparison and recipe layout. Gallery cards retain their
+fixed width and reflow without stretching sprite pixels. The typography, semantic palette and
+workspace hatch/dither are preserved.
 
 ## Elevation & Depth
 
