@@ -4,6 +4,28 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { assert, assertEquals } from '@std/assert';
 import { runCli } from './dist/mod.js';
+import { rigRunArgs } from '../../apps/studio/src/rig.ts';
+
+test('Studio orientation switches reach catalog validation without requiring values', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-rig-flags-'));
+  try {
+    for (const fix of ['face-front', 'feet-ground', 'center']) {
+      const lines: string[] = [];
+      const code = await runCli([
+        ...rigRunArgs(join(root, 'hero'), { fixes: [fix] }),
+        '--catalog',
+        join(root, 'missing-catalog.json'),
+        '--json',
+      ], { stdout: (line) => lines.push(line), stderr: (line) => lines.push(line) });
+      assertEquals(code, 1);
+      const error = lines.map((line) => JSON.parse(line)).find((event) => event.t === 'error');
+      assert(error, 'the missing catalog must stop the run before any inference');
+      assert(error.message.includes('missing-catalog.json'), `${fix}: ${error.message}`);
+    }
+  } finally {
+    await fs.rm(root, { recursive: true });
+  }
+});
 
 test('missing and repeated flag values refuse before touching workspaces', async () => {
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
