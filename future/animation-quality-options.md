@@ -14,6 +14,11 @@ passed the whole-character quality gate. Blender automatic weights fail both gen
 the current pack and binder while resolving surface ownership and garment preparation; do not make a
 larger optional install the default merely because inference completes.
 
+The subsequent approved [guided repair trials](guided-motion-repair.md) cover explicit ownership,
+conservative separation/capping, prepared cloth through full walk/jump clips, correction exchange
+and optional existing-tool checks. No actual-character repair passes. Movement review and resource
+checks land independently; full deformation integration and Blender deployment remain unselected.
+
 ## Recommendation
 
 Keep the current animation pack and TypeScript retarget/render core. Under the maintainer's

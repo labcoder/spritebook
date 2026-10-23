@@ -547,6 +547,16 @@ Keep optional ML/Blender engines outside the base app; Blender deployment is sti
 registry's former automatic macOS/Metal assumption is corrected locally, without claiming new native
 platform runs. No new binder, cloth provider or release is selected by these experiments.
 
+**F5-T2/F6-T1 follow-through, 2026-10-23:** the approved guided binding, prepared garment,
+correction-exchange and optional-tool trials are recorded in
+[guided motion repair](guided-motion-repair.md). Known-region fill passes public controls, but
+actual Amy ownership/mesh candidates fail or refuse. Both prepared Bulma cloth paths fail detailed
+attachment/contact/shape review; clean controls also expose unresolved jump/loop behavior. No repair
+provider is promoted. Rig now offers catalog motion previews before acceptance, using the existing
+core CLI without enabling clips or changing source bytes. F3-T2 adds destination pinned-file space
+checks and honest host memory/disk/NVIDIA inventory. The deformation cache, final Blender decision
+and native/weaker-device qualification remain conditional/open; F5-T2/F6-T1 are not closed.
+
 F6-T4 qualifies complete production workflows on the same inputs and hardware: a textured prop
 through eight directions; an asymmetric humanoid through idle/walk/action; a roster look change with
 failure/restart; and engine playback with pivots, timing and aligned passes. Report setup, download,

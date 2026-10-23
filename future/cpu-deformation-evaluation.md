@@ -10,6 +10,10 @@ observed failures automatically. Keep Blender optional and undecided. The
 [TokenRig evaluation](tokenrig-evaluation.md) and [cloth evaluation](cloth-evaluation.md) cover the
 parallel comparisons; [the proposal](animation-quality-options.md) records deployment choices.
 
+The [guided follow-through](guided-motion-repair.md) now tests explicit-region harmonic fill,
+conservative mesh separation and public controls. Clean/control results improve, but the actual Amy
+selection still fails or refuses. No new automatic binder is integrated.
+
 ## Controls and boundaries
 
 - Full generated meshes: aligned Amy, 595,107 vertices / 28 joints; Bulma, 628,916 / 52.

@@ -197,6 +197,11 @@ Blender components are GPL; using the already-installed isolated runtime for res
 change the repository's permissive bundle policy or settle a deployment decision.
 [Blender component license](https://raw.githubusercontent.com/blender/blender/blender-v4.2-release/source/blender/modifiers/intern/MOD_surfacedeform.cc)
 
+The subsequent [prepared-garment trials](guided-motion-repair.md) extend this comparison to a clean
+authored control, improved exterior carrier and full walk/jump samples. They retain all detailed
+garment triangles and add actual-body/self-crossing/loop checks. Neither actual-character candidate
+passes; this report's negative verdict is unchanged.
+
 ## Private replay and artifacts
 
 Replay root: `.render-bench/quality-research-2026-10-23/cloth/`. Scripts only write there. The
