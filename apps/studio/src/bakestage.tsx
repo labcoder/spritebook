@@ -7,7 +7,7 @@ import { Inspector } from './workbench';
  * one set of frame rects addresses them all), and QA flags that jump to the
  * stage that owns them.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StudioBridge } from './bridge';
 import {
   type BakeSummary,
@@ -28,7 +28,7 @@ const PASSES = ['lit', 'albedo', 'normal', 'depth', 'mask'] as const;
 /* ---------------- the sprite player ---------------- */
 
 export function Player(
-  { summary, atlasPng, pass, dir, clip, playing, fps, zoom, frame, focusPivot }: {
+  { summary, atlasPng, pass, dir, clip, playing, fps, zoom, frame, focusPivot, readPage }: {
     summary: BakeSummary;
     atlasPng: string;
     pass: string;
@@ -40,26 +40,47 @@ export function Player(
     /** Look's comparison shares one clock across its directions. */
     frame?: number;
     focusPivot?: boolean;
+    readPage?: (pageIndex: number) => Promise<string | null>;
   },
 ) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [at, setAt] = useState(0);
-  const frames = playFrames(summary, clip, dir);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const images = useRef(new Map<number, HTMLImageElement>());
+  const frames = useMemo(() => playFrames(summary, clip, dir), [summary, clip, dir]);
   const current = Math.min(frame ?? at, frames.length - 1);
 
+  const pageIndex = frames[current]?.atlas.pageIndex ?? 0;
+  useEffect(() => {
+    images.current.clear();
+  }, [atlasPng, readPage]);
   useEffect(() => {
     let live = true;
+    setPageError(null);
+    const cached = images.current.get(pageIndex);
+    if (cached) {
+      setImg(cached);
+      return;
+    }
     setImg(null);
-    const next = new Image();
-    next.onload = () => {
-      if (live) setImg(next);
-    };
-    next.src = `data:image/png;base64,${atlasPng}`;
+    (async () => {
+      const png = pageIndex === 0 ? atlasPng : await readPage?.(pageIndex);
+      if (!png) throw new Error(t('Atlas page unavailable. Try baking again.'));
+      const next = new Image();
+      next.src = `data:image/png;base64,${png}`;
+      await next.decode();
+      if (!live) return;
+      images.current.set(pageIndex, next);
+      if (images.current.size > 4) images.current.delete(images.current.keys().next().value!);
+      setImg(next);
+    })().catch((e) => {
+      if (live) setPageError(String(e));
+    });
     return () => {
       live = false;
     };
-  }, [atlasPng]);
+  }, [atlasPng, readPage, pageIndex]);
 
   useEffect(() => {
     if (!playing || frames.length === 0) return;
@@ -73,11 +94,7 @@ export function Player(
     const canvas = ref.current;
     const f = frames[current];
     if (!canvas) return;
-    if (!img || !f) {
-      canvas.width = 0;
-      canvas.height = 0;
-      return;
-    }
+    if (!img || !f) return;
     canvas.width = f.atlas.w * zoom;
     canvas.height = f.atlas.h * zoom;
     const ctx = canvas.getContext('2d');
@@ -126,7 +143,9 @@ export function Player(
         />
       </div>
       <div className='playermeta mono'>
-        {t('frame')} {current + 1}/{frames.length} · {pass}
+        {pageError ?? (!img
+          ? t('Loading atlas page…')
+          : `${t('frame')} ${current + 1}/${frames.length} · ${pass}`)}
       </div>
     </div>
   );
@@ -181,6 +200,11 @@ export function BakeStage({ bridge, dir, manifest, onChanged, onGoToStage }: {
   useEffect(() => {
     loadBake(pass);
   }, [loadBake, pass, m.lastBakeId]);
+
+  const readPage = useCallback(
+    async (pageIndex: number) => (await bridge.readBakeAtlas(dir, pass, pageIndex))?.png ?? null,
+    [bridge, dir, pass, m.lastBakeId],
+  );
 
   const args = bakeArgs(dir);
 
@@ -298,6 +322,7 @@ export function BakeStage({ bridge, dir, manifest, onChanged, onGoToStage }: {
                   <Player
                     summary={summary}
                     atlasPng={atlasPng}
+                    readPage={readPage}
                     pass={pass}
                     dir={direction}
                     clip={clip}

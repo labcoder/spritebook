@@ -69,9 +69,22 @@ export function bakeArgs(workspace: string, opts: { onlyInvalidated?: boolean } 
   return a;
 }
 
-export function exportArgs(workspace: string, outDir: string, targets: string[]): string[] {
+export function exportArgs(
+  workspace: string,
+  outDir: string,
+  targets: string[],
+  mesh = false,
+): string[] {
   // Core selects the accepted lastBakeId, including after undo.
-  return ['export', '--workspace', workspace, '--out', outDir, '--targets', targets.join(',')];
+  return [
+    'export',
+    '--workspace',
+    workspace,
+    '--out',
+    outDir,
+    ...(targets.length ? ['--targets', targets.join(',')] : []),
+    ...(mesh ? ['--mesh'] : []),
+  ];
 }
 
 /** A NEW texture on an existing result's mesh - a new result card appears.

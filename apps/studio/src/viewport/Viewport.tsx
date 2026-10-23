@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StudioBridge } from '../bridge';
-import { MeshViewport, type NudgeEvent, type ViewMode } from './meshviewport';
+import { type CaptureCamera, MeshViewport, type NudgeEvent, type ViewMode } from './meshviewport';
 import { t } from '../i18n';
 import { scrollIntoViewPolitely } from '../focus';
 
@@ -23,6 +23,9 @@ export function Viewport(
     onNudge,
     onJointSelected,
     height,
+    captureCamera,
+    onCaptureChange,
+    sampleTime,
   }: {
     bridge: StudioBridge;
     /** canonical glTF in the workspace — never a raw upload */
@@ -43,6 +46,11 @@ export function Viewport(
     onNudge?: (e: NudgeEvent) => void;
     onJointSelected?: (joint: string | null) => void;
     height?: number;
+    captureCamera?: CaptureCamera;
+    onCaptureChange?: (
+      patch: { yawOffsetDeg: number; elevationDeg: number; pixelsPerMeter: number },
+    ) => void;
+    sampleTime?: number;
   },
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -54,6 +62,7 @@ export function Viewport(
   const [vpReady, setVpReady] = useState(false);
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // transport state mirrors the class (D-038: playback, never synthesis)
   const [animDuration, setAnimDuration] = useState(0);
@@ -64,6 +73,23 @@ export function Viewport(
   nudgeRef.current = onNudge;
   const selRef = useRef(onJointSelected);
   selRef.current = onJointSelected;
+  const captureRef = useRef(onCaptureChange);
+  captureRef.current = onCaptureChange;
+  useEffect(() => {
+    if (!captureCamera || state !== 'ready') return;
+    try {
+      vpRef.current?.setCaptureCamera(captureCamera);
+      vpRef.current?.renderOnce();
+      setCaptureError(null);
+    } catch (e) {
+      setCaptureError(e instanceof Error ? e.message : String(e));
+    }
+  }, [captureCamera, state]);
+  useEffect(() => {
+    if (sampleTime === undefined || state !== 'ready') return;
+    vpRef.current?.setAnimationPlaying(false);
+    vpRef.current?.seekAnimation(sampleTime);
+  }, [sampleTime, state]);
 
   useEffect(() => {
     vpRef.current?.setJointEditing(onNudge !== undefined);
@@ -88,6 +114,7 @@ export function Viewport(
       vpRef.current = v;
       setVpReady(true);
       v.on('jointNudged', (e) => nudgeRef.current?.(e));
+      v.on('captureChanged', (patch) => captureRef.current?.(patch));
       v.on('jointSelected', (j) => {
         setSelected(j);
         selRef.current?.(j);
@@ -211,6 +238,7 @@ export function Viewport(
 
   return (
     <div className='vpwrap'>
+      {captureError && <p className='mdl-error' role='alert'>{captureError}</p>}
       <div className='vpbar'>
         <span className='m-seg' role='group' aria-label={t('Display mode')}>
           {MODES.map((m) => (
@@ -225,28 +253,40 @@ export function Viewport(
             </button>
           ))}
         </span>
-        <button
-          type='button'
-          className='btn mbtn'
-          onClick={() => vpRef.current?.frame()}
-        >
-          {t('Frame')}
-        </button>
-        <span className='m-seg' role='group' aria-label={t('Camera view')}>
-          <button
-            type='button'
-            className='btn mbtn'
-            onClick={() => vpRef.current?.setView('front')}
-          >
-            {t('Front')}
-          </button>
-          <button type='button' className='btn mbtn' onClick={() => vpRef.current?.setView('side')}>
-            {t('Side')}
-          </button>
-          <button type='button' className='btn mbtn' onClick={() => vpRef.current?.setView('back')}>
-            {t('Rear')}
-          </button>
-        </span>
+        {!captureCamera && (
+          <>
+            <button
+              type='button'
+              className='btn mbtn'
+              onClick={() => vpRef.current?.frame()}
+            >
+              {t('Frame')}
+            </button>
+            <span className='m-seg' role='group' aria-label={t('Camera view')}>
+              <button
+                type='button'
+                className='btn mbtn'
+                onClick={() => vpRef.current?.setView('front')}
+              >
+                {t('Front')}
+              </button>
+              <button
+                type='button'
+                className='btn mbtn'
+                onClick={() => vpRef.current?.setView('side')}
+              >
+                {t('Side')}
+              </button>
+              <button
+                type='button'
+                className='btn mbtn'
+                onClick={() => vpRef.current?.setView('back')}
+              >
+                {t('Rear')}
+              </button>
+            </span>
+          </>
+        )}
         {showSkeleton && (
           <>
             <label className='check-field'>
@@ -280,8 +320,26 @@ export function Viewport(
         style={height ? { height } : undefined}
         role='application'
         aria-label={t('Mesh inspection viewport')}
-      />
-      {state === 'ready' && animDuration > 0 && (
+      >
+        {captureCamera && (
+          <svg
+            className='capture-guide'
+            viewBox={`0 0 ${captureCamera.cellPx.w} ${captureCamera.cellPx.h}`}
+            aria-hidden='true'
+          >
+            <rect
+              x='1'
+              y='1'
+              width={captureCamera.cellPx.w - 2}
+              height={captureCamera.cellPx.h - 2}
+              fill='none'
+              stroke='currentColor'
+              vectorEffect='non-scaling-stroke'
+            />
+          </svg>
+        )}
+      </div>
+      {state === 'ready' && animDuration > 0 && sampleTime === undefined && (
         <div className='vptransport'>
           <button
             type='button'

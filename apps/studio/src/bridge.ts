@@ -59,7 +59,9 @@ export interface StudioBridge {
   readBakeAtlas(
     dir: string,
     pass?: string,
+    pageIndex?: number,
   ): Promise<{ manifest: unknown; png: string } | null>;
+  readLookPreview(dir: string, key: string): Promise<unknown | null>;
   /** Reveal a produced folder in the OS file manager. */
   openFolder(path: string): Promise<void>;
   /** Canonical glTF bytes (base64) for the inspection viewport. */
@@ -170,13 +172,17 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
     async readRigReport(dir) {
       return await t.core.invoke('read_rig_report', { dir });
     },
-    async readBakeAtlas(dir, pass) {
+    async readBakeAtlas(dir, pass, pageIndex) {
       return (await t.core.invoke('read_bake_atlas', {
         dir,
         pass: pass ?? 'lit',
+        pageIndex: pageIndex ?? 0,
       })) as
         | { manifest: unknown; png: string }
         | null;
+    },
+    async readLookPreview(dir, key) {
+      return await t.core.invoke('read_look_preview', { dir, key });
     },
     async openFolder(path) {
       await t.core.invoke('open_folder', { path });
@@ -578,6 +584,9 @@ function browserBridge(): StudioBridge {
           },
         ],
       });
+    },
+    readLookPreview() {
+      return Promise.resolve(null);
     },
     readBakeAtlas(_dir, _pass) {
       // a SYNTHETIC 2-direction x 3-frame atlas (16px cells) so the strips

@@ -50,3 +50,9 @@ test('unchanged and hidden viewport sizes do not clear the drawing buffer', () =
   assertEquals(calls, [[800, 400, 1], [400, 400, 2]]);
   assertEquals(camera.aspect, 1);
 });
+
+test('orthographic resize preserves vertical world scale and adjusts horizontal span', () => {
+  const camera = new THREE.OrthographicCamera(-1, 1, 2, -2, .01, 10);
+  applyViewportSize({ setDrawingBufferSize() {} }, camera, { width: 800, height: 400, ratio: 1 });
+  assertEquals([camera.left, camera.right, camera.top, camera.bottom], [-4, 4, 2, -2]);
+});

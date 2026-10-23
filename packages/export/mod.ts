@@ -13,6 +13,8 @@ import { exportGodot } from './godot.ts';
 import { exportStrips } from './strips.ts';
 import { exportAseprite } from './aseprite.ts';
 import { exportTexturePacker } from './texturepacker.ts';
+import { exportModel } from './model.ts';
+export { exportModel } from './model.ts';
 
 export { exportAseprite } from './aseprite.ts';
 export { exportGodot } from './godot.ts';
@@ -30,7 +32,9 @@ export const EXPORTERS: Record<ExportTargetId, Exporter> = {
 export interface ExportJobSpec {
   jobId: string;
   /** a bake dir produced by runBakeJob (manifest.json + atlas pages) */
-  bakeDir: string;
+  bakeDir?: string;
+  /** Independent of sprite exporters: canonical GLB and embedded textures. */
+  modelPath?: string;
   outDir: string;
   targets: ExportTargetId[];
   fps?: number;
@@ -45,27 +49,37 @@ export async function* runExportJob(spec: ExportJobSpec): AsyncIterable<JobEvent
   yield { t: 'started', jobId, at: at() };
 
   try {
-    if (spec.targets.length === 0) throw new Error('no export targets given');
+    if (spec.targets.length === 0 && !spec.modelPath) throw new Error('no export targets given');
     if (spec.fps !== undefined && (!Number.isFinite(spec.fps) || spec.fps <= 0)) {
       // validated ONCE at the seam so every target behaves identically —
       // texturepacker ignores fps by design and would otherwise accept -5
       throw new Error(`fps must be positive and finite, got ${spec.fps}`);
     }
-    const manifest: BakeManifest = parseWith(
-      BakeManifestSchema,
-      JSON.parse(await fs.readFile(`${spec.bakeDir}/manifest.json`, 'utf8')),
-      'BakeManifest',
-    );
+    if (spec.targets.length && !spec.bakeDir) {
+      throw new Error('Sprite exports need a bake directory');
+    }
+    const manifest: BakeManifest | undefined = spec.targets.length
+      ? parseWith(
+        BakeManifestSchema,
+        JSON.parse(await fs.readFile(`${spec.bakeDir}/manifest.json`, 'utf8')),
+        'BakeManifest',
+      )
+      : undefined;
     const targets = [...new Set(spec.targets)];
     const opts = { fps: spec.fps ?? DEFAULT_FPS };
 
     let done = 0;
     for (const target of targets) {
       const targetDir = `${spec.outDir}/${target}`;
-      await EXPORTERS[target](manifest, spec.bakeDir, targetDir, opts);
+      await EXPORTERS[target](manifest!, spec.bakeDir!, targetDir, opts);
       done++;
       yield { t: 'progress', jobId, at: at(), step: target, done, total: targets.length };
       yield { t: 'artifact', jobId, at: at(), kind: `export-${target}`, path: targetDir };
+    }
+    if (spec.modelPath) {
+      const targetDir = `${spec.outDir}/model`;
+      await exportModel(spec.modelPath, targetDir);
+      yield { t: 'artifact', jobId, at: at(), kind: 'export-model', path: targetDir };
     }
     yield { t: 'done', jobId, at: at(), wallTimeS: (performance.now() - t0) / 1000 };
   } catch (err) {

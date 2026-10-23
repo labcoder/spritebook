@@ -384,3 +384,15 @@ width persists at drag end. Asset loads depend on path/content revision, not bri
 identity, and superseded loads cannot replace the current model. Unmount cancels input and drawing
 immediately; expensive resource release follows off the navigation commit. Frame cadence, resize
 paint continuity and Gallery latency require measured hardware evidence.
+
+### Capture composition (2026-10-22)
+
+Look is a spatial workbench and a fresh core-rendered frame, with camera, lighting, finish, output
+cell and sample controls in the shared right inspector. Side-scroller and isometric setups adjust
+angles and direction counts without replacing the character. Original is the existing Clean preset,
+shown as full color. The 3D canvas remains an aiming instrument; only the flat core PNG represents
+lighting and finish. Changed settings keep the prior PNG with a stale label until Render frame.
+Saving the look is journaled separately from baking the whole animation set. Output cells range
+through4096px; large renders retain their native pixels and offer a fitted inspection view. Atlas
+playback loads the page referenced by each frame and never crops another page's bytes. Export can
+deliver the saved canonical GLB and separate texture files, including before a first bake.

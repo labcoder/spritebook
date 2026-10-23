@@ -607,8 +607,18 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
     'no-mirror',
     'light-frame',
   ],
-  export: ['bake', 'workspace', 'out', 'targets', 'fps'],
-  workspace: ['root', 'workspace', 'roster', 'bake', 'thumb', 'atlas', 'pass'],
+  export: ['bake', 'workspace', 'out', 'targets', 'fps', 'mesh'],
+  workspace: [
+    'root',
+    'workspace',
+    'roster',
+    'bake',
+    'thumb',
+    'atlas',
+    'pass',
+    'page',
+    'look-preview',
+  ],
   undo: ['manifest'],
   redo: ['manifest'],
   anim: [
@@ -732,6 +742,7 @@ VERB_FLAGS.look = [...VERB_FLAGS.look, 'preview', 'clip', 'frame', 'direction', 
 const GLOBAL_FLAGS = ['json', 'log-append'] as const;
 
 const BOOLEAN_FLAGS: Record<string, readonly string[]> = {
+  export: ['mesh'],
   bake: ['all', 'plan', 'only-invalidated', 'mirror', 'no-mirror'],
   anim: ['list'],
   look: ['list', 'preview'],
@@ -1305,20 +1316,23 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
 
   if (verb === 'workspace') {
     try {
-      const { listWorkspaces, readCurrentBake, readBakeArtifact, scanRoster } = await import(
-        '@spritebook/core'
-      );
+      const { listWorkspaces, readCurrentBake, readBakeArtifact, readLookPreview, scanRoster } =
+        await import(
+          '@spritebook/core'
+        );
       const root = flag(args, 'root'), workspace = flag(args, 'workspace');
-      const modes = ['roster', 'bake', 'thumb', 'atlas'].filter((k) => args.includes(`--${k}`));
+      const modes = ['roster', 'bake', 'thumb', 'atlas', 'look-preview'].filter((k) =>
+        args.includes(`--${k}`)
+      );
       if (
         !!root === !!workspace || modes.length > 1 ||
         (root && modes.some((k) => k !== 'roster')) || (workspace && modes.includes('roster')) ||
-        (flag(args, 'pass') && !modes.includes('atlas'))
+        ((flag(args, 'pass') || flag(args, 'page')) && !modes.includes('atlas'))
       ) {
         return fail(
           'workspace' as JobEvent['jobId'],
           'bad-args',
-          'Choose --root <dir> [--roster] or --workspace <dir> [--bake | --thumb | --atlas [--pass <pass>]]',
+          'Choose --root <dir> [--roster] or --workspace <dir> [--bake | --thumb | --atlas [--pass <pass> --page <index>] | --look-preview <key>]',
         );
       }
       const result = root
@@ -1330,7 +1344,10 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
           workspace!,
           modes.includes('thumb') ? 'thumb' : 'atlas',
           flag(args, 'pass'),
+          numFlag(args, 'page', 0),
         )
+        : modes.includes('look-preview')
+        ? await readLookPreview(workspace!, flag(args, 'look-preview')!)
         : await readWorkspace(workspace!);
       io.stdout(canonicalJson(result).trimEnd());
       return 0;
@@ -2739,16 +2756,17 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     }
     const out = flag(args, 'out');
     const targetsRaw = flag(args, 'targets');
-    if ((!bakeDir && !workspace) || !out || !targetsRaw) {
+    const mesh = args.includes('--mesh');
+    if ((!bakeDir && !workspace) || !out || (!targetsRaw && !mesh) || (mesh && !workspace)) {
       return fail(
         'export' as JobEvent['jobId'],
         'missing-arg',
-        '--bake <bakeDir> or --workspace <dir>, plus --out <dir> and --targets <a,b,...>, are required',
+        'Use --workspace <dir> or --bake <dir>, --out <dir>, and --targets <a,b,...>. Add --mesh with --workspace to export the model and textures; targets may be omitted for model-only export.',
       );
     }
     let targets: ExportTargetId[];
     try {
-      targets = targetsRaw.split(',').map((t) =>
+      targets = (targetsRaw ? targetsRaw.split(',') : []).map((t) =>
         parseWith(ExportTargetIdSchema, t.trim(), `target "${t.trim()}"`)
       );
     } catch (err) {
@@ -2761,7 +2779,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     // the same arg-error-to-event discipline as the bake branch (M4): a bad
     // --fps must become an NDJSON error event, never a raw throw out of runCli
     try {
-      if (workspace) {
+      if (workspace && targets.length) {
         const { readCurrentBake } = await import('@spritebook/core');
         const selected = await readCurrentBake(workspace);
         if (!selected) {
@@ -2773,10 +2791,18 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         }
         bakeDir = selected.dir;
       }
+      if (mesh && !(await readWorkspace(workspace!)).canonicalMesh) {
+        return fail(
+          'export' as JobEvent['jobId'],
+          'no-mesh',
+          'Save a canonical mesh before exporting the model',
+        );
+      }
       return await pump(
         runExportJob({
           jobId: 'export',
           bakeDir: bakeDir!,
+          modelPath: mesh ? workspacePaths(workspace!).canonicalModel : undefined,
           outDir: out,
           targets,
           fps: numFlag(args, 'fps', 8),

@@ -69,12 +69,20 @@ export async function readCurrentBake(workspace: string) {
 }
 
 /** Read the selected artifact under the same recovery lock as its selection. */
-export async function readBakeArtifact(workspace: string, kind: 'thumb' | 'atlas', pass = 'lit') {
+export async function readBakeArtifact(
+  workspace: string,
+  kind: 'thumb' | 'atlas',
+  pass = 'lit',
+  pageIndex = 0,
+) {
+  if (!Number.isSafeInteger(pageIndex) || pageIndex < 0) {
+    throw new Error('Invalid atlas page index');
+  }
   return await withManifestLock(workspacePaths(workspace).manifest, async () => {
     const bake = await readCurrentBake(workspace);
     if (!bake) return null;
     if (kind === 'atlas') {
-      const atlas = bake.manifest.atlases.find((a) => a.pass === pass);
+      const atlas = bake.manifest.atlases.find((a) => a.pass === pass && a.pageIndex === pageIndex);
       if (!atlas) return null;
       const bytes = new Uint8Array(await fs.readFile(artifactPath(bake.dir, atlas.png)));
       return { manifest: bake.manifest, png: Buffer.from(bytes).toString('base64') };
@@ -92,4 +100,15 @@ export async function readBakeArtifact(workspace: string, kind: 'thumb' | 'atlas
     }
     return null;
   });
+}
+
+/** A preview key addresses one core-written artifact, never an arbitrary file. */
+export async function readLookPreview(workspace: string, key: string) {
+  if (!/^[a-f0-9]{20}$/.test(key)) throw new Error('Invalid look preview key');
+  try {
+    return JSON.parse(await fs.readFile(resolve(workspace, 'look', key, 'preview.json'), 'utf8'));
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw e;
+  }
 }

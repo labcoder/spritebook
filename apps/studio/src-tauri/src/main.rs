@@ -248,6 +248,7 @@ async fn read_bake_atlas(
     app: tauri::AppHandle,
     dir: String,
     pass: Option<String>,
+    page_index: Option<u32>,
 ) -> Result<Option<serde_json::Value>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let value = core_query(
@@ -258,6 +259,30 @@ async fn read_bake_atlas(
                 "--atlas",
                 "--pass",
                 pass.as_deref().unwrap_or("lit"),
+                "--page",
+                &page_index.unwrap_or(0).to_string(),
+            ],
+        )?;
+        Ok(if value.is_null() { None } else { Some(value) })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn read_look_preview(
+    app: tauri::AppHandle,
+    dir: String,
+    key: String,
+) -> Result<Option<serde_json::Value>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let value = core_query(
+            &app,
+            &[
+                "--workspace",
+                &display_path(Path::new(&dir)),
+                "--look-preview",
+                &key,
             ],
         )?;
         Ok(if value.is_null() { None } else { Some(value) })
@@ -398,6 +423,7 @@ fn main() {
             read_image,
             read_rig_report,
             read_bake_atlas,
+            read_look_preview,
             open_folder,
             read_mesh,
             write_rig_edits

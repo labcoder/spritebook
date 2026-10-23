@@ -2,27 +2,10 @@ import { test } from 'node:test';
 /**
  * The Look stage's pure parts, pinned: resolution (preset under overrides)
  * matches what core's resolveCamera/resolveStyle would produce, the arg
- * builder emits only DIVERGENCE, and the staleness statement is all-or-none
- * because every frame key embeds the whole recipe.
+ * builder carries capture settings through the real CLI contract.
  */
 import { assertEquals } from '@std/assert';
-import {
-  comparisonDirections,
-  DIRECTION_CHOICES,
-  ELEVATION_DETENTS,
-  lookArgs,
-  type LookDraft,
-  resolvedCamera,
-  resolvedStyle,
-  staleFrames,
-} from './src/look.ts';
-
-test('comparison uses available angles, including sparse and empty bakes', () => {
-  assertEquals(comparisonDirections([]), []);
-  assertEquals(comparisonDirections([0, 4]), [0, 4]);
-  assertEquals(comparisonDirections([0, 1, 2, 3, 4, 5, 6, 7]), [0, 2, 4]);
-  assertEquals(comparisonDirections([1, 3, 5, 7]), [1, 3, 5]);
-});
+import { lookArgs, type LookDraft, resolvedCamera, resolvedStyle } from './src/look.ts';
 
 const CAMERAS = [
   {
@@ -48,11 +31,6 @@ const STYLES = [
   { id: 'pixel', mode: 'pixel', maxColors: 16, outlineWidthPx: 0.5 },
   { id: 'clean', mode: 'painterly' },
 ];
-
-test('the detents are the ones core’s schema documents', () => {
-  assertEquals(ELEVATION_DETENTS.map((d) => d.deg), [15, 26.565, 30, 35.264]);
-  assertEquals([...DIRECTION_CHOICES], [2, 4, 8, 16]);
-});
 
 test('resolution is preset defaults UNDER recorded overrides', () => {
   const plain = resolvedCamera(
@@ -119,21 +97,54 @@ test('the twin carries ONLY divergence from the presets', () => {
   );
 });
 
-test('staleness is all-or-none, and zero when nothing is baked', () => {
-  const rec: LookDraft = {
+test('capture settings preserve projection, turn, resolution and lighting through the CLI', () => {
+  const cam = resolvedCamera(CAMERAS, {
     cameraPresetId: 'standard-30',
-    stylePresetId: 'pixel',
+    stylePresetId: 'clean',
+    cameraOverrides: { yawOffsetDeg: 90, orthographic: false, fovDeg: 45 },
+  }, 'standard-30')!;
+  assertEquals([cam.yawOffsetDeg, cam.orthographic, cam.fovDeg], [90, false, 45]);
+  const draft: LookDraft = {
+    cameraPresetId: cam.id,
+    stylePresetId: 'clean',
+    elevationDeg: 0,
+    directions: 2,
+    pixelsPerMeter: 3000,
+    cellW: 4096,
+    cellH: 4096,
+    yawOffsetDeg: cam.yawOffsetDeg,
+    orthographic: cam.orthographic,
+    fovDeg: cam.fovDeg,
+    superSample: 1,
+    ambient: .6,
+    lightYaw: 20,
+    lightFrame: 'world',
+  };
+  const args = lookArgs('W', draft, CAMERAS[0], STYLES[1]);
+  for (
+    const [flag, value] of [['--cell', '4096'], ['--projection', 'perspective'], ['--yaw', '90'], [
+      '--ambient',
+      '0.6',
+    ], ['--light-frame', 'world']]
+  ) {
+    assertEquals(args[args.indexOf(flag) + 1], value);
+  }
+});
+
+test('editing the same preset retains recorded settings the form does not expose', () => {
+  const draft: LookDraft = {
+    cameraPresetId: 'standard-30',
+    stylePresetId: 'clean',
     elevationDeg: 30,
     directions: 8,
     pixelsPerMeter: 32,
     cellW: 64,
     cellH: 64,
-    maxColors: 16,
-    outlineWidthPx: 0.5,
   };
-  assertEquals(staleFrames(48, rec, rec), 0, 'an unchanged look invalidates nothing');
-  assertEquals(staleFrames(48, { ...rec, maxColors: 17 }, rec), 48, 'one colour stales ALL 48');
-  assertEquals(staleFrames(48, { ...rec, elevationDeg: 15 }, rec), 48);
-  assertEquals(staleFrames(0, { ...rec, elevationDeg: 15 }, rec), 0, 'nothing baked, nothing lost');
-  assertEquals(staleFrames(48, rec, null), 0, 'no recorded look to diverge from');
+  const args = lookArgs('W', draft, CAMERAS[0], STYLES[1], {
+    ...draft,
+    cameraOverrides: { pivot: 'center' },
+    overrides: { alpha: { mode: 'soft' } },
+  });
+  assertEquals(args, ['look', '--workspace', 'W']);
 });

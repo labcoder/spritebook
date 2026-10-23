@@ -18,6 +18,8 @@ import { pickJoint, type ScreenJoint } from './picking';
 import { SkeletonOverlay } from './skeleton';
 import { applyViewportSize, type ViewportSize } from './size';
 import { disposeTree, type MaterialLike, type TreeNode } from './dispose';
+import { solveFraming } from '@spritebook/render/camera';
+export type CaptureCamera = Parameters<typeof solveFraming>[0];
 
 export type ViewMode = 'textured' | 'clay' | 'wire';
 
@@ -32,6 +34,9 @@ type Events = {
   error: (message: string) => void;
   jointSelected: (joint: string | null) => void;
   jointNudged: (e: NudgeEvent) => void;
+  captureChanged: (
+    value: { yawOffsetDeg: number; elevationDeg: number; pixelsPerMeter: number },
+  ) => void;
 };
 
 /** camera-controls needs a THREE subset installed once, before any instance. */
@@ -53,7 +58,9 @@ export class MeshViewport {
   #container: HTMLElement;
   #renderer: THREE.WebGPURenderer;
   #scene = new THREE.Scene();
-  #camera: THREE.PerspectiveCamera;
+  #camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+  #capture: CaptureCamera | null = null;
+  #captureTouched = false;
   #controls: CameraControls | null = null;
   #timer = new THREE.Timer();
   #resize: ResizeObserver | null = null;
@@ -92,6 +99,7 @@ export class MeshViewport {
     error: [],
     jointSelected: [],
     jointNudged: [],
+    captureChanged: [],
   };
   #onPointerDown: (e: PointerEvent) => void;
   #onKeyDown: (e: KeyboardEvent) => void;
@@ -136,6 +144,23 @@ export class MeshViewport {
     this.#controls = new CameraControls(this.#camera, canvas);
     this.#controls.smoothTime = 0.08;
     this.#controls.dollyToCursor = true;
+    this.#controls.addEventListener('control', () => {
+      this.#captureTouched = true;
+    });
+    this.#controls.addEventListener('rest', () => {
+      if (!this.#capture || !this.#captureTouched || !this.#controls) return;
+      this.#captureTouched = false;
+      const c = this.#capture;
+      const scale = this.#camera instanceof THREE.OrthographicCamera
+        ? this.#camera.zoom
+        : (c.cellPx.h / (2 * c.pixelsPerMeter * Math.tan((c.fovDeg ?? 35) * Math.PI / 360))) /
+          this.#controls.distance;
+      this.#emit('captureChanged', {
+        yawOffsetDeg: ((this.#controls.azimuthAngle * 180 / Math.PI) % 360 + 360) % 360,
+        elevationDeg: Math.max(0, Math.min(89, 90 - this.#controls.polarAngle * 180 / Math.PI)),
+        pixelsPerMeter: Math.max(1, Math.round(c.pixelsPerMeter * scale)),
+      });
+    });
 
     this.#gizmo = new TransformControls(this.#camera, canvas);
     this.#gizmo.setSpace('world');
@@ -193,6 +218,7 @@ export class MeshViewport {
       height: this.#container.clientHeight,
       ratio,
     }, this.#size);
+    if (this.#capture) this.setCaptureCamera(this.#capture);
   }
 
   /** Load canonical glTF bytes (asset-store only, per the skill). */
@@ -295,10 +321,58 @@ export class MeshViewport {
 
   /** fitToBox — the frame-selected an editor must have. */
   frame(): void {
+    if (this.#capture) {
+      this.setCaptureCamera(this.#capture);
+      return;
+    }
     if (!this.#model || !this.#controls) return;
     const box = new THREE.Box3().setFromObject(this.#model);
     if (box.isEmpty()) return;
     this.#controls.fitToBox(box, true, { paddingTop: 0.1, paddingBottom: 0.1 });
+  }
+
+  /** The shared framing solver aims the instrument; core's flat frame is output truth. */
+  setCaptureCamera(recipe: CaptureCamera): void {
+    if (!this.#model || !this.#controls) return;
+    const box = new THREE.Box3().setFromObject(this.#model);
+    if (box.isEmpty()) return;
+    const framing = solveFraming(recipe, { min: box.min.toArray(), max: box.max.toArray() });
+    this.#capture = recipe;
+    this.#captureTouched = false;
+    const frame = framing.cameras[0]!;
+    const width = this.#size?.width ?? recipe.cellPx.w;
+    const height = this.#size?.height ?? recipe.cellPx.h;
+    const fit = Math.min(width / recipe.cellPx.w, height / recipe.cellPx.h);
+    const halfH = height / (2 * recipe.pixelsPerMeter * fit);
+    const halfW = halfH * (this.#size ? this.#size.width / this.#size.height : 1);
+    const camera = recipe.orthographic
+      ? new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, frame.near, frame.far)
+      : new THREE.PerspectiveCamera(
+        2 *
+          Math.atan(
+            Math.tan((recipe.fovDeg ?? 35) * Math.PI / 360) * height / (recipe.cellPx.h * fit),
+          ) * 180 / Math.PI,
+        width / height,
+        frame.near,
+        frame.far,
+      );
+    const world = new THREE.Matrix4().fromArray(frame.view).invert();
+    const eye = new THREE.Vector3().setFromMatrixPosition(world);
+    const forward = new THREE.Vector3(0, 0, -1).transformDirection(world);
+    const distance = recipe.orthographic
+      ? Math.max(1, box.getSize(new THREE.Vector3()).length())
+      : recipe.cellPx.h /
+        (2 * recipe.pixelsPerMeter * Math.tan((recipe.fovDeg ?? 35) * Math.PI / 360));
+    const target = eye.clone().addScaledVector(forward, distance);
+    this.#camera = camera;
+    this.#controls.camera = camera;
+    this.#controls.dollyToCursor = false;
+    this.#controls.mouseButtons.right = CameraControls.ACTION.NONE;
+    this.#controls.minPolarAngle = Math.PI / 180;
+    this.#controls.maxPolarAngle = Math.PI / 2;
+    if (this.#gizmo) this.#gizmo.camera = camera;
+    this.#controls.setLookAt(...eye.toArray(), ...target.toArray(), false);
+    this.#controls.update(0);
   }
 
   setMode(mode: ViewMode): void {

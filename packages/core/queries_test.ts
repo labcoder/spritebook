@@ -7,7 +7,12 @@ import { assertEquals } from '@std/assert';
 import { SCHEMA_VERSION } from '@spritebook/schema';
 import { createWorkspace, readWorkspace, workspacePaths } from './dist/workspace.js';
 import { commitManifest, moveManifestCursor } from './dist/persistence.js';
-import { listWorkspaces, readBakeArtifact, readCurrentBake } from './dist/queries.js';
+import {
+  listWorkspaces,
+  readBakeArtifact,
+  readCurrentBake,
+  readLookPreview,
+} from './dist/queries.js';
 import { runCli } from '../cli/dist/mod.js';
 
 test('core, CLI and artifacts follow the selected bake through undo, never directory age', async () => {
@@ -29,11 +34,13 @@ test('core, CLI and artifacts follow the selected bake through undo, never direc
     );
     Object.assign(bake, { schemaVersion: SCHEMA_VERSION, characterId: 'hero' });
     bake.inputs.characterId = 'hero';
+    bake.atlases.push({ ...bake.atlases[0], pageIndex: 1, png: 'atlas-1-lit.png' });
     for (const [id, byte] of [['e41c', 1], ['f00d', 2]] as const) {
       const dir = `${workspace}/bakes/bake-${id}`;
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(`${dir}/manifest.json`, JSON.stringify({ ...bake, bakeId: id }));
       await fs.writeFile(`${dir}/atlas-0-lit.png`, new Uint8Array([byte]));
+      await fs.writeFile(`${dir}/atlas-1-lit.png`, new Uint8Array([byte + 10]));
       await fs.writeFile(`${dir}/contact-walk_relaxed.gif`, new Uint8Array([byte]));
       await commitManifest(manifestPath, () => ({
         op: [{ op: 'add', path: '/lastBakeId', value: id }],
@@ -45,6 +52,15 @@ test('core, CLI and artifacts follow the selected bake through undo, never direc
     assertEquals(await readBakeArtifact(workspace, 'thumb'), 'AQ==');
     const atlas = await readBakeArtifact(workspace, 'atlas');
     assertEquals(typeof atlas === 'object' && atlas?.png, 'AQ==');
+    const second = await readBakeArtifact(workspace, 'atlas', 'lit', 1);
+    assertEquals(typeof second === 'object' && second?.png, 'Cw==');
+    await rejects(() => readBakeArtifact(workspace, 'atlas', 'lit', -1), /page index/);
+    await rejects(() => readLookPreview(workspace, '../character.json'), /preview key/);
+    assertEquals(await readLookPreview(workspace, 'a'.repeat(20)), null);
+    const previewDir = `${workspace}/look/${'a'.repeat(20)}`;
+    await fs.mkdir(previewDir, { recursive: true });
+    await fs.writeFile(`${previewDir}/preview.json`, '{"frame":2}');
+    assertEquals(await readLookPreview(workspace, 'a'.repeat(20)), { frame: 2 });
     const lines: string[] = [];
     assertEquals(
       await runCli(['workspace', '--workspace', workspace, '--bake', '--json'], {

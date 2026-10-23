@@ -1,19 +1,9 @@
 /**
- * The Look stage's pure parts: the elevation detents core's schema names, the
+ * The Look stage's pure parts: the
  * resolved camera/style a control panel starts from, the `look` arg builder
  * (so the CLI twin IS the command), and the honest staleness statement.
  * react-free, so look_test.ts holds them.
  */
-
-/** Spread comparison views around the saved directions without inventing missing angles. */
-export function comparisonDirections(directions: number[]): number[] {
-  if (directions.length <= 3) return directions;
-  return [
-    directions[0]!,
-    directions[Math.floor(directions.length / 4)]!,
-    directions[Math.floor(directions.length / 2)]!,
-  ];
-}
 
 export interface CameraPresetRow {
   id: string;
@@ -23,6 +13,9 @@ export interface CameraPresetRow {
   pixelsPerMeter: number;
   cellPx: { w: number; h: number };
   paddingPx: number;
+  orthographic?: boolean;
+  fovDeg?: number;
+  pivot?: 'center' | 'feet-baseline' | { xPct: number; yPct: number };
 }
 
 export interface StylePresetRow {
@@ -32,6 +25,7 @@ export interface StylePresetRow {
   outlineWidthPx?: number;
   superSample?: number;
   alphaMode?: string;
+  lighting?: { direction: number[]; ambient: number; frame: string };
 }
 
 export interface LookRecord {
@@ -40,19 +34,6 @@ export interface LookRecord {
   stylePresetId: string;
   overrides?: Record<string, unknown>;
 }
-
-/**
- * The detents `CameraPresetSchema` documents: 15 | 26.565 (2:1) | 30 | 35.264
- * (iso). Any value in [0, 90) is legal — these are the ones worth one click.
- */
-export const ELEVATION_DETENTS = [
-  { deg: 15, label: 'low-15' },
-  { deg: 26.565, label: '2:1' },
-  { deg: 30, label: 'standard' },
-  { deg: 35.264, label: 'isometric' },
-] as const;
-
-export const DIRECTION_CHOICES = [2, 4, 8, 16] as const;
 
 /** The camera a bake would run with: preset defaults under recorded overrides. */
 export function resolvedCamera(
@@ -64,14 +45,7 @@ export function resolvedCamera(
   const base = presets.find((c) => c.id === id) ?? presets.find((c) => c.id === fallbackId);
   if (!base) return null;
   const o = (look?.cameraOverrides ?? {}) as Partial<CameraPresetRow>;
-  return {
-    ...base,
-    ...(o.elevationDeg !== undefined ? { elevationDeg: o.elevationDeg } : {}),
-    ...(o.directions !== undefined ? { directions: o.directions } : {}),
-    ...(o.pixelsPerMeter !== undefined ? { pixelsPerMeter: o.pixelsPerMeter } : {}),
-    ...(o.cellPx !== undefined ? { cellPx: o.cellPx } : {}),
-    ...(o.paddingPx !== undefined ? { paddingPx: o.paddingPx } : {}),
-  };
+  return { ...base, ...o };
 }
 
 /** The style knobs a bake would run with: preset defaults under overrides. */
@@ -104,6 +78,15 @@ export interface LookDraft {
   cellH: number;
   maxColors?: number;
   outlineWidthPx?: number;
+  yawOffsetDeg?: number;
+  orthographic?: boolean;
+  fovDeg?: number;
+  paddingPx?: number;
+  superSample?: number;
+  ambient?: number;
+  lightYaw?: number;
+  lightElevation?: number;
+  lightFrame?: string;
 }
 
 /**
@@ -115,16 +98,11 @@ export function lookArgs(
   draft: LookDraft,
   cameraBase: CameraPresetRow | undefined,
   styleBase: StylePresetRow | undefined,
+  stored?: LookRecord,
 ): string[] {
-  const a = [
-    'look',
-    '--workspace',
-    dir,
-    '--camera',
-    draft.cameraPresetId,
-    '--style',
-    draft.stylePresetId,
-  ];
+  const a = ['look', '--workspace', dir];
+  if (stored?.cameraPresetId !== draft.cameraPresetId) a.push('--camera', draft.cameraPresetId);
+  if (stored?.stylePresetId !== draft.stylePresetId) a.push('--style', draft.stylePresetId);
   if (cameraBase) {
     if (draft.elevationDeg !== cameraBase.elevationDeg) {
       a.push('--elevation', String(draft.elevationDeg));
@@ -150,31 +128,22 @@ export function lookArgs(
       a.push('--outline', String(draft.outlineWidthPx));
     }
   }
+  for (
+    const [field, flag] of [
+      ['yawOffsetDeg', 'yaw'],
+      ['fovDeg', 'fov'],
+      ['paddingPx', 'padding'],
+      ['superSample', 'supersample'],
+      ['ambient', 'ambient'],
+      ['lightYaw', 'light-yaw'],
+      ['lightElevation', 'light-elevation'],
+      ['lightFrame', 'light-frame'],
+    ] as const
+  ) {
+    if (draft[field] !== undefined) a.push(`--${flag}`, String(draft[field]));
+  }
+  if (draft.orthographic !== undefined) {
+    a.push('--projection', draft.orthographic ? 'orthographic' : 'perspective');
+  }
   return a;
-}
-
-/**
- * What a look change costs, and it is all-or-nothing by construction: every
- * frame key embeds the whole recipe (pack/cache.ts), so ANY change stales the
- * entire last bake. Zero when nothing is baked — nothing to invalidate.
- */
-export function staleFrames(
-  bakedFrameCount: number,
-  draft: LookDraft,
-  recorded: LookDraft | null,
-): number {
-  if (recorded === null) return 0;
-  const same = ([
-    'cameraPresetId',
-    'stylePresetId',
-    'elevationDeg',
-    'directions',
-    'pixelsPerMeter',
-    'cellW',
-    'cellH',
-    'maxColors',
-    'outlineWidthPx',
-  ] as const)
-    .every((k) => draft[k] === recorded[k]);
-  return same ? 0 : bakedFrameCount;
 }

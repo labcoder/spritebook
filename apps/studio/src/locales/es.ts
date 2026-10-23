@@ -6,6 +6,71 @@
  * purpose — they match the CLI the GUI mirrors.
  */
 export const es: Record<string, string> = {
+  '3D model & textures': 'Modelo 3D y texturas',
+  'Actual pixels': 'Píxeles reales',
+  'Aim the camera, then render a frame to check the final lighting and style.':
+    'Orienta la cámara y renderiza un fotograma para comprobar la iluminación y el estilo finales.',
+  'Ambient fill': 'Luz ambiental',
+  'Animation': 'Animación',
+  'Antialiasing': 'Suavizado',
+  'Atlas page unavailable. Try baking again.':
+    'La página del atlas no está disponible. Prueba a hacer bake de nuevo.',
+  'Bake a sprite sheet first, or export the 3D model and textures now.':
+    'Haz bake de una hoja de sprites o exporta ahora el modelo 3D y sus texturas.',
+  'CLI commands': 'Comandos CLI',
+  'Camera setup': 'Configuración de cámara',
+  'Canonical GLB with embedded textures, plus separate texture files. Includes the saved rig when present.':
+    'GLB canónico con texturas integradas y archivos de textura separados. Incluye el rig guardado si existe.',
+  'Cell size': 'Tamaño de celda',
+  'Core-rendered sprite frame': 'Fotograma de sprite renderizado por el núcleo',
+  'Could not load capture presets. Open logs and retry.':
+    'No se pudieron cargar los ajustes de captura. Abre el log y vuelve a intentarlo.',
+  'Current frame · same renderer as Bake': 'Fotograma actual · mismo renderizador que Bake',
+  'Finish': 'Acabado',
+  'Fit preview': 'Ajustar vista previa',
+  'Height': 'Alto',
+  'Isometric': 'Isométrico',
+  'Large cells and higher antialiasing increase GPU memory and bake time.':
+    'Las celdas grandes y un mayor suavizado aumentan la memoria GPU y el tiempo de bake.',
+  'Light follows': 'La luz sigue a',
+  'Light height': 'Altura de la luz',
+  'Light turn': 'Giro de la luz',
+  'Lighting & finish': 'Iluminación y acabado',
+  'Loading atlas page…': 'Cargando página del atlas…',
+  'Loading capture settings…': 'Cargando ajustes de captura…',
+  'No frame rendered yet': 'Todavía no hay ningún fotograma renderizado',
+  'No preview was produced. Run this action in the desktop app.':
+    'No se generó una vista previa. Ejecuta esta acción en la aplicación de escritorio.',
+  'Orbit to aim. Scroll to change scale. The frame guide shows the capture area.':
+    'Orbita para orientar. Usa la rueda para cambiar la escala. La guía muestra el área de captura.',
+  'Original · full color': 'Original · color completo',
+  'Orthographic': 'Ortográfica',
+  'Outline pixels': 'Píxeles de contorno',
+  'Output cell': 'Celda de salida',
+  'Palette colors': 'Colores de la paleta',
+  'Palette preview uses this frame. Bake builds one stable palette across the animation set.':
+    'La vista previa calcula la paleta con este fotograma. Bake crea una paleta estable para todas las animaciones.',
+  'Perspective': 'Perspectiva',
+  'Preparing animation…': 'Preparando animación…',
+  'Preview failed. Open logs for details, then retry.':
+    'Falló la vista previa. Consulta el log y vuelve a intentarlo.',
+  'Preview files are unavailable. Render the frame again.':
+    'Los archivos de vista previa no están disponibles. Renderiza el fotograma de nuevo.',
+  'Preview sample': 'Muestra de vista previa',
+  'Projection': 'Proyección',
+  'Render frame': 'Renderizar fotograma',
+  'Rendered frame': 'Fotograma renderizado',
+  'Rendering…': 'Renderizando…',
+  'Save look': 'Guardar apariencia',
+  'Save look & bake animations': 'Guardar apariencia y hacer bake',
+  'Settings changed · render to update': 'Ajustes modificados · renderiza para actualizar',
+  'Side-scroller': 'Vista lateral',
+  'The look was not saved. Open logs and retry.':
+    'No se guardó la apariencia. Abre el log y vuelve a intentarlo.',
+  'The rendered image could not be read. Render the frame again.':
+    'No se pudo leer la imagen renderizada. Renderiza el fotograma de nuevo.',
+  'Width': 'Ancho',
+  'World': 'Mundo',
   'Rear': 'Posterior',
   'Preparing joint preview': 'Preparando vista previa de la articulación',
   'CPU only. The saved rig is unchanged.': 'Solo CPU. El rig guardado no cambia.',

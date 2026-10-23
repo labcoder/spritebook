@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./camera": {
+      "types": "./dist/camera.d.ts",
+      "default": "./dist/camera.js"
+    },
     ".": {
       "types": "./dist/mod.d.ts",
       "default": "./dist/mod.js"

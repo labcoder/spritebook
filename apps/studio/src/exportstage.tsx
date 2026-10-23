@@ -37,6 +37,7 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
   const m = (manifest ?? {}) as Record<string, unknown>;
   const bakeId = typeof m.lastBakeId === 'string' ? m.lastBakeId : null;
   const [selected, setSelected] = useState<string[]>(['godot']);
+  const [includeMesh, setIncludeMesh] = useState(false);
   const [running, setRunning] = useState(false);
   const [failed, setFailed] = useState(false);
   const [artifacts, setArtifacts] = useState<string[]>([]);
@@ -60,7 +61,7 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
   }, [bridge, dir, bakeId]);
 
   const outDir = `${dir}/export`;
-  const args = exportArgs(dir, outDir, selected);
+  const args = exportArgs(dir, outDir, bakeId ? selected : [], includeMesh);
 
   const runExport = useCallback(async () => {
     if (running) return; // the button stays focusable while running (aria-busy)
@@ -88,7 +89,11 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
       <div className='asset-workspace'>
         <section className='gensec'>
           {bakeId === null
-            ? <div className='inote'>{t('nothing to export — bake a sheet first')}</div>
+            ? (
+              <div className='inote'>
+                {t('Bake a sprite sheet first, or export the 3D model and textures now.')}
+              </div>
+            )
             : (
               <div className='inote'>
                 {t('one bake, many formats')}: {t('bake')} {bakeId}
@@ -145,6 +150,7 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
                   <input
                     type='checkbox'
                     checked={selected.includes(id)}
+                    disabled={bakeId === null}
                     onChange={() => toggle(id)}
                   />
                   <span className='targetname mono'>{id}</span>
@@ -152,6 +158,19 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
                 </label>
               ))}
             </div>
+            <label className='target'>
+              <input
+                type='checkbox'
+                checked={includeMesh}
+                onChange={(e) => setIncludeMesh(e.target.checked)}
+              />
+              <span className='targetname'>{t('3D model & textures')}</span>
+              <span className='inote'>
+                {t(
+                  'Canonical GLB with embedded textures, plus separate texture files. Includes the saved rig when present.',
+                )}
+              </span>
+            </label>
           </section>
         </div>
         <section className='gensec action-section'>
@@ -163,14 +182,15 @@ export function ExportStage({ bridge, dir, manifest, onChanged }: {
             <button
               type='button'
               className='btn primary'
-              disabled={bakeId === null || selected.length === 0}
+              disabled={!includeMesh && (bakeId === null || selected.length === 0)}
               aria-busy={running}
               onClick={runExport}
             >
               {running ? t('Exporting…') : t('Export selected')}
             </button>
-            {selected.length === 0 && <span className='inote'>{t('pick at least one target')}
-            </span>}
+            {!includeMesh && selected.length === 0 && (
+              <span className='inote'>{t('pick at least one target')}</span>
+            )}
             {failed && (
               <span className='mv-exit mono' role='status'>
                 {t('failed — the log drawer has the verbatim reason')}

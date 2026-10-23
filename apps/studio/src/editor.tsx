@@ -122,6 +122,7 @@ export function Editor(
                 dir={card.dir}
                 manifest={manifest}
                 onChanged={onChanged}
+                onGoToStage={setActive}
               />
             )
             : effective === 'bake'

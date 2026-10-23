@@ -339,3 +339,15 @@ consent fingerprint, unmanaged behavior, renderer-pin boundary and qualification
 
 `gen --more-like <result>` reuses the result's recorded backend version as well as its parameters.
 Explicit `--model` or `--model-version` requests a different choice; project pins still apply.
+
+## Model delivery and preview queries
+
+`export --workspace <dir> --out <dir> --mesh` exports the canonical `model/model.glb` byte-for-byte,
+plus its embedded texture files and `textures.json`. It includes a saved rig when present and needs
+no bake. Combine `--mesh` with `--targets godot,strips` to deliver sprites and the 3D asset
+together. Sprite exporters remain projections of BakeManifest; model delivery is a separate
+artifact.
+
+`workspace --workspace <dir> --atlas --pass lit --page 1 --json` reads a specific selected atlas
+page (indices start at 0). `workspace --workspace <dir> --look-preview <20-hex-key> --json` reads
+the metadata for a core-produced frame preview. It cannot read arbitrary paths.
