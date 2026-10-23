@@ -7,3 +7,5 @@ may precede a redacted path because those prefixes were part of the original exp
 
 Private source images, character projects and local replay traces are not included here. A passing
 file-format check does not establish animation quality or qualify an untested native platform.
+The old model-manager screenshot was removed from this tree because it exposed a personal profile
+path. Its numeric install/runtime evidence remains in the redacted receipt.

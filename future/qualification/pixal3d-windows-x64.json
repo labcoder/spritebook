@@ -198,7 +198,7 @@
             {
               "min": 0,
               "max": 1,
-              "mean": 0.0000011920928955078125
+              "mean": 1.1920928955078125e-06
             }
           ]
         }
@@ -255,13 +255,13 @@
             {
               "min": 0,
               "max": 1,
-              "mean": 0.0000011920928955078125
+              "mean": 1.1920928955078125e-06
             }
           ]
         }
       },
       "skins": 1,
-      "maxWeightError": 4.470348358154297e-8,
+      "maxWeightError": 4.470348358154297e-08,
       "joints": [
         "spine_02",
         "thigh_l",
@@ -1061,7 +1061,12 @@
   ],
   "images": {
     "pixal3d-sprite-review.png": "cafefcbcca2ff23cfee6809b203129c2bcfd9bc04a0cce385bb6489f5275dd8b",
-    "model-platform-review.png": "60215305672f7b05bc7c1a732cbf55cc24d873ae3d97dd82e6c38a549b5d045d",
-    "pixal3d-model-manager.png": "07b04ca30381b3b7d6b54df726b4e8331e49497ae497676c873f528df9f178df"
+    "model-platform-review.png": "60215305672f7b05bc7c1a732cbf55cc24d873ae3d97dd82e6c38a549b5d045d"
+  },
+  "removedImages": {
+    "pixal3d-model-manager.png": {
+      "sha256": "07b04ca30381b3b7d6b54df726b4e8331e49497ae497676c873f528df9f178df",
+      "reason": "Historical screenshot exposed a local profile path; numeric evidence retained."
+    }
   }
 }

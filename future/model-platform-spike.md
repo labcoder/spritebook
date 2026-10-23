@@ -101,7 +101,9 @@ show idle, walk and punch at frames 0/3; columns show directions 0–7. All 144 
 contain the subject, with six distinct frames per clip/direction. Full provenance and numeric checks
 are sealed in the [Windows qualification receipt](qualification/pixal3d-windows-x64.json).
 
-![Pixal3D installed model-manager entry](qualification/pixal3d-model-manager.png)
+Installed model inventory and runtime evidence are retained in the qualification receipt above. The
+historical model-manager screenshot contained a local profile path and is omitted from the shared
+documentation; the model-manager interface has since been redesigned.
 
 ## Recommendation
 

@@ -16,9 +16,8 @@ button shows the exact command it runs. To work in the terminal instead, read
 This guide is about the app. Read the quickstart first if you want the shortest path to a
 spritesheet.
 
-The gallery and Look images show the current production browser-demo UI with synthetic data; the
-colored demo frames illustrate controls, not generated character output. See the
-[dark theme](img/stage-04-look-dark.png) as well.
+Some screenshots show earlier browser-demo controls with synthetic data. The current Look workbench
+is described below; colored demo frames in historical images are not generated character output.
 
 ## 1. Open a project
 
@@ -206,43 +205,44 @@ total frames. The stage shows this arithmetic.
 
 ## 5. Stage 04 — Look
 
-![Stage 04 - Look](img/stage-04-look.png)
+Look composes one sprite frame before you commit to a full bake. The left workspace contains a 3D
+aiming view and a flat frame rendered by core. The right inspector contains the capture recipe.
 
-Look sets the camera and the art style. It is the stage that decides what the sprites look like.
+Start with **Side-scroller** for two opposite side views or **Isometric** for eight elevated views.
+Orbit the 3D view to aim; scroll to adjust scale. The frame guide marks the capture area. The 3D
+view is an inspection instrument: lighting and finish are verified in the flat rendered frame.
 
-The camera controls are:
+| Control               | What it does                                                                             |
+| --------------------- | ---------------------------------------------------------------------------------------- |
+| **Projection**        | orthographic world scale or perspective with a field of view                             |
+| **Elevation / Turn**  | aim above the ground and around the character                                            |
+| **Pixels per metre**  | adjust world scale; use the same ruler across a roster                                   |
+| **Directions**        | bake 2, 4, 8 or 16 views                                                                 |
+| **Lighting & finish** | key-light direction, ambient fill, light frame and finish                                |
+| **Output cell**       | independent width/height, size shortcuts from 64px to 4K, ground margin and antialiasing |
+| **Preview sample**    | select an enabled animation, frame and direction                                         |
 
-| Control               | What it does                                                       |
-| --------------------- | ------------------------------------------------------------------ |
-| **Camera**            | selects a camera preset, such as `standard-30`                     |
-| **Elevation**         | the camera angle above the ground, in degrees                      |
-| **Directions**        | how many directions to bake: 2, 4, 8, or 16                        |
-| **Pixels per metre**  | the world-locked ruler. The whole roster shares it                 |
-| **Cell width/height** | the size of one sprite cell, in pixels. The shipped default is 112 |
+**Original · full color** uses the existing Clean recipe without palette quantization, outlines or
+dithering. Pixel, cel and painterly finishes remain available. Antialiasing changes the internal
+render resolution; it does not change the output cell dimensions. Large cells and higher
+antialiasing need more memory. Unsupported GPU sizes fail with an instruction to reduce them.
 
-The main recipe row contains camera, direction count, cell size, style, colour count and outline.
-Open **Camera and style details** for elevation, its detent buttons and pixels per metre. The
-elevation slider moves 0.5 degrees for each arrow key press. The selected style also states its mode
-and supersampling there.
+Select **Render frame** after changing the camera, finish or sample. Core prepares the clip and
+renders that frame through the same pipeline as Bake. An old frame remains visible with a stale
+label until the new one arrives. Adaptive-palette previews are provisional until the full clip is
+baked. **Actual pixels** inspects large full-color frames at native size; pixel finishes retain
+integer nearest-neighbor zoom.
 
-The comparison shows the original source image beside sprites from the saved bake. Select a
-**Clip**, then **Play** or **Pause**. The displayed directions share one playback clock. Zoom is
-nearest-neighbor at 1×, 2×, 4× or 6×; large cells scroll within the dark well. This preview
-currently shows the first atlas page, as labeled. Bake retains its full review controls.
+The inspector uses the character name. Drag its boundary or use its focused Left/Right keys to
+resize; its chevron collapses and reopens it without discarding drafts.
 
-The right-hand inspector is headed by the character name and reaches from the stage rail to the
-bottom. Drag its boundary to resize, or focus the grip and use Left/Right, Home/End; double-click
-resets to 360px. Its chevron collapses/reopens the panel without losing draft settings or stopping
-jobs. Width persists locally (280–560px). This layout applies to every stage; assets and candidate
-choices remain on the left.
+Select **Save look** to record the recipe, or **Save look & bake animations** to save and move to
+Bake. Saving is journaled and reversible. Rendering a preview does not save settings, select a new
+bake or replace the last export. A changed look invalidates the baked frames; Bake renders the whole
+selected animation set with the recorded recipe.
 
-CAUTION: every frame key holds the whole recipe, so a look change makes every baked frame stale. The
-stage states the exact frame count before you record. This is all-or-none: there is no partial
-re-bake after a look change.
-
-Select **Record look** to save the change. Select **Reset to recorded** to drop it.
-
-**The CLI twin:** `spritebook look`.
+**The CLI twins:** `spritebook look` and `spritebook look --preview --clip walk-loop --frame 0
+--direction 0`. See [capture flags](cli.md#look--the-camera-and-style-decision).
 
 ## 6. Stage 05 — Bake
 
@@ -263,7 +263,8 @@ The player shows the result:
 - **1x**, **2x**, **4x** set the zoom. The zoom is always an integer, with nearest-neighbour
   sampling, so what you see is the real pixels.
 - **lit**, **albedo**, **normal**, **depth**, **mask** select the render pass. Every pass page has
-  the same layout as the lit page.
+  the same layout as the lit page. The player loads the page referenced by the selected frame,
+  including when an animation crosses pages.
 
 **Quality flags** report problems the bake found. Each flag names the stage that owns the fix, and
 its button takes you there.
@@ -285,9 +286,10 @@ with every vertex still at or above the ground. The flag states the contact widt
 
 ## 7. Stage 06 — Export
 
-Export writes the files your engine reads. One bake can feed every target.
+Export delivers the saved sprite bake, the canonical 3D model, or both. Sprite targets require a
+bake. **3D model & textures** works before the first bake and includes the saved rig when present.
 
-1. Select the targets you want.
+1. Select the sprite targets you want and optionally **3D model & textures**.
 
 2. Select **Export selected**.
 
@@ -300,7 +302,14 @@ Export writes the files your engine reads. One bake can feed every target.
 | `aseprite`      | Aseprite JSON array, with frame tags                 | [Aseprite](engines/aseprite.md)         |
 | `strips`        | one horizontal strip PNG for each clip and direction | [Phaser](engines/phaser.md)             |
 
-The exporters are pure projections of one bake manifest. The same bake always writes the same bytes.
+Sprite exporters are pure projections of one BakeManifest. The same bake writes the same bytes.
+Model delivery copies `model.glb` unchanged and extracts its embedded texture bytes into separate
+files, with `textures.json` recording filenames, source names and MIME types. It does not create new
+animations or convert the mesh format.
+
+Godot and strips support animations spanning atlas pages. The Aseprite and TexturePacker exporters
+currently refuse animation runs split across pages. Use Godot/strips or smaller cells for those
+bakes. Format validation is separate from importing the files into an engine.
 
 **The CLI twin:** `spritebook export`.
 
