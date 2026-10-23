@@ -201,8 +201,10 @@ spritebook look --workspace ./characters/hero --camera standard-30 --style pixel
 sample time and resolved recipe. It uses full-clip bounds and the same sampled pose/render/style
 path as Bake. Adaptive palettes are provisional until the whole animation set is baked; unfiltered
 `--style clean` previews match their corresponding bake pixels. Supersampling multiplies render
-size, not output size: use `--cell 4096 --supersample 1` for a 4096 px frame. Large atlases use
-multiple pages, and review-only contact GIF cells are capped at 256 px.
+size, not output size: use `--cell 4096 --supersample 1` for a 4096 px frame. Capture sizes
+exceeding the GPU's texture or readback-buffer limits fail before allocation; lower supersampling or
+output size to recover. Large atlases use multiple pages, and review-only contact GIF cells are
+capped at 256 px.
 
 Only the divergences are recorded. A look change makes every baked frame stale; the stage states the
 cost before you re-bake.

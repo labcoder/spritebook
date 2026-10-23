@@ -43,7 +43,7 @@ export interface ClipPoses {
   map: Int32Array;
   jointsPerFrame: number;
 }
-import { ReadbackPool } from './readback.ts';
+import { align256, ReadbackPool } from './readback.ts';
 import { encodeAov } from './png.ts';
 import { buildThroughput, writeThroughput } from './throughput.ts';
 
@@ -126,6 +126,25 @@ export function lightDirFor(
 }
 
 const bpp = AOV_TARGETS.map((t) => t.bpp);
+
+/** Refuse unsupported capture sizes before allocating targets or readback buffers. */
+export function assertRenderSize(
+  limits: Pick<GPUSupportedLimits, 'maxTextureDimension2D' | 'maxBufferSize'>,
+  width: number,
+  height: number,
+): void {
+  const readbackBytes = align256(width * Math.max(...bpp)) * height;
+  if (
+    width > limits.maxTextureDimension2D || height > limits.maxTextureDimension2D ||
+    readbackBytes > limits.maxBufferSize
+  ) {
+    throw new Error(
+      `Capture ${width} × ${height} exceeds this GPU's render limits ` +
+        `(${limits.maxTextureDimension2D}px per side; ${limits.maxBufferSize} bytes per buffer). ` +
+        'Reduce supersampling or output size and try again.',
+    );
+  }
+}
 
 function pad(n: number, width: number): string {
   return String(n).padStart(width, '0');
@@ -213,6 +232,7 @@ export class Renderer {
     lighting?: Lighting,
   ): Promise<Renderer> {
     const { device } = gpu;
+    assertRenderSize(device.limits, width, height);
     device.pushErrorScope('validation');
 
     const pipeline = await createAovPipeline(device, shaderSrc);
@@ -576,6 +596,7 @@ export async function makeRenderer(
   >,
   shaderSrc: string,
 ): Promise<Renderer> {
+  assertRenderSize(gpu.device.limits, spec.camera.cellPx.w, spec.camera.cellPx.h);
   const pose = spec.pose ?? 'turntable';
   const asset = await loadSkinnedAsset(spec.modelPath);
 
