@@ -16,6 +16,6 @@
     "depth",
     "mask"
   ],
-  "framesDir": "C:/dev/Mighty/tools/spritebook/packages/style/fixtures/aov/frames",
+  "framesDir": "<repo>/packages/style/fixtures/aov/frames",
   "pageCount": 60
 }

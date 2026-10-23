@@ -68,7 +68,7 @@
         "trellis2-4b",
         "--accept-license",
         "--from",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\seed\\trellis2-4b"
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\seed\\trellis2-4b"
       ],
       "code": 1,
       "seconds": 48.412
@@ -91,7 +91,7 @@
         "install",
         "unirig",
         "--from",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\seed\\unirig"
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\seed\\unirig"
       ],
       "code": 0,
       "seconds": 161.515
@@ -120,9 +120,9 @@
       "args": [
         "prep",
         "--image",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\prep-input.png",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\prep-input.png",
         "--out",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\prep"
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\prep"
       ],
       "code": 0,
       "seconds": 47.424
@@ -132,11 +132,11 @@
       "args": [
         "gen",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--character",
         "hero",
         "--image",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\reference.png",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\reference.png",
         "--model",
         "trellis2-4b",
         "--seed",
@@ -152,7 +152,7 @@
       "args": [
         "pick",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--result",
         "r1"
       ],
@@ -164,7 +164,7 @@
       "args": [
         "retexture",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--result",
         "r1",
         "--seed",
@@ -178,7 +178,7 @@
       "args": [
         "pick",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--result",
         "r2"
       ],
@@ -190,11 +190,11 @@
       "args": [
         "rig",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--model",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\canonical\\model.glb",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\canonical\\model.glb",
         "--out",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\rig"
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\rig"
       ],
       "code": 0,
       "seconds": 145.03
@@ -206,7 +206,7 @@
         "--preview",
         "idle-loop",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero"
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero"
       ],
       "code": 0,
       "seconds": 0.984
@@ -217,7 +217,7 @@
         "rig",
         "--accept",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero"
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero"
       ],
       "code": 0,
       "seconds": 1.186
@@ -229,7 +229,7 @@
         "--enable",
         "idle-loop:6,walk-loop:6,punch-jab:6",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero"
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero"
       ],
       "code": 0,
       "seconds": 1.207
@@ -239,7 +239,7 @@
       "args": [
         "look",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--style",
         "pixel",
         "--cell",
@@ -253,9 +253,9 @@
       "args": [
         "bake",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--cache",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\render-cache",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\render-cache",
         "--only-invalidated"
       ],
       "code": 0,
@@ -266,9 +266,9 @@
       "args": [
         "export",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--out",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\exports",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\exports",
         "--targets",
         "godot,aseprite,texturepacker,strips"
       ],
@@ -280,9 +280,9 @@
       "args": [
         "bake",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--cache",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\render-cache",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\render-cache",
         "--only-invalidated"
       ],
       "code": 0,
@@ -293,7 +293,7 @@
       "args": [
         "retexture",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--result",
         "r1",
         "--seed",
@@ -307,7 +307,7 @@
       "args": [
         "retexture",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--result",
         "r1",
         "--seed",
@@ -321,7 +321,7 @@
       "args": [
         "retexture",
         "--workspace",
-        "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
+        "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero",
         "--result",
         "r1",
         "--seed",
@@ -1290,7 +1290,7 @@
       "platform": "windows-x64",
       "vramGb": 24,
       "models": {
-        "root": "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\models",
+        "root": "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\models",
         "virtualization": {
           "virtualized": false
         }
@@ -1324,7 +1324,7 @@
       },
       "sidecar": {
         "ok": true,
-        "dir": "\\\\?\\C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\application\\runtime\\assets\\sidecar",
+        "dir": "\\\\?\\%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\application\\runtime\\assets\\sidecar",
         "contractVersion": 1,
         "sidecarVersion": "0.1.0",
         "python": "3.11.16",

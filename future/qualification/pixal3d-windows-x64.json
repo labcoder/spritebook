@@ -511,13 +511,13 @@
     ],
     "sourceCorruption": "refused and repaired",
     "acceptedAssets": {
-      "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\canonical\\model.glb": "fcd46305f9e2924bc4d00d652ca7bc14034106b3d7ee58650416fcaa508cc36c",
-      "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\manifest.json": "30c24f1810a54903e247630bc69e31d134f5640a9451913f8c287b6b4106e9d4",
-      "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_lit_0.png": "486411ae9cdb67469f28a460209c8fc396d597dbf01c3275c8b10592ed029e56",
-      "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_albedo_0.png": "c48bca33af00ed9af233fef73b17b715a2d4a18767b17441a04d7ff63e0730ec",
-      "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_normal_0.png": "b5a5bc5fc7d722b49d69560f5801955dad10dd364bf9567936286b6adb80a0cb",
-      "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_depth_0.png": "0991436834c3e703c9b29d50cc7e5c4fe54fadef00ccd8677a41bacff7f8f1bd",
-      "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_mask_0.png": "5f12a56bde79b950a237861c87bfafa02e67083969cad0d07fd4f54b0fd143be"
+      "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\canonical\\model.glb": "fcd46305f9e2924bc4d00d652ca7bc14034106b3d7ee58650416fcaa508cc36c",
+      "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\manifest.json": "30c24f1810a54903e247630bc69e31d134f5640a9451913f8c287b6b4106e9d4",
+      "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_lit_0.png": "486411ae9cdb67469f28a460209c8fc396d597dbf01c3275c8b10592ed029e56",
+      "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_albedo_0.png": "c48bca33af00ed9af233fef73b17b715a2d4a18767b17441a04d7ff63e0730ec",
+      "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_normal_0.png": "b5a5bc5fc7d722b49d69560f5801955dad10dd364bf9567936286b6adb80a0cb",
+      "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_depth_0.png": "0991436834c3e703c9b29d50cc7e5c4fe54fadef00ccd8677a41bacff7f8f1bd",
+      "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed\\characters\\pixal\\bakes\\bake-acc25412\\atlas_mask_0.png": "5f12a56bde79b950a237861c87bfafa02e67083969cad0d07fd4f54b0fd143be"
     },
     "weightReceipt": "9be6e8abf10fa8013d96aca4a1026b43c4f027d515a6dd51dbb8cc2b3720ee65",
     "outboundAttempts": 0
@@ -530,7 +530,7 @@
       "platform": "windows-x64",
       "vramGb": 24,
       "models": {
-        "root": "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\models",
+        "root": "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\models",
         "virtualization": {
           "virtualized": false
         }
@@ -564,7 +564,7 @@
       },
       "sidecar": {
         "ok": true,
-        "dir": "\\\\?\\C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\application\\runtime\\assets\\sidecar",
+        "dir": "\\\\?\\%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\application\\runtime\\assets\\sidecar",
         "contractVersion": 1,
         "sidecarVersion": "0.1.0",
         "python": "3.11.16",
@@ -632,8 +632,8 @@
     "body": "SPRITEBOOK\nFile\nEdit\n⌘K\nlang: en\ntheme: dark\ngpu: unexamined\nGallery\n+\nProjects root\nLoad\nRUN HEALTH EXAM\npixal\npixal · 1.70 m · pick r1\npixel\nrig B · 52j · accepted\nbaked acc25412\nhealth: not yet examined\n1 characters\nbridge: tauri\n▴ log",
     "owner": {
       "pid": 43076,
-      "exe": "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\application\\spritebook-studio.exe",
-      "profile": "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed-webview",
+      "exe": "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\application\\spritebook-studio.exe",
+      "profile": "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\Pixal proof final\\installed-webview",
       "modelCard": "Pixal3D (image to PBR mesh)\npixal3d\ngen3d\nMIT AND Apache-2.0 AND LicenseRef-DINOv3\nlicense acceptance required\nb0cb2e1b.local1\n25.26 GB\n≥24 GiB VRAM\n1 platforms\ninstalled\nVerify\nRemove",
       "outboundAttempts": 0
     }
@@ -923,13 +923,13 @@
     }
   ],
   "preservedBaselineArtifacts": {
-    "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\canonical\\model.glb": "ac4a15fb0660ad00c24f0225848dab7b53eba36525a68b48508d1c8485193684",
-    "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\manifest.json": "e74e9548b2188268385dc664976b4c2cf89f7bd33fd85864c12171afa49a8929",
-    "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_lit_0.png": "41558ee0c7625f1e9c73dd328ed368ba85413219f1bf78e51eec84f5dbd835a6",
-    "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_albedo_0.png": "3fb2d1360097bbf7a386a0d09ad8cd52cc921c60929a71531800740407b7333f",
-    "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_normal_0.png": "35bf8228a575fdd1b2a1aee4524c642aa9bfa13e30928e2e98d8e30da1a04022",
-    "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_depth_0.png": "404553ab976a84d0c73e9661656a3d963b55519367bc978382e3ed6218ab31cd",
-    "C:\\Users\\oms10\\AppData\\Local\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_mask_0.png": "5c2c17f92c0625ea313d00ea1d47b1b28204c5b16b9da5a863381271604d6b7e"
+    "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\canonical\\model.glb": "ac4a15fb0660ad00c24f0225848dab7b53eba36525a68b48508d1c8485193684",
+    "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\manifest.json": "e74e9548b2188268385dc664976b4c2cf89f7bd33fd85864c12171afa49a8929",
+    "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_lit_0.png": "41558ee0c7625f1e9c73dd328ed368ba85413219f1bf78e51eec84f5dbd835a6",
+    "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_albedo_0.png": "3fb2d1360097bbf7a386a0d09ad8cd52cc921c60929a71531800740407b7333f",
+    "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_normal_0.png": "35bf8228a575fdd1b2a1aee4524c642aa9bfa13e30928e2e98d8e30da1a04022",
+    "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_depth_0.png": "404553ab976a84d0c73e9661656a3d963b55519367bc978382e3ed6218ab31cd",
+    "%LOCALAPPDATA%\\Temp\\SpriteBook F4 models é 空 4f03e036\\characters\\hero\\bakes\\bake-a6907f1f\\atlas_mask_0.png": "5c2c17f92c0625ea313d00ea1d47b1b28204c5b16b9da5a863381271604d6b7e"
   },
   "meshRepeatability": {
     "original": [

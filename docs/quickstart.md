@@ -63,7 +63,7 @@ OK`):
 SpriteBook 0.9.0
 node 24.22.0 - v8 13.6.233.17-node.57 - windows-x64
 vram: 24 GiB detected
-models root: C:\Users\oms10\AppData\Local/spritebook/models
+models root: %LOCALAPPDATA%/spritebook/models
 render pipeline spritebook-render@0.6.0
 backend env: SPRITEBOOK_GPU_BACKEND=vulkan
 adapter: NVIDIA: 610.88 610.88.0.0 (vendor nvidia, device nvidia-geforce-rtx-3090)
