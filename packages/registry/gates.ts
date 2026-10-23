@@ -149,7 +149,11 @@ export const runCommand: CommandRunner = async (cmd) => {
     const executable = cmd[0] === 'nvidia-smi' && driverTool && existsSync(driverTool)
       ? driverTool
       : cmd[0];
-    const out = await promisify(execFile)(executable, cmd.slice(1), { windowsHide: true });
+    const out = await promisify(execFile)(executable, cmd.slice(1), {
+      windowsHide: true,
+      timeout: 5_000,
+      maxBuffer: 1024 * 1024,
+    });
     return { ok: true, stdout: out.stdout };
   } catch {
     return { ok: false, stdout: '' };
@@ -157,17 +161,21 @@ export const runCommand: CommandRunner = async (cmd) => {
 };
 
 /**
- * OS from Node + accelerator probe. `nvidia-smi -L` listing at least
- * one GPU means cuda; darwin is assumed Apple Silicon and reports
- * macos-metal without probing (fine for every Mac we target); anything that
- * is neither windows nor darwin rides the linux entries.
+ * NVIDIA presence selects a candidate CUDA lane; runtime kernel checks still
+ * admit the actual backend. macOS stays CPU until a backend verifies its own
+ * acceleration: a Darwin host or Metal renderer does not establish MPS support.
  */
 export async function detectPlatform(
   run: CommandRunner = runCommand,
   os: NodeJS.Platform | 'windows' = (process.platform === 'win32' ? 'windows' : process.platform),
 ): Promise<Platform> {
-  if (os === 'darwin') return 'macos-metal';
-  const family = os === 'windows' ? 'windows' : 'linux';
+  if (os === 'darwin') return 'macos-cpu';
+  if (os !== 'windows' && os !== 'win32' && os !== 'linux') {
+    throw Object.assign(new Error(`Model runtimes are not supported on ${os}.`), {
+      code: 'platform-unsupported',
+    });
+  }
+  const family = os === 'windows' || os === 'win32' ? 'windows' : 'linux';
   const probe = await run(['nvidia-smi', '-L']);
   const hasGpu = probe.ok && probe.stdout.split('\n').some((l) => /^GPU \d+:/.test(l.trim()));
   return `${family}-${hasGpu ? 'cuda' : 'cpu'}` as Platform;

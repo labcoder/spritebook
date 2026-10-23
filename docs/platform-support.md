@@ -22,6 +22,13 @@ memory requirements and available operations; the
 [platform spike](../future/model-platform-spike.md) separates upstream claims, experimental ports
 and local measurements. Model availability is independent of CLI/render and desktop availability.
 
+Model detection reports macOS CPU conservatively until the selected backend has verified its own
+accelerator. Neither an Intel/Apple Silicon host nor the renderer's Metal device proves that a
+Python model supports MPS. CUDA presence is likewise only a candidate lane: exact architecture and
+runtime kernel admission still apply. Driver probes have a bounded timeout; unsupported operating
+systems cannot inherit Linux recipes. These checks do not constitute new native platform execution
+evidence.
+
 ## What CI covers
 
 [CI](../.github/workflows/ci.yml) uses Node for formatting, linting, separate type checks and tests

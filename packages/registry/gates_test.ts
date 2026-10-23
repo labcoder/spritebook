@@ -6,7 +6,7 @@ import { test } from 'node:test';
  * are exercised through injected runners — no nvidia-smi, no GPU — plus one
  * skip-graceful smoke of the real default path.
  */
-import { assert, assertEquals, assertStringIncludes } from '@std/assert';
+import { assert, assertEquals, assertRejects, assertStringIncludes } from '@std/assert';
 import { PlatformSchema } from '@spritebook/schema';
 import {
   type CommandRunner,
@@ -153,10 +153,24 @@ test('detectPlatform: os + probe matrix through injected runners', async () => {
   assertEquals(await detectPlatform(fakeRun({ ok: false, stdout: '' }), 'windows'), 'windows-cpu');
   assertEquals(await detectPlatform(fakeRun(gpuList), 'linux'), 'linux-cuda');
   assertEquals(await detectPlatform(fakeRun({ ok: true, stdout: '' }), 'linux'), 'linux-cpu');
-  // darwin never probes: Apple Silicon assumption -> macos-metal
+  assertEquals(await detectPlatform(fakeRun(gpuList), 'win32'), 'windows-cuda');
   const darwinCalls: string[][] = [];
-  assertEquals(await detectPlatform(fakeRun(gpuList, darwinCalls), 'darwin'), 'macos-metal');
+  const mac = await detectPlatform(fakeRun(gpuList, darwinCalls), 'darwin');
+  assertEquals(mac, 'macos-cpu');
   assertEquals(darwinCalls, []);
+  assert(gatePlatform(toyVersion({ platforms: ['macos-cpu'] }), mac).ok);
+  assert(!gatePlatform(toyVersion({ platforms: ['macos-metal'] }), mac).ok);
+});
+
+test('unsupported operating systems cannot borrow a Linux model recipe', async () => {
+  const calls: string[][] = [];
+  const error = await assertRejects(
+    () => detectPlatform(fakeRun({ ok: true, stdout: 'GPU 0: NVIDIA' }, calls), 'freebsd'),
+    Error,
+    'not supported on freebsd',
+  );
+  assertEquals((error as Error & { code: string }).code, 'platform-unsupported');
+  assertEquals(calls, []);
 });
 
 test('detectVramGb: MiB -> GiB (1 decimal), first GPU, failures -> null', async () => {
