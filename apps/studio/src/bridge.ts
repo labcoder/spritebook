@@ -14,6 +14,7 @@
  */
 import { log } from './log';
 import { DEMO_MESH_B64 } from './demo-mesh';
+import TOOL_CATALOG from '../../../packages/registry/catalog/tools.json' with { type: 'json' };
 
 export interface RawWorkspace {
   dir: string;
@@ -463,6 +464,38 @@ function browserBridge(): StudioBridge {
         onLine?.(line);
         return line;
       };
+      if (args[0] === 'extensions' && args[1] === 'list') {
+        return Promise.resolve({
+          exitCode: 0,
+          lines: [emit(JSON.stringify({
+            ...DEMO_CATALOG,
+            tools: TOOL_CATALOG.tools.map((tool) => ({
+              ...tool,
+              download: tool.downloads[0],
+              selected: null,
+              managed: [],
+              detected: [],
+              issue: null,
+            })),
+            content: [
+              {
+                id: 'ual',
+                displayName: 'UAL (browser demo)',
+                kind: 'animation-pack',
+                clipCount: DEMO_CLIPS.clips.length,
+                license: 'CC0-1.0',
+                bundled: true,
+              },
+              ...DEMO_LOOK_PRESETS.styles.map((style) => ({
+                id: style.id,
+                displayName: style.id,
+                kind: 'style',
+                bundled: true,
+              })),
+            ],
+          }))],
+        });
+      }
       if (args[0] === 'models' && args[1] === 'list') {
         return Promise.resolve({
           exitCode: 0,

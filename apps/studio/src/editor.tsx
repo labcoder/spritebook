@@ -23,7 +23,7 @@ export function Editor(
     manifest: unknown;
     /** a verb changed the manifest — the projections must re-read */
     onChanged: () => void;
-    /** the Generate-more panel and failure banners open Manage models from here */
+    /** the Generate-more panel and failure banners open Manage extensions from here */
     onOpenModels: () => void;
     catalogEpoch?: number;
   },

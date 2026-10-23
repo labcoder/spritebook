@@ -310,7 +310,7 @@ solid panel surfaces and separating rules, without resting shadows.
 
 ### Model management
 
-Manage models uses a single list with one recommended build per model. A condensed model name,
+Manage extensions uses a single list with one recommended build per model. A condensed model name,
 download size, memory requirement and a plain status carry the default row. Thin horizontal rules
 separate models; metadata is not boxed into badges. Details discloses exact versions, platform and
 license information, verification, repair and removal. Other versions preserves historical pins.
@@ -402,3 +402,13 @@ Saving the look is journaled separately from baking the whole animation set. Out
 through4096px; large renders retain their native pixels and offer a fitted inspection view. Atlas
 playback loads the page referenced by each frame and never crops another page's bytes. Export can
 deliver the saved canonical GLB and separate texture files, including before a first bake.
+
+### Extension management (2026-10-23)
+
+Manage extensions groups Models, Tools and Content in one compact category row. Retain the model
+list's recommended-build/disclosure pattern and shared progress. Blender is optional and marked
+experimental: use a checked existing installation or explicitly download a private portable copy.
+Show ownership and real disk costs before download; forgetting a user installation never deletes it.
+Downloaded copies remain separately selectable/removable. Content lists bundled packs/presets
+without fake install controls. Preserve focus/cancellation on close, CLI twins, error recovery,
+themes and translated layout.

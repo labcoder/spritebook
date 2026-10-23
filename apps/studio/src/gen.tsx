@@ -187,7 +187,7 @@ export function lastWarnOf(lines: string[], code: string): string | null {
   return null;
 }
 
-/** Errors whose remedy lives in Manage models, so the banner offers the door. */
+/** Errors whose remedy lives in Manage extensions, so the banner offers the door. */
 const MODEL_PROBLEMS = new Set([
   'not-installed',
   'model-missing',
@@ -227,7 +227,7 @@ export function FailureNote({ failure, onOpenModels }: {
         <>
           {' '}
           <button type='button' className='linkish' onClick={onOpenModels}>
-            {t('Manage models…')}
+            {t('Manage extensions…')}
           </button>
         </>
       )}
@@ -409,7 +409,7 @@ export function GenerateNew(
     onCreated: (characterId: string) => void;
     onBack: () => void;
     onOpenModels: () => void;
-    /** bumped when Manage models closes - the backend cards re-read the catalog */
+    /** bumped when Manage extensions closes - the backend cards re-read the catalog */
     catalogEpoch?: number;
     /** the health exam's measured VRAM (F3) - null until an exam has run */
     vramGb?: number | null;
@@ -724,7 +724,7 @@ export function GenerateNew(
                     <p className='inote'>
                       {t('this backend is not installed')} —{' '}
                       <button type='button' className='linkish' onClick={onOpenModels}>
-                        {t('Manage models…')}
+                        {t('Manage extensions…')}
                       </button>
                     </p>
                   )}
@@ -871,7 +871,7 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
   manifest: unknown;
   onChanged: () => void;
   onOpenModels: () => void;
-  /** bumped when Manage models closes - the panel's cards re-read the catalog */
+  /** bumped when Manage extensions closes - the panel's cards re-read the catalog */
   catalogEpoch?: number;
 }) {
   const m = (manifest ?? {}) as Record<string, unknown>;
@@ -1278,7 +1278,7 @@ function GenerateMore(
             <span className='inote'>
               {t('this backend is not installed')} —{' '}
               <button type='button' className='linkish' onClick={onOpenModels}>
-                {t('Manage models…')}
+                {t('Manage extensions…')}
               </button>
             </span>
           )}

@@ -51,14 +51,15 @@ exports, CLI target — renameable because identity is an immutable `characterId
 **01 · Generate.** Preflight streams in (background removal is async with a visible processing
 state; pose check is an advisory heuristic). Backend cards come from the registry catalog: license,
 territory, VRAM-vs-detected, install state — the model manager gate appears _in context_ when
-weights are missing, and the full **Manage models… (⌘M)** dialog lives under File. Per-backend
-options render from the catalog's `paramsSchema` (for example, Pixal3D's camera FOV and candidate
-count). **Default = generate one model.** Seed is a recorded receipt, not a decision; iteration is
-"More like this" and "Adjust settings", post-hoc. Results arrive **textured** (Pixal3D/TRELLIS.2
-emit geometry+textures together; geometry-only backends insert a texture substage) with
-Textured/Clay/Wire inspection and full orbit/pan/zoom/frame controls. Optional detail reprojection
-keeps tattoos crisp. Checkpoint: **Save canonical mesh** — unlocks the rail; also a valid exit for
-3D-game users.
+weights are missing, and the full **Manage extensions… (⌘M)** dialog lives under File. Models,
+optional external tools and bundled content share this manager; Blender stays an optional download.
+Per-backend options render from the catalog's `paramsSchema` (for example, Pixal3D's camera FOV and
+candidate count). **Default = generate one model.** Seed is a recorded receipt, not a decision;
+iteration is "More like this" and "Adjust settings", post-hoc. Results arrive **textured**
+(Pixal3D/TRELLIS.2 emit geometry+textures together; geometry-only backends insert a texture
+substage) with Textured/Clay/Wire inspection and full orbit/pan/zoom/frame controls. Optional detail
+reprojection keeps tattoos crisp. Checkpoint: **Save canonical mesh** — unlocks the rail; also a
+valid exit for 3D-game users.
 
 **02 · Rig.** Auto-rig, then a two-tier repair model. Tier 1: click any joint in the bone overlay,
 gizmo-nudge it (mirror L↔R optional, snap-to-estimate, reset), with test-pose deformation checks.

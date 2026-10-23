@@ -109,6 +109,14 @@ preserve the CLI reason and recovery path.
 
 ## Rig inspection
 
+The manager is now **Manage extensions**. Models, Tools and Content use a compact category row and
+the existing list/disclosure styling. Models retain one recommended build and historical versions.
+Tools distinguish user-owned installations from removable managed downloads, show real archive,
+expanded and staging sizes, and disclose experimental status independently from installed state.
+Blender selection/download requires explicit license review; checking and forgetting do not change
+the user's installation. Content is a read-only bundled pack/preset inventory. No empty marketplace
+or executable community-plugin controls are presented.
+
 Use outcome names for the two methods: UniRig preserves geometry; template fitting replaces it.
 After the first rig, disclose the rebuild method so the orientation controls have room. Group
 upright alignment, facing, grounding and centering into one explicit rebuild. First builds enable

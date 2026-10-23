@@ -543,9 +543,10 @@ LBS/DQS, independent motion controls, Blender automatic weights, TokenRig and fi
 See [the execution results](cpu-deformation-evaluation.md), [TokenRig](tokenrig-evaluation.md), and
 [cloth](cloth-evaluation.md). Completed inference and valid normalized weights do not establish
 whole-character quality: source ownership and final-detail garment contact remain F5-T2/F6-T1 gates.
-Keep optional ML/Blender engines outside the base app; Blender deployment is still undecided. The
-registry's former automatic macOS/Metal assumption is corrected locally, without claiming new native
-platform runs. No new binder, cloth provider or release is selected by these experiments.
+Keep optional ML/Blender engines outside the base app; Blender deployment was subsequently approved
+as an optional external tool; see the maintained-build follow-through below. The registry's former
+automatic macOS/Metal assumption is corrected locally, without claiming new native platform runs. No
+new binder, cloth provider or release is selected by these experiments.
 
 **F5-T2/F6-T1 follow-through, 2026-10-23:** the approved guided binding, prepared garment,
 correction-exchange and optional-tool trials are recorded in
@@ -554,8 +555,26 @@ actual Amy ownership/mesh candidates fail or refuse. Both prepared Bulma cloth p
 attachment/contact/shape review; clean controls also expose unresolved jump/loop behavior. No repair
 provider is promoted. Rig now offers catalog motion previews before acceptance, using the existing
 core CLI without enabling clips or changing source bytes. F3-T2 adds destination pinned-file space
-checks and honest host memory/disk/NVIDIA inventory. The deformation cache, final Blender decision
-and native/weaker-device qualification remain conditional/open; F5-T2/F6-T1 are not closed.
+checks and honest host memory/disk/NVIDIA inventory. The deformation cache and native/weaker-device
+qualification remain conditional/open; F5-T2/F6-T1 are not closed.
+
+**F3-T2/F5-T2/F6-T1 optional-tool follow-through, 2026-10-23:**
+[Blender 4.5.15 portable](maintained-blender-trial.md) passes native Windows x64 operators, bounded
+cancellation and all planned simulations. Walk/jump arrays match the retained 4.2 method exactly;
+the upgrade does not fix actual character motion.
+[Binding/clothing preparation](binding-clothing-followup.md) improves Amy’s full-character stretch
+5.635×→2.236× and Bulma’s walking attachment strain 17.39×→1.154×, but visible tethers, garment
+shape/contact and landing coverage still fail. No candidate is applied and no production
+deformation/cache contract is funded by a clean operator probe.
+
+Manage extensions now groups Models, optional Tools and bundled Content. Blender supports checked
+existing 4.5 LTS selection and an explicit pinned 4.5.15 portable download, private receipts,
+verification, progress and ownership-aware removal. Existing model commands/pins remain compatible;
+no engine, weights or community code are bundled. See [extensions](../docs/extensions.md). Remaining
+priority: complete trustworthy surface ownership/reference and garment/body correspondence; qualify
+actual walk/jump correction; then implement one shared animated correction consumer/cache. Follow
+with weaker/native hardware, interrupted-install recovery and full F7 qualification. F5-T2/F6-T1
+remain open; the capture/export preview’s known motion limitations are unchanged.
 
 F6-T4 qualifies complete production workflows on the same inputs and hardware: a textured prop
 through eight directions; an asymmetric humanoid through idle/walk/action; a roster look change with

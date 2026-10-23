@@ -9,7 +9,7 @@ import { Gallery } from './gallery';
 import { Editor } from './editor';
 import { LogDrawer, MenuBar, StatusBar, Tabs } from './chrome';
 import { Palette, type PaletteAction } from './palette';
-import { ManageModels } from './models';
+import { ManageExtensions } from './extensions';
 import { GenerateNew } from './gen';
 import { journalArgs } from './args';
 import { useLandFocus } from './focus';
@@ -51,7 +51,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
-  // bumped when Manage models closes, so the + tab's backend cards re-read
+  // bumped when Manage extensions closes, so the + tab's backend cards re-read
   // the catalog in the very flow that installs
   const [catalogEpoch, setCatalogEpoch] = useState(0);
   useLandFocus(activeTab === '__new__', '#gname');
@@ -232,7 +232,7 @@ export default function App() {
     { id: 'exam', title: t('Run health exam'), enabled: true, run: runExam },
     {
       id: 'models',
-      title: t('Manage models…'),
+      title: t('Manage extensions…'),
       hint: 'Ctrl+M',
       enabled: true,
       run: () => setModelsOpen(true),
@@ -306,7 +306,7 @@ export default function App() {
         onClose={() => setPaletteOpen(false)}
         actions={paletteActions}
       />
-      <ManageModels
+      <ManageExtensions
         bridge={bridge}
         open={modelsOpen}
         onClose={() => {

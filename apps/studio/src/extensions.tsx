@@ -1,6 +1,6 @@
 import { discoverableModels } from './genmodels';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ListedModel, ListedVersion } from '@spritebook/registry';
+import type { ListedModel, ListedTool, ListedVersion } from '@spritebook/registry';
 import type { StudioBridge } from './bridge';
 import { useJobBridge } from './jobscope';
 import { Modal } from './modal';
@@ -9,60 +9,11 @@ import { type ProgressState, readProgress } from './bakeprogress';
 import { t } from './i18n';
 import { modelsArgs } from './args';
 import { useLandFocus } from './focus';
+import { InstallProgress } from './install-progress';
+import { ExtensionTools } from './extension-tools';
 
 type Action = 'install' | 'setup' | 'verify' | 'rm';
 const gb = (bytes: number) => (bytes / 1e9).toFixed(2);
-const byteLabel = (bytes: number) =>
-  bytes >= 1e9
-    ? `${gb(bytes)} GB`
-    : bytes >= 1e6
-    ? `${(bytes / 1e6).toFixed(1)} MB`
-    : `${Math.ceil(bytes / 1e3)} KB`;
-
-function ModelProgress({ progress }: { progress: ProgressState | null }) {
-  const step = progress?.step ?? '';
-  const bytes = step.includes('download-bytes:');
-  const determinate = bytes || step === 'verify';
-  const label = bytes
-    ? t('Downloading files')
-    : step.startsWith('setup:dependencies')
-    ? t('Installing dependencies')
-    : step.startsWith('setup:sidecar')
-    ? t('Preparing the model service')
-    : step.startsWith('setup:check')
-    ? t('Checking the runtime')
-    : step.startsWith('setup:')
-    ? t('Preparing runtime files')
-    : step.startsWith('download:') || step === 'verify'
-    ? t('Verifying model files')
-    : t('Starting…');
-  const dependency = step.startsWith('setup:dependencies:')
-    ? step.slice('setup:dependencies:'.length)
-    : '';
-  const detail = bytes
-    ? step.split('download-bytes:')[1]
-    : /^(Downloading|Downloaded|Installing|Installed|Prepared|Resolved)\s/.test(dependency)
-    ? dependency
-    : step.startsWith('download:')
-    ? step.slice('download:'.length)
-    : '';
-  return (
-    <div className='model-progress'>
-      <div className='model-progress-label'>
-        <span role='status'>{label}</span>
-        {determinate && progress && (
-          <span className='mono dimtext'>
-            {bytes
-              ? `${byteLabel(progress.done)} / ${byteLabel(progress.total)}`
-              : `${progress.done} / ${progress.total}`}
-          </span>
-        )}
-      </div>
-      <progress aria-label={label} max={1} value={determinate ? progress?.fraction : undefined} />
-      {detail && <div className='model-progress-detail mono' title={detail}>{detail}</div>}
-    </div>
-  );
-}
 
 function VersionRow({ bridge, model, v, busy, setBusy, refresh, historical = false }: {
   bridge: StudioBridge;
@@ -70,7 +21,7 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh, historical = fal
   v: ListedVersion;
   busy: string | null;
   setBusy: (ref: string | null) => void;
-  refresh: () => void;
+  refresh: () => Promise<void>;
   historical?: boolean;
 }) {
   const ref = `${model.id}@${v.version}`;
@@ -108,8 +59,8 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh, historical = fal
       });
       setResult({ exit: r.exitCode, message: lastFailure(r.lines)?.message });
     } finally {
+      await refresh();
       setBusy(null);
-      refresh();
     }
   };
   return (
@@ -156,7 +107,7 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh, historical = fal
             : null}
         </div>
       </div>
-      {isBusy && <ModelProgress progress={progress} />}
+      {isBusy && <InstallProgress progress={progress} />}
       {isBusy && action && <CliTwin args={modelsArgs(action, ref, accepted)} />}
       {confirming && !isBusy && (
         <div className='model-confirm'>
@@ -280,7 +231,7 @@ function VersionRow({ bridge, model, v, busy, setBusy, refresh, historical = fal
   );
 }
 
-export function ManageModels(
+function ExtensionsDialog(
   { bridge: baseBridge, open, onClose }: {
     bridge: StudioBridge;
     open: boolean;
@@ -289,17 +240,25 @@ export function ManageModels(
 ) {
   const { bridge, cancel } = useJobBridge(baseBridge, String(open));
   const [rows, setRows] = useState<ListedModel[] | null>(null);
+  const [tools, setTools] = useState<ListedTool[]>([]);
+  const [content, setContent] = useState<
+    { id: string; displayName: string; kind: string; license?: string; clipCount?: number }[]
+  >([]);
+  const [section, setSection] = useState<'models' | 'tools' | 'content'>('models');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     setError(null);
-    const r = await bridge.runCli(['models', 'list', '--json']);
+    const r = await bridge.runCli(['extensions', 'list', '--json']);
     if (r.exitCode !== 0 || !r.lines.length) {
-      setError(t('Could not load models. Check the log, then refresh.'));
+      setError(t('Could not load extensions. Check the log, then refresh.'));
       return;
     }
     try {
-      setRows(discoverableModels(JSON.parse(r.lines.at(-1)!).models ?? [], import.meta.env.DEV));
+      const doc = JSON.parse(r.lines.at(-1)!);
+      setRows(discoverableModels(doc.models ?? [], import.meta.env.DEV));
+      setTools(doc.tools ?? []);
+      setContent(doc.content ?? []);
     } catch {
       setError(t('catalog output was not JSON'));
     }
@@ -316,11 +275,11 @@ export function ManageModels(
     [rows],
   );
   return (
-    <Modal open={open} onClose={onClose} label={t('Manage models')} className='mdl'>
+    <Modal open={open} onClose={onClose} label={t('Manage extensions')} className='mdl'>
       <div className='mdl-head'>
         <div>
-          <h2>{t('Manage models')}</h2>
-          <p className='dimtext'>{gb(installedBytes)} GB {t('model files downloaded')}</p>
+          <h2>{t('Manage extensions')}</h2>
+          <p className='dimtext'>{t('Install only what you need.')}</p>
         </div>
         <div className='model-actions'>
           {busy && (
@@ -334,13 +293,40 @@ export function ManageModels(
           <button type='button' className='btn mbtn' onClick={onClose}>{t('Close')}</button>
         </div>
       </div>
-      <div className='mdl-body'>
+      <nav className='extension-nav' aria-label={t('Extension categories')}>
+        {(['models', 'tools', 'content'] as const).map((id) => (
+          <button
+            type='button'
+            key={id}
+            aria-pressed={section === id}
+            disabled={busy !== null}
+            onClick={() => setSection(id)}
+          >
+            {id === 'models' ? t('Models') : id === 'tools' ? t('Tools') : t('Content')}
+          </button>
+        ))}
+      </nav>
+      <div
+        className='mdl-body'
+        tabIndex={0}
+        role='region'
+        aria-label={section === 'models'
+          ? t('Models')
+          : section === 'tools'
+          ? t('Tools')
+          : t('Content')}
+      >
         {error && <p className='mdl-error' role='alert'>{error}</p>}
         {rows === null && !error && (
-          <p className='mdl-loading' role='status'>{t('Loading models…')}</p>
+          <p className='mdl-loading' role='status'>{t('Loading extensions…')}</p>
         )}
-        {rows?.length === 0 && <p className='mdl-loading'>{t('No models in this catalog.')}</p>}
-        {rows?.map((m) => {
+        {section === 'models' && (
+          <p className='extension-summary'>{gb(installedBytes)} GB {t('model files downloaded')}</p>
+        )}
+        {section === 'models' && rows?.length === 0 && (
+          <p className='mdl-loading'>{t('No models in this catalog.')}</p>
+        )}
+        {section === 'models' && rows?.map((m) => {
           const recommended = m.versions.find((v) => v.version === m.recommendedVersion) ??
             m.versions.at(-1);
           if (!recommended) return null;
@@ -389,7 +375,40 @@ export function ManageModels(
             </section>
           );
         })}
+        {section === 'tools' && (
+          <ExtensionTools
+            bridge={bridge}
+            tools={tools}
+            busy={busy}
+            setBusy={setBusy}
+            refresh={refresh}
+          />
+        )}
+        {section === 'content' &&
+          content.map((item) => (
+            <section className='mrow' key={`${item.kind}:${item.id}`}>
+              <div className='model-main'>
+                <div className='model-summary'>
+                  <h3>{item.displayName}</h3>
+                  <div className='model-meta'>
+                    <span>
+                      {item.kind === 'animation-pack' ? t('Animation pack') : t('Style preset')}
+                    </span>
+                    {item.clipCount !== undefined && <span>{item.clipCount} {t('clips')}</span>}
+                    {item.license && <span>{item.license}</span>}
+                  </div>
+                </div>
+                <span className='model-status'>{t('Included')}</span>
+              </div>
+            </section>
+          ))}
       </div>
     </Modal>
   );
+}
+
+export function ManageExtensions(
+  props: { bridge: StudioBridge; open: boolean; onClose: () => void },
+) {
+  return props.open ? <ExtensionsDialog {...props} /> : null;
 }

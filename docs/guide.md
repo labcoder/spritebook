@@ -93,9 +93,9 @@ To make a character:
 
 Generate removes the background automatically when the source is opaque, before loading the 3D
 model. This uses the installed **U²-Net** (`rembg-u2net`) model; if it is missing, the error offers
-**Manage models**. Transparent 8-bit RGBA PNGs pass through unchanged. Preparation appears in the
-job progress and runs once for the candidate batch; retries reuse the verified cutout. Your original
-reference is retained, and preparation is recorded as an undoable source edit.
+**Manage extensions**. Transparent 8-bit RGBA PNGs pass through unchanged. Preparation appears in
+the job progress and runs once for the candidate batch; retries reuse the verified cutout. Your
+original reference is retained, and preparation is recorded as an undoable source edit.
 
 The button stays disabled until the form is complete. The text below it names what is missing.
 During generation, an activity panel shows elapsed time and the stage reported by core. Different
@@ -335,7 +335,7 @@ holds it there.
 | Up/Down              | move between entries in the character index; change native select values  |
 | Left/Right           | move inside backend/track radio groups; resize the focused inspector grip |
 | Ctrl+K               | open the command palette                                                  |
-| Ctrl+M               | open **Manage models**                                                    |
+| Ctrl+M               | open **Manage extensions**                                                |
 | Ctrl+Z, Ctrl+Shift+Z | undo and redo the last recorded change                                    |
 | Delete               | close the focused opened character entry                                  |
 | Escape               | close the palette, a dialog, or the log drawer                            |
@@ -371,12 +371,15 @@ retexturing and identity edits. It also covers clip bindings and the look. It do
 files a bake wrote. Review, thumbnails and implicit exports use the recorded `lastBakeId`, including
 after undo; they do not guess the newest bake directory.
 
-## 11. Manage or remove models
+## 11. Manage extensions
 
-Open **File > Manage models** (Ctrl+M). Each model shows one recommended build for this machine;
-**Other versions** keeps historical builds available. Downloaded weights and runtime readiness have
-separate status labels. Installation immediately shows activity, real download bytes and the current
-setup phase. Dependency and native checks use an indeterminate indicator.
+Open **File > Manage extensions** (Ctrl+M). **Models** retains the model controls, **Tools** manages
+optional Blender, and **Content** lists bundled packs and presets. See [extensions](extensions.md)
+for tool setup, ownership and experimental quality limits. Each model shows one recommended build
+for this machine; **Other versions** keeps historical builds available. Downloaded weights and
+runtime readiness have separate status labels. Installation immediately shows activity, real
+download bytes and the current setup phase. Dependency and native checks use an indeterminate
+indicator.
 
 Open **Details** for exact versions, terms, **Verify files**, **Repair runtime** and **Remove**. For
 installed versions with a runtime recipe, **Repair runtime** runs `models setup`; confirm the action

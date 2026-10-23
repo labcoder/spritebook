@@ -66,7 +66,7 @@ export function MenuBar(
               <MenuEntry label={t('Reload gallery')} onClick={onReload} />
               <MenuEntry label={t('Run health exam')} onClick={onExam} />
               <MenuEntry
-                label={t('Manage models…')}
+                label={t('Manage extensions…')}
                 hint='Ctrl+M'
                 onClick={onModels}
               />
@@ -137,7 +137,7 @@ export function MenuBar(
         </Menu.Portal>
       </Menu.Root>
       <button type='button' className='menubtn' onClick={onModels}>
-        {t('Manage models…')}
+        {t('Manage extensions…')}
       </button>
       <div className='menur'>
         <button

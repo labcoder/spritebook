@@ -56,11 +56,11 @@ retry. Missing weights are an actionable model gate, never a silent download.
 
 ## Install and repair
 
-Studio's **Manage models** dialog shows one recommended build per model for the detected platform,
-preferring a managed runtime recipe. **Other versions** retains earlier builds and their install
-state for existing pins. The `.local1` suffix identifies SpriteBook's complete managed build, with
-runtime setup and required support files; it is not a second model trained by SpriteBook. Exact
-build IDs, platform declarations, terms and notes live under **Details**.
+Studio's **Manage extensions > Models** list shows one recommended build per model for the detected
+platform, preferring a managed runtime recipe. **Other versions** retains earlier builds and their
+install state for existing pins. The `.local1` suffix identifies SpriteBook's complete managed
+build, with runtime setup and required support files; it is not a second model trained by
+SpriteBook. Exact build IDs, platform declarations, terms and notes live under **Details**.
 
 Downloaded weights and runtime preparation are separate states. **Runtime setup required** offers
 setup directly; **Ready** means the weight receipt and prepared runtime are present. This is not a
@@ -211,3 +211,7 @@ preview exposes leakage more clearly than walking. Distance, surface-normal, vis
 heat-weight experiments did not produce a safe replacement and are not shipping. For generated
 humanoids, separated limbs in an A/T pose remain the safer source; accepting a report does not fix
 weight ownership. F5-T2 remains open for that repair.
+
+Optional Blender is managed under **Tools** with its own external/portable ownership receipts. It is
+separate from UniRig’s Python runtime; selecting it does not switch riggers or enable automatic
+clothing repair. See [extensions](extensions.md).
