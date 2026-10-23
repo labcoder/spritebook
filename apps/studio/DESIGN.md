@@ -385,6 +385,12 @@ identity, and superseded loads cannot replace the current model. Unmount cancels
 immediately; expensive resource release follows off the navigation commit. Frame cadence, resize
 paint continuity and Gallery latency require measured hardware evidence.
 
+Rig also offers Motion check in the inspector, backed by the same catalog/retarget preview as
+Animate. It does not enable clips or accept the rig. Keep the canvas clear of library settings,
+retain the CLI twin and Return to rest pose, and block playback while edits are pending. Preview
+transport failure restores an actionable state; it does not leave the inspector busy. This is
+review, not an automatic binding or garment repair.
+
 ### Capture composition (2026-10-22)
 
 Look is a spatial workbench and a fresh core-rendered frame, with camera, lighting, finish, output

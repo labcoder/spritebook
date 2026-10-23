@@ -67,8 +67,17 @@ test('anim --preview writes the retargeted clip onto the rigged character', asyn
       assertEquals(r.code, 0, `${args[0]}: ${r.out.slice(-4).join('\n')}`);
     }
 
+    const manifestBefore = await fs.readFile(`${ws}/character.json`, 'utf8');
+    const modelBefore = await fs.readFile(`${ws}/canonical/model.glb`);
+    assertEquals(
+      JSON.parse(manifestBefore).rig.accepted,
+      false,
+      'motion review precedes acceptance',
+    );
     const r = await cli(['anim', '--preview', 'idle-loop', '--workspace', ws]);
     assertEquals(r.code, 0, r.out.slice(-4).join('\n'));
+    assertEquals(await fs.readFile(`${ws}/character.json`, 'utf8'), manifestBefore);
+    assertEquals(await fs.readFile(`${ws}/canonical/model.glb`), modelBefore);
 
     const glbPath = `${ws}/anim/preview-idle-loop.glb`;
     const doc = await new NodeIO().readBinary(new Uint8Array(await fs.readFile(glbPath)));

@@ -12,10 +12,11 @@ import { t } from './i18n';
 import { CliTwin, FailureNote, type JobFailure, lastFailure } from './gen';
 import { JobActivity } from './jobactivity';
 import { type ProgressState, readProgress } from './bakeprogress';
-import { acceptRigArgs } from './args';
+import { acceptRigArgs, animPreviewArgs } from './args';
 import { Viewport } from './viewport/Viewport';
 import { editsFile, mergeEdits, mirrorPartner, type PendingEdit } from './viewport/picking';
 import { useLandFocus } from './focus';
+import { useClipLibrary } from './clip-library';
 
 const BUNDLED_BODY = 'ubc-male';
 
@@ -40,18 +41,24 @@ function useRigRun(bridge: StudioBridge, onChanged: (args: string[]) => void) {
     setFailure(null);
     setCanceled(false);
     setRun({ running: true, progress: null, args });
-    const r = await bridge.runCli([...args, '--json'], (line) => {
-      const progress = readProgress(line);
-      if (progress) setRun({ running: true, progress, args });
-    });
-    setRun({ running: false, progress: null, args });
-    if (r.exitCode === 0) onChanged(args);
-    else if (r.exitCode === 130) setCanceled(true);
-    else {setFailure(
-        lastFailure(r.lines) ??
-          { code: null, message: t('the log drawer has the verbatim reason') },
-      );}
-    return r.exitCode;
+    try {
+      const r = await bridge.runCli([...args, '--json'], (line) => {
+        const progress = readProgress(line);
+        if (progress) setRun({ running: true, progress, args });
+      });
+      if (r.exitCode === 0) onChanged(args);
+      else if (r.exitCode === 130) setCanceled(true);
+      else {setFailure(
+          lastFailure(r.lines) ??
+            { code: null, message: t('the log drawer has the verbatim reason') },
+        );}
+      return r.exitCode;
+    } catch (error) {
+      setFailure({ code: null, message: error instanceof Error ? error.message : String(error) });
+      return 1;
+    } finally {
+      setRun({ running: false, progress: null, args });
+    }
   }, [bridge, onChanged, run]);
   return { run, failure, canceled, exec };
 }
@@ -364,6 +371,60 @@ function ReportTable({ view, onFocusJoint }: {
   );
 }
 
+function MotionReview({ bridge, dir, busy, running, onPreview }: {
+  bridge: StudioBridge;
+  dir: string;
+  busy: boolean;
+  running: boolean;
+  onPreview: (args: string[], path: string) => Promise<void>;
+}) {
+  const { clips, error } = useClipLibrary(bridge);
+  const [clipId, setClipId] = useState('');
+  const selected = clips?.find((clip) => clip.id === clipId) ?? clips?.[0];
+  const args = selected ? animPreviewArgs(dir, selected.id) : null;
+  return (
+    <section className='gensec rig-motion-review'>
+      <div className='rig-posebar'>
+        <label className='rig-motion-clip'>
+          {t('Motion check')}
+          <select
+            value={selected?.id ?? ''}
+            disabled={busy || !selected}
+            onChange={(e) => setClipId(e.target.value)}
+          >
+            {!selected && (
+              <option value=''>
+                {clips === null && !error ? t('Loading clips…') : t('No clips available')}
+              </option>
+            )}
+            {(clips ?? []).map((clip) => <option key={clip.id} value={clip.id}>{clip.id}</option>)}
+          </select>
+        </label>
+        <button
+          type='button'
+          className='btn mbtn'
+          aria-busy={running}
+          disabled={!args || busy && !running}
+          onClick={async () => {
+            if (!busy && args && selected) {
+              await onPreview(args, `${dir}/anim/preview-${selected.id}.glb`);
+            }
+          }}
+        >
+          {t('Preview motion')}
+        </button>
+      </div>
+      <p className='inote'>
+        {t(
+          'Review hands and clothing in motion before accepting. Previewing does not enable the clip.',
+        )}
+      </p>
+      {error && <p className='inote' role='status'>{error}</p>}
+      {args && <CliTwin args={args} />}
+    </section>
+  );
+}
+
 export function RigStage({ bridge, dir, manifest, onChanged }: {
   bridge: StudioBridge;
   dir: string;
@@ -387,19 +448,20 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
   const [rerunBody, setRerunBody] = useState(BUNDLED_BODY);
   const [revision, setRevision] = useState(0);
   const [orientation, setOrientation] = useState(REST_ORIENTATION);
-  const [preview, setPreview] = useState(false);
+  const [previewState, setPreviewState] = useState<{ path: string; args: string[] } | null>(null);
+  const preview = previewState !== null;
   const [previewRevision, setPreviewRevision] = useState(0);
   const rerunOpts = rerunTrackA
     ? { trackA: true as const, bodyDir: rerunBody }
     : { fixes: orientationFixes(orientation) };
   const changed = useCallback((args: string[]) => {
+    if (args.includes('--preview') || args.includes('--preview-joint')) return;
     if (
-      !args.includes('--preview-joint') && !args.includes('--accept') &&
-      !args.includes('--unaccept')
+      !args.includes('--accept') && !args.includes('--unaccept')
     ) {
       setRevision((n) => n + 1);
       setOrientation(REST_ORIENTATION);
-      setPreview(false);
+      setPreviewState(null);
       setEdits([]);
     }
     onChanged();
@@ -474,7 +536,10 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                     await exec(['rig', '--workspace', dir, '--preview-joint', selectedJoint]) === 0
                   ) {
                     setPreviewRevision((n) => n + 1);
-                    setPreview(true);
+                    setPreviewState({
+                      path: `${dir}/rig/deform-preview.glb`,
+                      args: ['rig', '--workspace', dir, '--preview-joint', selectedJoint],
+                    });
                   }
                 }}
               >
@@ -484,7 +549,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                 <button
                   type='button'
                   className='btn mbtn'
-                  onClick={() => setPreview(false)}
+                  onClick={() => setPreviewState(null)}
                 >
                   {t('Return to rest pose')}
                 </button>
@@ -499,7 +564,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
             </div>
             <Viewport
               bridge={bridge}
-              meshPath={preview ? `${dir}/rig/deform-preview.glb` : `${dir}/canonical/model.glb`}
+              meshPath={previewState?.path ?? `${dir}/canonical/model.glb`}
               contentKey={`${
                 (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? ''
               }:${preview ? previewRevision : 0}`}
@@ -519,9 +584,7 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                   )}
               onJointSelected={setSelectedJoint}
             />
-            {selectedJoint && (
-              <CliTwin args={['rig', '--workspace', dir, '--preview-joint', selectedJoint]} />
-            )}
+            {previewState && <CliTwin args={previewState.args} />}
             {selectedJoint && !preview && rig.track !== 'A' && (
               <div className='genrow'>
                 <label className='bindhold'>
@@ -655,7 +718,11 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
             <div className='rig-activity'>
               <JobActivity
                 progress={run.progress}
-                verb={run.args.includes('--preview-joint') ? 'rig-preview' : 'rig'}
+                verb={run.args.includes('--preview')
+                  ? 'anim-preview'
+                  : run.args.includes('--preview-joint')
+                  ? 'rig-preview'
+                  : 'rig'}
               />
               <CliTwin args={run.args} />
             </div>
@@ -663,6 +730,18 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           {failure && <FailureNote failure={failure} />}
           {canceled && <p className='inote job-canceled' role='status'>{t('Job canceled')}</p>}
           <div className='rig-controls'>
+            <MotionReview
+              bridge={bridge}
+              dir={dir}
+              busy={busy || edits.length > 0}
+              running={run?.running === true && run.args.includes('--preview')}
+              onPreview={async (args, path) => {
+                if (await exec(args) === 0) {
+                  setPreviewRevision((n) => n + 1);
+                  setPreviewState({ path, args });
+                }
+              }}
+            />
             <RigMethod
               disclosed
               trackA={rerunTrackA}

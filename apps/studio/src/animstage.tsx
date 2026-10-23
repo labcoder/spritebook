@@ -13,15 +13,7 @@ import { scrollIntoViewPolitely, useLandFocus } from './focus';
 import { bindingSpec, framesMath } from './bindings';
 import { animDisableArgs, animEnableArgs, animPreviewArgs } from './args';
 import { Viewport } from './viewport/Viewport';
-
-interface ClipMeta {
-  id: string;
-  name: string;
-  category: string;
-  tags: string[];
-  durationS: number;
-  loop: boolean;
-}
+import { useClipLibrary } from './clip-library';
 
 interface Binding {
   clipId: string;
@@ -32,34 +24,6 @@ interface Binding {
   holdLast: boolean;
 }
 
-function useLibrary(bridge: StudioBridge) {
-  const [clips, setClips] = useState<ClipMeta[] | null>(null);
-  const [packId, setPackId] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    bridge.runCli(['anim', '--list', '--json']).then((r) => {
-      if (!live) return;
-      if (r.exitCode !== 0 || r.lines.length === 0) {
-        setError(t('could not read the clip library — the log drawer has the verbatim reason'));
-        return;
-      }
-      try {
-        const doc = JSON.parse(r.lines.at(-1)!);
-        const first = Array.isArray(doc.packs) ? doc.packs[0] : doc;
-        setClips((first?.clips ?? []) as ClipMeta[]);
-        setPackId(String(first?.pack ?? ''));
-      } catch {
-        setError(t('clip library output was not JSON'));
-      }
-    });
-    return () => {
-      live = false;
-    };
-  }, [bridge]);
-  return { clips, packId, error };
-}
-
 export function AnimStage({ bridge, dir, manifest, onChanged }: {
   bridge: StudioBridge;
   dir: string;
@@ -68,7 +32,7 @@ export function AnimStage({ bridge, dir, manifest, onChanged }: {
 }) {
   const m = (manifest ?? {}) as Record<string, unknown>;
   const bindings = (Array.isArray(m.animationSet) ? m.animationSet : []) as Binding[];
-  const { clips, packId, error } = useLibrary(bridge);
+  const { clips, packId, error } = useClipLibrary(bridge);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   // one CLI run at a time; the key names the button that owns the run, so

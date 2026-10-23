@@ -125,6 +125,12 @@ show the fraction of stretched edges beside the worst edge. Separate mesh parts 
 information; clothing is not automatically broken. Show predicted/named joint counts and limited
 hand mapping without promising articulated fingers from a GPU run.
 
+Motion check lives in the Rig inspector and reads the same catalog as Animate. It plays a
+core-retargeted clip before acceptance, without enabling it. The active preview retains its CLI
+twin; Return to rest pose restores editing. Keep pending edits blocked and report transport failures
+without leaving the control busy. This review capability does not imply that binding or clothing has
+been repaired.
+
 ## Implementation verification
 
 The identity implementation has 67 Studio tests, alongside TypeScript and production web-build

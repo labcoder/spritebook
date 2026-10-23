@@ -38,6 +38,8 @@ export function JobActivity({ progress, verb }: { progress: ProgressState | null
     : step || t('Starting…');
   const title = verb === 'rig-preview'
     ? t('Preparing joint preview')
+    : verb === 'anim-preview'
+    ? t('Preparing motion preview')
     : verb === 'rig'
     ? t('Rigging character')
     : verb === 'pick'
@@ -56,7 +58,7 @@ export function JobActivity({ progress, verb }: { progress: ProgressState | null
       <div role='status'>{phase}</div>
       <progress aria-label={title} />
       <p className='inote'>
-        {verb === 'rig-preview'
+        {verb === 'rig-preview' || verb === 'anim-preview'
           ? t('CPU only. The saved rig is unchanged.')
           : t('Timing varies with the model and settings.')}
       </p>

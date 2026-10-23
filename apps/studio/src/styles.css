@@ -1790,6 +1790,9 @@ textarea {
   padding: 12px 0;
 }
 .rig-posebar .inote { flex-basis: 100%; }
+.rig-motion-review .rig-posebar { padding-top: 0; }
+.rig-motion-clip { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 0 1 360px; }
+.rig-motion-clip select { flex: 1; min-width: 0; }
 .vpbar .check-field { align-items: center; margin: 0; font-size: 12px; }
 .vpbar .check-field input { margin: 0; }
 

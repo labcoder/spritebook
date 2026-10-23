@@ -656,4 +656,11 @@ export const es: Record<string, string> = {
   'mesh parts': 'partes de la malla',
   'named joints': 'articulaciones con nombre',
   'predicted joints': 'articulaciones predichas',
+  'Motion check': 'Prueba de movimiento',
+  'Preparing motion preview': 'Preparando vista previa de movimiento',
+  'No clips available': 'No hay clips disponibles',
+  'Loading clips…': 'Cargando clips…',
+  'Preview motion': 'Previsualizar movimiento',
+  'Review hands and clothing in motion before accepting. Previewing does not enable the clip.':
+    'Revisa las manos y la ropa en movimiento antes de aceptar. La vista previa no activa el clip.',
 };

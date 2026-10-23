@@ -164,6 +164,12 @@ anatomy too. **Preview selected joint bend** writes a CPU-generated ±30° diagn
 the same pose axis as the check. Pause or scrub it in the viewport; **Return to rest pose** returns
 to the saved model. Previewing does not change the rig or its acceptance.
 
+The inspector's **Motion check** lets you select a library clip and **Preview motion** before
+accepting the rig. Check `walk-loop`, the `jump-start`/`jump-loop`/`jump-land` phases and `a-tpose`
+for raised arms. The CLI twin is `spritebook anim --preview <clip> --workspace <dir>`. This uses
+core-retargeted motion without enabling the clip or changing the source mesh. Return to rest before
+drafting joint edits; apply or discard pending edits before previewing movement.
+
 Predicted joint counts and hand detail vary between characters. A wrist with one branch is not five
 independently mapped fingers. When separate finger motion is unavailable, the screen says so and
 hands follow the wrists. Check both walking and an arms-raised pose: hands resting against clothing
