@@ -213,12 +213,13 @@ export class MeshViewport {
     const ratio = Math.min(globalThis.devicePixelRatio ?? 1, 2);
     if (!this.#resizePending && this.#size?.ratio === ratio) return;
     this.#resizePending = false;
+    const previous = this.#size;
     this.#size = applyViewportSize(this.#renderer, this.#camera, {
       width: this.#container.clientWidth,
       height: this.#container.clientHeight,
       ratio,
     }, this.#size);
-    if (this.#capture) this.setCaptureCamera(this.#capture);
+    if (this.#capture && this.#size !== previous) this.setCaptureCamera(this.#capture);
   }
 
   /** Load canonical glTF bytes (asset-store only, per the skill). */
@@ -345,17 +346,30 @@ export class MeshViewport {
     const fit = Math.min(width / recipe.cellPx.w, height / recipe.cellPx.h);
     const halfH = height / (2 * recipe.pixelsPerMeter * fit);
     const halfW = halfH * (this.#size ? this.#size.width / this.#size.height : 1);
+    const previousCamera = this.#camera;
     const camera = recipe.orthographic
-      ? new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, frame.near, frame.far)
-      : new THREE.PerspectiveCamera(
-        2 *
-          Math.atan(
-            Math.tan((recipe.fovDeg ?? 35) * Math.PI / 360) * height / (recipe.cellPx.h * fit),
-          ) * 180 / Math.PI,
-        width / height,
-        frame.near,
-        frame.far,
-      );
+      ? (previousCamera instanceof THREE.OrthographicCamera
+        ? previousCamera
+        : new THREE.OrthographicCamera())
+      : (previousCamera instanceof THREE.PerspectiveCamera
+        ? previousCamera
+        : new THREE.PerspectiveCamera());
+    camera.near = frame.near;
+    camera.far = frame.far;
+    camera.zoom = 1;
+    if (camera instanceof THREE.OrthographicCamera) {
+      camera.left = -halfW;
+      camera.right = halfW;
+      camera.top = halfH;
+      camera.bottom = -halfH;
+    } else {
+      camera.fov = 2 *
+        Math.atan(
+          Math.tan((recipe.fovDeg ?? 35) * Math.PI / 360) * height / (recipe.cellPx.h * fit),
+        ) * 180 / Math.PI;
+      camera.aspect = width / height;
+    }
+    camera.updateProjectionMatrix();
     const world = new THREE.Matrix4().fromArray(frame.view).invert();
     const eye = new THREE.Vector3().setFromMatrixPosition(world);
     const forward = new THREE.Vector3(0, 0, -1).transformDirection(world);
@@ -365,7 +379,7 @@ export class MeshViewport {
         (2 * recipe.pixelsPerMeter * Math.tan((recipe.fovDeg ?? 35) * Math.PI / 360));
     const target = eye.clone().addScaledVector(forward, distance);
     this.#camera = camera;
-    this.#controls.camera = camera;
+    if (camera !== previousCamera) this.#controls.camera = camera;
     this.#controls.dollyToCursor = false;
     this.#controls.mouseButtons.right = CameraControls.ACTION.NONE;
     this.#controls.minPolarAngle = Math.PI / 180;
