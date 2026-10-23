@@ -60,14 +60,14 @@ Healthy output shows the product and render-pipeline versions, your adapter, the
 OK`):
 
 ```
-SpriteBook 0.9.0
+SpriteBook 0.5.0
 node 24.22.0 - v8 13.6.233.17-node.57 - windows-x64
 vram: 24 GiB detected
 models root: %LOCALAPPDATA%/spritebook/models
-render pipeline spritebook-render@0.6.0
+render pipeline spritebook-render@0.7.0
 backend env: SPRITEBOOK_GPU_BACKEND=vulkan
 adapter: NVIDIA: 610.88 610.88.0.0 (vendor nvidia, device nvidia-geforce-rtx-3090)
-render signature: spritebook-render@0.6.0#9a231c45
+render signature: spritebook-render@0.7.0#9a231c45
 features: core-features-and-limits
 limits: maxColorAttachments=8 maxColorAttachmentBytesPerSample=32 maxTextureDimension2D=8192 maxBufferSize=268435456
 render probe: OK (checksum 5f70bf18a0860070)

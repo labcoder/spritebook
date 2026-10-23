@@ -8,10 +8,15 @@ move together.
 
 ## Product versioning
 
-Semver, pre-1.0; the current product version is `0.9.0`. Prerelease tags may use suffixes such as
+Semver, pre-1.0; the current product version is `0.5.0`. Prerelease tags may use suffixes such as
 `-alpha.1`. The CLI version is `SPRITEBOOK_VERSION` in `packages/cli/version.ts`; `spritebook
 --version` prints it. Keep root/Studio package metadata and Tauri's version in sync when advancing
 the product version; the candidate workflow checks the tag against the CLI value.
+
+The Node Windows preview uses the maintainer-requested 0.5.0 baseline. Earlier prototype changelog
+entries retain their original numbers. Metadata preparation is separate from publication; the
+motion-quality gate in `future/beta-0.5.md` remains open, and no upgrade path from prototype
+installers is qualified by this version reset.
 
 Pre-1.0 rules:
 
@@ -22,9 +27,9 @@ Pre-1.0 rules:
 ## rendererVersion and the render signature (D-023)
 
 The render package owns the pipeline version: `RENDERER_VERSION` in `packages/render/contracts.ts`,
-currently `spritebook-render@0.6.0`. It moves on its own schedule: it tracks PIXELS, not the
-product, so a product release never bumps it and a pixel change always does. The 0.9.0 product
-version and the 0.6.0 render version are both correct and unrelated.
+currently `spritebook-render@0.7.0`. It moves on its own schedule: it tracks PIXELS, not the
+product, so a product release never bumps it and a pixel change always does. The 0.5.0 product
+version and the 0.7.0 render version are both correct and unrelated.
 
 **Bump it on any pixel-affecting change anywhere in the bake pipeline** — shaders, camera framing,
 the pose driver, AOV encoding, style algorithms, packing — not only changes inside the render
@@ -36,7 +41,7 @@ Cache keys never carry the raw string. At bake time they carry `renderSignature(
 
 ```
 <RENDERER_VERSION>#<8-hex sha256 of runtime/backend/adapter identity>
-e.g. spritebook-render@0.6.0#9a231c45
+e.g. spritebook-render@0.7.0#9a231c45
 ```
 
 The signature includes Node version, platform/architecture, Dawn version, PNG/zlib identity, backend

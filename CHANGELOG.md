@@ -4,6 +4,20 @@ Notable changes to SpriteBook. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version, tag, and golden policy is in
 `docs/versioning.md` in the repository.
 
+## 0.5.0 - Unreleased Windows preview
+
+The Node-based preview adopts the requested 0.5.0 product version. Earlier prototype entries keep
+their original version numbers. No tag or publication is implied by this entry.
+
+- Tauri and TypeScript remain the desktop and core; the application owns its Node runtime.
+- Look composes camera projection, angles, lighting and output size against a fresh core-rendered
+  frame. Original preserves full color; pixel, cel and painterly finishes remain available.
+- Output cells support 64 through 4096 pixels, with GPU-size preflight and multipage atlas playback.
+- Export can copy the canonical GLB and embedded textures independently of sprite baking.
+- Windows walk/jump exports pass atlas, timing, strip-pixel and Godot resource checks. Amy's skin
+  ownership and Bulma's skirt motion still block visual qualification; experimental repairs do not
+  ship. Engine imports, additional native platforms and signed distribution are unqualified.
+
 ## 0.9.0 - 2026-08-06
 
 The GUI release. SpriteBook Studio wraps the proven CLI in six guided stages, and the pipeline grew
