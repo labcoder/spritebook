@@ -113,7 +113,7 @@ if (gpuArg === '--gpu') {
     import { writeFile } from 'node:fs/promises';
     const { encode } = await import(${JSON.stringify(imageModule)});
     const data = new Uint8Array(512 * 512 * 4);
-    for(let i=0;i<data.length;i+=4)data.set([128,64,32,255],i);
+    for(let y=64;y<448;y++)for(let x=128;x<384;x++)data.set([128,64,32,255],(y*512+x)*4);
     await writeFile(${JSON.stringify(image)},encode({width:512,height:512,data}));
   `,
   ], { cwd: root, env, windowsHide: true });

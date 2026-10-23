@@ -23,21 +23,22 @@ test('template fitting refuses orientation and repair options instead of silentl
   }
 });
 
-test('Studio orientation switches reach catalog validation without requiring values', async () => {
+test('Studio orientation switches reach model validation without requiring values', async () => {
   const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-rig-flags-'));
   try {
     for (const fix of ['upright', 'face-front', 'feet-ground', 'center']) {
       const lines: string[] = [];
       const code = await runCli([
         ...rigRunArgs(join(root, 'hero'), { fixes: [fix] }),
-        '--catalog',
-        join(root, 'missing-catalog.json'),
+        '--models-dir',
+        join(root, 'empty-models'),
         '--json',
       ], { stdout: (line) => lines.push(line), stderr: (line) => lines.push(line) });
       assertEquals(code, 1);
       const error = lines.map((line) => JSON.parse(line)).find((event) => event.t === 'error');
-      assert(error, 'the missing catalog must stop the run before any inference');
-      assert(error.message.includes('missing-catalog.json'), `${fix}: ${error.message}`);
+      assert(error, 'the missing model must stop the run before any inference');
+      assertEquals(error.code, 'model-missing', `${fix}: ${error.message}`);
+      assert(error.message.includes('empty-models'), `${fix}: ${error.message}`);
     }
   } finally {
     await fs.rm(root, { recursive: true });
