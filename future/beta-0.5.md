@@ -46,10 +46,16 @@ delivery. All exported frames are nonempty, atlas rectangles are in bounds, Godo
 against the manifests, timing agrees, and sampled strip crops match atlas pixels exactly. Real 64px
 pixel and 4096px Original previews also pass on the owned runtime.
 
-The complete suite passes on Node 24.22: 923 tests pass and seven gated checks skip. The Windows x64
-0.5.0 installer builds. Those local proofs precede the subsequently approved capture/export preview
-publication; fresh checks and hosted CI are being recorded for that publication. Live character
-manifests and canonical GLB hashes remain unchanged.
+The fresh local suite passes on Node 24.22: **924 tests pass and seven gated checks skip**. Lint,
+format and separate type checks pass. The Windows x64 installer builds at source `35878cb` with a
+clean runtime receipt: 64,261,147 bytes, SHA-256
+`439059bd2b2a29f9bdb31f46ee3140964ddf8d063fe2711645bccb2c7a5cd1d3`.
+
+[Hosted CI at `3da4ddf`](https://github.com/labcoder/spritebook/actions/runs/39990823015) passes all
+five jobs: checks, Windows/macOS/Ubuntu tests and Linux lavapipe structural/image checks. Initial
+failures exposed an orientation test dependent on installed user models and an opaque image in the
+weightless installed-runtime smoke; both harness assumptions are fixed. No production prep or
+deformation check was weakened. Live character manifests and canonical GLB hashes remain unchanged.
 
 Capture was reviewed in light and dark themes at 1280×720. A five-second browser proof on the
 800k-triangle character averaged 139.8fps idle and 100.1fps during continuous inspector resizing,

@@ -36,7 +36,11 @@ on Ubuntu/macOS/Windows. Its Linux lavapipe lane requires an adapter and runs re
 and image checks. The [candidate workflow](../.github/workflows/release.yml) builds owned CLI trees
 on native hosted OS runners and a Windows NSIS candidate, then exercises copied CLI trees with an
 empty PATH. Intel and ARM Mac jobs use separate runner labels. Definitions are committed; they were
-not dispatched or reported as remote passes during this local session.
+executed for the 0.5.0 preview.
+[Fresh source CI](https://github.com/labcoder/spritebook/actions/runs/39990823015) passes on
+Windows/macOS/Ubuntu, including Linux software rendering. Candidate native payload and installer
+results are recorded by the release workflow. Source fixtures and copied-payload checks do not
+qualify native consumer GPU performance, downloaded models or installed Mac/Linux desktops.
 
 F7 still needs actual target artifacts, native GPU/performance measurements, installer recovery,
 clean-machine runtime prerequisites, signing/notarization, notices and native accessibility. The
