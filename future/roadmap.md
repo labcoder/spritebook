@@ -583,6 +583,12 @@ cold inference, warm inference and sprite-bake time separately. Include silhouet
 baseline QA without rejecting legitimate poses or asymmetric attachments. A node that runs
 successfully is not evidence that the complete character workflow is ready.
 
+**F5-T2/F6-T1/F6-T4 approved hardening milestone, 2026-10-23:** work the five acceptance steps in
+[dependable first animated character](first-character-hardening.md): reference, matched generator
+cohort, early motion audition, reviewed preparation and complete delivery/recovery. Source ownership
+is a demonstrated problem; clean cloth jump/loop failures also require a prepared reference. Keep
+original assets and rejected candidates, with no quality claims based solely on process exit.
+
 ## Feature preservation map
 
 | Existing capability                                                      | Migration protection                                                | Later improvement                  |
