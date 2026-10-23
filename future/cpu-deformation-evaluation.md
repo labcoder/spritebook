@@ -165,8 +165,9 @@ canonical assets. Keep large optional tools out until a repair beats the same ow
 motion and contact gates. Native CI/hardware runs and deployment/cancellation/removal qualification
 belong to a candidate that passes, not to a rejected prototype.
 
-An attempted cleanup of the disposable TokenRig checkpoints and overlay environment was rejected by
-automatic approval review with only "blocked by policy." No deletion ran. About 1.70 GB of those
-logical files therefore remains alongside the retained research meshes/images; existing installed
-model environments and package caches were not targeted. This is local experiment storage, not an
-increase in the default app's payload.
+Automatic approval review rejected the combined recursive checkpoint/environment cleanup with only
+"blocked by policy." A narrower nonrecursive cleanup subsequently removed the two explicitly named,
+hash-verified checkpoint copies: 1,618,915,724 logical bytes. The separate 82,739,474-byte research
+overlay remains, along with proof meshes/images, logs, recipes and hashes. Existing installed model
+environments and package caches were untouched. Replay must fetch the pinned checkpoints again; none
+of this experiment storage increases the default app payload.

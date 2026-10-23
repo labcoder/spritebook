@@ -89,9 +89,10 @@ is modified.
 
 The release workflow builds **candidate artifacts** with a complete owned runtime, sample, docs and
 notices, and a Windows NSIS candidate. It executes copied CLI trees on native hosted OS runners;
-Linux additionally exercises software Vulkan. This is not a public release or native GPU/desktop
-qualification. Windows ARM64, both Mac architectures and Linux remain F7 targets, including native
-execution, installer recovery and accessibility checks. No emulated run counts as native evidence.
+Linux additionally exercises software Vulkan. The maintainer-approved 0.5.0 prerelease links these
+testing candidates; this is not production distribution or native GPU/desktop qualification. Windows
+ARM64, both Mac architectures and Linux remain F7 targets, including native execution, installer
+recovery and accessibility checks. No emulated run counts as native evidence.
 
 Keep the entire portable runtime tree together. It includes production JavaScript dependencies and
 native assets, with no development node_modules, compiler or source TypeScript. The installed app

@@ -7,8 +7,12 @@ remaining ownership and clothing problems. This report records an isolated exper
 production integration or a completed cross-platform qualification.
 
 No live character, installed model environment, registry default or application behavior changed.
-The experiment and its downloaded weights remain under the ignored
-`.render-bench/quality-research-2026-10-23/tokenrig/` directory.
+The experiment's recipes, hashes, candidate meshes and comparisons remain under the ignored
+`.render-bench/quality-research-2026-10-23/tokenrig/` directory. After evaluation, a narrow cleanup
+removed the two hash-verified checkpoint copies (1,618,915,724 logical bytes). The 82.74 MB overlay
+remains because recursive environment cleanup was blocked by automatic review. Replaying inference
+requires fetching the pinned checkpoints again; existing installed models and shared packages were
+untouched. The footprint table below records measured evaluation-time sizes.
 
 ## What was held constant
 

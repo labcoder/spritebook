@@ -18,8 +18,27 @@ outside this pass. Motion repairs remain active work, not a prerequisite for thi
       atlases and exporting the canonical GLB plus texture files.
 - [x] Export both game-view scenarios and validate output manifests, alpha, timing and strip pixels.
 - [ ] Pass visual motion review, including hand/trouser ownership and skirt clearance.
-- [ ] Review code/docs for beta polish and personal machine assumptions, align version metadata, run
+- [x] Review code/docs for beta polish and personal machine assumptions, align version metadata, run
       Windows checks, then push main and tag `v0.5.0`; follow CI to completion.
+
+## Published preview
+
+[v0.5.0](https://github.com/labcoder/spritebook/releases/tag/v0.5.0) is published as a prerelease at
+`b24adaebc6825d25908abff93083711b5b85878d`. Its exact-source
+[CI](https://github.com/labcoder/spritebook/actions/runs/39992511449) and
+[candidate workflow](https://github.com/labcoder/spritebook/actions/runs/39992515204) both pass all
+five jobs. The latter verifies copied CLI payloads on Windows x64, Linux x64, Mac ARM64 and Intel
+Mac, including Linux software-rendered generation/bake/export, and builds the Windows NSIS
+installer.
+
+Download the
+[Windows installer candidate](https://github.com/labcoder/spritebook/actions/runs/39992515204/artifacts/12518737901)
+or
+[portable Windows CLI](https://github.com/labcoder/spritebook/actions/runs/39992515204/artifacts/12519260589)
+from Actions. The installer artifact ZIP is 64,251,894 bytes with Actions archive digest
+`sha256:e50aaf2cd3c68f5b80ec5f7e1a2a2198bf86323b47c448dd4d82ca6daecca093`; this is the ZIP digest,
+not the inner EXE's hash. These are unsigned testing candidates. The quality items left unchecked
+above, engine integration and broader F7 platform/distribution gates remain open.
 
 ## Acceptance
 

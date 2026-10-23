@@ -26,8 +26,10 @@ generation/rig/sprites, offline operation, exact fresh-worker replay and repair:
 [hardware/platform spike](model-platform-spike.md) adds measured TripoSR experiments and sourced
 Mac/Linux requirements. F7 retains release and deferred native-platform qualification; no public
 production release is claimed. The maintainer approved a **0.5.0 Windows capture/export preview**
-with documented hand/clothing deformation and skirt-clipping limitations; publication and CI status
-are tracked in the [preview checklist](beta-0.5.md). TRELLIS.2 remains the default.
+with documented hand/clothing deformation and skirt-clipping limitations. That
+[preview is published](https://github.com/labcoder/spritebook/releases/tag/v0.5.0), with green
+source CI and candidate builds recorded in the [preview checklist](beta-0.5.md). TRELLIS.2 remains
+the default.
 
 ## Recommendation in one paragraph
 

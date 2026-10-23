@@ -7,14 +7,14 @@ targets. The maintainer deferred native Mac, Windows ARM64 and Linux qualificati
 only the Windows x64 machine is available locally. Builds and software rendering do not close those
 gates.
 
-| Layer              | Windows x64                                                                      | Windows ARM64                                  | macOS ARM64 / Intel                               | Linux                                                       |
-| ------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------- |
-| Node core/CLI      | Local tests and copied payload executed                                          | Target; native addon/loader recipe unqualified | Target; native hosted build recipes, no local run | Target; source/lavapipe CI defined, no fresh remote run     |
-| GPU renderer       | NVIDIA RTX 3090, Vulkan, driver 610.88; paired image/performance checks pass     | F7 native hardware gate                        | F7 Metal gate, architectures recorded separately  | F7 hardware gate; lavapipe is software evidence only        |
-| Tauri desktop      | Windows build/integration qualification in F4                                    | F7 native installed-app gate                   | F7 native installed-app gate                      | Tier 2; F7 WebKitGTK/installed-app gate                     |
-| Base Python/uv     | Fresh writable environment and real U²-Net prep executed                         | CPU target, not run here                       | CPU target, not run here                          | CPU target, not run here                                    |
-| TRELLIS.2 / UniRig | Complete managed CUDA setup and installed offline workflow qualified on RTX 3090 | Current CUDA recipes unavailable               | Current CUDA recipes unavailable                  | Historical CUDA entries; complete native setup unqualified  |
-| Pixal3D            | Optional managed CUDA setup and installed offline workflow qualified on RTX 3090 | Current CUDA recipe unavailable                | Community ports researched; no catalog runtime    | Upstream CUDA path researched; no qualified catalog runtime |
+| Layer              | Windows x64                                                                      | Windows ARM64                                  | macOS ARM64 / Intel                                       | Linux                                                       |
+| ------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- |
+| Node core/CLI      | Local and hosted tests; copied payload executed                                  | Target; native addon/loader recipe unqualified | Hosted native copied-payload checks on both architectures | Hosted native copied payload and lavapipe execution         |
+| GPU renderer       | NVIDIA RTX 3090, Vulkan, driver 610.88; paired image/performance checks pass     | F7 native hardware gate                        | F7 Metal gate, architectures recorded separately          | F7 hardware gate; lavapipe is software evidence only        |
+| Tauri desktop      | Windows build/integration qualification in F4                                    | F7 native installed-app gate                   | F7 native installed-app gate                              | Tier 2; F7 WebKitGTK/installed-app gate                     |
+| Base Python/uv     | Fresh writable environment and real U²-Net prep executed                         | CPU target, not run here                       | CPU target, not run here                                  | CPU target, not run here                                    |
+| TRELLIS.2 / UniRig | Complete managed CUDA setup and installed offline workflow qualified on RTX 3090 | Current CUDA recipes unavailable               | Current CUDA recipes unavailable                          | Historical CUDA entries; complete native setup unqualified  |
+| Pixal3D            | Optional managed CUDA setup and installed offline workflow qualified on RTX 3090 | Current CUDA recipe unavailable                | Community ports researched; no catalog runtime            | Upstream CUDA path researched; no qualified catalog runtime |
 
 The model workflows above use exact recipes and configuration-specific admission. They do not
 qualify every NVIDIA card or every upstream mode. [Model management](models.md) lists file sizes,
@@ -42,11 +42,15 @@ Windows/macOS/Ubuntu, including Linux software rendering. Candidate native paylo
 results are recorded by the release workflow. Source fixtures and copied-payload checks do not
 qualify native consumer GPU performance, downloaded models or installed Mac/Linux desktops.
 
-F7 still needs actual target artifacts, native GPU/performance measurements, installer recovery,
-clean-machine runtime prerequisites, signing/notarization, notices and native accessibility. The
-Windows Vulkan payload excludes DXC/FXC; private Direct3D experiments confer no redistribution
-clearance. Windows ARM64 needs its own loader/addon qualification; x64 emulation is separate
-evidence.
+The [v0.5.0 candidate run](https://github.com/labcoder/spritebook/actions/runs/39992515204) passes
+all four native CLI payload jobs and the Windows installer build. The matching
+[source CI](https://github.com/labcoder/spritebook/actions/runs/39992511449) is also green.
+
+F7 still needs end-user installed-desktop qualification, native GPU/performance measurements,
+installer recovery, clean-machine runtime prerequisites, signing/notarization, notices and native
+accessibility. The Windows Vulkan payload excludes DXC/FXC; private Direct3D experiments confer no
+redistribution clearance. Windows ARM64 needs its own loader/addon qualification; x64 emulation is
+separate evidence.
 
 ## Re-check triggers
 

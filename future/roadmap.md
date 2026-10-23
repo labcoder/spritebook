@@ -534,7 +534,9 @@ region and Bulma's skirt fail visual qualification. See the [0.5.0 checklist](be
 [skinning investigation](garment-skinning-research.md). These exports do not close F7 or the motion
 gate. On 2026-10-23 the maintainer explicitly approved publishing **v0.5.0 as a capture/export
 preview**, with these motion limitations documented. This limited scope permits the preview tag
-after build/CI checks; it does not qualify automatic rigging or a production release.
+after build/CI checks; it does not qualify automatic rigging or a production release. The
+[preview is published](https://github.com/labcoder/spritebook/releases/tag/v0.5.0); exact-tag CI and
+all five candidate build/payload jobs pass. See [the preview record](beta-0.5.md).
 
 The approved low-footprint repair investigation now compares the exact Mesh2Motion CPU binder,
 LBS/DQS, independent motion controls, Blender automatic weights, TokenRig and fitted cloth methods.
