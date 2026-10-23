@@ -58,7 +58,7 @@ export interface PickOptions extends ReceiptOptions {
   /** required on a first pick; otherwise carried forward from the last one */
   heightM?: number;
   /** required on a first pick; otherwise carried forward from the last one */
-  texturedBy?: 'backend' | 'texture-substage';
+  texturedBy?: 'backend' | 'texture-substage' | 'source';
   /** a freshly picked mesh has not been reprojected yet (default false) */
   reprojected?: boolean;
   /**
@@ -76,7 +76,7 @@ export interface PickOptions extends ReceiptOptions {
 export interface CanonicalMeshPatch {
   gltfSha256?: string;
   heightM?: number;
-  texturedBy?: 'backend' | 'texture-substage';
+  texturedBy?: 'backend' | 'texture-substage' | 'source';
   reprojected?: boolean;
   colorMatched?: boolean;
   /** the image the fidelity passes conditioned on (see the schema's docstring) */

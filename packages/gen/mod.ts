@@ -9,6 +9,8 @@
  */
 export { runGenJob } from './gen.ts';
 export type { GenJobOptions } from './gen.ts';
+export { runImportJob } from './import.ts';
+export type { ImportJobOptions } from './import.ts';
 export { runPrepJob } from './prep.ts';
 export type { PrepJobOptions } from './prep.ts';
 export { retextureBackends, runRetextureJob } from './retexture.ts';

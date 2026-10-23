@@ -580,6 +580,7 @@ export function mergeAnimationSet(
  * reading this table, and docsknobs_test.ts makes that permanent.
  */
 export const VERB_FLAGS: Record<string, readonly string[]> = {
+  import: ['workspace', 'model', 'character', 'name', 'height', 'example'],
   bake: [
     'all',
     'root',
@@ -752,6 +753,7 @@ VERB_FLAGS.look = [...VERB_FLAGS.look, 'preview', 'clip', 'frame', 'direction', 
 const GLOBAL_FLAGS = ['json', 'log-append'] as const;
 
 const BOOLEAN_FLAGS: Record<string, readonly string[]> = {
+  import: ['example'],
   export: ['mesh'],
   bake: ['all', 'plan', 'only-invalidated', 'mirror', 'no-mirror'],
   anim: ['list'],
@@ -1400,6 +1402,39 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
   if (verb === 'doctor') {
     const { runDoctor } = await import('./doctor.ts');
     return await runDoctor(args, io);
+  }
+  if (verb === 'import') {
+    const workspace = flag(args, 'workspace'), model = flag(args, 'model');
+    const example = args.includes('--example');
+    if (!workspace || (!model && !example) || (model && example)) {
+      return fail(
+        'import' as JobEvent['jobId'],
+        'bad-args',
+        'Use --workspace <new-dir> and either --model <mesh> or --example.',
+      );
+    }
+    try {
+      const { basename } = await import('node:path');
+      const { runImportJob } = await import('@spritebook/gen');
+      const id = flag(args, 'character') ?? basename(workspace.replace(/[\\/]+$/, ''));
+      return await pump(
+        runImportJob({
+          jobId: 'import',
+          workspace,
+          characterId: id,
+          displayName: flag(args, 'name') ?? id,
+          input: model ?? resourcePath('rig', 'bodies/ubc-male/body.glb'),
+          ...(flag(args, 'height') !== undefined ? { heightM: numFlag(args, 'height', 1.7) } : {}),
+        }),
+        emit,
+      );
+    } catch (error) {
+      return fail(
+        'import' as JobEvent['jobId'],
+        'import-failed',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   if (verb === 'look') {

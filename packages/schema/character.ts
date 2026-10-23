@@ -173,7 +173,7 @@ export const CharacterManifestSchema = z.strictObject({
   canonicalMesh: z.strictObject({
     gltfSha256: Sha256Schema,
     heightM: z.number().positive(),
-    texturedBy: z.enum(['backend', 'texture-substage']),
+    texturedBy: z.enum(['backend', 'texture-substage', 'source']),
     reprojected: z.boolean(),
     /** the colour-match pass ran (A2): the texture's Oklab statistics were
      * reconciled with the source image's. Absent = did not run (no opt-in,

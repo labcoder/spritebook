@@ -17,6 +17,19 @@ external source/environments and gated assets; read [sidecar setup](../sidecar/R
 [licensing](licensing.md). `models install` verifies weights and provisions a declared runtime;
 `models setup` repairs that runtime while retaining verified weights.
 
+## import — preserve a mesh or try the offline reference
+
+```sh
+spritebook import --workspace ./characters/reference --example
+spritebook import --workspace ./characters/hero --model ./hero.glb --name Hero
+```
+
+Use a new workspace. `--character <id>` overrides the directory-derived id; `--height <metres>` sets
+the declared height. The canonical importer preserves an existing skin and its materials. Imported
+rigs start unaccepted: review walk and jump in Rig before accepting. Static meshes still need
+rigging. Import is journaled and undo restores the previous empty state. `--example` uses the
+already bundled CC0 humanoid, with no model downloads.
+
 ## gen — image to candidate meshes
 
 ```

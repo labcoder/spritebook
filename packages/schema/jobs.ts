@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { CharacterIdSchema, IsoTimeSchema, JobIdSchema } from './identity.ts';
 
 export const JOB_VERBS = [
+  'import',
   'prep',
   'gen',
   'pick',
