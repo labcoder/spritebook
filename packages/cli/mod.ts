@@ -717,6 +717,16 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
   ],
   prep: ['image', 'out', 'sidecar', 'models-dir', 'catalog'],
   models: ['models-dir', 'catalog', 'installed', 'accept-license', 'territory', 'from'],
+  extensions: [
+    'models-dir',
+    'catalog',
+    'installed',
+    'accept-license',
+    'territory',
+    'from',
+    'tools-dir',
+    'path',
+  ],
   doctor: ['sidecar'],
 };
 
@@ -760,6 +770,7 @@ const BOOLEAN_FLAGS: Record<string, readonly string[]> = {
     'center',
   ],
   models: ['installed', 'accept-license'],
+  extensions: ['installed', 'accept-license'],
   doctor: ['sidecar'],
   workspace: ['roster', 'bake', 'thumb', 'atlas'],
 };
@@ -2536,6 +2547,121 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     );
   }
 
+  if (verb === 'extensions') {
+    const registry = await import('@spritebook/registry');
+    const sub = args[1];
+    const ref = args[2];
+    try {
+      if (sub === 'list') {
+        const { loadPack } = await import('@spritebook/anim');
+        const [models, tools, pack] = await Promise.all([
+          registry.runListQuery({
+            catalog: await registry.loadCatalog(flag(args, 'catalog')),
+            root: flag(args, 'models-dir') ?? registry.defaultModelsRoot(),
+          }),
+          registry.listTools(flag(args, 'tools-dir')),
+          loadPack(BUNDLED_PACK),
+        ]);
+        const installed = args.includes('--installed');
+        const result = {
+          models: installed
+            ? models.map((m) => ({ ...m, versions: m.versions.filter((v) => v.installed) })).filter(
+              (m) => m.versions.length,
+            )
+            : models,
+          tools: installed ? tools.filter((t) => t.selected || t.managed.length) : tools,
+          content: [
+            {
+              id: pack.id,
+              displayName: pack.name,
+              kind: 'animation-pack',
+              bundled: true,
+              license: pack.license,
+              clipCount: pack.clips.length,
+            },
+            ...Object.entries(PRESETS).map(([id]) => ({
+              id,
+              displayName: id,
+              kind: 'style',
+              bundled: true,
+            })),
+          ],
+        };
+        if (json) io.stdout(JSON.stringify(result));
+        else {
+          for (const m of result.models) io.stdout(`model  ${m.id}  ${m.displayName}`);
+          for (const t of result.tools) {
+            io.stdout(
+              `tool   ${t.id}  ${t.selected ? t.selected.version : 'optional; not selected'}${
+                t.issue ? ` - ${t.issue}` : ''
+              }`,
+            );
+          }
+          for (const c of result.content) io.stdout(`content ${c.id}  bundled ${c.kind}`);
+        }
+        return 0;
+      }
+      if (ref?.split('@')[0] === 'blender') {
+        if (!['install', 'use', 'verify', 'rm'].includes(sub)) {
+          return fail(
+            'extensions' as JobEvent['jobId'],
+            'bad-args',
+            'Blender supports install, use, verify and rm.',
+          );
+        }
+        if (
+          args.includes('--catalog') || args.includes('--models-dir') ||
+          args.includes('--territory') || args.includes('--installed') ||
+          (args.includes('--path') && sub !== 'use') ||
+          (args.includes('--from') && sub !== 'install') ||
+          (args.includes('--path') && ref.includes('@'))
+        ) {
+          return fail(
+            'extensions' as JobEvent['jobId'],
+            'bad-args',
+            'Choose a Blender download, or use --path with extensions use blender. Model flags do not apply to tools.',
+          );
+        }
+        const [id, version, extra] = ref.split('@');
+        if (
+          id !== 'blender' || extra !== undefined ||
+          (version !== undefined && !/^\d+\.\d+\.\d+$/.test(version))
+        ) {
+          return fail(
+            'extensions' as JobEvent['jobId'],
+            'bad-args',
+            'Use blender or blender@<major.minor.patch>.',
+          );
+        }
+        return await pump(
+          registry.runToolJob({
+            action: sub as 'install' | 'use' | 'verify' | 'rm',
+            root: flag(args, 'tools-dir'),
+            version,
+            path: flag(args, 'path'),
+            from: flag(args, 'from'),
+            acceptLicense: args.includes('--accept-license'),
+          }),
+          emit,
+        );
+      }
+      if (['install', 'setup', 'verify', 'rm'].includes(sub) && ref && !ref.startsWith('--')) {
+        return await runCli(['models', ...args.slice(1)], io);
+      }
+      return fail(
+        'extensions' as JobEvent['jobId'],
+        'bad-args',
+        'extensions list | install <id[@version]> | use blender [--path <executable>] --accept-license | verify <id[@version]> | rm <id[@version]>',
+      );
+    } catch (error) {
+      return fail(
+        'extensions' as JobEvent['jobId'],
+        'extensions-failed',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
   if (verb === 'models') {
     // registry verbs (P3-T2, D-009): list is a query snapshot; install/verify/
     // rm are job streams with the same event discipline as bake/export.
@@ -2824,7 +2950,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       'unknown-verb',
       `Unknown verb "${
         verb ?? ''
-      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, models, anim, look, bake, export, workspace, doctor, undo, redo (--version)`,
+      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, models, extensions, anim, look, bake, export, workspace, doctor, undo, redo (--version)`,
     );
   }
 

@@ -12,6 +12,7 @@ a supported native target.
 | Use Studio's six stages                           | [User guide](guide.md)                                                                                                                     |
 | Run or automate a capability                      | [CLI reference](cli.md)                                                                                                                    |
 | Install or remove model dependencies              | [Models and local runtimes](models.md), [sidecar setup](../sidecar/README.md)                                                              |
+| Manage optional tools and bundled content         | [Extensions](extensions.md)                                                                                                                |
 | Understand product goals and performance budgets  | [Product requirements](prd.md)                                                                                                             |
 | Understand process, module and storage boundaries | [Architecture](architecture/architecture.md)                                                                                               |
 | Change persisted or wire data                     | [Source schemas](../packages/schema/mod.ts), [data-model index](architecture/data-models.ts)                                               |

@@ -184,6 +184,15 @@ release gates.
 
 ## Installed ownership
 
+Optional external tools share the Extensions management surface with models and bundled content.
+Their version/platform/license/archive pins live in `registry/catalog/tools.json`; schema and
+ownership receipts live in `packages/schema/tools.ts`. The current Blender adapter only manages
+selection, portable installation, checking and removal. It is not a production cloth provider.
+Existing programs are registered rather than copied/uninstalled; managed portable directories have
+their own verified file inventory, with an atomic machine-local selection. Existing `models`
+commands, model runtime receipts and project pins retain their meaning. See
+[extension lifecycle and qualification limits](../extensions.md).
+
 Tauri launches app-owned Node and `runtime/core/cli.mjs` through the shared native process owner.
 The portable `spritebook` launcher owns the same worker tree. Native code handles process groups/
 Windows Job Objects and kernel file locks; TypeScript owns all product policy. Startup gates prevent

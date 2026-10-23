@@ -37,6 +37,13 @@ become a new free-memory admission threshold without backend-specific measuremen
 
 ## What CI covers
 
+Optional Blender's maintained portable build and operator/motion trials were executed on Windows x64
+only. Managed downloads currently cover that target. Existing 4.5 LTS program selection can run a
+local version/operator probe on other platforms, but neither a probe nor Blender's upstream platform
+availability qualifies SpriteBook's full workflow there. The new cloth candidates still fail actual
+character quality checks. [Extensions](extensions.md) separates tool readiness from correction
+quality and documents storage/removal.
+
 [CI](../.github/workflows/ci.yml) uses Node for formatting, linting, separate type checks and tests
 on Ubuntu/macOS/Windows. Its Linux lavapipe lane requires an adapter and runs renderer structural
 and image checks. The [candidate workflow](../.github/workflows/release.yml) builds owned CLI trees

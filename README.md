@@ -39,6 +39,7 @@ shows its CLI twin for every action. See [`docs/prd.md`](docs/prd.md) for the pr
 | [Godot](docs/engines/godot.md) · [Unity](docs/engines/unity-texturepacker.md) · [Phaser](docs/engines/phaser.md) · [Aseprite](docs/engines/aseprite.md) | importing the exported files                                 |
 | [Licensing](docs/licensing.md)                                                                                                                          | what you can ship, what installs behind gates, and the traps |
 | [Models and local runtimes](docs/models.md)                                                                                                             | available models, setup, storage and removal                 |
+| [Extensions](docs/extensions.md)                                                                                                                        | optional Blender, models and bundled content in one manager  |
 | [Platform support](docs/platform-support.md)                                                                                                            | what runs where                                              |
 | [Documentation map](docs/README.md)                                                                                                                     | contributor contracts, source schemas and qualification      |
 

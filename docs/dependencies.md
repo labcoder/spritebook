@@ -257,6 +257,15 @@ Exact resolved files remain in `.render-bench/f4/alternatives/triposr/runtime/uv
 | Canonical Track A body                | roster-fit rig                                     | ours, seeded from CC0 **Universal Base Characters** (Quaternius)                       | **✓ CC0 re-verified 2026-07-20** from the downloaded pack's License_Standard.txt; both bodies bundled at `packages/rig/bodies/` (65-joint UAL skeleton, full core, byte-stable builds via tools/roster/build-body.ts) |
 | Blender/bpy (upstream UniRig tooling) | conversions inside sidecar only                    | GPL                                                                                    | isolated subprocess; adapters return neutral npz/json; never shipped                                                                                                                                                  |
 
+Blender **4.5.15 LTS Windows x64 portable** is also available as an explicit optional external-tool
+download, separately from UniRig's retained bpy environment. The official mirror archive/executable
+SHA-256 pins, exact sizes and source URL live in
+[`tools.json`](../packages/registry/catalog/tools.json). GPL-3.0-or-later; preserve the full
+upstream distribution notices and corresponding-source access. Integration scripts must remain
+GPL-compatible. No Blender binary/environment is app-bundled, and a subprocess is not itself a
+license exception. Native operator checks pass; real garment corrections remain rejected. See the
+[trial](../future/maintained-blender-trial.md) and [tool lifecycle](extensions.md).
+
 ### Frozen UniRig Windows environment
 
 [Recipe](../sidecar/runtimes/unirig-win.json) and [lock](../sidecar/runtimes/unirig/uv.lock) pin an

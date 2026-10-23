@@ -17,6 +17,7 @@ export const JOB_VERBS = [
   'bake',
   'export',
   'models',
+  'extensions',
 ] as const;
 
 export const JobSpecSchema = z.strictObject({

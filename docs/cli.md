@@ -277,6 +277,23 @@ with NVIDIA CUDA; other native model targets remain F7 work.
 deletes model files and the install receipt, preserving Python environments, shared caches and
 workspace assets. See [model storage and removal](models.md#storage-and-removal) for a full reset.
 
+## extensions — models, optional tools and bundled content
+
+`spritebook extensions list [--installed] --json` returns one document with `models`, `tools` and
+`content`. Models retain the existing list shape. Tool rows distinguish the selected installation,
+managed copies, discovered executable paths, platform download and any verification issue. Content
+is the bundled pack/preset inventory, not an executable plugin catalog.
+
+`extensions install/setup/verify/rm <model[@version]>` forwards to the existing model commands;
+`models` remains compatible. Blender has `install`, `use`, `verify` and `rm`; `use --path
+<executable> --accept-license` selects an existing Blender 4.5 LTS without uninstalling it later.
+Managed downloads are pinned, optional Windows x64 portable archives. `--tools-dir <dir>` selects a
+separate machine tool root. `install --from <archive.zip>` preserves verification for offline reuse.
+
+See [extensions](extensions.md) for exact commands, ownership, sizes, experimental quality status
+and platform limits. These jobs do not modify character manifests or enable a new deformation
+provider.
+
 ## Sizes and floors
 
 | Model         | Declared model files | VRAM admission                   | Needs                |

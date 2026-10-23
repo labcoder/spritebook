@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "tools": [
+    {
+      "id": "blender",
+      "displayName": "Blender",
+      "version": "4.5.15",
+      "license": {
+        "name": "GNU General Public License v3 or later",
+        "spdx": "GPL-3.0-or-later",
+        "url": "https://www.blender.org/about/license/",
+        "requiresAcceptance": true
+      },
+      "sourceUrl": "https://download.blender.org/source/blender-4.5.15.tar.xz",
+      "releaseUrl": "https://www.blender.org/releases/4-5/",
+      "downloads": [
+        {
+          "os": "win32",
+          "arch": "x64",
+          "archive": {
+            "path": "blender-4.5.15-windows-x64.zip",
+            "url": "https://mirror.blender.org/release/Blender4.5/blender-4.5.15-windows-x64.zip",
+            "bytes": 398649826,
+            "sha256": "52dd02fd74877fa08e74b67d7854cf32468a232c02aaa19b6844c91285574f8d"
+          },
+          "prefix": "blender-4.5.15-windows-x64",
+          "executable": "blender.exe",
+          "executableSha256": "935e4bed28e51d08b8e1fbcc31dcccc000cc1c3dd065d82dcb1da813e75db795",
+          "expandedBytes": 924669131,
+          "requiredDiskBytes": 1455650853
+        }
+      ]
+    }
+  ]
+}
