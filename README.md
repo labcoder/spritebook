@@ -16,6 +16,12 @@ Factorio, and Dead Cells, but always required a 3D team and a homebrew pipeline.
 image-to-3D and auto-rigging models make that pipeline automatable for one person. SpriteBook is
 that pipeline, productized: **the 3D is an implementation detail; the sprites are the product.**
 
+**v0.5.0 is a Windows capture/export preview.** Camera composition, 64–4096px rendering and
+atlas/model delivery are ready to evaluate. Automatic rigs can still stretch hands/clothing, and
+animated legs can intersect skirts. Review the
+[known limitations](CHANGELOG.md#050---2026-10-23--windows-captureexport-preview) before using
+generated motion. Native Mac/Linux/ARM desktop use and signed distribution remain unqualified.
+
 ## The pipeline
 
 `01 Generate → 02 Rig → 03 Animate → 04 Look → 05 Bake → 06 Export`

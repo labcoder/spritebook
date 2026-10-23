@@ -1,5 +1,10 @@
 # Quickstart
 
+**0.5.0 capture/export preview:** automatic rigs can misassign contacting hands/clothing and allow
+legs to cross skirts during motion. Review walk/jump before baking; rig acceptance does not repair
+those defects. An authored, well-rigged mesh is the most reliable input for evaluating capture and
+export. The packaged `CHANGELOG.md` records the preview scope and limitations.
+
 The current Node runtime is a qualification candidate. Windows x64 has local GPU evidence;
 additional native targets, unprovisioned clean-machine setup, signing and native notices remain
 release gates. Installed Windows model workflows have recorded F4 evidence. See the

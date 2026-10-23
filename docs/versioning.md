@@ -15,8 +15,9 @@ the product version; the candidate workflow checks the tag against the CLI value
 
 The Node Windows preview uses the maintainer-requested 0.5.0 baseline. Earlier prototype changelog
 entries retain their original numbers. Metadata preparation is separate from publication; the
-motion-quality gate in `future/beta-0.5.md` remains open, and no upgrade path from prototype
-installers is qualified by this version reset.
+motion-quality work in `future/beta-0.5.md` remains open. The maintainer approved publishing 0.5.0
+as a Windows capture/export preview with those limitations documented; it is not a qualification of
+automatic rigging or an upgrade path from prototype installers.
 
 Pre-1.0 rules:
 

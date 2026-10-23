@@ -4,10 +4,16 @@ Notable changes to SpriteBook. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version, tag, and golden policy is in
 `docs/versioning.md` in the repository.
 
-## 0.5.0 - Unreleased Windows preview
+## 0.5.0 - 2026-10-23 · Windows capture/export preview
 
-The Node-based preview adopts the requested 0.5.0 product version. Earlier prototype entries keep
-their original version numbers. No tag or publication is implied by this entry.
+This unsigned preview focuses on camera composition, rendering and exporting sprites/model assets.
+Earlier prototype entries keep their original version numbers. The maintainer approved publication
+with the motion limitations below; this is not a production-quality auto-rigging release.
+
+**Known motion limitations:** generated characters can have incorrect skin ownership where hands
+touch clothing, stretched hands/shoulders and legs intersecting loose skirts during walk/jump.
+Review animation before baking. Accepting a rig records your review; it does not repair these
+problems. Use an authored, well-rigged mesh for the most reliable capture/export evaluation.
 
 - Tauri and TypeScript remain the desktop and core; the application owns its Node runtime.
 - Look composes camera projection, angles, lighting and output size against a fresh core-rendered
@@ -15,8 +21,11 @@ their original version numbers. No tag or publication is implied by this entry.
 - Output cells support 64 through 4096 pixels, with GPU-size preflight and multipage atlas playback.
 - Export can copy the canonical GLB and embedded textures independently of sprite baking.
 - Windows walk/jump exports pass atlas, timing, strip-pixel and Godot resource checks. Amy's skin
-  ownership and Bulma's skirt motion still block visual qualification; experimental repairs do not
-  ship. Engine imports, additional native platforms and signed distribution are unqualified.
+  ownership and Bulma's skirt motion remain open quality work; experimental repairs do not ship.
+  Godot/Unity engine import, native Mac/Linux/ARM desktop use and signed distribution are
+  unqualified.
+- Model compatibility detection no longer assumes every Mac supports model acceleration; unknown
+  operating systems cannot inherit Linux recipes and driver probes have a bounded timeout.
 
 ## 0.9.0 - 2026-08-06
 

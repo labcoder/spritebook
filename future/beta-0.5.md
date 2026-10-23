@@ -2,8 +2,9 @@
 
 Requested scope: complete the existing Amy and Bulma projects into side-scrolling walk/jump sheets
 and higher-resolution eight-direction isometric sheets. Preserve working source projects, use
-incremental commits on main, and push/tag only after qualification. Engine import, signing and
-notarization are outside this pass.
+incremental commits on main. On 2026-10-23 the maintainer approved publication as a capture/export
+preview with known motion limitations documented. Engine import, signing and notarization are
+outside this pass. Motion repairs remain active work, not a prerequisite for this limited preview.
 
 ## Work sequence
 
@@ -29,8 +30,9 @@ Exported pixels, pivots, animation timing and atlas rectangles agree across the 
 selected engine formats. High-resolution qualification includes a real 4096 px render; complete
 side/isometric sets may use smaller production-friendly cells.
 
-The earlier Amy ownership defect remains an active reproduction, not an accepted limitation for this
-beta qualification. Private character assets and local replay traces stay outside Git.
+Amy's ownership defect and Bulma's skirt clipping remain active reproductions and explicitly
+documented limitations of this capture/export preview. They do not qualify as successful automatic
+rig repairs. Private character assets and local replay traces stay outside Git.
 
 ## Capture and delivery qualification so far
 
@@ -45,8 +47,9 @@ against the manifests, timing agrees, and sampled strip crops match atlas pixels
 pixel and 4096px Original previews also pass on the owned runtime.
 
 The complete suite passes on Node 24.22: 923 tests pass and seven gated checks skip. The Windows x64
-0.5.0 installer builds. Metadata is prepared but unreleased; no push, tag or new hosted CI run has
-occurred. Live character manifests and canonical GLB hashes remain unchanged.
+0.5.0 installer builds. Those local proofs precede the subsequently approved capture/export preview
+publication; fresh checks and hosted CI are being recorded for that publication. Live character
+manifests and canonical GLB hashes remain unchanged.
 
 Capture was reviewed in light and dark themes at 1280×720. A five-second browser proof on the
 800k-triangle character averaged 139.8fps idle and 100.1fps during continuous inspector resizing,
@@ -72,7 +75,7 @@ alone is insufficient. Keep source geometry/textures recoverable and use the sam
 preview and bake. Restoring mesh-based character creation in the GUI remains later work; canonical
 mesh import is still available in core.
 
-Keep the requested `v0.5.0` publication gate closed unless the maintainer explicitly changes this
-scope to a capture/export preview with documented motion limitations. Signing, notarization,
-additional native targets and engine-import qualification remain outside this requested Windows
-pass.
+The maintainer explicitly changed the `v0.5.0` publication scope to a capture/export preview with
+documented motion limitations. Finish build/CI checks and publish the tag under that scope. Keep
+automatic motion quality open. Signing, notarization, additional native desktop targets and
+engine-import qualification remain outside this requested Windows pass.

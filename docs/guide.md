@@ -1,5 +1,9 @@
 # SpriteBook Studio user guide
 
+**0.5.0 is a capture/export preview.** Generated rigs may stretch hands or clothing and permit legs
+to intersect loose skirts. Inspect animations before baking; accepting a rig does not fix these
+issues. See the [preview notes](../CHANGELOG.md) for the supported scope.
+
 Studio on main now uses the owned Node runtime. Build a local Windows candidate with `npm run
 build:desktop`; see [development setup](../README.md#development) and the
 [qualification status](../future/runtime-cutover.md). Published/signed target artifacts remain F7
