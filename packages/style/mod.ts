@@ -60,6 +60,7 @@ export async function* runStyleJob(spec: StyleJobSpec): AsyncIterable<JobEvent> 
         camera: supersampleCamera(spec.camera, s),
         frames: spec.frames,
         pose: 'idle',
+        lighting: spec.style.lighting,
         stylePreset: spec.style.id,
         outDir: aovDir,
       })

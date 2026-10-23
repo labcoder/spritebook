@@ -85,6 +85,22 @@ export function mat4Ortho(
   return m;
 }
 
+/** Right-handed perspective, WebGPU z in [0, 1]. */
+export function mat4Perspective(
+  fovRadians: number,
+  aspect: number,
+  near: number,
+  far: number,
+): Mat4 {
+  const m = new Float32Array(16), f = 1 / Math.tan(fovRadians / 2);
+  m[0] = f / aspect;
+  m[5] = f;
+  m[10] = far / (near - far);
+  m[11] = -1;
+  m[14] = near * far / (near - far);
+  return m;
+}
+
 function sub(a: Vec3, b: Vec3): Vec3 {
   return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }

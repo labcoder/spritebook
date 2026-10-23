@@ -18,6 +18,46 @@ function io() {
   return { stdout: (s: string) => out.push(s), stderr: (s: string) => out.push(s), out };
 }
 
+test('capture camera and lighting flags record together and reject invalid lighting before writing', async () => {
+  const { dir, tmp } = await ws();
+  try {
+    const args = [
+      'look',
+      '--workspace',
+      dir,
+      '--style',
+      'clean',
+      '--projection',
+      'perspective',
+      '--yaw',
+      '90',
+      '--fov',
+      '40',
+      '--ambient',
+      '0.6',
+      '--light-yaw',
+      '0',
+      '--light-elevation',
+      '90',
+      '--supersample',
+      '1',
+      '--json',
+    ];
+    const output = io();
+    assertEquals(await runCli(args, output), 0);
+    const { look } = JSON.parse(output.out.at(-1)!);
+    assertEquals(look.cameraOverrides, { orthographic: false, yawOffsetDeg: 90, fovDeg: 40 });
+    assertEquals(look.overrides.temporal.superSample, 1);
+    assertEquals(look.overrides.lighting.ambient, .6);
+    assert(Math.abs(look.overrides.lighting.direction[1] - 1) < 1e-6);
+    const before = await fs.readFile(`${dir}/character.json`, 'utf8');
+    assertEquals(await runCli(['look', '--workspace', dir, '--ambient', '2', '--json'], io()), 1);
+    assertEquals(await fs.readFile(`${dir}/character.json`, 'utf8'), before);
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 async function ws(): Promise<{ dir: string; tmp: string }> {
   const tmp = await fs.mkdtemp(join(tmpdir(), 'spritebook-'));
   const dir = `${tmp}/sprout`;

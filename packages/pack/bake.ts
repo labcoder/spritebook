@@ -73,7 +73,7 @@ import { assertRenderedPrefix, flipCellPng, type MirrorPlan, mirrorPlan } from '
 import { composePage, encodePagePng } from './atlas.ts';
 import { packLayout } from './maxrects.ts';
 import { aov1x } from './aov1x.ts';
-import { buildContactSheet } from './contactsheet.ts';
+import { buildContactSheet, contactThumbnail } from './contactsheet.ts';
 
 export interface BakeJobSpec {
   jobId: string;
@@ -255,9 +255,9 @@ export async function buildCacheInputs(
     // the rig as DATA, so a change to it invalidates by itself rather than by
     // whoever changed it also remembering to bump rendererVersion
     lightRigHash: await sha256Hex(canonicalJson({
-      lightDir: LIGHT_DIR,
-      ambient: AMBIENT,
-      lightFrame: spec.lightFrame ?? DEFAULT_LIGHT_FRAME,
+      lightDir: spec.style.lighting?.direction ?? LIGHT_DIR,
+      ambient: spec.style.lighting?.ambient ?? AMBIENT,
+      lightFrame: spec.lightFrame ?? spec.style.lighting?.frame ?? DEFAULT_LIGHT_FRAME,
     })),
     rendererVersion: renderSig,
     // The backend that made this character, when one did. `source-mesh@0` is
@@ -399,7 +399,7 @@ const FOOT_WARN_M = 0.02;
  * guess with extra steps; review F2): core joints left at rest and foot
  * residuals above tolerance become `warn` JobEvents in runBakeJob.
  */
-async function prepareClips(
+export async function prepareClips(
   spec: BakeJobSpec,
   bakeDir: string,
 ): Promise<{ prepared: PreparedClip[]; warnings: { code: string; message: string }[] }> {
@@ -500,6 +500,7 @@ async function recomputeClips(
           camera: supersample(spec.camera, s),
           frames: binding.frames,
           lightFrame: spec.lightFrame,
+          lighting: spec.style.lighting,
           pose: 'clip',
           posesPath,
           // D-008: only the directions that are not flips (mirror.ts) — the
@@ -587,6 +588,7 @@ async function recompute(
       camera: supersample(spec.camera, s),
       frames: spec.frames,
       lightFrame: spec.lightFrame,
+      lighting: spec.style.lighting,
       pose: 'idle',
       // D-008: only the non-flip directions (mirror.ts)
       directionSubset: plan.rendered,
@@ -752,17 +754,8 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
 
     // 2. pack: ONE layout from the lit cells, replayed on every AOV page (law)
     yield { t: 'progress', jobId, at: at(), step: 'pack', done: 2, total: 4 };
-    const decoded = new Map<string, Map<string, CellPlane>>();
-    for (const pass of ['lit', ...AOV_PASSES]) {
-      const kind = PAGE_KIND[pass as keyof typeof PAGE_KIND];
-      decoded.set(
-        pass,
-        new Map(
-          [...baked.cells.get(pass)!].map(([k, bytes]) => [k, decodeCell(bytes, kind)]),
-        ),
-      );
-    }
-    const litCells = decoded.get('lit')!;
+    const rgbaCells = new Map<string, Uint8Array>();
+    let contactW = spec.camera.cellPx.w, contactH = spec.camera.cellPx.h;
     // THE LAW, by construction: one layout, computed once from the lit cells,
     // replayed verbatim on all five passes below. The runtime guard against a
     // pass diverging is composePage's cell-size-mismatch throw (an AOV cell
@@ -771,15 +764,32 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     // assertRectIdentity remains for callers holding genuinely separate layouts.
     const layout = packLayout(
       grid.map((id) => {
-        const c = litCells.get(frameIdKey(id))!;
-        return { id, w: c.w, h: c.h };
+        return { id, w: spec.camera.cellPx.w, h: spec.camera.cellPx.h };
       }),
+      {
+        maxPageSizePx: Math.max(
+          2048,
+          2 ** Math.ceil(Math.log2(Math.max(spec.camera.cellPx.w, spec.camera.cellPx.h))),
+        ),
+      },
     );
 
     for (const pass of RENDER_PASSES) {
       const kind = PAGE_KIND[pass];
-      const source = pass === 'lit' ? litCells : decoded.get(pass)!;
       for (let i = 0; i < layout.pageCount; i++) {
+        const source = new Map<string, CellPlane>();
+        for (const rect of layout.rects) {
+          if (rect.pageIndex !== i) continue;
+          const key = frameIdKey(rect.id),
+            cell = decodeCell(baked.cells.get(pass)!.get(key)!, kind);
+          source.set(key, cell);
+          if (pass === 'lit') {
+            const thumb = contactThumbnail(cell.rgba!, cell.w, cell.h);
+            rgbaCells.set(key, thumb.rgba);
+            contactW = thumb.w;
+            contactH = thumb.h;
+          }
+        }
         const page = composePage(layout, i, source, kind);
         await fs.writeFile(`${bakeDir}/${atlasPageName(pass, i)}`, encodePagePng(page, kind));
       }
@@ -805,7 +815,6 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       `${bakeDir}/style-result.json`,
       JSON.stringify(persistedStyleResult(baked.styleResult), null, 2) + '\n',
     );
-    const rgbaCells = new Map([...litCells].map(([k, c]) => [k, c.rgba!]));
     const clipList = spec.clips?.length
       ? spec.clips.map((c) => ({ clipId: c.clipId, frames: c.frames }))
       : [{ clipId: CLIP_ID, frames: spec.frames }];
@@ -814,8 +823,8 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
         clipId: c.clipId,
         directions: spec.camera.directions,
         frames: c.frames,
-        cellW: spec.camera.cellPx.w,
-        cellH: spec.camera.cellPx.h,
+        cellW: contactW,
+        cellH: contactH,
         fps: DEFAULT_FPS,
       });
       await fs.writeFile(`${bakeDir}/contact-${c.clipId}.gif`, gif);

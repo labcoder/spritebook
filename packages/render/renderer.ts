@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import type { Lighting } from '@spritebook/schema';
 /**
  * The render orchestrator (P2-T1): canonical glb -> per-direction, per-frame AOV
  * PNGs + a throughput report, entirely headless. INTERNAL — the D-004 seam is
@@ -107,16 +108,20 @@ export type LightFrame = 'world' | 'camera';
 export const DEFAULT_LIGHT_FRAME: LightFrame = 'camera';
 
 /** LIGHT_DIR as each direction camera sees it, per the frame choice. */
-export function lightDirFor(frame: LightFrame, yawDeg: number): [number, number, number] {
-  if (frame === 'world') return [LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]];
+export function lightDirFor(
+  frame: LightFrame,
+  yawDeg: number,
+  direction = LIGHT_DIR,
+): [number, number, number] {
+  if (frame === 'world') return [direction[0], direction[1], direction[2]];
   // rotate the key about +Y by the camera's yaw, so the light-to-camera
   // relation at direction 0 is reproduced at every direction
   const r = (yawDeg * Math.PI) / 180;
   const c = Math.cos(r), s = Math.sin(r);
   return [
-    c * LIGHT_DIR[0] + s * LIGHT_DIR[2],
-    LIGHT_DIR[1],
-    -s * LIGHT_DIR[0] + c * LIGHT_DIR[2],
+    c * direction[0] + s * direction[2],
+    direction[1],
+    -s * direction[0] + c * direction[2],
   ];
 }
 
@@ -205,6 +210,7 @@ export class Renderer {
     clipPoses?: ClipPoses,
     subset?: number[],
     lightFrame: LightFrame = DEFAULT_LIGHT_FRAME,
+    lighting?: Lighting,
   ): Promise<Renderer> {
     const { device } = gpu;
     device.pushErrorScope('validation');
@@ -310,7 +316,14 @@ export class Renderer {
     );
 
     const camData = framing.cameras.map((c) =>
-      packCamera(c.view, c.proj, c.near, c.far, lightDirFor(lightFrame, c.yawDeg), AMBIENT)
+      packCamera(
+        c.view,
+        c.proj,
+        c.near,
+        c.far,
+        lightDirFor(lightFrame, c.yawDeg, lighting?.direction),
+        lighting?.ambient ?? AMBIENT,
+      )
     );
 
     const err = await device.popErrorScope();
@@ -410,7 +423,14 @@ export class Renderer {
   async renderAll(
     outDir: string,
     frames: number,
+    frameIndex?: number,
   ): Promise<{ summary: RenderSummary; throughputPath: string }> {
+    if (
+      frameIndex !== undefined &&
+      (!Number.isInteger(frameIndex) || frameIndex < 0 || frameIndex >= frames)
+    ) {
+      throw new Error(`Preview frame must be between 0 and ${frames - 1}`);
+    }
     const framesDir = `${outDir}/frames`;
     await fs.mkdir(framesDir, { recursive: true });
 
@@ -419,13 +439,14 @@ export class Renderer {
     // so the FILE NAMES keep the true direction index and a mirrored bake
     // drops straight into the same naming the packer already reads
     const list = this.directionList;
-    const total = list.length * frames;
+    const count = frameIndex === undefined ? frames : 1;
+    const total = list.length * count;
 
     const metrics = await pool.runBatch({
       frames: total,
       submitFrame: (g, slotBuffers) => {
-        const direction = list[Math.floor(g / frames)];
-        const frame = g % frames;
+        const direction = list[Math.floor(g / count)];
+        const frame = frameIndex ?? g % frames;
         const encoder = this.gpu.device.createCommandEncoder();
         this.encodeFrame(encoder, direction, frame);
         for (let k = 0; k < AOV_TARGETS.length; k++) {
@@ -438,8 +459,8 @@ export class Renderer {
         this.gpu.device.queue.submit([encoder.finish()]);
       },
       consume: async (g, planes) => {
-        const direction = list[Math.floor(g / frames)];
-        const frame = g % frames;
+        const direction = list[Math.floor(g / count)];
+        const frame = frameIndex ?? g % frames;
         const tag = `d${pad(direction, 2)}_f${pad(frame, 3)}`;
         for (let k = 0; k < AOV_TARGETS.length; k++) {
           const png = encodeAov(planes[k], this.width, this.height, AOV_TARGETS[k].encode);
@@ -544,7 +565,14 @@ export async function makeRenderer(
   gpu: GpuContext,
   spec: Pick<
     RenderJobSpec,
-    'modelPath' | 'camera' | 'frames' | 'pose' | 'posesPath' | 'directionSubset' | 'lightFrame'
+    | 'modelPath'
+    | 'camera'
+    | 'frames'
+    | 'pose'
+    | 'posesPath'
+    | 'directionSubset'
+    | 'lightFrame'
+    | 'lighting'
   >,
   shaderSrc: string,
 ): Promise<Renderer> {
@@ -587,7 +615,8 @@ export async function makeRenderer(
     pose,
     clipPoses,
     validateSubset(spec.directionSubset, spec.camera.directions),
-    spec.lightFrame ?? DEFAULT_LIGHT_FRAME,
+    spec.lightFrame ?? spec.lighting?.frame ?? DEFAULT_LIGHT_FRAME,
+    spec.lighting,
   );
 }
 

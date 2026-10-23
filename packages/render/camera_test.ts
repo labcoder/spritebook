@@ -11,6 +11,21 @@ import { solveFraming } from './dist/camera.js';
 const EPS_PX = 1e-2;
 const EPS_NDC = 1e-4;
 
+test('perspective preserves the pivot and foreshortens depth at a fixed capture scale', () => {
+  const p = preset({ orthographic: false, fovDeg: 40, elevationDeg: 0, pivot: 'center' });
+  const result = solveFraming(p, { min: [-.5, 0, -.25], max: [.5, 2, .25] });
+  for (const camera of result.cameras) {
+    const pivot = project(camera, [0, 1, 0], p.cellPx.w, p.cellPx.h);
+    assertAlmostEquals(pivot.x, result.pivotPx.x, EPS_PX);
+    assertAlmostEquals(pivot.y, result.pivotPx.y, EPS_PX);
+    assert(pivot.ndcZ > 0 && pivot.ndcZ < 1);
+  }
+  const camera = result.cameras[0];
+  const near = project(camera, [.25, 1, .2], p.cellPx.w, p.cellPx.h);
+  const far = project(camera, [.25, 1, -.2], p.cellPx.w, p.cellPx.h);
+  assert(near.x - result.pivotPx.x > far.x - result.pivotPx.x, 'near details appear larger');
+});
+
 function preset(overrides: Partial<CameraPreset> = {}): CameraPreset {
   return CameraPresetSchema.parse({
     id: 'test',

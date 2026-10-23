@@ -15,6 +15,26 @@ const { GIFEncoder, quantize, applyPalette } = gifenc;
 
 const BG: [number, number, number] = [240, 240, 240];
 
+/** Review GIFs stay bounded; exported atlas cells retain their full resolution. */
+export function contactThumbnail(
+  rgba: Uint8Array,
+  w: number,
+  h: number,
+): { rgba: Uint8Array; w: number; h: number } {
+  const scale = Math.min(1, 256 / Math.max(w, h));
+  if (scale === 1) return { rgba, w, h };
+  const width = Math.max(1, Math.round(w * scale)), height = Math.max(1, Math.round(h * scale));
+  const out = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const from =
+        (Math.min(h - 1, Math.floor(y / scale)) * w + Math.min(w - 1, Math.floor(x / scale))) * 4;
+      out.set(rgba.subarray(from, from + 4), (y * width + x) * 4);
+    }
+  }
+  return { rgba: out, w: width, h: height };
+}
+
 /** Straight-alpha over the fixed background into a flat sheet row. */
 function blit(
   sheet: Uint8Array,

@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import { assert, assertEquals, assertThrows } from '@std/assert';
-import { buildContactSheet } from './dist/contactsheet.js';
+import { buildContactSheet, contactThumbnail } from './dist/contactsheet.js';
+
+test('large review thumbnails preserve aspect and alpha without changing source cells', () => {
+  const rgba = new Uint8Array(1024 * 512 * 4).fill(128);
+  const thumbnail = contactThumbnail(rgba, 1024, 512);
+  assertEquals([thumbnail.w, thumbnail.h], [256, 128]);
+  assertEquals(thumbnail.rgba.length, 256 * 128 * 4);
+  assertEquals(thumbnail.rgba[3], 128);
+  assertEquals(rgba.length, 1024 * 512 * 4);
+});
 import { frameIdKey } from './dist/contracts.js';
 
 function cell(r: number, g: number, b: number, w = 8, h = 8): Uint8Array {

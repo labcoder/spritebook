@@ -371,6 +371,32 @@ export interface ClipAovSource extends AovSource {
  * is the per-direction total across all clips. Single-clip styleFromAovs below
  * keeps its flat layout untouched.
  */
+async function paletteInputs(srcs: AovSource[], style: StylePreset): Promise<Uint8Array[]> {
+  if (!style.quantize || style.quantize.palette !== 'adaptive') return [];
+  const pixels = srcs.reduce(
+    (n, src) => n + src.width * src.height * src.frames * src.directions,
+    0,
+  );
+  const stride = Math.max(1, Math.ceil(pixels / 1_048_576));
+  const result: Uint8Array[] = [];
+  for (const src of srcs) {
+    for (let d = 0; d < src.directions; d++) {
+      for (let f = 0; f < src.frames; f++) {
+        const { lit } = await readAov(src.framesDir, d, f);
+        if (stride === 1) result.push(lit);
+        else {
+          const sampled = new Uint8Array(Math.ceil(lit.length / 4 / stride) * 4);
+          for (let p = 0, target = 0; p < lit.length; p += stride * 4, target += 4) {
+            sampled.set(lit.subarray(p, p + 4), target);
+          }
+          result.push(sampled);
+        }
+      }
+    }
+  }
+  return result;
+}
+
 export async function styleClipsFromAovs(
   srcs: ClipAovSource[],
   camera: CameraPreset,
@@ -381,40 +407,32 @@ export async function styleClipsFromAovs(
   const s = style.temporal.superSample;
   const w1 = srcs[0].width / s, h1 = srcs[0].height / s;
 
-  const perClip = new Map<string, AovImage[][]>();
-  const allLit: Uint8Array[] = [];
-  for (const src of srcs) {
-    const aovs: AovImage[][] = [];
-    for (let d = 0; d < src.directions; d++) {
-      aovs[d] = [];
-      for (let f = 0; f < src.frames; f++) {
-        const aov = await readAov(src.framesDir, d, f);
-        aovs[d][f] = aov;
-        allLit.push(aov.lit);
-      }
-    }
-    perClip.set(src.clipId, aovs);
-  }
-
+  const allLit = await paletteInputs(srcs, style);
   const palette = buildPalette(style, allLit);
   const color = style.outline
     ? outlineColor(style, palette)
     : [0, 0, 0] as [number, number, number];
   const dither = ditherConfig(style);
   const styledDir = `${outDir}/styled`;
-  const flickerFrames: Uint8Array[] = [];
+  let flickerPrevious: Uint8Array | null = null, flickerTotal = 0, flickerPairs = 0;
 
   const clipped: QAFlag['frameRefs'] = [];
   const clippedEdges = new Map<string, number>();
   let bestCov: { cov: number; ref: QAFlag['frameRefs'][number] } | null = null;
   for (const src of srcs) {
-    const aovs = perClip.get(src.clipId)!;
     const clipDir = `${styledDir}/${src.clipId}`;
     await fs.mkdir(clipDir, { recursive: true });
     for (let d = 0; d < src.directions; d++) {
       let prev: Int32Array | null = null;
       for (let f = 0; f < src.frames; f++) {
-        const { rgba, labels } = processFrame(aovs[d][f], style, palette, color, dither, prev);
+        const { rgba, labels } = processFrame(
+          await readAov(src.framesDir, d, f),
+          style,
+          palette,
+          color,
+          dither,
+          prev,
+        );
         prev = labels;
         finishAlpha(rgba, style, w1, h1);
         const hitM = touchedEdges(rgba, w1, h1);
@@ -426,7 +444,13 @@ export async function styleClipsFromAovs(
         if (bestCov === null || cov > bestCov.cov) {
           bestCov = { cov, ref: { clipId: src.clipId, direction: d, frame: f } };
         }
-        if (src === srcs[0] && d === 0) flickerFrames.push(rgba.slice());
+        if (src === srcs[0] && d === 0) {
+          if (flickerPrevious) {
+            flickerTotal += flickerPct([flickerPrevious, rgba], w1, h1);
+            flickerPairs++;
+          }
+          flickerPrevious = rgba;
+        }
         await fs.writeFile(
           `${clipDir}/${tag(d, f)}.png`,
           encodePng({ width: w1, height: h1, data: rgba }),
@@ -444,7 +468,7 @@ export async function styleClipsFromAovs(
     cellPx: { w: w1, h: h1 },
     superSample: s,
     paletteHex: paletteToHex(palette),
-    flickerPct: flickerPct(flickerFrames, w1, h1),
+    flickerPct: flickerPairs ? flickerTotal / flickerPairs : 0,
     flags: [
       ...qaFlags(style, camera),
       ...[clippedFlag(clipped, clippedEdges, camera)].filter((f) => f !== null),
@@ -470,16 +494,7 @@ export async function styleFromAovs(
   const w1 = src.width / s, h1 = src.height / s;
 
   // read every AOV; pool lit for the once-per-character palette
-  const aovs: AovImage[][] = [];
-  const allLit: Uint8Array[] = [];
-  for (let d = 0; d < src.directions; d++) {
-    aovs[d] = [];
-    for (let f = 0; f < src.frames; f++) {
-      const aov = await readAov(src.framesDir, d, f);
-      aovs[d][f] = aov;
-      allLit.push(aov.lit);
-    }
-  }
+  const allLit = await paletteInputs([src], style);
 
   const palette = buildPalette(style, allLit);
   const color = style.outline
@@ -490,14 +505,21 @@ export async function styleFromAovs(
   const styledDir = `${outDir}/styled`;
   await fs.mkdir(styledDir, { recursive: true });
 
-  const idleFrames: Uint8Array[] = []; // direction 0's styled frames, for flicker
+  let flickerPrevious: Uint8Array | null = null, flickerTotal = 0, flickerPairs = 0;
   const clipped: QAFlag['frameRefs'] = [];
   const clippedEdges = new Map<string, number>();
   let bestCov: { cov: number; ref: QAFlag['frameRefs'][number] } | null = null;
   for (let d = 0; d < src.directions; d++) {
     let prev: Int32Array | null = null;
     for (let f = 0; f < src.frames; f++) {
-      const { rgba, labels } = processFrame(aovs[d][f], style, palette, color, dither, prev);
+      const { rgba, labels } = processFrame(
+        await readAov(src.framesDir, d, f),
+        style,
+        palette,
+        color,
+        dither,
+        prev,
+      );
       prev = labels;
       finishAlpha(rgba, style, w1, h1);
       const hitS = touchedEdges(rgba, w1, h1);
@@ -509,7 +531,13 @@ export async function styleFromAovs(
       if (bestCov === null || cov > bestCov.cov) {
         bestCov = { cov, ref: { clipId: 'idle', direction: d, frame: f } };
       }
-      if (d === 0) idleFrames.push(rgba.slice());
+      if (d === 0) {
+        if (flickerPrevious) {
+          flickerTotal += flickerPct([flickerPrevious, rgba], w1, h1);
+          flickerPairs++;
+        }
+        flickerPrevious = rgba;
+      }
       await fs.writeFile(
         `${styledDir}/${tag(d, f)}.png`,
         encodePng({ width: w1, height: h1, data: rgba }),
@@ -525,7 +553,7 @@ export async function styleFromAovs(
     cellPx: { w: w1, h: h1 },
     superSample: s,
     paletteHex: paletteToHex(palette),
-    flickerPct: flickerPct(idleFrames, w1, h1),
+    flickerPct: flickerPairs ? flickerTotal / flickerPairs : 0,
     flags: [
       ...qaFlags(style, camera),
       ...[clippedFlag(clipped, clippedEdges, camera)].filter((f) => f !== null),

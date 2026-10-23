@@ -6,6 +6,7 @@
  * or pixel buffer crosses this API (D-004 discipline throughout).
  */
 export * from './contracts.ts';
+export { runLookPreview } from './preview.ts';
 export {
   artifactKey,
   bakeKey,

@@ -1,5 +1,6 @@
 import { appendFileSync } from 'node:fs';
 import { resourcePath } from '@spritebook/core';
+import { AMBIENT, DEFAULT_LIGHT_FRAME, LIGHT_DIR } from '@spritebook/render';
 import { promises as fs } from 'node:fs';
 
 function bodyDirectory(value: string): string {
@@ -221,6 +222,15 @@ function cameraOverridesFromFlags(args: string[]): CameraOverrides {
   if (flag(args, 'ppm') !== undefined) out.pixelsPerMeter = intFlag(args, 'ppm', 32);
   if (flag(args, 'cell') !== undefined) out.cellPx = cellFromFlag(args);
   if (flag(args, 'padding') !== undefined) out.paddingPx = intFlag(args, 'padding', 6);
+  if (flag(args, 'yaw') !== undefined) out.yawOffsetDeg = numFlag(args, 'yaw', 0);
+  if (flag(args, 'fov') !== undefined) out.fovDeg = numFlag(args, 'fov', 35);
+  if (flag(args, 'projection') !== undefined) {
+    const projection = flag(args, 'projection');
+    if (projection !== 'orthographic' && projection !== 'perspective') {
+      throw new Error('--projection must be orthographic or perspective');
+    }
+    out.orthographic = projection === 'orthographic';
+  }
   return out;
 }
 
@@ -257,6 +267,39 @@ function cellFromFlag(args: string[]): { w: number; h: number } {
  */
 function styleOverridesFromFlags(args: string[], base: StylePreset): StyleOverrides {
   const out: StyleOverrides = {};
+  if (flag(args, 'supersample') !== undefined) {
+    const s = intFlag(args, 'supersample', 2);
+    if (![1, 2, 3, 4].includes(s)) throw new Error('--supersample must be 1, 2, 3 or 4');
+    out.temporal = { ...base.temporal, superSample: s as 1 | 2 | 3 | 4 };
+  }
+  if (
+    ['ambient', 'light-yaw', 'light-elevation', 'light-frame'].some((f) =>
+      flag(args, f) !== undefined
+    )
+  ) {
+    const direction = base.lighting?.direction ?? LIGHT_DIR;
+    const azimuth =
+      numFlag(args, 'light-yaw', Math.atan2(direction[0], direction[2]) * 180 / Math.PI) * Math.PI /
+      180;
+    const elevation = numFlag(
+      args,
+      'light-elevation',
+      Math.atan2(direction[1], Math.hypot(direction[0], direction[2])) * 180 / Math.PI,
+    ) * Math.PI / 180;
+    const frame = flag(args, 'light-frame') ?? base.lighting?.frame ?? DEFAULT_LIGHT_FRAME;
+    if (frame !== 'camera' && frame !== 'world') {
+      throw new Error('--light-frame must be camera or world');
+    }
+    out.lighting = {
+      direction: [
+        Math.cos(elevation) * Math.sin(azimuth),
+        Math.sin(elevation),
+        Math.cos(elevation) * Math.cos(azimuth),
+      ],
+      ambient: numFlag(args, 'ambient', base.lighting?.ambient ?? AMBIENT),
+      frame,
+    };
+  }
   if (flag(args, 'colors') !== undefined) {
     const maxColors = intFlag(args, 'colors', 8);
     if (base.quantize === undefined) {
@@ -670,6 +713,20 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
 for (const verb of ['gen', 'retexture', 'rig', 'prep', 'bake', 'anim']) {
   VERB_FLAGS[verb] = [...VERB_FLAGS[verb], 'pins'];
 }
+for (const verb of ['look', 'bake']) {
+  VERB_FLAGS[verb] = [
+    ...VERB_FLAGS[verb],
+    'yaw',
+    'projection',
+    'fov',
+    'supersample',
+    'ambient',
+    'light-yaw',
+    'light-elevation',
+    'light-frame',
+  ];
+}
+VERB_FLAGS.look = [...VERB_FLAGS.look, 'preview', 'clip', 'frame', 'direction', 'pack'];
 
 /** Accepted everywhere. */
 const GLOBAL_FLAGS = ['json', 'log-append'] as const;
@@ -677,7 +734,7 @@ const GLOBAL_FLAGS = ['json', 'log-append'] as const;
 const BOOLEAN_FLAGS: Record<string, readonly string[]> = {
   bake: ['all', 'plan', 'only-invalidated', 'mirror', 'no-mirror'],
   anim: ['list'],
-  look: ['list'],
+  look: ['list', 'preview'],
   pick: ['reproject', 'color-match', 'no-reproject', 'no-color-match'],
   rig: [
     'track-a',
@@ -1407,8 +1464,41 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         ...styleOverridesFromFlags(args, PRESETS[styleId]),
       };
       // both throw on an illegal preset+override COMBINATION
-      resolveCamera(cameraId, cameraOverrides);
-      resolveStyle(styleId, styleOverrides);
+      const resolvedCamera = resolveCamera(cameraId, cameraOverrides);
+      const resolvedStyle = resolveStyle(styleId, styleOverrides);
+
+      if (args.includes('--preview')) {
+        if (!manifest.canonicalMesh) {
+          throw new Error('Save a canonical mesh before previewing a look');
+        }
+        const { runLookPreview } = await import('@spritebook/pack');
+        const clipId = flag(args, 'clip') ?? manifest.animationSet?.find((c) =>
+          c.enabled
+        )?.clipId ?? 'walk-loop';
+        const binding = manifest.animationSet?.find((c) => c.clipId === clipId);
+        return await pump(
+          runLookPreview({
+            jobId: 'look',
+            characterId: manifest.id,
+            modelPath: `${workspace}/canonical/model.glb`,
+            camera: resolvedCamera,
+            style: resolvedStyle,
+            frames: binding?.frames ?? 12,
+            clips: [{
+              clipId,
+              frames: binding?.frames ?? 12,
+              speed: binding?.speed ?? 1,
+              holdLast: binding?.holdLast ?? false,
+            }],
+            packDir: flag(args, 'pack'),
+            outRoot: `${workspace}/look`,
+            outDir: `${workspace}/look`,
+            direction: numFlag(args, 'direction', 0),
+            frameIndex: numFlag(args, 'frame', 0),
+          }),
+          emit,
+        );
+      }
 
       const look = {
         cameraPresetId: cameraId,

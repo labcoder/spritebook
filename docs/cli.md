@@ -187,11 +187,22 @@ spritebook look --list
 spritebook look --workspace ./characters/hero --camera standard-30 --style pixel
 ```
 
-| Flag                                                                 | Meaning                                   |
-| -------------------------------------------------------------------- | ----------------------------------------- |
-| `--list`                                                             | the camera and style preset rosters       |
-| `--camera <id>` `--style <id>`                                       | the presets to record                     |
-| `--elevation --directions --ppm --cell --padding --colors --outline` | per-character divergences from the preset |
+| Flag                                                                         | Meaning                                                         |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `--list`                                                                     | the camera and style preset rosters                             |
+| `--camera <id>` `--style <id>`                                               | the presets to record                                           |
+| `--elevation --yaw --directions --ppm --cell --padding`                      | per-character camera framing                                    |
+| `--projection orthographic\|perspective --fov <degrees>`                     | projection; perspective scale is measured at the pivot plane    |
+| `--colors --outline --supersample <1..4>`                                    | palette, outline and output antialiasing                        |
+| `--ambient <0..1> --light-yaw --light-elevation --light-frame camera\|world` | constant lighting recorded with the style                       |
+| `--preview --clip <id> --frame <index> --direction <index>`                  | render one frame without recording the look or selecting a bake |
+
+`look --preview` emits a `look-preview` artifact pointing to JSON with the PNG, core-retargeted GLB,
+sample time and resolved recipe. It uses full-clip bounds and the same sampled pose/render/style
+path as Bake. Adaptive palettes are provisional until the whole animation set is baked; unfiltered
+`--style clean` previews match their corresponding bake pixels. Supersampling multiplies render
+size, not output size: use `--cell 4096 --supersample 1` for a 4096 px frame. Large atlases use
+multiple pages, and review-only contact GIF cells are capped at 256 px.
 
 Only the divergences are recorded. A look change makes every baked frame stale; the stage states the
 cost before you re-bake.

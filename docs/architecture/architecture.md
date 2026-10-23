@@ -134,6 +134,12 @@ translations and bone lengths still come from the target. This applies in core t
 bake. The animated-pixel change advances the shared renderer cache namespace to
 `spritebook-render@0.6.1`; old frame caches are not reused for the changed poses.
 
+Look frame previews are a read-only CLI job over the bake sampling/render/style path, with stable
+full-clip framing. Orthographic scale remains world-locked; perspective expresses pixels per metre
+at the pivot plane. Optional style lighting is part of the cache inputs. Styling reads one AOV frame
+at a time and pools a deterministic bounded sample for large adaptive palettes; packing decodes one
+atlas page at a time. Full-resolution cells are preserved; contact GIFs are thumbnails.
+
 ## Non-goals of the architecture
 
 No cloud services in the core path; no telemetry; no plugin system in 1.0 (exporters are in-tree

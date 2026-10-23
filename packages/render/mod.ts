@@ -19,7 +19,7 @@ import { promises as fs } from 'node:fs';
  * RETRYABLE error (webgpu-headless-rendering skill).
  */
 import type { JobEvent } from '@spritebook/schema';
-import { CameraPresetSchema, parseWith } from '@spritebook/schema';
+import { CameraPresetSchema, LightingSchema, parseWith } from '@spritebook/schema';
 import type { RenderJobSpec } from './contracts.ts';
 import { getGpu } from './gpu.ts';
 import { makeRenderer } from './renderer.ts';
@@ -51,6 +51,13 @@ export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent
   let gpu: Awaited<ReturnType<typeof getGpu>> | undefined;
   try {
     parseWith(CameraPresetSchema, spec.camera, 'CameraPreset'); // defensive: plain data in
+    if (spec.lighting) parseWith(LightingSchema, spec.lighting, 'Lighting');
+    if (
+      spec.frameIndex !== undefined &&
+      (!Number.isInteger(spec.frameIndex) || spec.frameIndex < 0 || spec.frameIndex >= spec.frames)
+    ) {
+      throw new Error(`Preview frame must be between 0 and ${spec.frames - 1}`);
+    }
     yield { t: 'progress', jobId, at: at(), step: 'device', done: 1, total: 4 };
     gpu = await getGpu();
 
@@ -58,7 +65,11 @@ export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent
     const renderer = await makeRenderer(gpu, spec, shaderSrc);
     yield { t: 'progress', jobId, at: at(), step: 'setup', done: 2, total: 4 };
 
-    const { summary, throughputPath } = await renderer.renderAll(spec.outDir, spec.frames);
+    const { summary, throughputPath } = await renderer.renderAll(
+      spec.outDir,
+      spec.frames,
+      spec.frameIndex,
+    );
     // renderAll has fully drained the readback pool, so no queued work references
     // the renderer's textures/buffers — safe to release them (M3: no per-job leak).
     renderer.dispose();

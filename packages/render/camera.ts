@@ -64,7 +64,7 @@
  */
 import type { CameraPreset } from '@spritebook/schema';
 import type { DirectionCamera, FramingResult, ModelBounds, SolveFraming } from './contracts.ts';
-import { mat4LookAt, mat4Ortho, normalize, type Vec3 } from './math.ts';
+import { mat4LookAt, mat4Ortho, mat4Perspective, normalize, type Vec3 } from './math.ts';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -184,13 +184,21 @@ export const solveFraming: SolveFraming = (
       if (hc > hMax) hMax = hc;
     }
     const margin = mpp + 0.01 * (hMax - hMin);
-    const dist = 2 * margin - hMin;
-    const near = margin;
+    const fov = (preset.fovDeg ?? 35) * DEG2RAD;
+    const dist = preset.orthographic ? 2 * margin - hMin : halfH / Math.tan(fov / 2);
+    const near = preset.orthographic ? margin : Math.max(0.001, (dist + hMin) / 2);
+    if (dist + hMin <= 0) {
+      throw new Error(
+        'Perspective camera is inside the model. Reduce pixels per metre or field of view.',
+      );
+    }
     const far = hMax + dist + margin;
 
     const eye = addScaled(look, dir, dist);
     const view = mat4LookAt(eye, look, up);
-    const proj = mat4Ortho(-halfW, halfW, -halfH, halfH, near, far);
+    const proj = preset.orthographic
+      ? mat4Ortho(-halfW, halfW, -halfH, halfH, near, far)
+      : mat4Perspective(fov, w / h, near, far);
 
     cameras.push({ dirIndex: i, yawDeg, view, proj, near, far });
   }

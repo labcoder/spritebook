@@ -10,7 +10,7 @@
  *  - Shade in linear; apply the sRGB encode EXACTLY ONCE, in the lit AOV.
  *  - vec3 aligns to 16 bytes inside WGSL uniform/storage structs — pad to vec4.
  */
-import type { CameraPreset, RenderPass } from '@spritebook/schema';
+import type { CameraPreset, Lighting, RenderPass } from '@spritebook/schema';
 
 // ---------------------------------------------------------------------------
 // The seam spec (plain data in; files + events out). Core resolves the preset
@@ -25,6 +25,8 @@ export interface RenderJobSpec {
   camera: CameraPreset;
   /** frames to render (with `posesPath`: must equal the poses file's frame count) */
   frames: number;
+  /** Render one sample while retaining the full clip's stable framing. */
+  frameIndex?: number;
   /**
    * pose source: the deterministic test poses ('turntable' default; 'idle' is
    * the low-motion flicker loop), or 'clip' — play the poses artifact at
@@ -50,6 +52,7 @@ export interface RenderJobSpec {
   /** which frame the key light is fixed in; omitted = the renderer's default
    * (renderer.ts DEFAULT_LIGHT_FRAME, decided from renders in C-WAVE.md) */
   lightFrame?: 'world' | 'camera';
+  lighting?: Lighting;
   /** carried through; the NPR style stack is P2-T2 */
   stylePreset: string;
   /** every render product is written under here */
@@ -134,7 +137,8 @@ export const REQUIRED_LIMITS: Record<string, number> = {
 // reaches maxColors DISTINCT colours; area average weights colour by coverage.
 // 0.6.0: Node/Dawn and native PNG bytes get a new cache namespace.
 // 0.6.1: arm bind-pose alignment changes animated pixels; invalidate prior poses/frames.
-export const RENDERER_VERSION = 'spritebook-render@0.6.1';
+// 0.7.0: capture projections/lighting and bounded large adaptive-palette sampling.
+export const RENDERER_VERSION = 'spritebook-render@0.7.0';
 
 // ---------------------------------------------------------------------------
 // AOV contract (aov.ts + shaders.wgsl). One MRT pass, five color attachments,

@@ -32,7 +32,9 @@ export const CameraPresetSchema = z.strictObject({
     z.literal('center'),
     z.strictObject({ xPct: z.number().min(0).max(100), yPct: z.number().min(0).max(100) }),
   ]),
-  orthographic: z.literal(true),
+  orthographic: z.boolean(),
+  /** Perspective vertical field of view; scale is measured at the pivot plane. */
+  fovDeg: z.number().min(10).max(90).optional(),
 });
 export type CameraPreset = z.output<typeof CameraPresetSchema>;
 
@@ -53,6 +55,14 @@ export const RENDER_PASSES = ['lit', 'albedo', 'normal', 'depth', 'mask'] as con
 export const RenderPassSchema = z.enum(RENDER_PASSES);
 export type RenderPass = z.output<typeof RenderPassSchema>;
 
+export const LightingSchema = z.strictObject({
+  direction: z.tuple([z.number().finite(), z.number().finite(), z.number().finite()])
+    .refine((v) => Math.hypot(...v) > 1e-6, 'Light direction must not be zero'),
+  ambient: z.number().min(0).max(1),
+  frame: z.enum(['world', 'camera']),
+});
+export type Lighting = z.output<typeof LightingSchema>;
+
 /** Base object shape — use for .partial() derivations (look.overrides). */
 export const StylePresetBaseSchema = z
   .strictObject({
@@ -63,6 +73,7 @@ export const StylePresetBaseSchema = z
      * the preset's human label and for the GUI's preset picker.
      */
     mode: z.enum(['cel', 'pixel', 'painterly']),
+    lighting: LightingSchema.optional(),
     ramp: z.strictObject({
       stops: z.int().min(2).max(8),
       rimStrength: z.number().min(0).max(1),
