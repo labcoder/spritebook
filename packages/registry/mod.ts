@@ -16,3 +16,4 @@ export * from './install.ts';
 
 export * from './execution.ts';
 export * from './setup.ts';
+export * from './resources.ts';

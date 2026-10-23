@@ -73,6 +73,40 @@ function install(rig: InstallRig, over: Partial<InstallJobOpts> = {}) {
   });
 }
 
+test('insufficient destination space refuses before download or staging writes', async () => {
+  const rig = await installRig();
+  try {
+    let downloads = 0;
+    const events = await collect(install(rig, {
+      detected: { ...DETECTED, diskFreeBytes: 0 },
+      fetcher: async () => {
+        downloads++;
+      },
+    }));
+    const error = ofType(events, 'error')[0];
+    assertEquals(error.code, 'disk-insufficient');
+    assertEquals(error.retryable, true);
+    assertEquals(downloads, 0);
+    assertEquals(await fs.stat(rig.root).catch(() => null), null);
+  } finally {
+    await fs.rm(rig.tmp, { recursive: true, force: true });
+  }
+});
+
+test('an unmeasured destination warns without claiming the model runtime fits', async () => {
+  const rig = await installRig();
+  try {
+    const events = await collect(install(rig, { detected: { ...DETECTED, diskFreeBytes: null } }));
+    const warning = ofType(events, 'warn').find((e) => e.code === 'disk-unmeasured');
+    assert(warning);
+    assertStringIncludes(warning.message, 'additional space');
+    assertEquals(ofType(events, 'done').length, 1);
+    assert(await resolveInstalled(rig.root, 'toy-rig'));
+  } finally {
+    await fs.rm(rig.tmp, { recursive: true, force: true });
+  }
+});
+
 test('install: happy path - verified files land, canonical receipt, events in order', async () => {
   const rig = await installRig();
   try {

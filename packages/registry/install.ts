@@ -7,6 +7,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { modelRuntime, readModelRuntime } from '@spritebook/core';
 import { downloadFile } from './download.ts';
+import { availableDiskBytes } from './resources.ts';
 /**
  * Install / verify / rm jobs (D-009), speaking the runBakeJob event
  * discipline: queued -> started -> per-file progress -> artifact -> done,
@@ -173,6 +174,7 @@ export interface InstallJobOpts {
     platform?: Platform;
     vramGb?: number | null;
     virtualization?: VirtualizationReport;
+    diskFreeBytes?: number | null;
   };
 }
 
@@ -253,6 +255,28 @@ export async function* runInstallJob(opts: InstallJobOpts): AsyncIterable<JobEve
         `Model "${entry.id}" ${version.version} is already installed at ${finalDir}. ` +
           `Installs never overwrite - run \`spritebook models rm ${entry.id}\` first ` +
           `to reinstall.`,
+      );
+    }
+
+    const downloadBytes = versionDiskBytes(version);
+    const diskFreeBytes = opts.detected?.diskFreeBytes !== undefined
+      ? opts.detected.diskFreeBytes
+      : await availableDiskBytes(opts.root);
+    if (diskFreeBytes === null) {
+      yield {
+        t: 'warn',
+        jobId,
+        at: at(),
+        code: 'disk-unmeasured',
+        message: 'Free space on the model destination could not be measured. ' +
+          `The pinned model files need ${downloadBytes} bytes; optional runtime setup needs additional space.`,
+      };
+    } else if (diskFreeBytes < downloadBytes) {
+      throw new JobFail(
+        'disk-insufficient',
+        `The model files need ${downloadBytes} bytes, but the destination has ${diskFreeBytes} bytes free. ` +
+          'Free space or choose another model location, then retry. Nothing was downloaded.',
+        true,
       );
     }
 

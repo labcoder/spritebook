@@ -10,6 +10,7 @@ import { assert, assertEquals, assertRejects, assertStringIncludes } from '@std/
 import { PlatformSchema } from '@spritebook/schema';
 import {
   type CommandRunner,
+  detectGpuMemory,
   detectPlatform,
   detectVramGb,
   gateLicense,
@@ -189,4 +190,26 @@ test('default detectors: skip-graceful smoke (no GPU required, no GPU asserted)'
   PlatformSchema.parse(await detectPlatform());
   const vram = await detectVramGb();
   assert(vram === null || vram > 0);
+});
+
+test('GPU memory inventory preserves all devices and refuses incomplete or conflicting reports', async () => {
+  const devices = await detectGpuMemory(fakeRun({
+    ok: true,
+    stdout: '0, GPU-first, 24576, 12000\n1, GPU-second, 8192, 0\n',
+  }));
+  assertEquals(devices, [
+    { index: 0, uuid: 'GPU-first', totalBytes: 24576 * 1024 ** 2, freeBytes: 12000 * 1024 ** 2 },
+    { index: 1, uuid: 'GPU-second', totalBytes: 8192 * 1024 ** 2, freeBytes: 0 },
+  ]);
+  for (
+    const stdout of [
+      '0, GPU-first, 24576, N/A',
+      '0, GPU-first, 8192, 9000',
+      '0, GPU-first, 8192, -1',
+      ', GPU-first, 8192, 100',
+      '0, GPU-first, 8192, 100\n0, GPU-second, 8192, 100',
+    ]
+  ) assertEquals(await detectGpuMemory(fakeRun({ ok: true, stdout })), null);
+  assertEquals(await detectGpuMemory(fakeRun({ ok: false, stdout: '' })), null);
+  assertEquals(await detectGpuMemory(fakeRun({ ok: true, stdout: '' })), []);
 });

@@ -29,6 +29,12 @@ runtime kernel admission still apply. Driver probes have a bounded timeout; unsu
 systems cannot inherit Linux recipes. These checks do not constitute new native platform execution
 evidence.
 
+`doctor` also reports RAM, process-available memory, destination disk space and per-device NVIDIA
+free/total memory. Failed inventory probes remain unmeasured; they do not assert CPU, Metal or CUDA
+support. CUDA ordering and visibility can differ from this physical inventory. Configured model
+capacity floors are not interchangeable with required free working memory, so the snapshot does not
+become a new free-memory admission threshold without backend-specific measurements.
+
 ## What CI covers
 
 [CI](../.github/workflows/ci.yml) uses Node for formatting, linting, separate type checks and tests

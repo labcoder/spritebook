@@ -199,3 +199,40 @@ export async function detectVramGb(run: CommandRunner = runCommand): Promise<num
   if (!Number.isFinite(mib) || mib <= 0) return null;
   return Math.round((mib / 1024) * 10) / 10;
 }
+
+export interface GpuMemory {
+  index: number;
+  uuid: string;
+  totalBytes: number;
+  freeBytes: number;
+}
+
+/** Physical inventory only; CUDA ordering/visibility and backend device selection can differ. */
+export async function detectGpuMemory(
+  run: CommandRunner = runCommand,
+): Promise<GpuMemory[] | null> {
+  const probe = await run([
+    'nvidia-smi',
+    '--query-gpu=index,uuid,memory.total,memory.free',
+    '--format=csv,noheader,nounits',
+  ]);
+  if (!probe.ok) return null;
+  const devices: GpuMemory[] = [];
+  for (const line of probe.stdout.trim().split('\n').filter((line) => line.trim())) {
+    const parts = line.split(',').map((part) => part.trim());
+    const [index, total, free] = [Number(parts[0]), Number(parts[2]), Number(parts[3])];
+    if (
+      parts.length !== 4 || parts.some((part) => !part) ||
+      !Number.isInteger(index) || index < 0 || !parts[1].startsWith('GPU-') ||
+      !Number.isFinite(total) || total <= 0 || !Number.isFinite(free) || free < 0 || free > total ||
+      devices.some((device) => device.index === index || device.uuid === parts[1])
+    ) return null;
+    devices.push({
+      index,
+      uuid: parts[1],
+      totalBytes: total * 1024 ** 2,
+      freeBytes: free * 1024 ** 2,
+    });
+  }
+  return devices;
+}

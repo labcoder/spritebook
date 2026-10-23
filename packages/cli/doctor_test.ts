@@ -49,6 +49,10 @@ test('doctor --json: one parseable document with the same verdict', async () => 
   assertEquals(out.length, 1, 'exactly one JSON line');
   const doc = JSON.parse(out[0]);
   assertEquals(doc.spritebook, SPRITEBOOK_VERSION);
+  assert(doc.resources.ram.totalBytes > 0);
+  assert(doc.resources.ram.freeBytes >= 0);
+  assert(doc.resources.ram.processAvailableBytes >= 0);
+  assert(doc.resources.diskFreeBytes === null || doc.resources.diskFreeBytes >= 0);
   if (code === 0) {
     assertEquals(doc.available, true);
     assertEquals(doc.probe.ok, true);

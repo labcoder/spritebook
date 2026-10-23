@@ -22,7 +22,9 @@ import { SidecarSession } from '@spritebook/core';
 import {
   defaultModelsRoot,
   detectAppDataVirtualization,
+  detectGpuMemory,
   detectVramGb,
+  hostResources,
   type VirtualizationReport,
 } from '@spritebook/registry';
 import { SPRITEBOOK_VERSION } from './version.ts';
@@ -95,13 +97,19 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
   const virtualization: VirtualizationReport = await detectAppDataVirtualization();
   // the exam is where the GUI learns the card's capacity (W6: a 24 GiB card
   // should not default to lowVram) - null when nvidia-smi is absent
-  const vramGb = await detectVramGb();
+  const [vramGb, resources, gpuMemory] = await Promise.all([
+    detectVramGb(),
+    hostResources(modelsRoot ?? undefined),
+    detectGpuMemory(),
+  ]);
   const report = {
     spritebook: SPRITEBOOK_VERSION,
     node: process.versions.node,
     v8: process.versions.v8,
     platform: `${(process.platform === 'win32' ? 'windows' : process.platform)}-${process.arch}`,
     vramGb,
+    resources,
+    gpuMemory,
     models: { root: modelsRoot, virtualization },
     ...diag,
     ...(sidecar ? { sidecar } : {}),
@@ -113,9 +121,32 @@ export async function runDoctor(args: string[], io: CliIo): Promise<number> {
     io.stdout(`SpriteBook ${SPRITEBOOK_VERSION}`);
     io.stdout(`node ${report.node} - v8 ${report.v8} - ${report.platform}`);
     io.stdout(`vram: ${vramGb === null ? 'unknown (no nvidia-smi)' : `${vramGb} GiB detected`}`);
+    const gib = (bytes: number) => (bytes / 1024 ** 3).toFixed(1);
+    io.stdout(
+      `ram: ${gib(resources.ram.freeBytes)} GiB free of ${gib(resources.ram.totalBytes)} GiB; ` +
+        `${gib(resources.ram.processAvailableBytes)} GiB available to this process`,
+    );
+    io.stdout(
+      `model destination free: ${
+        resources.diskFreeBytes === null ? 'unmeasured' : `${gib(resources.diskFreeBytes)} GiB`
+      }`,
+    );
     io.stdout(
       `models root: ${modelsRoot ?? '(unresolvable - set SPRITEBOOK_MODELS_DIR)'}`,
     );
+    if (gpuMemory === null) io.stdout('NVIDIA memory inventory: unmeasured');
+    for (const device of gpuMemory ?? []) {
+      io.stdout(
+        `NVIDIA GPU ${device.index} (${device.uuid}): ${gib(device.freeBytes)} GiB free of ${
+          gib(device.totalBytes)
+        } GiB`,
+      );
+    }
+    if (gpuMemory?.length) {
+      io.stdout(
+        'Memory is a snapshot; backend device selection and kernel support need separate checks.',
+      );
+    }
     if (virtualization.virtualized) {
       io.stdout(
         `  CONTAINED: MSIX AppData virtualization is active - package ` +

@@ -124,6 +124,17 @@ source receipts. See [execution policy](architecture/execution-policy.md).
 
 ## Storage and removal
 
+Before downloading weights, installation checks free space on the destination filesystem against the
+total pinned model-file size. Insufficient space refuses before staging or network activity; an
+unavailable measurement produces a warning. This is a lower-bound check: runtime extraction, Python
+environments, shared caches and concurrent installs can need more space.
+
+`spritebook doctor --json` includes `resources` (host RAM, memory available to the process and free
+space at the model destination) and `gpuMemory` (all measured NVIDIA devices, UUIDs, total/free
+bytes). An unavailable GPU inventory is `null`; a successful empty inventory is `[]`. These are
+snapshots, not reservations or backend qualification. The existing `vramGb` field remains the
+first-card capacity advisory; it does not identify the device selected by a model worker.
+
 | Data                         | Windows default                                            | Ownership                                                                         |
 | ---------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Weights and install receipts | `%LOCALAPPDATA%/spritebook/models/<id>/<version>`          | Per-machine, outside workspaces; `SPRITEBOOK_MODELS_DIR` overrides only this root |
