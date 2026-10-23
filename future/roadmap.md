@@ -531,8 +531,19 @@ full-color output, 64–4096px capture, multipage playback and independent model
 existing characters now produce side-view and eight-direction walk/jump sheets with validated native
 manifests, strips and Godot resources. Motion quality remains open: Amy's contacting hand/trouser
 region and Bulma's skirt fail visual qualification. See the [0.5.0 checklist](beta-0.5.md) and
-[skinning investigation](garment-skinning-research.md). These exports do not close F7 or authorize a
-release tag while that gate remains unresolved.
+[skinning investigation](garment-skinning-research.md). These exports do not close F7 or the motion
+gate. On 2026-10-23 the maintainer explicitly approved publishing **v0.5.0 as a capture/export
+preview**, with these motion limitations documented. This limited scope permits the preview tag
+after build/CI checks; it does not qualify automatic rigging or a production release.
+
+The approved low-footprint repair investigation now compares the exact Mesh2Motion CPU binder,
+LBS/DQS, independent motion controls, Blender automatic weights, TokenRig and fitted cloth methods.
+See [the execution results](cpu-deformation-evaluation.md), [TokenRig](tokenrig-evaluation.md), and
+[cloth](cloth-evaluation.md). Completed inference and valid normalized weights do not establish
+whole-character quality: source ownership and final-detail garment contact remain F5-T2/F6-T1 gates.
+Keep optional ML/Blender engines outside the base app; Blender deployment is still undecided. The
+registry's former automatic macOS/Metal assumption is corrected locally, without claiming new native
+platform runs. No new binder, cloth provider or release is selected by these experiments.
 
 F6-T4 qualifies complete production workflows on the same inputs and hardware: a textured prop
 through eight directions; an asymmetric humanoid through idle/walk/action; a roster look change with

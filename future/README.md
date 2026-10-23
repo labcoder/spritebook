@@ -25,7 +25,9 @@ generation/rig/sprites, offline operation, exact fresh-worker replay and repair:
 [qualification](qualification/pixal3d-windows-x64.json). The
 [hardware/platform spike](model-platform-spike.md) adds measured TripoSR experiments and sourced
 Mac/Linux requirements. F7 retains release and deferred native-platform qualification; no public
-release is claimed. TRELLIS.2 remains the default.
+production release is claimed. The maintainer approved a **0.5.0 Windows capture/export preview**
+with documented hand/clothing deformation and skirt-clipping limitations; publication and CI status
+are tracked in the [preview checklist](beta-0.5.md). TRELLIS.2 remains the default.
 
 ## Recommendation in one paragraph
 
@@ -39,22 +41,24 @@ migration problems either.
 
 ## Read in order
 
-| File                                                     | Question it answers                                                                                                          |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| [Vision and decision brief](vision.md)                   | What product are we remaking, what should the experience become, and which choices need a decision?                          |
-| [Repository migration strategy](migration-strategy.md)   | Why is this repository retained, which alternatives were rejected, and what does the approved direction preserve?            |
-| [Architecture review](architecture-review.md)            | What actually runs today; what is worth keeping; what safety, CLI, UI, cache and delivery gaps need repair?                  |
-| [Deno replacement](runtime-migration.md)                 | What must move, which GPU/runtime paths are credible, and how do we preserve data and output behavior?                       |
-| [Model landscape](models.md)                             | Which text/image-to-3D models and implementations deserve trials on Windows, Mac and Linux, under which terms and resources? |
-| [Model hardware/platform spike](model-platform-spike.md) | What ran on the RTX 3090, which Mac/Linux runners are credible, and what memory, disk, terms and quality limits apply?       |
-| [Desktop and language decisions](technology-options.md)  | What is settled about Tauri and TypeScript, what still needs validation, and which alternatives are now historical research? |
-| [Hugging Face and model management](model-management.md) | What HF integration exists, should we retain it, and how should authentication, caches, pins and offline inference work?     |
-| [Migration roadmap](roadmap.md)                          | What is the required execution order, what evidence closes each task, and which model/UX improvements come later?            |
-| [F0 preservation and control](baseline.md)               | Which contracts and platform targets must survive, what ran, and how do we replay the legacy control safely?                 |
-| [F1 state-safety completion](state-safety.md)            | What changed in state, process ownership, queries and execution policy; what passed and what remains unqualified?            |
-| [F2 renderer qualification](renderer-qualification.md)   | Does the actual Node/Dawn pipeline preserve pixels and performance, and which installed/platform gates remain open?          |
-| [F4 Node cutover](runtime-cutover.md)                    | What migrated, what passed in the installed Windows app, and what remains open?                                              |
-| [F4 model setup gate](model-provisioning-gate.md)        | How are existing models provisioned, which exact terms apply, and what evidence closed the gate?                             |
+| File                                                               | Question it answers                                                                                                          |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| [Vision and decision brief](vision.md)                             | What product are we remaking, what should the experience become, and which choices need a decision?                          |
+| [Repository migration strategy](migration-strategy.md)             | Why is this repository retained, which alternatives were rejected, and what does the approved direction preserve?            |
+| [Architecture review](architecture-review.md)                      | What actually runs today; what is worth keeping; what safety, CLI, UI, cache and delivery gaps need repair?                  |
+| [Deno replacement](runtime-migration.md)                           | What must move, which GPU/runtime paths are credible, and how do we preserve data and output behavior?                       |
+| [Model landscape](models.md)                                       | Which text/image-to-3D models and implementations deserve trials on Windows, Mac and Linux, under which terms and resources? |
+| [Model hardware/platform spike](model-platform-spike.md)           | What ran on the RTX 3090, which Mac/Linux runners are credible, and what memory, disk, terms and quality limits apply?       |
+| [Desktop and language decisions](technology-options.md)            | What is settled about Tauri and TypeScript, what still needs validation, and which alternatives are now historical research? |
+| [Hugging Face and model management](model-management.md)           | What HF integration exists, should we retain it, and how should authentication, caches, pins and offline inference work?     |
+| [Migration roadmap](roadmap.md)                                    | What is the required execution order, what evidence closes each task, and which model/UX improvements come later?            |
+| [F0 preservation and control](baseline.md)                         | Which contracts and platform targets must survive, what ran, and how do we replay the legacy control safely?                 |
+| [F1 state-safety completion](state-safety.md)                      | What changed in state, process ownership, queries and execution policy; what passed and what remains unqualified?            |
+| [F2 renderer qualification](renderer-qualification.md)             | Does the actual Node/Dawn pipeline preserve pixels and performance, and which installed/platform gates remain open?          |
+| [F4 Node cutover](runtime-cutover.md)                              | What migrated, what passed in the installed Windows app, and what remains open?                                              |
+| [F4 model setup gate](model-provisioning-gate.md)                  | How are existing models provisioned, which exact terms apply, and what evidence closed the gate?                             |
+| [Animation repair options](animation-quality-options.md)           | Which lightweight and optional repair methods were investigated, and what remains undecided?                                 |
+| [CPU binding and motion evaluation](cpu-deformation-evaluation.md) | What actually ran, which automatic fixes failed, and what do the independent controls establish?                             |
 
 ## Findings that change the decision
 
