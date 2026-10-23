@@ -17,6 +17,7 @@
       "!packages/registry/catalog",
       "!future/baseline",
       "!future/qualification",
+      "!future/ui-concepts",
       "!.build"
     ]
   },
