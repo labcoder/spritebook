@@ -526,6 +526,14 @@ without adopting another core, project format, renderer or provisioning stack:
 
 ### Workflow qualification
 
+The active Windows preview extends F5-T1/T2 and F6-T2/T4 through a spatial Look workbench,
+full-color output, 64–4096px capture, multipage playback and independent model/texture export. Both
+existing characters now produce side-view and eight-direction walk/jump sheets with validated native
+manifests, strips and Godot resources. Motion quality remains open: Amy's contacting hand/trouser
+region and Bulma's skirt fail visual qualification. See the [0.5.0 checklist](beta-0.5.md) and
+[skinning investigation](garment-skinning-research.md). These exports do not close F7 or authorize a
+release tag while that gate remains unresolved.
+
 F6-T4 qualifies complete production workflows on the same inputs and hardware: a textured prop
 through eight directions; an asymmetric humanoid through idle/walk/action; a roster look change with
 failure/restart; and engine playback with pivots, timing and aligned passes. Report setup, download,
