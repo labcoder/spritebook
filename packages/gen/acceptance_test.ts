@@ -167,7 +167,7 @@ test('ACCEPTANCE: image -> gen -> canonical textured glb with full provenance', 
     // unstamped from P1-T4 until now).
     assertEquals(
       generatorOf(bytes),
-      'spritebook-import@0.1.1',
+      'spritebook-import@0.1.2',
       'the canonical file itself declares who made it',
     );
     const preflight = JSON.parse(await fs.readFile(preflightPath, 'utf8'));
