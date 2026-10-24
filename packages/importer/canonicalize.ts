@@ -80,6 +80,11 @@ function validateAndRepairSkins(doc: Document, label: string, notes: CanonNote[]
         );
       }
       const jointCount = skin.listJoints().length;
+      if (prim.listSemantics().some((name) => /^(JOINTS|WEIGHTS)_[1-9]/.test(name))) {
+        throw new ImportError(
+          `${label}: mesh "${mesh.getName()}" uses more than four skin influences; reduce to four before importing`,
+        );
+      }
       const ibm = skin.getInverseBindMatrices();
       if (!ibm) {
         throw new ImportError(
@@ -109,11 +114,42 @@ function validateAndRepairSkins(doc: Document, label: string, notes: CanonNote[]
       }
 
       // renormalize sloppy weights (generators are sloppy — skill)
-      const wArr = weights.getArray()! as Float32Array<ArrayBuffer>;
+      let wArr = weights.getArray()!;
+      if (!(wArr instanceof Float32Array)) {
+        if (
+          !weights.getNormalized() ||
+          !(wArr instanceof Uint8Array || wArr instanceof Uint16Array)
+        ) {
+          throw new ImportError(
+            `${label}: mesh "${mesh.getName()}" has invalid skin weight encoding`,
+          );
+        }
+        const decoded = new Float32Array(wArr.length);
+        for (let vertex = 0; vertex < weights.getCount(); vertex++) {
+          decoded.set(weights.getElement(vertex, []), vertex * 4);
+        }
+        weights.setArray(decoded).setNormalized(false);
+        wArr = decoded;
+        notes.push({
+          id: 'skin',
+          status: 'ok',
+          message: `Mesh "${mesh.getName()}": integer skin weights decoded to canonical floats`,
+        });
+      }
       let repaired = 0;
       for (let v = 0; v < wArr.length; v += 4) {
         const sum = wArr[v] + wArr[v + 1] + wArr[v + 2] + wArr[v + 3];
-        if (sum > 1e-6 && Math.abs(sum - 1) > 1e-3) {
+        if (
+          !Number.isFinite(sum) || sum <= 1e-6 ||
+          wArr[v] < 0 || wArr[v + 1] < 0 || wArr[v + 2] < 0 || wArr[v + 3] < 0
+        ) {
+          throw new ImportError(
+            `${label}: mesh "${mesh.getName()}" vertex ${
+              v / 4
+            } has invalid skin weights; use finite nonnegative weights with a positive total`,
+          );
+        }
+        if (Math.abs(sum - 1) > 1e-3) {
           for (let k = 0; k < 4; k++) wArr[v + k] /= sum;
           repaired++;
         }

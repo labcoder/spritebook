@@ -200,6 +200,72 @@ test('declared height + feet grounding hold for skinned sources too', async () =
   assert(Math.abs(Math.max(...heights) - 1.8) < 1e-5, 'Actual skinned height is 1.8 m');
 });
 
+for (const [ArrayType, maximum] of [[Uint8Array, 255], [Uint16Array, 65535]] as const) {
+  test(`normalized ${ArrayType.name} skin weights retain their blend at the border`, async () => {
+    const root = await fs.mkdtemp(join(tmpdir(), 'sb-weight-encoding-'));
+    try {
+      const io = await getIO(), doc = await io.read(fx('skinned-column.glb'));
+      const weights = doc.getRoot().listMeshes()[0].listPrimitives()[0].getAttribute('WEIGHTS_0')!;
+      const encoded = new ArrayType(weights.getCount() * 4);
+      for (let vertex = 0; vertex < weights.getCount(); vertex++) {
+        encoded.set([Math.ceil(maximum / 2), Math.floor(maximum / 2), 0, 0], vertex * 4);
+      }
+      weights.setArray(encoded).setNormalized(true);
+      const input = join(root, 'weighted.glb');
+      const source = await io.writeBinary(doc);
+      await fs.writeFile(input, source);
+      const { bytes, report } = await importToCanonical({ input });
+      const output = await io.readBinary(bytes);
+      const decoded = output.getRoot().listMeshes()[0].listPrimitives()[0]
+        .getAttribute('WEIGHTS_0')!;
+      assert(decoded.getArray() instanceof Float32Array, 'Core consumes canonical floats');
+      assertEquals(decoded.getNormalized(), false);
+      const row = decoded.getElement(0, []);
+      assert(Math.abs(row[0] - Math.ceil(maximum / 2) / maximum) < 1e-7);
+      assert(Math.abs(row[1] - Math.floor(maximum / 2) / maximum) < 1e-7);
+      assertEquals(row[2] + row[3], 0);
+      assert(report.checks.some((check) => check.message.includes('integer skin weights decoded')));
+      assertEquals(
+        new Uint8Array(await fs.readFile(input)),
+        source,
+        'Original upload stays intact',
+      );
+      assertEquals(
+        (await importToCanonical({ input })).bytes,
+        bytes,
+        'Decoded import is deterministic',
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('invalid weights and unsupported extra influences refuse instead of changing the blend', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'sb-weight-refusal-'));
+  try {
+    const io = await getIO(), input = join(root, 'invalid.glb');
+    for (const row of [[0, 0, 0, 0], [-1, 2, 0, 0], [NaN, 0, 0, 0]]) {
+      const doc = await io.read(fx('skinned-column.glb'));
+      const mesh = doc.getRoot().listMeshes()[0].setName('test body');
+      const weights = mesh.listPrimitives()[0].getAttribute('WEIGHTS_0')!;
+      weights.getArray()!.set(row);
+      await fs.writeFile(input, await io.writeBinary(doc));
+      const error = await assertRejects(() => importToCanonical({ input }), ImportError);
+      assert(error.message.includes('test body') && error.message.includes('invalid skin weights'));
+    }
+    const doc = await io.read(fx('skinned-column.glb'));
+    const primitive = doc.getRoot().listMeshes()[0].listPrimitives()[0];
+    primitive.setAttribute('WEIGHTS_1', primitive.getAttribute('WEIGHTS_0'));
+    primitive.setAttribute('JOINTS_1', primitive.getAttribute('JOINTS_0'));
+    await fs.writeFile(input, await io.writeBinary(doc));
+    const error = await assertRejects(() => importToCanonical({ input }), ImportError);
+    assert(error.message.includes('reduce to four before importing'));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 // --- acceptance: actionable errors -------------------------------------------
 test('acceptance: failures are actionable - no stack traces, names named', async () => {
   const missing = await assertRejects(

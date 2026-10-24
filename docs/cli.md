@@ -1,6 +1,6 @@
 # The CLI, stage by stage
 
-This page covers the verbs that take an image to a rigged, animated character: `gen`, `pick`, `rig`,
+This page covers mesh import and the image-to-character verbs: `import`, `gen`, `pick`, `rig`,
 `anim`, `look`, `retexture`, and `models`. The [quickstart](quickstart.md) covers `bake`, `export`,
 and `doctor`.
 
@@ -35,6 +35,10 @@ wrappers are folded into the first joint without replacing weights or bind matri
 wrappers/root tracks that need coordinate conversion, inherited shear, and intermediate non-joint
 wrappers inside a skin are refused with a preparation message; importing existing animation
 libraries is a separate workflow.
+
+Normalized 8/16-bit skin weights are decoded to canonical floats. Invalid zero-total, negative or
+nonfinite weights refuse, as do extra influence sets: reduce to four influences per vertex before
+importing. Unsupported data is not silently discarded from an authored rig.
 
 ## gen — image to candidate meshes
 
