@@ -35,8 +35,16 @@ export function JobActivity({ progress, verb }: { progress: ProgressState | null
     ? t('Fitting rig to mesh')
     : step === 'deform' || step === 'validate'
     ? t('Checking deformation')
+    : step === 'motion-surface-check'
+    ? t('Measuring animated surfaces')
+    : verb === 'motion-audition' && step === 'cells'
+    ? t('Rendering motion samples')
+    : verb === 'motion-audition' && step === 'pack'
+    ? t('Preparing direction previews')
     : step || t('Starting…');
-  const title = verb === 'rig-preview'
+  const title = verb === 'motion-audition'
+    ? t('Reviewing walk and jump')
+    : verb === 'rig-preview'
     ? t('Preparing joint preview')
     : verb === 'anim-preview'
     ? t('Preparing motion preview')

@@ -9,6 +9,46 @@ import { resolveStyle } from '@spritebook/style';
 import { tryGetGpu } from '../render/dist/gpu.js';
 import { type BakeJobSpec, runBakeJob, runLookPreview } from './dist/mod.js';
 
+test('Look preview enforces project pack pins before writing a preview or rendering', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'sb-look-pins-'));
+  try {
+    await fs.writeFile(
+      join(root, 'pins.json'),
+      JSON.stringify({ models: {}, packs: {}, rendererVersion: 'reserved' }),
+    );
+    const events = await Array.fromAsync(runLookPreview({
+      jobId: 'look',
+      characterId: 'pin-test',
+      workspace: join(root, 'character'),
+      modelPath: resourcePath('rig', 'bodies/ubc-male/body.glb'),
+      camera: {
+        id: 'test',
+        yawOffsetDeg: 0,
+        cellPx: { w: 64, h: 64 },
+        pixelsPerMeter: 20,
+        paddingPx: 4,
+        elevationDeg: 15,
+        directions: 2,
+        orthographic: true,
+        pivot: 'feet-baseline',
+      },
+      style: resolveStyle('clean'),
+      frames: 4,
+      clips: [{ clipId: 'walk-loop', frames: 4, speed: 1, holdLast: false }],
+      frameIndex: 0,
+      direction: 0,
+      outRoot: root,
+      outDir: join(root, 'preview'),
+    }));
+    const last = events.at(-1);
+    assert(last?.t === 'error' && last.message.includes('no packs version'));
+    assertEquals(events.some((event) => event.t === 'artifact'), false);
+    assertEquals(await fs.stat(join(root, 'preview')).catch(() => null), null);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test('Look frame matches its full bake with custom perspective and lighting', async (t) => {
   if (!(await tryGetGpu())) {
     t.skip('No WebGPU adapter');

@@ -17,6 +17,7 @@ import { Viewport } from './viewport/Viewport';
 import { editsFile, mergeEdits, mirrorPartner, type PendingEdit } from './viewport/picking';
 import { useLandFocus } from './focus';
 import { useClipLibrary } from './clip-library';
+import { MotionAudition } from './motion-audition';
 
 const BUNDLED_BODY = 'ubc-male';
 
@@ -433,7 +434,13 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
 }) {
   const m = (manifest ?? {}) as Record<string, unknown>;
   const rig = m.rig as
-    | { track?: string; accepted?: boolean; jointCount?: number; orientationFixes?: string[] }
+    | {
+      track?: string;
+      accepted?: boolean;
+      jointCount?: number;
+      orientationFixes?: string[];
+      backend?: { modelId: string };
+    }
     | undefined;
   const [report, setReport] = useState<RigReportView | null>(null);
   const [editsPath, setEditsPath] = useState('');
@@ -455,7 +462,9 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
     ? { trackA: true as const, bodyDir: rerunBody }
     : { fixes: orientationFixes(orientation) };
   const changed = useCallback((args: string[]) => {
-    if (args.includes('--preview') || args.includes('--preview-joint')) return;
+    if (
+      args.includes('--preview') || args.includes('--preview-joint') || args.includes('--audition')
+    ) return;
     if (
       !args.includes('--accept') && !args.includes('--unaccept')
     ) {
@@ -696,7 +705,11 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
             {report === null
               ? (
                 <div className='inote'>
-                  {t('no deform report on disk — re-run the rig to write one')}
+                  {rig?.backend?.modelId === 'imported-rig'
+                    ? t(
+                      'Authored rig preserved. Review walk and jump before accepting; rebuilding replaces its weights.',
+                    )
+                    : t('no deform report on disk — re-run the rig to write one')}
                 </div>
               )
               : report.flagged.length === 0
@@ -720,6 +733,8 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
                 progress={run.progress}
                 verb={run.args.includes('--preview')
                   ? 'anim-preview'
+                  : run.args.includes('--audition')
+                  ? 'motion-audition'
                   : run.args.includes('--preview-joint')
                   ? 'rig-preview'
                   : 'rig'}
@@ -730,6 +745,21 @@ export function RigStage({ bridge, dir, manifest, onChanged }: {
           {failure && <FailureNote failure={failure} />}
           {canceled && <p className='inote job-canceled' role='status'>{t('Job canceled')}</p>}
           <div className='rig-controls'>
+            <section className='gensec'>
+              <MotionAudition
+                bridge={bridge}
+                dir={dir}
+                busy={busy || edits.length > 0}
+                running={run?.running === true && run.args.includes('--audition')}
+                sourceKey={(m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ??
+                  ''}
+                run={exec}
+                onPlay={(path, args) => {
+                  setPreviewRevision((n) => n + 1);
+                  setPreviewState({ path, args });
+                }}
+              />
+            </section>
             <MotionReview
               bridge={bridge}
               dir={dir}

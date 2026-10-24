@@ -5,8 +5,8 @@ import { canonicalJson, type JobEvent, RENDER_PASSES } from '@spritebook/schema'
 import { sha256Hex } from '@spritebook/core';
 import { RENDERER_VERSION, runRenderJob } from '@spritebook/render';
 import { styleFromAovs } from '@spritebook/style';
-import { writePoses } from '@spritebook/anim';
-import { type BakeJobSpec, buildCacheInputs, prepareClips } from './bake.ts';
+import { loadPack, writePoses } from '@spritebook/anim';
+import { type BakeJobSpec, buildCacheInputs, BUNDLED_PACK, prepareClips } from './bake.ts';
 
 /** A read-only frame preview over the exact bake sampling, framing and style path. */
 export async function* runLookPreview(
@@ -22,6 +22,7 @@ export async function* runLookPreview(
     if (!binding || spec.clips?.length !== 1) {
       throw new Error('Look preview needs one animation clip');
     }
+    await loadPack(spec.packDir ?? BUNDLED_PACK, spec);
     if (
       !Number.isInteger(spec.direction) || spec.direction < 0 ||
       spec.direction >= spec.camera.directions

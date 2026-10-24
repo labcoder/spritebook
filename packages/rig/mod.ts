@@ -69,6 +69,7 @@ export type { ApplyEditsResult } from './edits.ts';
 
 export { runRigJob } from './job.ts';
 export type { RigJobOptions, RigJobSummary } from './job.ts';
+export { motionSurfaceStats } from './motion.ts';
 
 /**
  * Track A (P3-T4): ONE canonical rigged humanoid fitted to each generated

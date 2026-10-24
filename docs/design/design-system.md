@@ -139,6 +139,16 @@ twin; Return to rest pose restores editing. Keep pending edits blocked and repor
 without leaving the control busy. This review capability does not imply that binding or clothing has
 been repaired.
 
+New character offers a mesh import and an offline CC0 authored reference alongside image generation.
+An existing authored rig is preserved and enters Rig for review, not automatic acceptance. Generate
+starts with one candidate; comparing generators requires at least one candidate per selected
+backend. Input guidance asks for visible feet and separation between hands and torso, with honest
+clothing limits. Candidate Motion review explains the single draft-rig cost before running it and
+keeps the selected mesh unchanged. Rig also offers the same four-motion review on its current rig
+without inference. Four-direction core contact sheets retain integer pixel size, with source-bound
+detailed surface measurements alongside them. Numerical findings are areas to inspect, not a quality
+score or an anatomical diagnosis.
+
 ## Implementation verification
 
 The identity implementation has 67 Studio tests, alongside TypeScript and production web-build

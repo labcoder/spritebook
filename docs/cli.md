@@ -175,6 +175,22 @@ pause and scrub controls. Passing this diagnostic does not prove anatomical corr
 
 ## anim — the clip library and your bindings
 
+`spritebook anim --audition --workspace ./characters/hero` renders walking and jump
+start/air/landing in four directions and measures detailed surface stretch and separation under 17
+poses per motion. It uses the current rig, with no inference or downloads, and leaves acceptance,
+clips, look and the selected bake unchanged. `spritebook anim --review --workspace ./characters/hero
+--json` reads the current report; changed mesh bytes, bundled clips or renderer version invalidate
+it. These sampled checks require visual review and do not certify anatomy, clothing coverage or
+collision-free motion.
+
+Add `--result r1` to audition a generated candidate before picking it. This makes one seed-0 UniRig
+attempt in a derived workspace under `anim/candidates/`, then uses the same motion review. UniRig
+must already be installed and admitted for this machine. Exact project model/pack pins are retained;
+no downloads or automatic acceptance occur. Repeating an unchanged candidate/backend recipe reuses
+its draft rig. `anim --review --result r1 --workspace <dir> --json` reads its source-bound report.
+Changing candidate bytes or project pins invalidates that evidence. The parent selection and its
+accepted rig are untouched; derived files still consume disk space.
+
 ```
 spritebook anim --list
 spritebook anim --enable idle-loop:6,walk-loop:8@1.5 --workspace ./characters/hero

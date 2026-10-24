@@ -91,3 +91,20 @@ An identical rig/fit rerun succeeds with a `rig-unchanged` warning and no undo e
 acceptance failures remain terminal. Cancellation racing an already committed intent may reveal the
 complete new state after recovery; it cannot turn that intent into a partial accepted asset. The
 editor refreshes recovered state when work terminates, and tab activation reads current state.
+
+## Imported characters and motion evidence
+
+`import` passes the original mesh through the canonical importer, retaining authored skins and
+materials. It records a journaled canonical promotion with source provenance rather than inventing a
+generation result. Imported rigs start unaccepted. Only an interrupted, empty initial import with
+the same source hash and no journal history can resume; undo does not authorize overwriting a
+character.
+
+`anim --audition` writes derived `anim/reviews/` renders and an atomically published
+`anim/motion-review.json`. The report binds the detailed source mesh, bundled motion bytes and
+renderer version; it does not mutate rig acceptance, enabled clips, look or the selected bake.
+Candidate audition additionally owns an isolated `anim/candidates/<result>/<recipe-hash>/character`
+workspace. The recipe pins source bytes, the UniRig version and the project's model/pack pins. Its
+internal journal never replaces the parent character. An interrupted candidate can resume its
+existing draft; there is no hidden retry or automatic quality acceptance. These derivatives can be
+deleted independently of originals, but remain on disk until explicitly removed.

@@ -206,3 +206,35 @@ export const DeformReportSchema = z.strictObject({
   flaggedJoints: z.array(z.string()),
 });
 export type DeformReport = z.output<typeof DeformReportSchema>;
+
+export const MOTION_REVIEW_CLIPS = ['walk-loop', 'jump-start', 'jump-loop', 'jump-land'] as const;
+export const MotionReviewSchema = z.strictObject({
+  version: z.literal(1),
+  method: z.literal('motion-surface@1'),
+  sourceSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  renderer: z.string().min(1),
+  bakeDir: z.string().min(1),
+  flags: z.array(z.string()),
+  clips: z.array(z.strictObject({
+    clipId: z.enum(MOTION_REVIEW_CLIPS),
+    sourceSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    preview: z.string().min(1),
+    contact: z.string().min(1),
+    stats: z.strictObject({
+      frames: z.int().min(2),
+      measuredEdges: z.int().nonnegative(),
+      worstStretchedFraction: z.number().min(0).max(1),
+      worstFrame: z.int().nonnegative(),
+      maxStretch: z.number().nonnegative(),
+      coincidentPairs: z.int().nonnegative(),
+      maxSeparationM: z.number().nonnegative(),
+      minY: z.number(),
+      maxY: z.number(),
+      reviewJoints: z.array(z.string()),
+    }),
+  })).length(4).refine(
+    (clips) => new Set(clips.map((clip) => clip.clipId)).size === 4,
+    'Every critical motion must appear once',
+  ),
+});
+export type MotionReview = z.output<typeof MotionReviewSchema>;

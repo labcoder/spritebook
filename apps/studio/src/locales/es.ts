@@ -708,4 +708,59 @@ export const es: Record<string, string> = {
   'Use this copy': 'Usar esta copia',
   'Your installation': 'Tu instalación',
   'Verifying files': 'Verificando archivos',
+  'A bundled CC0 humanoid. No model downloads or AI rigging required.':
+    'Un humanoide CC0 incluido. No necesita descargar modelos ni usar IA para el rig.',
+  'Areas to inspect': 'Zonas que revisar',
+  'Back to reference image': 'Volver a la imagen de referencia',
+  'Coincident vertices separate': 'Los vértices coincidentes se separan',
+  'Core-rendered motion in four directions':
+    'Movimiento renderizado por el núcleo en cuatro direcciones',
+  'Could not read the motion review. Retry the audition.':
+    'No se pudo leer la revisión de movimiento. Vuelve a ejecutar la prueba.',
+  'Existing rigs are preserved, not automatically accepted. Static meshes still need a rig.':
+    'Se conservan los rigs existentes, sin aceptarlos automáticamente. Las mallas estáticas todavía necesitan un rig.',
+  'For animation, separate hands from the body and show the feet. Loose or layered clothing may need preparation. More polygons do not guarantee better motion.':
+    'Para animar, separa las manos del cuerpo y muestra los pies. La ropa holgada o con capas puede necesitar preparación. Más polígonos no garantizan un mejor movimiento.',
+  'Four motions, four directions. Uses the current rig without enabling clips or changing your saved look.':
+    'Cuatro movimientos en cuatro direcciones. Usa el rig actual sin activar clips ni cambiar el aspecto guardado.',
+  'Import character': 'Importar personaje',
+  'Import failed. The log drawer has the reason.':
+    'La importación falló. Consulta el motivo en el registro.',
+  'Importing…': 'Importando…',
+  'Inspect hands, clothing and landing. These samples do not certify anatomy or collision-free motion.':
+    'Revisa las manos, la ropa y el aterrizaje. Estas muestras no certifican la anatomía ni un movimiento sin colisiones.',
+  'Keep your existing rig': 'Conserva tu rig',
+  'Measuring animated surfaces': 'Midiendo superficies animadas',
+  'Mesh path': 'Ruta de la malla',
+  'Mesh, materials and existing skin weights pass through the canonical importer.':
+    'La malla, los materiales y los pesos existentes pasan por el importador canónico.',
+  'Motion image unavailable. Use Play to inspect the model.':
+    'Imagen de movimiento no disponible. Usa Reproducir para revisar el modelo.',
+  'Motion samples': 'Muestras de movimiento',
+  'Preparing direction previews': 'Preparando vistas por dirección',
+  'Render warnings': 'Avisos del renderizado',
+  'Rendering motion samples': 'Renderizando muestras de movimiento',
+  'Review walk and jump': 'Revisar marcha y salto',
+  'Review walking and jumping in Rig, then choose the look and export sprites.':
+    'Revisa la marcha y el salto en Rig; después elige el aspecto y exporta los sprites.',
+  'Reviewing walk and jump': 'Revisando marcha y salto',
+  'Source': 'Origen',
+  'Start with a mesh': 'Empezar con una malla',
+  'Try the offline character': 'Prueba el personaje sin conexión',
+  'Use a mesh or offline example': 'Usar una malla o el ejemplo sin conexión',
+  'Use the bundled reference character': 'Usar el personaje de referencia incluido',
+  'edges double in length at the worst sampled pose':
+    'de las aristas duplican su longitud en la peor pose muestreada',
+  'Choose at least one candidate per compared backend.':
+    'Elige al menos un candidato por cada motor que compares.',
+  'Authored rig preserved. Review walk and jump before accepting; rebuilding replaces its weights.':
+    'Rig original conservado. Revisa la marcha y el salto antes de aceptar; reconstruirlo sustituye sus pesos.',
+  'Build draft rig and test motion': 'Crear rig de prueba y comprobar movimiento',
+  'One GPU rigging attempt, then four motions. Your selected mesh and rig stay unchanged. Repeating this recipe reuses its result.':
+    'Un intento de rig con GPU y cuatro movimientos. La malla y el rig seleccionados se conservan. Repetir esta receta reutiliza el resultado.',
+  'Review motion': 'Revisar movimiento',
+  'Motion review': 'Revisión de movimiento',
+  'Imported character': 'Personaje importado',
+  'Source materials and authored skinning are preserved. Continue to Rig to review movement.':
+    'Se conservan los materiales y los pesos originales. Continúa a Rig para revisar el movimiento.',
 };

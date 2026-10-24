@@ -1,5 +1,17 @@
 # Quickstart
 
+To start without downloading AI models, use the bundled CC0 authored character:
+
+```sh
+spritebook import --workspace ./characters/reference --example
+spritebook anim --audition --workspace ./characters/reference
+```
+
+Review its walking and jumping before accepting the rig. Existing meshes can use `import --model
+<mesh>` instead. The reference proof in `tools/proofs/first-character.ts` exercises complete
+side-view and eight-direction sprite exports. It is a developer qualification command, not an
+automatic quality guarantee for imported or generated characters.
+
 **0.5.0 capture/export preview:** automatic rigs can misassign contacting hands/clothing and allow
 legs to cross skirts during motion. Review walk/jump before baking; rig acceptance does not repair
 those defects. An authored, well-rigged mesh is the most reliable input for evaluating capture and

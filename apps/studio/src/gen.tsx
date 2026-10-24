@@ -4,7 +4,7 @@ import { useJobBridge } from './jobscope';
  *
  *  - GenerateNew: the "+ tab" — name→slug, image (drop or path), backend
  *    cards from the REAL catalog with their gates in context, the D-009
- *    options form rendered from paramsSchema, two candidates by default. The
+ *    options form rendered from paramsSchema, one candidate by default. The
  *    button runs exactly the CLI line shown under it.
  *  - Candidates: the editor's Gen stage — per-result cards from the
  *    manifest, More-like-this, and pick with the reproject/colour-match
@@ -26,6 +26,8 @@ import { discoverableModels, generatorSelection } from './genmodels';
 import { Inspector, Workbench } from './workbench';
 import { JobActivity } from './jobactivity';
 import { type ProgressState, readProgress } from './bakeprogress';
+import { ImportCharacter } from './import-character';
+import { MotionAudition } from './motion-audition';
 
 /** slugProblem returns one of three known sentences — literal per branch so
  * the extractor sees every id (t(variable) is a refused callsite). */
@@ -417,6 +419,7 @@ export function GenerateNew(
 ) {
   const { bridge, busy: jobBusy, cancel } = useJobBridge(baseBridge, projectsRoot);
   const [name, setName] = useState('');
+  const [importing, setImporting] = useState(false);
   const [imagePath, setImagePath] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
@@ -430,9 +433,8 @@ export function GenerateNew(
   const [canceled, setCanceled] = useState(false);
   useLandFocus(canceled, '.newcharacter .job-canceled');
   useLandFocus(failure !== null, '.newcharacter .mv-exit');
-  // DEFAULT 2: one job, candidate i at seed + 1000*i, the model loads once -
-  // the UX pass asked for the choice up front, not buried in the options form
-  const [count, setCount] = useState(2);
+  // Start with one inference; additional candidates are an explicit resource budget.
+  const [count, setCount] = useState(1);
   const [compare, setCompare] = useState(false);
   // the size every later stage believes (D-012): bake frames at
   // pixelsPerMeter, so a character left at the backend's unit-box scale bakes
@@ -529,6 +531,8 @@ export function GenerateNew(
     ? (name.length === 0 ? t('a name is required') : problemText(problem))
     : imagePath.length === 0
     ? t('a source image is required')
+    : compare && count < installedGen.length
+    ? t('Choose at least one candidate per compared backend.')
     : version === null
     ? t('pick a backend')
     : !version.installed
@@ -601,6 +605,17 @@ export function GenerateNew(
     heightBad,
   ]);
 
+  if (importing) {
+    return (
+      <ImportCharacter
+        bridge={baseBridge}
+        projectsRoot={projectsRoot}
+        onCreated={onCreated}
+        onBack={() => setImporting(false)}
+      />
+    );
+  }
+
   return (
     <div className='newcharacter'>
       <StageRail stages={stageStates({})} active='gen' onSelect={() => {}} />
@@ -616,6 +631,14 @@ export function GenerateNew(
           <section className='asset-workspace source-workspace' aria-label={t('Source image')}>
             <div className='panel-heading'>
               <h2>{t('Source image')}</h2>
+              <button
+                type='button'
+                className='linkish'
+                disabled={run?.running}
+                onClick={() => setImporting(true)}
+              >
+                {t('Use a mesh or offline example')}
+              </button>
               <button type='button' className='linkish' onClick={onBack}>
                 {t('Back to gallery')}
               </button>
@@ -648,6 +671,11 @@ export function GenerateNew(
                 )}
             </div>
             <div className='source-path field'>
+              <p className='inote'>
+                {t(
+                  'For animation, separate hands from the body and show the feet. Loose or layered clothing may need preparation. More polygons do not guarantee better motion.',
+                )}
+              </p>
               <label htmlFor='gimage'>{t('Source image')}</label>
               <input
                 id='gimage'
@@ -801,7 +829,10 @@ export function GenerateNew(
                         <input
                           type='checkbox'
                           checked={compare}
-                          onChange={(e) => setCompare(e.target.checked)}
+                          onChange={(e) => {
+                            setCompare(e.target.checked);
+                            if (e.target.checked) setCount((n) => Math.max(n, installedGen.length));
+                          }}
                         />
                         {t(
                           'Compare backends — one job per installed backend, the count split across them',
@@ -880,11 +911,14 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
   const results = (Array.isArray(gen.results) ? gen.results : []) as ResultEntry[];
   const picked = typeof gen.pickedResultId === 'string' ? gen.pickedResultId : undefined;
   const canonical = m.canonicalMesh !== undefined && m.canonicalMesh !== null;
+  const imported = (m.source as { kind?: string } | undefined)?.kind === 'mesh';
 
   const [inspecting, setInspecting] = useState<string | null>(() =>
     canonical ? null : results[0]?.id ?? null
   );
   const [reproject, setReproject] = useState(false);
+  const [audition, setAudition] = useState<string | null>(null);
+  const [motionPath, setMotionPath] = useState<string | null>(null);
   const [colorMatch, setColorMatch] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState<ProgressState | null>(null);
@@ -908,7 +942,7 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
     setBusy(key);
     setProgress(null);
     setCanceled(false);
-    setVerb(cliArgs[0] ?? 'gen');
+    setVerb(cliArgs.includes('--audition') ? 'motion-audition' : cliArgs[0] ?? 'gen');
     setFailures({});
     const r = await bridge.runCli([...cliArgs, '--json'], (line) => {
       const next = readProgress(line);
@@ -917,12 +951,13 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
     setBusy(null);
     if (r.exitCode === 0) {
       if (cliArgs[0] === 'pick') setInspecting(null);
-      onChanged();
+      if (!cliArgs.includes('--audition')) onChanged();
     } else if (r.exitCode === 130) {
       setCanceled(true);
     } else {
       setFailures({ [cardId]: lastFailure(r.lines) ?? { code: null, message: '' } });
     }
+    return r.exitCode;
   }, [bridge, onChanged, busy]);
 
   const doPick = useCallback(
@@ -960,9 +995,9 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
             </div>
             <Viewport
               bridge={bridge}
-              meshPath={inspecting !== null
+              meshPath={motionPath ?? (inspecting !== null
                 ? `${dir}/results/${inspecting}/model.glb`
-                : `${dir}/canonical/model.glb`}
+                : `${dir}/canonical/model.glb`)}
               contentKey={String(
                 (m.canonicalMesh as { gltfSha256?: string } | undefined)?.gltfSha256 ?? '',
               )}
@@ -975,111 +1010,156 @@ export function Candidates({ bridge, dir, manifest, onChanged, onOpenModels, cat
             <p>{t('Inspect a candidate to compare it here.')}</p>
           </div>
         )}
-        <section className='candidate-shelf' aria-label={t('Candidates')}>
-          <div className='panel-heading'>
-            <h2>{t('Candidates')}</h2>
-            <span className='inote'>{results.length}</span>
-          </div>
-          <div className='candgrid'>
-            {results.map((r) => (
-              <div
-                key={r.id}
-                className={`cand ${picked === r.id ? 'picked' : ''} ${
-                  inspecting === r.id ? 'inspecting' : ''
-                }`}
-              >
-                <div className='candhead'>
-                  <span className='mono candid'>{r.id}</span>
-                  {picked === r.id && <span className='mbadge ok'>{t('picked')}</span>}
-                  {inspecting === r.id && <span className='mbadge'>{t('inspecting')}</span>}
-                  {r.discarded && <span className='mbadge'>{t('discarded')}</span>}
-                </div>
-                <CandThumb bridge={bridge} path={`${dir}/results/${r.id}/thumb.png`} />
-                <div className='candmeta mono'>
-                  {t('seed')} {r.seed}
-                  {r.backend?.modelId ? ` · ${r.backend.modelId}` : ''}
-                  {r.output?.tris !== undefined
-                    ? ` · ${(r.output.tris / 1000).toFixed(0)}k tris`
-                    : ''}
-                  {r.output?.textureRes !== undefined ? ` · ${r.output.textureRes}px` : ''}
-                  {r.wallTimeS !== undefined ? ` · ${Math.round(r.wallTimeS)}s` : ''}
-                </div>
-                <div className='candacts'>
-                  <button
-                    type='button'
-                    className='btn mbtn'
-                    aria-pressed={inspecting === r.id}
-                    onClick={() => setInspecting(inspecting === r.id ? null : r.id)}
-                  >
-                    {t('Inspect')}
-                  </button>
-                  <button
-                    type='button'
-                    className='btn mbtn primaryish'
-                    disabled={busy !== null && busy !== `pick:${r.id}`}
-                    aria-busy={busy === `pick:${r.id}`}
-                    onClick={() => doPick(r.id)}
-                  >
-                    {t('Save as canonical mesh')}
-                  </button>
-                </div>
-                <details className='candidate-actions'>
-                  <summary>{t('More actions')}</summary>
+        {!imported && (
+          <section className='candidate-shelf' aria-label={t('Candidates')}>
+            <div className='panel-heading'>
+              <h2>{t('Candidates')}</h2>
+              <span className='inote'>{results.length}</span>
+            </div>
+            <div className='candgrid'>
+              {results.map((r) => (
+                <div
+                  key={r.id}
+                  className={`cand ${picked === r.id ? 'picked' : ''} ${
+                    inspecting === r.id ? 'inspecting' : ''
+                  }`}
+                >
+                  <div className='candhead'>
+                    <span className='mono candid'>{r.id}</span>
+                    {picked === r.id && <span className='mbadge ok'>{t('picked')}</span>}
+                    {inspecting === r.id && <span className='mbadge'>{t('inspecting')}</span>}
+                    {r.discarded && <span className='mbadge'>{t('discarded')}</span>}
+                  </div>
+                  <CandThumb bridge={bridge} path={`${dir}/results/${r.id}/thumb.png`} />
+                  <div className='candmeta mono'>
+                    {t('seed')} {r.seed}
+                    {r.backend?.modelId ? ` · ${r.backend.modelId}` : ''}
+                    {r.output?.tris !== undefined
+                      ? ` · ${(r.output.tris / 1000).toFixed(0)}k tris`
+                      : ''}
+                    {r.output?.textureRes !== undefined ? ` · ${r.output.textureRes}px` : ''}
+                    {r.wallTimeS !== undefined ? ` · ${Math.round(r.wallTimeS)}s` : ''}
+                  </div>
                   <div className='candacts'>
                     <button
                       type='button'
                       className='btn mbtn'
-                      disabled={busy !== null && busy !== `more:${r.id}`}
-                      aria-busy={busy === `more:${r.id}`}
-                      onClick={() => moreLike(r.id)}
-                      title={t('re-runs this result’s recipe with a new seed')}
+                      aria-pressed={inspecting === r.id}
+                      onClick={() => {
+                        setMotionPath(null);
+                        setInspecting(inspecting === r.id ? null : r.id);
+                      }}
                     >
-                      {busy === `more:${r.id}` ? t('Working…') : (
-                        // more-like reproduces the RECIPE, so a candidate ladder
-                        // yields that many again — the parity run found this
-                        (r.params?.candidates ?? 1) > 1
-                          ? `${t('More like this')} (×${r.params!.candidates})`
-                          : t('More like this')
-                      )}
+                      {t('Inspect')}
                     </button>
                     <button
                       type='button'
                       className='btn mbtn'
-                      disabled={busy !== null && busy !== `retex:${r.id}`}
-                      aria-busy={busy === `retex:${r.id}`}
-                      onClick={() => retexture(r.id)}
-                      title={t('keeps this mesh, paints a new texture — a new card appears')}
+                      disabled={busy !== null || r.discarded}
+                      onClick={() => {
+                        setAudition(r.id);
+                        setMotionPath(null);
+                        setInspecting(r.id);
+                      }}
                     >
-                      {t('Re-texture')}
+                      {t('Review motion')}
+                    </button>
+                    <button
+                      type='button'
+                      className='btn mbtn primaryish'
+                      disabled={busy !== null && busy !== `pick:${r.id}`}
+                      aria-busy={busy === `pick:${r.id}`}
+                      onClick={() => doPick(r.id)}
+                    >
+                      {t('Save as canonical mesh')}
                     </button>
                   </div>
-                  <CliTwin args={pickFor(r.id)} />
-                </details>
-                {failures[r.id] && (
-                  <FailureNote
-                    failure={failures[r.id]!}
-                    onOpenModels={onOpenModels}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          {results.length === 0 && <p className='inote'>{t('nothing generated')}</p>}
-        </section>
+                  <details className='candidate-actions'>
+                    <summary>{t('More actions')}</summary>
+                    <div className='candacts'>
+                      <button
+                        type='button'
+                        className='btn mbtn'
+                        disabled={busy !== null && busy !== `more:${r.id}`}
+                        aria-busy={busy === `more:${r.id}`}
+                        onClick={() => moreLike(r.id)}
+                        title={t('re-runs this result’s recipe with a new seed')}
+                      >
+                        {busy === `more:${r.id}` ? t('Working…') : (
+                          // more-like reproduces the RECIPE, so a candidate ladder
+                          // yields that many again — the parity run found this
+                          (r.params?.candidates ?? 1) > 1
+                            ? `${t('More like this')} (×${r.params!.candidates})`
+                            : t('More like this')
+                        )}
+                      </button>
+                      <button
+                        type='button'
+                        className='btn mbtn'
+                        disabled={busy !== null && busy !== `retex:${r.id}`}
+                        aria-busy={busy === `retex:${r.id}`}
+                        onClick={() => retexture(r.id)}
+                        title={t('keeps this mesh, paints a new texture — a new card appears')}
+                      >
+                        {t('Re-texture')}
+                      </button>
+                    </div>
+                    <CliTwin args={pickFor(r.id)} />
+                  </details>
+                  {failures[r.id] && (
+                    <FailureNote
+                      failure={failures[r.id]!}
+                      onOpenModels={onOpenModels}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+            {results.length === 0 && <p className='inote'>{t('nothing generated')}</p>}
+          </section>
+        )}
       </div>
       <Inspector>
-        <GenerateMore
-          bridge={bridge}
-          dir={dir}
-          m={m}
-          characterId={characterId}
-          results={results}
-          busy={busy}
-          runFor={runFor}
-          failure={failures['genmore'] ?? null}
-          onOpenModels={onOpenModels}
-          catalogEpoch={catalogEpoch}
-        />
+        {audition && (
+          <section className='control-section'>
+            <h2>{t('Motion review')}: {audition}</h2>
+            <MotionAudition
+              bridge={bridge}
+              dir={dir}
+              sourceKey={audition}
+              resultId={audition}
+              busy={busy !== null}
+              running={busy === `audition:${audition}`}
+              run={async (args) => await runFor(`audition:${audition}`, audition, args) ?? null}
+              onPlay={(path) => setMotionPath(path)}
+            />
+          </section>
+        )}
+        {imported
+          ? (
+            <section className='control-section'>
+              <h2>{t('Imported character')}</h2>
+              <p className='inote'>
+                {t(
+                  'Source materials and authored skinning are preserved. Continue to Rig to review movement.',
+                )}
+              </p>
+            </section>
+          )
+          : (
+            <GenerateMore
+              bridge={bridge}
+              dir={dir}
+              m={m}
+              characterId={characterId}
+              results={results}
+              busy={busy}
+              runFor={runFor}
+              failure={failures['genmore'] ?? null}
+              onOpenModels={onOpenModels}
+              catalogEpoch={catalogEpoch}
+            />
+          )}
         {results.length > 0 && (
           <details className='control-section pickopts panel-disclosure'>
             <summary>{t('Canonical mesh options')}</summary>
@@ -1130,7 +1210,7 @@ function GenerateMore(
     characterId: string;
     results: ResultEntry[];
     busy: string | null;
-    runFor: (key: string, cardId: string, cliArgs: string[]) => Promise<void>;
+    runFor: (key: string, cardId: string, cliArgs: string[]) => Promise<number | null | undefined>;
     failure: JobFailure | null;
     onOpenModels: () => void;
     catalogEpoch?: number;

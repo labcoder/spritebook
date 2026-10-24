@@ -2391,4 +2391,8 @@ textarea {
 .capture-actions { display: flex; flex-direction: column; gap: 10px; }
 .capture-actions .primary { width: 100%; }
 .capture-output-foot { font-size: 12px; color: var(--sb-dim); }
+.motion-review-results { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+.motion-review-pixels { overflow: auto; background: var(--sb-check-a); }
+.motion-review-pixels img { display: block; max-width: none; image-rendering: pixelated; }
+.motion-review-results .rig-posebar { justify-content: space-between; }
 @media(min-width: 1200px) { .capture-workspace { display: grid; grid-template-columns: minmax(0,1fr) minmax(240px,0.6fr); align-items: stretch; } .capture-output { align-self: center; } .capture-flat { height: 320px; } }

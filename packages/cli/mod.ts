@@ -623,6 +623,9 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
   undo: ['manifest'],
   redo: ['manifest'],
   anim: [
+    'audition',
+    'review',
+    'result',
     'list',
     'packs',
     'tag',
@@ -756,7 +759,7 @@ const BOOLEAN_FLAGS: Record<string, readonly string[]> = {
   import: ['example'],
   export: ['mesh'],
   bake: ['all', 'plan', 'only-invalidated', 'mirror', 'no-mirror'],
-  anim: ['list'],
+  anim: ['list', 'audition', 'review'],
   look: ['list', 'preview'],
   pick: ['reproject', 'color-match', 'no-reproject', 'no-color-match'],
   rig: [
@@ -1008,15 +1011,13 @@ export async function resolveBake(
       jobId: bakeId,
       at: now(),
       code: 'rig-unaccepted',
-      message: `this character's rig (${manifest.rig.jointCount} joints, track ` +
-        `${manifest.rig.track}) was never accepted - the deform check flagged joints when it ` +
-        `was made, and RigState.accepted is still false. The sprites will bake with that ` +
-        `skinning. Check deform-report.json in the rig output, repair with ` +
-        `\`spritebook rig --edits <patch.json>\` or \`--rerun-with-hints\`, or - if you have ` +
-        `looked and the sprites are fine - record that with \`spritebook rig --workspace ` +
-        `<dir> --accept\`, which since D-031 costs NOTHING: acceptance is out of the cache key, ` +
-        `so recording it re-bakes not one frame. Baking continues; this is a warning, not a ` +
-        `refusal.`,
+      message: `This character's rig (${manifest.rig.jointCount} joints) has not been accepted. ` +
+        `Baking continues with its current skinning. Review walking and jumping with ` +
+        `\`spritebook anim --audition --workspace <dir>\`, then inspect hands and clothing ` +
+        `and any bend report. Use \`spritebook rig --edits <patch.json>\` for confirmed ` +
+        `joint-placement errors ` +
+        `before recording acceptance with \`spritebook rig --workspace <dir> --accept\`. ` +
+        `Acceptance does not change the skinning or invalidate rendered frames.`,
     };
     emit(w, `warn [${w.code}]: ${w.message}`);
   }
@@ -1542,6 +1543,8 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         return await pump(
           runLookPreview({
             jobId: 'look',
+            workspace,
+            pinsPath: flag(args, 'pins'),
             characterId: manifest.id,
             modelPath: `${workspace}/canonical/model.glb`,
             camera: resolvedCamera,
@@ -1613,6 +1616,61 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
   }
 
   if (verb === 'anim') {
+    if (args.includes('--audition') || args.includes('--review')) {
+      const workspace = flag(args, 'workspace');
+      if (
+        !workspace || args.some((arg) =>
+          arg.startsWith('--') &&
+          !['--audition', '--review', '--workspace', '--result', '--json', '--log-append', '--pins']
+            .includes(
+              arg,
+            )
+        ) ||
+        ['--audition', '--review', '--preview', '--enable', '--disable', '--list', '--import-pack']
+            .filter((key) => args.includes(key)).length !== 1
+      ) {
+        return fail(
+          'anim' as JobEvent['jobId'],
+          'bad-args',
+          'Choose --audition or --review with --workspace <dir>, without another animation action.',
+        );
+      }
+      try {
+        const { runMotionAudition, readMotionReview } = await import('./audition.ts');
+        const result = flag(args, 'result');
+        if (result) {
+          const { runCandidateAudition, readCandidateReview } = await import(
+            './candidate-audition.ts'
+          );
+          if (args.includes('--audition')) {
+            return await pump(runCandidateAudition(workspace, result, flag(args, 'pins')), emit);
+          }
+          io.stdout(
+            canonicalJson(await readCandidateReview(workspace, result, flag(args, 'pins')))
+              .trimEnd(),
+          );
+          return 0;
+        }
+        if (args.includes('--audition')) {
+          return await pump(runMotionAudition(workspace, flag(args, 'pins')), emit);
+        }
+        io.stdout(canonicalJson(await readMotionReview(workspace, flag(args, 'pins'))).trimEnd());
+        return 0;
+      } catch (error) {
+        return fail(
+          'anim' as JobEvent['jobId'],
+          'review-failed',
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+    if (args.includes('--result')) {
+      return fail(
+        'anim' as JobEvent['jobId'],
+        'bad-args',
+        '--result needs --audition or --review.',
+      );
+    }
     // query/install verbs over animation packs (P3-T1). Like doctor, --json
     // emits ONE JSON document (a query snapshot, not a job stream).
     const { importPack, listClips, loadPack } = await import('@spritebook/anim');

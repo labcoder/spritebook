@@ -32,7 +32,9 @@ export function Editor(
   // 'gen', not 'look': the old default sat masked behind the locked-stage
   // fallback and TELEPORTED the user two stages ahead the instant a pick
   // unlocked the rail (UX pass 2, F10)
-  const [active, setActive] = useState<StageKey>('gen');
+  const [active, setActive] = useState<StageKey>(() =>
+    (manifest as { source?: { kind?: string } } | null)?.source?.kind === 'mesh' ? 'rig' : 'gen'
+  );
   // an active stage can become locked when switching characters — fall back
   const activeStage = stages.find((s) => s.key === active);
   const effective = activeStage && activeStage.state !== 'locked' ? active : 'gen';

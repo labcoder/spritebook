@@ -12,7 +12,7 @@
  *   ../../packages/schema/registry.ts      catalog, install receipts and exact pins
  *   ../../packages/schema/model-runtime.ts frozen runtime recipes and readiness receipts
  *   ../../packages/schema/sidecar.ts        authenticated local service and adapter jobs
- *   ../../packages/schema/rig.ts            skeletons, body fit and repair reports
+ *   ../../packages/schema/rig.ts            skeletons, body fit, repair and motion-review reports
  *   ../../packages/schema/roster.ts         identity layers, attachments and canonical bodies
  *   ../../packages/schema/animpack.ts       animation packs, clips and provenance
  *   ../../packages/schema/bake.ts           BakeManifest, frame rects and parallel AOV pages

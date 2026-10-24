@@ -1,5 +1,10 @@
 # SpriteBook Studio user guide
 
+**Start without model downloads:** New character → **Use a mesh or offline example** opens the
+bundled CC0 humanoid or an existing mesh. Existing skinning is preserved and starts unaccepted;
+review walking and jumping in Rig. Static imports still need a rig. Import is reversible and records
+source provenance.
+
 **0.5.0 is a capture/export preview.** Generated rigs may stretch hands or clothing and permit legs
 to intersect loose skirts. Inspect animations before baking; accepting a rig does not fix these
 issues. See the [preview notes](../CHANGELOG.md) for the supported scope.
