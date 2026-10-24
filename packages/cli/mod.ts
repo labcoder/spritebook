@@ -1407,7 +1407,8 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     (['gen', 'pick', 'retexture'].includes(verb) ? flag(args, 'out') : undefined);
   if (
     !owned && workspace && !(verb === 'bake' && args.includes('--all')) &&
-    ['gen', 'pick', 'retexture', 'rig', 'identity', 'bake', 'anim', 'look', 'rename'].includes(verb)
+    ['gen', 'pick', 'retexture', 'rig', 'identity', 'bake', 'anim', 'look', 'rename', 'export']
+      .includes(verb)
   ) {
     try {
       await fs.mkdir(workspace, { recursive: true });

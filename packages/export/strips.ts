@@ -21,6 +21,7 @@ import { encode as encodePng } from '@spritebook/image';
 import type { FrameRecord } from '@spritebook/schema';
 import type { Exporter } from '@spritebook/pack/contracts';
 import { frameIdKey } from '@spritebook/pack/contracts';
+import { atlasFiles } from './files.ts';
 
 /** The schema leaves clipId free-form; file names must not be. */
 const SAFE_CLIP_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -92,10 +93,10 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
   // boundary godot.ts draws (an empty outDir reads as a successful export)
   if (litPngByIndex.size === 0) throw new Error('exportStrips: manifest has no lit atlas pages');
 
-  const decoded = new Map<number, DecodedPage>();
+  const files = await atlasFiles(manifest, bakeDir);
+  let decoded: { index: number; page: DecodedPage } | undefined;
   const litPage = async (f: FrameRecord): Promise<DecodedPage> => {
-    const cached = decoded.get(f.atlas.pageIndex);
-    if (cached !== undefined) return cached;
+    if (decoded?.index === f.atlas.pageIndex) return decoded.page;
     const png = litPngByIndex.get(f.atlas.pageIndex);
     if (png === undefined) {
       throw new Error(
@@ -103,14 +104,14 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
           'which has no lit page in the manifest',
       );
     }
-    const img = decodePng(new Uint8Array(await fs.readFile(`${bakeDir}/${png}`)));
+    const img = decodePng(new Uint8Array(await fs.readFile(files.get(png)!.source)));
     if (img.channels !== 4 || img.depth !== 8) {
       throw new Error(
         `exportStrips: ${png} is not rgba8 (channels=${img.channels}, depth=${img.depth})`,
       );
     }
     const page = { width: img.width, height: img.height, data: img.data as Uint8Array };
-    decoded.set(f.atlas.pageIndex, page);
+    decoded = { index: f.atlas.pageIndex, page };
     return page;
   };
 
@@ -148,6 +149,9 @@ export const exportStrips: Exporter = async (manifest, bakeDir, outDir, opts) =>
   const stripEntries: StripEntry[] = [];
   for (const g of groups) {
     const stripW = g.frames.length * cw;
+    if (!Number.isSafeInteger(stripW * ch * 4) || stripW > 0x7fffffff) {
+      throw new Error(`exportStrips: strip ${g.clipId} exceeds the PNG dimension limit`);
+    }
     const strip = new Uint8Array(stripW * ch * 4);
     for (const [fi, f] of g.frames.entries()) {
       const page = await litPage(f);

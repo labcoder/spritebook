@@ -27,6 +27,7 @@ import { promises as fs } from 'node:fs';
  */
 import type { FrameRecord } from '@spritebook/schema';
 import { atlasPageName, type Exporter, frameIdKey } from '@spritebook/pack/contracts';
+import { atlasFiles } from './files.ts';
 
 /** The schema leaves clipId free-form; resource names and file names must not. */
 const SAFE_CLIP_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -163,13 +164,14 @@ export const exportGodot: Exporter = async (manifest, bakeDir, outDir, opts) => 
     lines.push(gi < groups.length - 1 ? '}, {' : '}]');
   }
 
+  const files = await atlasFiles(manifest, bakeDir);
   await fs.mkdir(outDir, { recursive: true });
   const tresPath = `${outDir}/${manifest.characterId}.tres`;
   await fs.writeFile(tresPath, lines.join('\n') + '\n');
   const written = [tresPath];
   for (const page of litPages) {
     const dest = `${outDir}/${atlasPageName('lit', page.pageIndex)}`;
-    await fs.copyFile(`${bakeDir}/${page.png}`, dest);
+    await fs.copyFile(files.get(page.png)!.source, dest);
     written.push(dest);
   }
   return written.sort();

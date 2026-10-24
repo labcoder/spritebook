@@ -35,6 +35,7 @@ import { promises as fs } from 'node:fs';
 import type { FrameRecord } from '@spritebook/schema';
 import type { Exporter } from '@spritebook/pack/contracts';
 import { assertNoSplitAnimations } from './split-guard.ts';
+import { atlasFiles } from './files.ts';
 
 const META_APP = 'spritebook';
 /** Projected as meta.version — a frozen format constant, never read at runtime. */
@@ -96,9 +97,6 @@ function frameTags(frames: FrameRecord[]): AsepriteFrameTag[] {
   return tags;
 }
 
-/** AtlasPage.png is bake-dir-relative; the copy in outDir is flat (its base name). */
-const baseName = (relPath: string): string => relPath.split('/').at(-1) ?? relPath;
-
 export const exportAseprite: Exporter = async (manifest, bakeDir, outDir, opts) => {
   if (!Number.isFinite(opts.fps) || opts.fps <= 0) {
     throw new RangeError(`exportAseprite: fps must be positive and finite, got ${opts.fps}`);
@@ -118,12 +116,13 @@ export const exportAseprite: Exporter = async (manifest, bakeDir, outDir, opts) 
   if (litPages.length === 0) throw new Error('exportAseprite: manifest has no lit atlas pages');
   if (manifest.frames.length === 0) throw new Error('exportAseprite: manifest has no frames');
   const sortedFrames = manifest.frames.toSorted(byClipDirFrame);
+  const files = await atlasFiles(manifest, bakeDir);
   await fs.mkdir(outDir, { recursive: true });
 
   const written: string[] = [];
   for (const page of litPages) {
     const frames = sortedFrames.filter((f) => f.atlas.pageIndex === page.pageIndex);
-    const image = baseName(page.png);
+    const { name: image, source } = files.get(page.png)!;
     const suffix = litPages.length === 1 ? '' : `_p${page.pageIndex}`;
     const jsonPath = `${outDir}/${manifest.characterId}${suffix}.ase.json`;
     const pngPath = `${outDir}/${image}`;
@@ -149,7 +148,7 @@ export const exportAseprite: Exporter = async (manifest, bakeDir, outDir, opts) 
       },
     };
 
-    await fs.copyFile(`${bakeDir}/${page.png}`, pngPath);
+    await fs.copyFile(source, pngPath);
     await fs.writeFile(jsonPath, JSON.stringify(doc, null, 2) + '\n');
     written.push(jsonPath, pngPath);
   }
