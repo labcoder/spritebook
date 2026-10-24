@@ -55,6 +55,10 @@ while (Date.now() < deadline) {
         /\r?\n/,
       ).filter(Boolean).map((line) => JSON.parse(line)).filter((event) => event.t === 'warn');
       for (const result of manifest.generation.results) {
+        assert(
+          Date.now() < deadline,
+          'Cohort exceeded its four-hour budget; retained partial evidence',
+        );
         const out = join(dir, `evaluation-${result.id}`);
         const receipt = join(out, 'completed.json');
         assert.equal(
@@ -78,11 +82,13 @@ while (Date.now() < deadline) {
         const transcript: unknown[] = [];
         async function cli(args: string[]) {
           const start = performance.now();
+          const remaining = deadline - Date.now();
+          assert(remaining > 0, 'Cohort time budget exhausted');
           const run = await runProcess(process.execPath, [
             resolve('packages/cli/dist/entry.js'),
             ...args,
             '--json',
-          ], { timeout: 1800000 });
+          ], { timeout: Math.min(1800000, remaining) });
           const stdout = new TextDecoder().decode(run.stdout);
           transcript.push({
             args,
