@@ -5,17 +5,13 @@
  * (VRM 0.x rotated 180°), feet at Y=0, uniform rescale to declared height.
  * No quantize — canonical assets are the lossless source of truth.
  *
- * Normalization is skin-aware and lives entirely in the TRANSFORMS: uniform
- * scale s and Y-offset go onto the scene's root-node matrices, and every
- * inverse bind matrix becomes IBM · N⁻¹, keeping joint_world · IBM ≈ I — tested
- * invariant. VERTEX POSITIONS ARE NEVER TOUCHED (applyNormalization says so at
- * its definition, and this header used to claim the opposite). That is the only
- * formulation that is exact for skins, and it is why a consumer must compose
- * node transforms to see the normalized character.
+ * Static meshes bake normalization into vertices when possible. Existing skins
+ * keep their bind matrices: normalization moves the joints that place their
+ * vertices. Multiplying IBMs by N⁻¹ would cancel that requested normalization.
  */
 import type { Document, Node } from '@gltf-transform/core';
 import { getBounds } from '@gltf-transform/core';
-import { dedup, normals, prune, resample, weld } from '@gltf-transform/functions';
+import { clearNodeParent, dedup, normals, prune, resample, weld } from '@gltf-transform/functions';
 import { ImportError } from './errors.ts';
 
 export interface CanonNote {
@@ -159,8 +155,8 @@ function mul4(a: ArrayLike<number>, b: ArrayLike<number>): Mat4 {
   return out;
 }
 
-/** N = T(0,ty,0) · Ry(180°?) · S(s)  and its exact inverse. */
-function normalizationMatrices(s: number, ty: number, rotate: boolean): { n: Mat4; nInv: Mat4 } {
+/** N = T(0,ty,0) · Ry(180°?) · S(s). */
+function normalizationMatrix(s: number, ty: number, rotate: boolean): Mat4 {
   const r = rotate ? -1 : 1;
   // dprint-ignore
   const n: Mat4 = [
@@ -181,27 +177,7 @@ function normalizationMatrices(s: number, ty: number, rotate: boolean): { n: Mat
     0,
     1,
   ];
-  // N⁻¹ = S(1/s) · Ry⁻¹ · T(0,-ty,0):
-  // dprint-ignore
-  const nInv: Mat4 = [
-    r / s,
-    0,
-    0,
-    0,
-    0,
-    1 / s,
-    0,
-    0,
-    0,
-    0,
-    r / s,
-    0,
-    0,
-    -ty / s,
-    0,
-    1,
-  ];
-  return { n, nInv };
+  return n;
 }
 
 /** Is this matrix the identity, to float tolerance? */
@@ -225,8 +201,7 @@ function isIdentityMat4(m: ArrayLike<number>): boolean {
  * 64 px sprite ~20 px tall whose own outline swallowed 81% of it.
  *
  * Refuses, leaving the node path to run, when:
- *   - a SKIN exists. Then N·root with IBM·N⁻¹ is exact and the joints carry it;
- *     baking vertices without re-deriving the bind pose would break the skin.
+ *   - a SKIN exists. Its joints carry N; its authored vertex/bind data stays intact.
  *   - a mesh node is not at identity. Baking would give `local·N·v` where the
  *     node path gives `N·local·v`, and those differ unless they commute.
  *   - a primitive has morph targets, whose deltas take the rotation and scale
@@ -292,27 +267,53 @@ function bakeNormalizationIntoVertices(
  * its scale and grounding where nothing downstream is entitled to ignore them.
  * See `bakeNormalizationIntoVertices` for why a node transform was not enough.
  *
- * Fallback: root-node transforms become N·local and every inverse bind matrix
- * becomes IBM·N⁻¹, so world'·IBM' = I is preserved exactly. That is still the
- * only exact formulation for content that arrives already skinned, and it is
- * correct there because the joints sit under the root that receives N.
+ * Existing skins move with their joints. Put the first joint directly in the
+ * scene so consumers that store only skin joints retain its inherited transform.
+ * Animated wrappers/root tracks need a separate animation-import path; refuse
+ * them rather than silently changing their coordinate system.
  */
 function applyNormalization(doc: Document, s: number, ty: number, rotate: boolean): void {
   if (bakeNormalizationIntoVertices(doc, s, ty, rotate)) return;
-  const { n, nInv } = normalizationMatrices(s, ty, rotate);
+  const n = normalizationMatrix(s, ty, rotate);
+  const animated = new Set(
+    doc.getRoot().listAnimations().flatMap((animation) =>
+      animation.listChannels().map((channel) => channel.getTargetNode())
+    ),
+  );
+  for (const skin of doc.getRoot().listSkins()) {
+    const joints = new Set(skin.listJoints());
+    for (const joint of joints) {
+      const parent = joint.getParentNode();
+      if (parent && joints.has(parent)) continue;
+      for (let ancestor = parent; ancestor; ancestor = ancestor.getParentNode()) {
+        if (joints.has(ancestor)) {
+          throw new ImportError(
+            `Joint "${joint.getName()}": bake intermediate wrappers into joints before importing`,
+          );
+        }
+        if (animated.has(ancestor)) {
+          throw new ImportError(
+            `Joint "${joint.getName()}": bake animated wrappers into joints before importing`,
+          );
+        }
+      }
+      if (animated.has(joint) && (!isIdentityMat4(n) || parent)) {
+        throw new ImportError(
+          `Joint "${joint.getName()}": bake root animation into the canonical coordinate system before importing`,
+        );
+      }
+      const world = joint.getWorldMatrix();
+      clearNodeParent(joint);
+      if (joint.getWorldMatrix().some((value, index) => Math.abs(value - world[index]) > 1e-5)) {
+        throw new ImportError(
+          `Joint "${joint.getName()}": bake inherited shear into the rig before importing`,
+        );
+      }
+    }
+  }
   for (const root of rootNodes(doc)) {
     const local = root.getMatrix();
     root.setMatrix(mul4(n, local) as unknown as typeof local);
-  }
-  for (const skin of doc.getRoot().listSkins()) {
-    const ibmAcc = skin.getInverseBindMatrices();
-    if (!ibmAcc) continue;
-    const arr = ibmAcc.getArray()! as Float32Array<ArrayBuffer>;
-    for (let j = 0; j < arr.length; j += 16) {
-      const updated = mul4(arr.subarray(j, j + 16), nInv);
-      arr.set(updated, j);
-    }
-    ibmAcc.setArray(arr);
   }
 }
 

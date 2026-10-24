@@ -96,13 +96,15 @@ test('acceptance: FBX fixture round-trips with skin intact and valid binds', asy
   assertEquals(skins.length, 1);
   assertEquals(skins[0].listJoints().length, 2, 'root + tip chain');
 
-  // bind validity invariant: joint_world · IBM ≈ I for every joint
+  // At rest every joint applies the same global normalization; it need not be identity.
   const ibm = skins[0].getInverseBindMatrices()!.getArray()! as Float32Array;
+  const normalization = multiply4(skins[0].listJoints()[0].getWorldMatrix(), ibm.subarray(0, 16));
+  assert(normalization[0] > 0 && normalization[5] > 0 && normalization[10] > 0);
   skins[0].listJoints().forEach((joint, j) => {
     const world = joint.getWorldMatrix();
     const m = multiply4(world, ibm.subarray(j * 16, j * 16 + 16));
     for (let i = 0; i < 16; i++) {
-      const expected = i % 5 === 0 ? 1 : 0;
+      const expected = normalization[i];
       assert(
         Math.abs(m[i] - expected) < 1e-3,
         `joint ${joint.getName()}: worldBind*IBM deviates at ${i}: ${m[i]}`,
@@ -114,6 +116,38 @@ test('acceptance: FBX fixture round-trips with skin intact and valid binds', asy
   const bounds = getBounds(doc.getRoot().listScenes()[0]);
   assert(Math.abs(bounds.max[1] - bounds.min[1] - 1.0) < 1e-3, 'height rescaled to 1 m');
   assert(Math.abs(bounds.min[1]) < 1e-3, 'feet at Y=0');
+});
+
+test('animated armature wrappers are refused before a skin silently loses their motion', async () => {
+  const io = await getIO();
+  const doc = await io.read(fx('skinned-column.glb'));
+  const joint = doc.getRoot().listSkins()[0].listJoints()[0];
+  const parent = joint.getParentNode();
+  if (parent) parent.removeChild(joint);
+  else doc.getRoot().listScenes()[0].removeChild(joint);
+  const wrapper = doc.createNode('Animated wrapper').addChild(joint);
+  doc.getRoot().listScenes()[0].addChild(wrapper);
+  const buffer = doc.getRoot().listBuffers()[0];
+  const sampler = doc.createAnimationSampler().setInput(
+    doc.createAccessor().setType('SCALAR').setArray(new Float32Array([0, 1])).setBuffer(buffer),
+  ).setOutput(
+    doc.createAccessor().setType('VEC3').setArray(new Float32Array([0, 0, 0, 0, 1, 0])).setBuffer(
+      buffer,
+    ),
+  );
+  doc.createAnimation('Wrapper motion').addSampler(sampler).addChannel(
+    doc.createAnimationChannel().setTargetNode(wrapper).setTargetPath('translation').setSampler(
+      sampler,
+    ),
+  );
+  const dir = await fs.mkdtemp(join(tmpdir(), 'sb-animated-wrapper-'));
+  try {
+    const input = join(dir, 'animated.glb');
+    await fs.writeFile(input, await io.writeBinary(doc));
+    await assertRejects(() => importToCanonical({ input }), ImportError, 'animated wrappers');
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });
 
 function multiply4(a: ArrayLike<number>, b: ArrayLike<number>): number[] {
@@ -139,16 +173,31 @@ test('declared height + feet grounding hold for skinned sources too', async () =
   const bounds = getBounds(doc.getRoot().listScenes()[0]);
   assert(Math.abs(bounds.max[1] - bounds.min[1] - 1.8) < 1e-3, 'height 1.8 m');
   assert(Math.abs(bounds.min[1]) < 1e-3, 'feet at Y=0');
-  // bind validity after skin-aware normalization
+  // A consumer skins vertices with jointWorld · IBM. Cancelling N in the IBM
+  // would leave the surface at the old size while getBounds still passed.
   const skin = doc.getRoot().listSkins()[0];
   const ibm = skin.getInverseBindMatrices()!.getArray()! as Float32Array;
-  skin.listJoints().forEach((joint, j) => {
-    const m = multiply4(joint.getWorldMatrix(), ibm.subarray(j * 16, j * 16 + 16));
-    for (let i = 0; i < 16; i++) {
-      const expected = i % 5 === 0 ? 1 : 0;
-      assert(Math.abs(m[i] - expected) < 1e-3, `IBM invariant broke at joint ${j} elem ${i}`);
+  const matrices = skin.listJoints().map((joint, j) =>
+    multiply4(joint.getWorldMatrix(), ibm.subarray(j * 16, j * 16 + 16))
+  );
+  const heights: number[] = [];
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const primitive of mesh.listPrimitives()) {
+      const positions = primitive.getAttribute('POSITION')!;
+      const joints = primitive.getAttribute('JOINTS_0')!;
+      const weights = primitive.getAttribute('WEIGHTS_0')!;
+      for (let vertex = 0; vertex < positions.getCount(); vertex++) {
+        const p = positions.getElement(vertex, []), indices = joints.getElement(vertex, []);
+        const w = weights.getElement(vertex, []);
+        heights.push(w.reduce((y, weight, slot) => {
+          const m = matrices[indices[slot]];
+          return y + weight * (m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13]);
+        }, 0));
+      }
     }
-  });
+  }
+  assert(Math.abs(Math.min(...heights)) < 1e-5, 'Actual skinned feet reach Y=0');
+  assert(Math.abs(Math.max(...heights) - 1.8) < 1e-5, 'Actual skinned height is 1.8 m');
 });
 
 // --- acceptance: actionable errors -------------------------------------------

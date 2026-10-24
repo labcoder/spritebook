@@ -30,6 +30,12 @@ rigs start unaccepted: review walk and jump in Rig before accepting. Static mesh
 rigging. Import is journaled and undo restores the previous empty state. `--example` uses the
 already bundled CC0 humanoid, with no model downloads.
 
+Height and grounding apply to the skinned surface as well as the static bounds. Static armature
+wrappers are folded into the first joint without replacing weights or bind matrices. Animated
+wrappers/root tracks that need coordinate conversion, inherited shear, and intermediate non-joint
+wrappers inside a skin are refused with a preparation message; importing existing animation
+libraries is a separate workflow.
+
 ## gen — image to candidate meshes
 
 ```

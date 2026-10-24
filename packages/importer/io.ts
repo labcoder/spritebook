@@ -9,7 +9,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import draco3d from 'draco3dgltf';
 import { MeshoptDecoder } from 'meshoptimizer';
 
-export const IMPORTER_VERSION = '0.1.0';
+export const IMPORTER_VERSION = '0.1.1';
 export const GENERATOR = `spritebook-import@${IMPORTER_VERSION}`;
 
 let ioPromise: Promise<NodeIO> | undefined;

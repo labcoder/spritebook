@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { createWorkspace, readWorkspace, resourcePath, sha256Bytes } from '@spritebook/core';
 import { runCli } from './dist/mod.js';
+import { loadSkinnedAsset, posedBounds } from '../render/dist/skinning.js';
 
 test('offline example preserves its authored rig and import is an asset-aware undo step', async () => {
   const root = await mkdtemp(join(tmpdir(), 'spritebook-example-'));
@@ -65,8 +66,13 @@ test('import requires an explicit source and refuses unknown switches', async ()
 test('an interrupted initial import resumes without allowing an overwrite after undo', async () => {
   const root = await mkdtemp(join(tmpdir(), 'spritebook-import-retry-'));
   try {
-    const model = resourcePath('rig', 'bodies/ubc-male/body.glb');
-    const original = new Uint8Array(await readFile(model));
+    const modelIO = new NodeIO();
+    const upload = await modelIO.read(resourcePath('rig', 'bodies/ubc-male/body.glb'));
+    upload.getRoot().listScenes()[0].listChildren()[0]
+      .setScale([1.2, 1.2, 1.2]).setTranslation([.2, .25, .1]);
+    const model = join(root, 'uploaded.glb');
+    const original = await modelIO.writeBinary(upload);
+    await writeFile(model, original);
     await createWorkspace({
       workspace: root,
       characterId: 'retry',
@@ -96,6 +102,19 @@ test('an interrupted initial import resumes without allowing an overwrite after 
       lines.join('\n'),
     );
     assert.equal((await readWorkspace(root)).canonicalMesh?.heightM, 1.6);
+    const actual = posedBounds(
+      await loadSkinnedAsset(join(root, 'canonical/model.glb')),
+      1,
+      'idle',
+    );
+    assert(
+      Math.abs(actual.min[1]) < 1e-5,
+      'The skinned feet, not just mesh bounds, reach the floor',
+    );
+    assert(
+      Math.abs(actual.max[1] - actual.min[1] - 1.6) < 1e-5,
+      'The actual skinned surface is 1.6 m',
+    );
     const doc = await new NodeIO().readBinary(
       new Uint8Array(await readFile(join(root, 'canonical/model.glb'))),
     );
