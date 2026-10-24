@@ -13,9 +13,12 @@ import {
 } from '@spritebook/core';
 import { runCli } from './dist/mod.js';
 
+// macOS's system temporary path aliases /private/var; these fixtures need physical paths.
+const TEMP_ROOT = await fs.realpath(tmpdir());
+
 async function fixture() {
-  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-delete-'));
-  assert(resolve(root).startsWith(resolve(tmpdir())), 'only test-owned temporary workspaces');
+  const root = await fs.mkdtemp(join(TEMP_ROOT, 'spritebook-delete-'));
+  assert(resolve(root).startsWith(TEMP_ROOT), 'only test-owned temporary workspaces');
   const workspace = join(root, 'hero');
   const source = Buffer.from('original user image');
   const hash = await sha256Bytes(source);

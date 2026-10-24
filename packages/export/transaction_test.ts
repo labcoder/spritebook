@@ -10,6 +10,8 @@ import type { ExportTargetId } from '@spritebook/schema';
 import { acquireFileLock } from '@spritebook/core';
 
 const BAKE = fileURLToPath(new URL('./fixtures/bake-aabbccdd/', import.meta.url));
+// Publication canonicalizes paths; fault injection must compare the same physical temp root.
+const TEMP_ROOT = await fs.realpath(tmpdir());
 const TARGETS: ExportTargetId[] = ['godot', 'aseprite', 'texturepacker', 'strips'];
 const run = (outDir: string, fps = 8, bakeDir = BAKE) =>
   Array.fromAsync(runExportJob({
@@ -44,7 +46,7 @@ async function snapshot(root: string): Promise<Record<string, string>> {
 }
 
 test('a competing output owner refuses promptly without changing the accepted export', async () => {
-  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-export-busy-'));
+  const root = await fs.mkdtemp(join(TEMP_ROOT, 'spritebook-export-busy-'));
   let lock: Awaited<ReturnType<typeof acquireFileLock>> | undefined;
   try {
     const out = join(root, 'export');
@@ -73,7 +75,7 @@ test('a competing output owner refuses promptly without changing the accepted ex
 });
 
 test('a copy failure in a later format preserves the complete accepted export and user files', async () => {
-  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-export-copy-'));
+  const root = await fs.mkdtemp(join(TEMP_ROOT, 'spritebook-export-copy-'));
   const copy = fs.copyFile;
   try {
     const out = join(root, 'export');
@@ -99,7 +101,7 @@ test('a copy failure in a later format preserves the complete accepted export an
 });
 
 test('closing an export during staging leaves the accepted export intact', async () => {
-  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-export-cancel-'));
+  const root = await fs.mkdtemp(join(TEMP_ROOT, 'spritebook-export-cancel-'));
   try {
     const out = join(root, 'export');
     await run(out);
@@ -127,7 +129,7 @@ test('closing an export during staging leaves the accepted export intact', async
 });
 
 test('an untrusted recovery record cannot delete or restore a sibling directory', async () => {
-  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-export-recovery-path-'));
+  const root = await fs.mkdtemp(join(TEMP_ROOT, 'spritebook-export-recovery-path-'));
   try {
     const out = join(root, 'export'), unrelated = join(root, 'user-files');
     await fs.mkdir(unrelated);
@@ -151,7 +153,7 @@ test('an untrusted recovery record cannot delete or restore a sibling directory'
 });
 
 test('a publication failure rolls back files already replaced', async () => {
-  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-export-publish-'));
+  const root = await fs.mkdtemp(join(TEMP_ROOT, 'spritebook-export-publish-'));
   const rename = fs.rename;
   try {
     const out = join(root, 'export');
@@ -182,7 +184,7 @@ test('a publication failure rolls back files already replaced', async () => {
 });
 
 test('a killed publication recovers the accepted bytes before a later failed retry', async () => {
-  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-export-death-'));
+  const root = await fs.mkdtemp(join(TEMP_ROOT, 'spritebook-export-death-'));
   try {
     const out = join(root, 'export');
     await run(out);
