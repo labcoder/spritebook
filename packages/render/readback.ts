@@ -1,3 +1,4 @@
+import { settleGpuQueue } from './gpu.ts';
 /**
  * Double-buffered pixel readback for the N-AOV pass (webgpu-headless-rendering
  * skill). Generalized from the P0-T2 spike: a pool of `poolSize` slots, each
@@ -25,6 +26,7 @@ export interface BatchMetrics {
 interface Slot {
   buffers: GPUBuffer[]; // one per AOV, size paddedBPR[k] * height
   frame: number;
+  mappings: Promise<unknown>[];
   mapped: Promise<unknown> | null;
 }
 
@@ -59,13 +61,16 @@ export class ReadbackPool {
     this.paddedBPR = this.unpaddedBPR.map(align256);
   }
 
-  private makeSlot(): Slot {
+  private makeSlot(allocated: GPUBuffer[]): Slot {
     const usage = GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST;
     return {
-      buffers: this.paddedBPR.map((bpr) =>
-        this.device.createBuffer({ size: bpr * this.height, usage })
-      ),
+      buffers: this.paddedBPR.map((bpr) => {
+        const buffer = this.device.createBuffer({ size: bpr * this.height, usage });
+        allocated.push(buffer);
+        return buffer;
+      }),
       frame: -1,
+      mappings: [],
       mapped: null,
     };
   }
@@ -100,67 +105,85 @@ export class ReadbackPool {
     onFrameDone?: (n: number) => void;
   }): Promise<BatchMetrics> {
     const { frames, firstFrame = 0, warmup = 3, submitFrame, consume, onFrameDone } = opts;
-    const slots = Array.from({ length: this.poolSize }, () => this.makeSlot());
-    const planes = this.unpaddedBPR.map((bpr) => new Uint8Array(bpr * this.height));
+    const allocated: GPUBuffer[] = [];
+    const slots: Slot[] = [];
+    try {
+      for (let i = 0; i < this.poolSize; i++) slots.push(this.makeSlot(allocated));
+      const planes = this.unpaddedBPR.map((bpr) => new Uint8Array(bpr * this.height));
 
-    let mapWaitMs = 0;
-    let consumeMs = 0;
-    let done = 0;
+      let mapWaitMs = 0;
+      let consumeMs = 0;
+      let done = 0;
 
-    const submit = (frame: number, slot: Slot) => {
-      submitFrame(frame, slot.buffers);
-      slot.frame = frame;
-      slot.mapped = Promise.all(slot.buffers.map((b) => b.mapAsync(GPUMapMode.READ)));
-    };
+      const submit = (frame: number, slot: Slot) => {
+        submitFrame(frame, slot.buffers);
+        slot.frame = frame;
+        slot.mappings = slot.buffers.map(async (b) => await b.mapAsync(GPUMapMode.READ));
+        slot.mapped = Promise.all(slot.mappings);
+        // Later slots may reject while an older frame's consumer is still writing its PNGs.
+        void slot.mapped.catch(() => {});
+      };
 
-    const resolve = async (slot: Slot, timed: boolean) => {
-      const t0 = performance.now();
-      await slot.mapped;
-      const t1 = performance.now();
-      for (let k = 0; k < this.aovCount; k++) this.stripInto(slot.buffers[k], k, planes[k]);
-      slot.mapped = null;
-      if (timed) await consume(slot.frame, planes);
-      const t2 = performance.now();
-      if (timed) {
-        mapWaitMs += t1 - t0;
-        consumeMs += t2 - t1;
-        onFrameDone?.(done++);
+      const resolve = async (slot: Slot, timed: boolean) => {
+        const t0 = performance.now();
+        await slot.mapped;
+        const t1 = performance.now();
+        for (let k = 0; k < this.aovCount; k++) this.stripInto(slot.buffers[k], k, planes[k]);
+        slot.mapped = null;
+        slot.mappings = [];
+        if (timed) await consume(slot.frame, planes);
+        const t2 = performance.now();
+        if (timed) {
+          mapWaitMs += t1 - t0;
+          consumeMs += t2 - t1;
+          onFrameDone?.(done++);
+        }
+      };
+
+      // untimed warmup, fully drained
+      for (let w = 0; w < warmup; w++) {
+        submit(firstFrame, slots[0]);
+        await resolve(slots[0], false);
       }
-    };
 
-    // untimed warmup, fully drained
-    for (let w = 0; w < warmup; w++) {
-      submit(firstFrame, slots[0]);
-      await resolve(slots[0], false);
-    }
-
-    const free = [...slots];
-    const inFlight: Slot[] = [];
-    const tStart = performance.now();
-    for (let f = 0; f < frames; f++) {
-      let slot: Slot;
-      if (free.length > 0) slot = free.pop()!;
-      else {
-        slot = inFlight.shift()!;
-        await resolve(slot, true);
+      const free = [...slots];
+      const inFlight: Slot[] = [];
+      const tStart = performance.now();
+      for (let f = 0; f < frames; f++) {
+        let slot: Slot;
+        if (free.length > 0) slot = free.pop()!;
+        else {
+          slot = inFlight.shift()!;
+          await resolve(slot, true);
+        }
+        submit(firstFrame + f, slot);
+        inFlight.push(slot);
       }
-      submit(firstFrame + f, slot);
-      inFlight.push(slot);
+      while (inFlight.length > 0) await resolve(inFlight.shift()!, true);
+      const wallMs = performance.now() - tStart;
+
+      const bytesPerFrame = this.unpaddedBPR.reduce((n, bpr) => n + bpr * this.height, 0);
+      return {
+        frames,
+        wallMs,
+        fps: frames / (wallMs / 1000),
+        mapWaitMs,
+        consumeMs,
+        bytesPerFrame,
+        readbackMBps: (bytesPerFrame * frames) / (wallMs / 1000) / (1024 * 1024),
+      };
+    } finally {
+      await settleGpuQueue(this.device);
+      // Unmapping cancels pending maps too. Keep releasing siblings if a driver rejects cleanup.
+      for (const buffer of allocated) {
+        try {
+          buffer.unmap();
+        } catch { /* preserve the operation's original failure */ }
+        try {
+          buffer.destroy();
+        } catch { /* release the remaining buffers */ }
+      }
+      await Promise.allSettled(slots.flatMap((slot) => slot.mappings));
     }
-    while (inFlight.length > 0) await resolve(inFlight.shift()!, true);
-    const wallMs = performance.now() - tStart;
-
-    for (const s of slots) for (const b of s.buffers) b.destroy();
-
-    const bytesPerFrame = this.unpaddedBPR.reduce((n, bpr) => n + bpr * this.height, 0);
-    return {
-      frames,
-      wallMs,
-      fps: frames / (wallMs / 1000),
-      mapWaitMs,
-      consumeMs,
-      bytesPerFrame,
-      readbackMBps: (bytesPerFrame * frames) / (wallMs / 1000) / (1024 * 1024),
-    };
   }
 }

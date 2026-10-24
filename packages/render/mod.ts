@@ -21,7 +21,7 @@ import { promises as fs } from 'node:fs';
 import type { JobEvent } from '@spritebook/schema';
 import { CameraPresetSchema, LightingSchema, parseWith } from '@spritebook/schema';
 import type { RenderJobSpec } from './contracts.ts';
-import { getGpu } from './gpu.ts';
+import { getGpu, settleGpuQueue } from './gpu.ts';
 import { makeRenderer } from './renderer.ts';
 
 export type { RenderJobSpec } from './contracts.ts';
@@ -63,16 +63,16 @@ export async function* runRenderJob(spec: RenderJobSpec): AsyncIterable<JobEvent
 
     const shaderSrc = await fs.readFile(resourcePath('render', 'shaders.wgsl'), 'utf8');
     const renderer = await makeRenderer(gpu, spec, shaderSrc);
-    yield { t: 'progress', jobId, at: at(), step: 'setup', done: 2, total: 4 };
-
-    const { summary, throughputPath } = await renderer.renderAll(
-      spec.outDir,
-      spec.frames,
-      spec.frameIndex,
-    );
-    // renderAll has fully drained the readback pool, so no queued work references
-    // the renderer's textures/buffers — safe to release them (M3: no per-job leak).
-    renderer.dispose();
+    let rendered: Awaited<ReturnType<typeof renderer.renderAll>>;
+    try {
+      yield { t: 'progress', jobId, at: at(), step: 'setup', done: 2, total: 4 };
+      rendered = await renderer.renderAll(spec.outDir, spec.frames, spec.frameIndex);
+    } finally {
+      // Also runs on failed PNG writes and when the event consumer closes the iterator.
+      await settleGpuQueue(gpu.device);
+      renderer.dispose();
+    }
+    const { summary, throughputPath } = rendered;
     yield { t: 'progress', jobId, at: at(), step: 'render', done: 3, total: 4 };
 
     if (gpu.lost) {

@@ -67,32 +67,39 @@ export async function createAovPipeline(
   device: GPUDevice,
   shaderSrc: string,
 ): Promise<GPURenderPipeline> {
-  const module = device.createShaderModule({ code: shaderSrc, label: 'aov-shaders' });
   device.pushErrorScope('validation');
-  const pipeline = device.createRenderPipeline({
-    label: 'aov-mrt-pipeline',
-    layout: 'auto',
-    vertex: {
-      module,
-      entryPoint: 'vs_main',
-      buffers: VERTEX_BUFFER_LAYOUT,
-    },
-    fragment: {
-      module,
-      entryPoint: 'fs_main',
-      // Formats + order straight from the frozen contract → FS @location(0..4).
-      targets: AOV_TARGETS.map((t): GPUColorTargetState => ({ format: t.format })),
-    },
-    primitive: { topology: 'triangle-list', cullMode: 'none' },
-    depthStencil: {
-      format: DEPTH_STENCIL_FORMAT,
-      depthWriteEnabled: true,
-      depthCompare: 'less',
-    },
-  });
-  const err = await device.popErrorScope();
-  if (err) throw new Error(`aov pipeline validation error: ${err.message}`);
-  return pipeline;
+  let scopeOpen = true;
+  try {
+    const module = device.createShaderModule({ code: shaderSrc, label: 'aov-shaders' });
+    const pipeline = device.createRenderPipeline({
+      label: 'aov-mrt-pipeline',
+      layout: 'auto',
+      vertex: {
+        module,
+        entryPoint: 'vs_main',
+        buffers: VERTEX_BUFFER_LAYOUT,
+      },
+      fragment: {
+        module,
+        entryPoint: 'fs_main',
+        // Formats + order straight from the frozen contract → FS @location(0..4).
+        targets: AOV_TARGETS.map((t): GPUColorTargetState => ({ format: t.format })),
+      },
+      primitive: { topology: 'triangle-list', cullMode: 'none' },
+      depthStencil: {
+        format: DEPTH_STENCIL_FORMAT,
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+      },
+    });
+    const checked = device.popErrorScope();
+    scopeOpen = false;
+    const err = await checked;
+    if (err) throw new Error(`aov pipeline validation error: ${err.message}`);
+    return pipeline;
+  } finally {
+    if (scopeOpen) await Promise.resolve().then(() => device.popErrorScope()).catch(() => {});
+  }
 }
 
 /** The offscreen render targets for one AOV pass. */
@@ -128,17 +135,28 @@ export function createAovTargets(
 ): AovTargets {
   const size = { width, height };
   const colorUsage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC;
-  const color = AOV_TARGETS.map((t) =>
-    device.createTexture({ size, format: t.format, usage: colorUsage, label: `aov-${t.pass}` })
-  );
-  const [lit, albedo, normal, depth, mask] = color;
-  const depthStencil = device.createTexture({
-    size,
-    format: DEPTH_STENCIL_FORMAT,
-    usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    label: 'aov-depth24plus',
-  });
-  return { width, height, lit, albedo, normal, depth, mask, depthStencil, color };
+  const allocated: GPUTexture[] = [];
+  const texture = (descriptor: GPUTextureDescriptor) => {
+    const value = device.createTexture(descriptor);
+    allocated.push(value);
+    return value;
+  };
+  try {
+    const color = AOV_TARGETS.map((t) =>
+      texture({ size, format: t.format, usage: colorUsage, label: `aov-${t.pass}` })
+    );
+    const [lit, albedo, normal, depth, mask] = color;
+    const depthStencil = texture({
+      size,
+      format: DEPTH_STENCIL_FORMAT,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      label: 'aov-depth24plus',
+    });
+    return { width, height, lit, albedo, normal, depth, mask, depthStencil, color };
+  } catch (error) {
+    for (const value of allocated) value.destroy();
+    throw error;
+  }
 }
 
 /**

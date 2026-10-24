@@ -46,6 +46,7 @@ export interface ClipPoses {
 import { align256, ReadbackPool } from './readback.ts';
 import { encodeAov } from './png.ts';
 import { buildThroughput, writeThroughput } from './throughput.ts';
+import { settleGpuQueue } from './gpu.ts';
 
 /**
  * THE LIGHT RIG. One key direction plus an ambient floor, constant in world
@@ -234,143 +235,167 @@ export class Renderer {
     const { device } = gpu;
     assertRenderSize(device.limits, width, height);
     device.pushErrorScope('validation');
-
-    const pipeline = await createAovPipeline(device, shaderSrc);
-    const targets = createAovTargets(device, width, height);
-
-    const mkBuf = (data: ArrayBufferView, usage: number): GPUBuffer => {
-      const buf = device.createBuffer({
-        size: Math.ceil(data.byteLength / 4) * 4,
-        usage: usage | GPUBufferUsage.COPY_DST,
-      });
-      device.queue.writeBuffer(buf, 0, data as BufferSource);
-      return buf;
+    let scopeOpen = true;
+    const allocated: (GPUBuffer | GPUTexture)[] = [];
+    const createBuffer = (descriptor: GPUBufferDescriptor) => {
+      const buffer = device.createBuffer(descriptor);
+      allocated.push(buffer);
+      return buffer;
     };
-    const vb = [
-      mkBuf(asset.positions, GPUBufferUsage.VERTEX),
-      mkBuf(asset.normals, GPUBufferUsage.VERTEX),
-      mkBuf(asset.joints, GPUBufferUsage.VERTEX),
-      mkBuf(asset.weights, GPUBufferUsage.VERTEX),
-      mkBuf(asset.uvs, GPUBufferUsage.VERTEX),
-    ];
-    const ib = mkBuf(asset.indices, GPUBufferUsage.INDEX);
+    try {
+      const pipeline = await createAovPipeline(device, shaderSrc);
+      const targets = createAovTargets(device, width, height);
+      allocated.push(...targets.color, targets.depthStencil);
 
-    // Base color sources, uploaded in the format that keeps each one HONEST.
-    // An image is authored in sRGB, so rgba8unorm-srgb lets the hardware decode
-    // it to linear for free. A material FACTOR is already a linear number and
-    // gets rgba16float, because sRGB-encoding it into 8 bits does not round
-    // trip (0.55 -> byte 196 -> 0.552011) and that error reaches the albedo
-    // AOV. Both bind as texture_2d<f32>, so the shader and the frozen
-    // interlock see no difference.
-    const sampler = device.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    });
-    const baseColorTex = asset.textures.map((t, i) => {
-      const image = t.kind === 'image';
-      const w = image ? t.width : 1;
-      const h = image ? t.height : 1;
-      const tex = device.createTexture({
-        label: `base-color-${i}`,
-        size: { width: w, height: h },
-        format: image ? 'rgba8unorm-srgb' : 'rgba16float',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      const mkBuf = (data: ArrayBufferView, usage: number): GPUBuffer => {
+        const buf = createBuffer({
+          size: Math.ceil(data.byteLength / 4) * 4,
+          usage: usage | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(buf, 0, data as BufferSource);
+        return buf;
+      };
+      const vb = [
+        mkBuf(asset.positions, GPUBufferUsage.VERTEX),
+        mkBuf(asset.normals, GPUBufferUsage.VERTEX),
+        mkBuf(asset.joints, GPUBufferUsage.VERTEX),
+        mkBuf(asset.weights, GPUBufferUsage.VERTEX),
+        mkBuf(asset.uvs, GPUBufferUsage.VERTEX),
+      ];
+      const ib = mkBuf(asset.indices, GPUBufferUsage.INDEX);
+
+      // Base color sources, uploaded in the format that keeps each one HONEST.
+      // An image is authored in sRGB, so rgba8unorm-srgb lets the hardware decode
+      // it to linear for free. A material FACTOR is already a linear number and
+      // gets rgba16float, because sRGB-encoding it into 8 bits does not round
+      // trip (0.55 -> byte 196 -> 0.552011) and that error reaches the albedo
+      // AOV. Both bind as texture_2d<f32>, so the shader and the frozen
+      // interlock see no difference.
+      const sampler = device.createSampler({
+        magFilter: 'linear',
+        minFilter: 'linear',
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
       });
-      const data: BufferSource = image
-        ? t.rgba as BufferSource
-        : Uint16Array.from(t.linear, toHalf) as BufferSource;
-      device.queue.writeTexture(
-        { texture: tex },
-        data,
-        { bytesPerRow: w * (image ? 4 : 8), rowsPerImage: h },
-        { width: w, height: h },
-      );
-      return tex;
-    });
+      const baseColorTex = asset.textures.map((t, i) => {
+        const image = t.kind === 'image';
+        const w = image ? t.width : 1;
+        const h = image ? t.height : 1;
+        const tex = device.createTexture({
+          label: `base-color-${i}`,
+          size: { width: w, height: h },
+          format: image ? 'rgba8unorm-srgb' : 'rgba16float',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        allocated.push(tex);
+        const data: BufferSource = image
+          ? t.rgba as BufferSource
+          : Uint16Array.from(t.linear, toHalf) as BufferSource;
+        device.queue.writeTexture(
+          { texture: tex },
+          data,
+          { bytesPerRow: w * (image ? 4 : 8), rowsPerImage: h },
+          { width: w, height: h },
+        );
+        return tex;
+      });
 
-    const jointBuf = device.createBuffer({
-      size: asset.jointCount * 64,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-    const camBuf = device.createBuffer({
-      size: 160,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-    const bindGroup = device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: camBuf } },
-        { binding: 1, resource: { buffer: jointBuf } },
-      ],
-    });
-    // One uniform + one bind group PER MATERIAL, because base color is
-    // `factor x texture` and two materials can share a texture with different
-    // factors (contracts.ts, THE MATERIAL CONTRACT). Std140: vec4 factor at 0,
-    // then cutoff and mode as floats at 16 — 32 bytes, the minimum a uniform
-    // binding can be without padding games.
-    const matBufs = asset.materials.map((m, i) => {
-      const buf = device.createBuffer({
-        label: `material-${i}`,
-        size: 32,
+      const jointBuf = createBuffer({
+        size: asset.jointCount * 64,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      const camBuf = createBuffer({
+        size: 160,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
-      const data = new Float32Array(8);
-      data.set(m.factor, 0);
-      data[4] = m.alphaCutoff;
-      data[5] = m.alphaMode === 'MASK' ? 1 : 0;
-      device.queue.writeBuffer(buf, 0, data as BufferSource);
-      return buf;
-    });
-    const texBindGroups = asset.materials.map((m, i) =>
-      device.createBindGroup({
-        label: `material-bg-${i}`,
-        layout: pipeline.getBindGroupLayout(1),
+      const bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
         entries: [
-          { binding: 0, resource: baseColorTex[m.texture].createView() },
-          { binding: 1, resource: sampler },
-          { binding: 2, resource: { buffer: matBufs[i] } },
+          { binding: 0, resource: { buffer: camBuf } },
+          { binding: 1, resource: { buffer: jointBuf } },
         ],
-      })
-    );
+      });
+      // One uniform + one bind group PER MATERIAL, because base color is
+      // `factor x texture` and two materials can share a texture with different
+      // factors (contracts.ts, THE MATERIAL CONTRACT). Std140: vec4 factor at 0,
+      // then cutoff and mode as floats at 16 — 32 bytes, the minimum a uniform
+      // binding can be without padding games.
+      const matBufs = asset.materials.map((m, i) => {
+        const buf = createBuffer({
+          label: `material-${i}`,
+          size: 32,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        const data = new Float32Array(8);
+        data.set(m.factor, 0);
+        data[4] = m.alphaCutoff;
+        data[5] = m.alphaMode === 'MASK' ? 1 : 0;
+        device.queue.writeBuffer(buf, 0, data as BufferSource);
+        return buf;
+      });
+      const texBindGroups = asset.materials.map((m, i) =>
+        device.createBindGroup({
+          label: `material-bg-${i}`,
+          layout: pipeline.getBindGroupLayout(1),
+          entries: [
+            { binding: 0, resource: baseColorTex[m.texture].createView() },
+            { binding: 1, resource: sampler },
+            { binding: 2, resource: { buffer: matBufs[i] } },
+          ],
+        })
+      );
 
-    const camData = framing.cameras.map((c) =>
-      packCamera(
-        c.view,
-        c.proj,
-        c.near,
-        c.far,
-        lightDirFor(lightFrame, c.yawDeg, lighting?.direction),
-        lighting?.ambient ?? AMBIENT,
-      )
-    );
+      const camData = framing.cameras.map((c) =>
+        packCamera(
+          c.view,
+          c.proj,
+          c.near,
+          c.far,
+          lightDirFor(lightFrame, c.yawDeg, lighting?.direction),
+          lighting?.ambient ?? AMBIENT,
+        )
+      );
 
-    const err = await device.popErrorScope();
-    if (err) throw new Error(`renderer setup validation error: ${err.message}`);
+      const checked = device.popErrorScope();
+      scopeOpen = false;
+      const err = await checked;
+      if (err) throw new Error(`renderer setup validation error: ${err.message}`);
 
-    return new Renderer(
-      gpu,
-      asset,
-      framing,
-      width,
-      height,
-      pipeline,
-      targets,
-      bindGroup,
-      camBuf,
-      jointBuf,
-      vb,
-      ib,
-      camData,
-      jointScratch(asset),
-      baseColorTex,
-      matBufs,
-      texBindGroups,
-      pose,
-      clipPoses,
-      subset,
-    );
+      return new Renderer(
+        gpu,
+        asset,
+        framing,
+        width,
+        height,
+        pipeline,
+        targets,
+        bindGroup,
+        camBuf,
+        jointBuf,
+        vb,
+        ib,
+        camData,
+        jointScratch(asset),
+        baseColorTex,
+        matBufs,
+        texBindGroups,
+        pose,
+        clipPoses,
+        subset,
+      );
+    } catch (error) {
+      if (scopeOpen) {
+        await Promise.resolve().then(() => device.popErrorScope()).catch(() => {});
+      }
+      // Uploads may already be queued when a later material or binding fails validation.
+      await settleGpuQueue(device);
+      for (const resource of allocated) {
+        try {
+          resource.destroy();
+        } catch { /* keep the original setup failure */ }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -551,32 +576,44 @@ export class Renderer {
   async captureRowByRow(direction: number, frame: number): Promise<Uint8Array[]> {
     const device = this.gpu.device;
     const unpadded = bpp.map((b) => this.width * b);
-    const bufs = unpadded.map((bpr) =>
-      device.createBuffer({
-        size: bpr * this.height,
-        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-      })
-    );
-    const encoder = device.createCommandEncoder();
-    this.encodeFrame(encoder, direction, frame);
-    for (let k = 0; k < AOV_TARGETS.length; k++) {
-      for (let y = 0; y < this.height; y++) {
-        encoder.copyTextureToBuffer(
-          { texture: this.targets.color[k], origin: { x: 0, y, z: 0 } },
-          { buffer: bufs[k], offset: y * unpadded[k] },
-          { width: this.width, height: 1 },
-        );
+    const bufs: GPUBuffer[] = [];
+    try {
+      for (const bpr of unpadded) {
+        bufs.push(device.createBuffer({
+          size: bpr * this.height,
+          usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+        }));
+      }
+      const encoder = device.createCommandEncoder();
+      this.encodeFrame(encoder, direction, frame);
+      for (let k = 0; k < AOV_TARGETS.length; k++) {
+        for (let y = 0; y < this.height; y++) {
+          encoder.copyTextureToBuffer(
+            { texture: this.targets.color[k], origin: { x: 0, y, z: 0 } },
+            { buffer: bufs[k], offset: y * unpadded[k] },
+            { width: this.width, height: 1 },
+          );
+        }
+      }
+      device.queue.submit([encoder.finish()]);
+      const planes: Uint8Array[] = [];
+      for (const b of bufs) {
+        await b.mapAsync(GPUMapMode.READ);
+        planes.push(new Uint8Array(b.getMappedRange()).slice());
+        b.unmap();
+      }
+      return planes;
+    } finally {
+      await settleGpuQueue(device);
+      for (const buffer of bufs) {
+        try {
+          buffer.unmap();
+        } catch { /* pending maps must not keep siblings alive */ }
+        try {
+          buffer.destroy();
+        } catch { /* keep the original readback failure */ }
       }
     }
-    device.queue.submit([encoder.finish()]);
-    const planes: Uint8Array[] = [];
-    for (const b of bufs) {
-      await b.mapAsync(GPUMapMode.READ);
-      planes.push(new Uint8Array(b.getMappedRange()).slice());
-      b.unmap();
-      b.destroy();
-    }
-    return planes;
   }
 }
 

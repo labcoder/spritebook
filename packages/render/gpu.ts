@@ -72,6 +72,13 @@ export async function disposeGpu(): Promise<void> {
   delete (navigator as { gpu?: GPU }).gpu;
 }
 
+/** Drain queued work before releasing resources; preserve the operation's error on queue failure. */
+export async function settleGpuQueue(device: GPUDevice): Promise<void> {
+  try {
+    await device.queue.onSubmittedWorkDone();
+  } catch { /* device/queue failure must not mask the original operation error */ }
+}
+
 /**
  * getGpu, but return null instead of throwing when no adapter exists — hosted CI
  * runners have no GPU, so render suites skip there. Set SPRITEBOOK_REQUIRE_GPU
