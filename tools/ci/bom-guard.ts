@@ -47,13 +47,13 @@ if (import.meta.main) {
     )).flat(),
   );
   const added = [...after].filter((name) => !before.has(name));
-  const bom = (await readFile('docs/dependencies.md', 'utf8')).toLowerCase();
+  const bom = (await readFile('docs/developer/dependencies.md', 'utf8')).toLowerCase();
   const missing = added.filter((name) =>
     !bom.includes(name.toLowerCase().replace(/^@[\w.-]+\//, ''))
   );
   if (missing.length) {
     console.error(
-      `bom-guard: add role/license rows to docs/dependencies.md for: ${missing.join(', ')}`,
+      `bom-guard: add role/license rows to docs/developer/dependencies.md for: ${missing.join(', ')}`,
     );
     process.exitCode = 1;
   } else {

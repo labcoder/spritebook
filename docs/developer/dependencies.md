@@ -6,7 +6,7 @@ re-confirm at pin time · **⚠** gate open — verify before integration. Rows 
 dependencies, historical investigations and proposed candidates; presence here is not evidence that
 a model or package ships. Current JavaScript resolution lives in `package-lock.json`, Rust in the
 Cargo locks, and model Python dependencies in the frozen sidecar locks. The
-[model inventory](models.md) identifies the integrated catalog choices.
+[model inventory](../user/models.md) identifies the integrated catalog choices.
 
 **License posture:** everything _bundled_ is MIT / Apache-2.0 / BSD / ISC / OFL / CC0. AI model
 weights are never bundled — catalog entries installed on demand behind license/territory/VRAM gates.
@@ -20,7 +20,7 @@ are unchanged.
 | Dependency      | Role                                                        | License                                       | Pin                  |
 | --------------- | ----------------------------------------------------------- | --------------------------------------------- | -------------------- |
 | Node LTS        | Core/CLI runtime; installed application owns its executable | MIT plus bundled notices                      | 24.22.0              |
-| zod             | Manifest/catalog/runtime validation                         | MIT                                           | 4.4.3                |
+| zod             | Manifest/catalog/runtime validation                         | MIT                                           | 4.6.7                |
 | Tauri           | Desktop shell, selected by D-005 and retained by D-041      | MIT/Apache-2.0                                | lock-pinned 2.11/2.6 |
 | Dawn (`webgpu`) | Native headless WebGPU                                      | shipped BSD-3-Clause text; native audit below | 0.6.2                |
 
@@ -33,12 +33,13 @@ Build/test dependencies below are not bundled in application resources:
 | `@types/node`                                            | Node API declarations                                                  | MIT               | 24.19.2                                      |
 | `@std/assert` / `@jsr/std__internal`                     | Existing assertions through JSR's npm-compatible registry              | MIT               | 1.0.19 / 1.0.12, retained from the Deno lock |
 | `@biomejs/biome`                                         | Development linter                                                     | MIT OR Apache-2.0 | 2.5.15                                       |
+| Vite                                                     | Studio development server and production web build                     | MIT               | 8.1.6                                        |
 | `@vitejs/plugin-react`                                   | Studio's existing React integration, made compatible with Vite 8       | MIT               | 6.0.1                                        |
 | `dprint`                                                 | Retain the existing formatting engine without executing Deno           | MIT               | 0.64.0                                       |
 | `@dprint/typescript`, `@dprint/json`, `@dprint/markdown` | Locally installed formatter Wasm plugins; no first-run plugin download | MIT               | 0.96.1 / 0.25.2 / 0.26.0                     |
 
 The previous React plugin 5.1.4 declared Vite support only through 7, preventing a clean npm
-workspace install with the already-pinned Vite 8.1.4. The
+workspace install with Vite 8. The
 [upstream migration notes](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/CHANGELOG.md)
 describe the compatible v6 integration. No Babel compiler plugin is enabled.
 
@@ -71,8 +72,8 @@ The private Direct3D 12 experiment adds the npm distribution's `dxcompiler.dll`,
 `dxcompiler-LICENSE.TXT` and `dxcompiler-ThirdPartyNotices.txt`. The shipped DXC license is **LLVM /
 University of Illinois-NCSA**, outside the strict bundling allowlist. These files are excluded from
 the Vulkan installer; their hashes and measured results are recorded in
-[`future/qualification/windows-x64.json`](../future/qualification/windows-x64.json). No Direct3D 12
-redistribution clearance or installed-artifact support claim follows from the private run.
+[`future/qualification/windows-x64.json`](../../future/qualification/windows-x64.json). No Direct3D
+12 redistribution clearance or installed-artifact support claim follows from the private run.
 
 The Windows proof merges a process-local UTF-8 `activeCodePage` into its **app-owned copy** of
 Node's PE manifest, using the Windows SDK's build-time `mt.exe`. Dawn's ANSI loader otherwise cannot
@@ -110,12 +111,16 @@ inputs normalize to RGBA8, including palette transparency, packed samples and 16
 Unsupported optional encodings remain encoded when an upstream optimization cannot decode them. The
 codec and ndarray notices are retained in the installed package tree.
 
-F4 retains the legacy production transitive versions in `package-lock.json`, with three security
-patches: Ajv **8.18.0** (MIT), fast-uri **3.1.8** (BSD-3-Clause) and DOMPurify **3.4.17**
-(Apache-2.0 option selected). A clean `npm ci --ignore-scripts` and `npm audit` report zero
-vulnerabilities at this cutover. Future audit results may change. The compiled runtime preserves the
-production package tree rather than bundling CJS importer code that depends on private relative
-assets. Development tools and source TypeScript are excluded.
+The production transitive security overrides are Ajv **8.18.0** (MIT), fast-uri **3.1.9**
+(BSD-3-Clause) and DOMPurify **3.4.17** (Apache-2.0 option selected). The October 2026 dependency
+review also pins Zod **4.6.7** and Vite **8.1.6** for the
+[Zod collection-size validation advisory](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5),
+[Vite Windows editor-launch advisory](https://github.com/advisories/GHSA-587h-7wmj-h5pm) and
+[fast-uri URI normalization advisory](https://github.com/advisories/GHSA-w74x-v6f9-j3xg). These
+retain the current major versions and Vite's 8.1 maintenance line. Audit results can change; run
+`npm audit` against the current lock before a release. The compiled runtime preserves the production
+package tree rather than bundling CJS importer code that depends on private relative assets.
+Development tools and source TypeScript are excluded.
 
 ## Importer border
 
@@ -155,9 +160,9 @@ runtime dependencies still install from frozen prebuilt wheels; no user compiler
 
 ## Generation backends (catalog — installed on demand)
 
-**Surveyed against four gates 2026-08-06 (D-036); transcript in
-[`docs/internal/proofs/backends.md`](internal/proofs/backends.md). The ✓ marks below were
-planning-era and described MODELS; the rows now describe STACKS, which is what ships.**
+The table retains historical candidate screening as well as integrated choices. Check the
+[current model inventory](../user/models.md) for what users can install; a candidate license label
+does not clear its transitive runtime or establish native support.
 
 | Backend          | License (model)           | Status                                                                                                                                                                                        |
 | ---------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -172,9 +177,9 @@ planning-era and described MODELS; the rows now describe STACKS, which is what s
 
 ### Selected TRELLIS.2 Windows runtime
 
-The optional environment is frozen in [sidecar/uv.lock](../sidecar/uv.lock), with
-[source/archive and notice pins](../sidecar/runtimes/trellis2-win.json). Third-party CUDA wheels are
-downloaded into the user's environment, never application resources.
+The optional environment is frozen in [sidecar/uv.lock](../../sidecar/uv.lock), with
+[source/archive and notice pins](../../sidecar/runtimes/trellis2-win.json). Third-party CUDA wheels
+are downloaded into the user's environment, never application resources.
 
 | Artifact                          | Role and terms                                      | Evidence/delivery                                                                                                                                                                |
 | --------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -182,7 +187,7 @@ downloaded into the user's environment, never application resources.
 | o-voxel-vb-ap 0.0.1+cu128torch2.8 | Dual-grid conversion, MIT source plus Eigen MPL-2.0 | Source `Trellis.2.drtk@200ba8cb`; build `cuda-wheels@7bc41ac7`, job 73822567578. Setup retains the omitted source notice, Eigen terms and source URL. External environment only. |
 | cumesh 1.0 / flex_gemm 0.0.1      | Mesh cleanup/unwrap and sparse sampling, MIT        | Exact previously inspected community wheels at `visualbruno/ComfyUI-Trellis2@438fe4e2`; hashes retained in uv.lock                                                               |
 | TRELLIS.2 / utils3d               | Official MIT source archives                        | Full commits/archive hashes in runtime recipe; no user-side Git/compiler. Keep upstream notices.                                                                                 |
-| Adapted UV helper                 | DRTK pixel/barycentric boundary                     | [MIT attribution](../sidecar/notices/uv-rasterizer-MIT.txt); adapted from `ComfyUI-TRELLIS2@3e696f2c`                                                                            |
+| Adapted UV helper                 | DRTK pixel/barycentric boundary                     | [MIT attribution](../../sidecar/notices/uv-rasterizer-MIT.txt); adapted from `ComfyUI-TRELLIS2@3e696f2c`                                                                         |
 | Triton Windows 3.7.1.post27       | MIT core with bundled toolchain notices             | Frozen wheel; own adapter reads Unicode environment values through Python and uses Triton's short-path helper for TinyCC arguments. No binary modification.                      |
 
 The selected extra excludes `nvdiffrast`, `nvdiffrec_render` and the old untraced `o_voxel` wheel.
@@ -190,7 +195,7 @@ The first two carried NVIDIA evaluation-only terms; installing them outside the 
 remove that restriction. Source preparation replaces both generation export and retexture UV
 rasterization while retaining cleanup, original-surface projection, PBR sampling and measured model
 defaults. The replacement passes native structural checks and real installed generation/retexture;
-the [completed F4 gate](../future/model-provisioning-gate.md) records exact qualification and
+the [completed F4 gate](../../future/model-provisioning-gate.md) records exact qualification and
 remaining F7 release checks.
 
 The Windows admission check compiles a real sparse trilinear sampler and verifies all six PBR
@@ -206,12 +211,12 @@ and redistribution terms; it is not MIT. Its exact license SHA-256 is
 website's “Built with DINOv3” clause. Preserve the applicable agreement and explicit acceptance; do
 not substitute a blanket attribution or output-rights claim.
 
-### Pixal3D Windows integration ? RTX 3090 qualified
+### Pixal3D Windows integration: recorded RTX 3090 scope
 
 F4-T6 uses official TencentARC/Pixal3D source and MIT single-view checkpoints, with the same
 separately gated DINOv3 snapshot/agreement described above. It is an optional user-provisioned
 runtime, never an application-bundled model stack. The
-[installed Windows qualification](../future/qualification/pixal3d-windows-x64.json) passes; no
+[installed Windows qualification](../../future/qualification/pixal3d-windows-x64.json) passes; no
 default or additional platform support is implied.
 
 | Component                                          | Role and terms                                    | Selected path                                                                                                                                                                                                                       |
@@ -231,7 +236,7 @@ Pixal3D's upstream NOTICE still lists DINOv2.
 
 The fast-simplification 0.2.0 source archive in the lock has SHA-256
 `ed02ea6f4968ec98f963f2d3665dbafd0297ec12aea9e4d0a87c4b3c14d608a8`. Its `Simplify.h` retains Sven
-Forstmann's 2014 MIT attribution; the wrapper license credits the PyVista developers (2017?2021).
+Forstmann's 2014 MIT attribution; the wrapper license credits the PyVista developers (2017–2021).
 The native binding uses
 [nanobind's BSD-3-Clause terms](https://github.com/wjakob/nanobind/blob/master/LICENSE). These are
 external runtime components; F7's binary-distribution notice review covers their complete upstream
@@ -246,31 +251,31 @@ families. All installed artifacts are prebuilt wheels. The experiment substitute
 extraction for an unavailable torchmcubes wheel and fixes the reference texture baker's CUDA/CPU
 handoff. These are recorded evaluation changes, not a catalog integration or new bundled dependency.
 Exact resolved files remain in `.render-bench/f4/alternatives/triposr/runtime/uv.lock`; see the
-[platform spike](../future/model-platform-spike.md) for measurements and upstream pins.
+[platform spike](../../future/model-platform-spike.md) for measurements and upstream pins.
 
 ## Rigging
 
 | Dependency                            | Role                                               | License                                                                                | Status                                                                                                                                                                                                                |
 | ------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **UniRig** (code + weights)           | Track B generic auto-rig                           | MIT                                                                                    | **✓** both GitHub LICENSE and HF model card; staged checkpoints → registry pins exact hashes                                                                                                                          |
-| Make-It-Animatable                    | Independent humanoid rig candidate, not integrated | MIT outer code / Apache-2.0 declared MIA weights; **⚠ complete deployment unverified** | V1 required Mixamo template is gated; v2 adds Hunyuan backbone terms. No inference or runtime installed in this evaluation; see [screen](../future/cpu-deformation-evaluation.md#mia-provisioning-screen).            |
+| Make-It-Animatable                    | Independent humanoid rig candidate, not integrated | MIT outer code / Apache-2.0 declared MIA weights; **⚠ complete deployment unverified** | V1 required Mixamo template is gated; v2 adds Hunyuan backbone terms. No inference or runtime installed in this evaluation; see [screen](../../future/cpu-deformation-evaluation.md#mia-provisioning-screen).         |
 | Canonical Track A body                | roster-fit rig                                     | ours, seeded from CC0 **Universal Base Characters** (Quaternius)                       | **✓ CC0 re-verified 2026-07-20** from the downloaded pack's License_Standard.txt; both bodies bundled at `packages/rig/bodies/` (65-joint UAL skeleton, full core, byte-stable builds via tools/roster/build-body.ts) |
 | Blender/bpy (upstream UniRig tooling) | conversions inside sidecar only                    | GPL                                                                                    | isolated subprocess; adapters return neutral npz/json; never shipped                                                                                                                                                  |
 
 Blender **4.5.15 LTS Windows x64 portable** is also available as an explicit optional external-tool
 download, separately from UniRig's retained bpy environment. The official mirror archive/executable
 SHA-256 pins, exact sizes and source URL live in
-[`tools.json`](../packages/registry/catalog/tools.json). GPL-3.0-or-later; preserve the full
+[`tools.json`](../../packages/registry/catalog/tools.json). GPL-3.0-or-later; preserve the full
 upstream distribution notices and corresponding-source access. Integration scripts must remain
 GPL-compatible. No Blender binary/environment is app-bundled, and a subprocess is not itself a
 license exception. Native operator checks pass; real garment corrections remain rejected. See the
-[trial](../future/maintained-blender-trial.md) and [tool lifecycle](extensions.md).
+[trial](../../future/maintained-blender-trial.md) and [tool lifecycle](../user/extensions.md).
 
 ### Frozen UniRig Windows environment
 
-[Recipe](../sidecar/runtimes/unirig-win.json) and [lock](../sidecar/runtimes/unirig/uv.lock) pin an
-external, wheels-only environment. No third-party model source, Python environment or CUDA wheel is
-app-bundled.
+[Recipe](../../sidecar/runtimes/unirig-win.json) and [lock](../../sidecar/runtimes/unirig/uv.lock)
+pin an external, wheels-only environment. No third-party model source, Python environment or CUDA
+wheel is app-bundled.
 
 | Components                                                                                   | Role/terms                                                              | Delivery and evidence                                                                                                                                                                    |
 | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -281,7 +286,7 @@ app-bundled.
 | UniRig/Michelangelo/bpy 4.2.0                                                                | MIT weights/root source; GPL Michelangelo/bpy components                | User-downloaded source and isolated subprocesses; retain source notices. Neutral rig JSON/NPZ boundary remains.                                                                          |
 | pyrender 0.1.45 / PyOpenGL 3.1.0                                                             | MIT / BSD and historical OpenGL component notices                       | PyOpenGL universal piwheels wheel: all 2131 Python files match official sdist, no DLL/native payload; setup preserves the complete 11,117-byte source notice. Native pyrender exercised. |
 | Lightning 2.5.1, transformers 4.51.3, open3d 0.19, trimesh 4.6.8, fast-simplification 0.1.11 | Apache-2.0 / MIT                                                        | Frozen prebuilt wheels. Unused OmegaConf/wandb omitted; selected simplifier permits NumPy 1.26.4.                                                                                        |
-| Owned OPT architecture description                                                           | MIT fairseq/UniRig architecture facts plus Apache Transformers defaults | [Provenance and notice](../sidecar/notices/unirig-opt-architecture.md); all active settings match. No Meta OPT config, weights or tokenizer in the new version.                          |
+| Owned OPT architecture description                                                           | MIT fairseq/UniRig architecture facts plus Apache Transformers defaults | [Provenance and notice](../../sidecar/notices/unirig-opt-architecture.md); all active settings match. No Meta OPT config, weights or tokenizer in the new version.                       |
 
 The original catalog's Meta OPT config carried noncommercial/production restrictions.
 `36842e2b.local1` omits that download, retains the two identical verified UniRig checkpoints and
@@ -290,7 +295,7 @@ the adapter always selects the owned configuration.
 
 Fresh-profile installed setup and real checkpoint inference pass on Windows x64/RTX 3090, including
 normalized skin weights and animated sprite exports. The
-[F4 receipt](../future/qualification/model-workflow-windows-x64.json) retains the sample's
+[F4 receipt](../../future/qualification/model-workflow-windows-x64.json) retains the sample's
 rig/retarget advisories; it does not certify a new model default, additional hardware or a public
 release.
 
@@ -313,12 +318,12 @@ the bundled starter.
 These components were evaluated outside the application and are not new catalog integrations or
 bundled dependencies. Their negative quality results do not justify increasing the base payload.
 
-| Component                                     | Terms and pin                                                                                                                                       | Evaluation boundary                                                                                                                                                                                                                       |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mesh2Motion TypeScript weight solver          | Project states MIT; source `653a9698f5f315523072f1c3ff3496100401317b`                                                                               | Required source graph only, using existing Three.js; rejected as an automatic replacement. [Results](../future/cpu-deformation-evaluation.md)                                                                                             |
-| TokenRig / SkinTokens                         | Root MIT and MIT-declared checkpoints; Michelangelo encoder provenance includes GPL                                                                 | Source `273b691d35989d71cd17ff2895fdc735097b92d1`, model `79736cad0fd84de384d5eede659b4ebd24effe33`; isolated worker, not bundled. Quality and clean provisioning remain open. [Audit and measurements](../future/tokenrig-evaluation.md) |
-| TokenRig disposable overlay                   | Apache-declared Transformers 4.57.1, Diffusers 0.35.1, Hugging Face Hub 0.35.3 and Tokenizers 0.22.1; BSD-declared OmegaConf 2.4.0 and psutil 7.1.0 | Research environment only, reusing existing Torch read-only. Retained package metadata is not a complete redistribution/transitive audit. [Provenance](../future/tokenrig-evaluation.md#provenance-and-deployment-boundary)               |
-| CPU XPBD-style cloth / Blender Surface Deform | Experimental NumPy code; existing external GPL `bpy` 4.2                                                                                            | No new physics library or Blender installation; candidates rejected on final-surface quality. [Results](../future/cloth-evaluation.md)                                                                                                    |
+| Component                                     | Terms and pin                                                                                                                                       | Evaluation boundary                                                                                                                                                                                                                          |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mesh2Motion TypeScript weight solver          | Project states MIT; source `653a9698f5f315523072f1c3ff3496100401317b`                                                                               | Required source graph only, using existing Three.js; rejected as an automatic replacement. [Results](../../future/cpu-deformation-evaluation.md)                                                                                             |
+| TokenRig / SkinTokens                         | Root MIT and MIT-declared checkpoints; Michelangelo encoder provenance includes GPL                                                                 | Source `273b691d35989d71cd17ff2895fdc735097b92d1`, model `79736cad0fd84de384d5eede659b4ebd24effe33`; isolated worker, not bundled. Quality and clean provisioning remain open. [Audit and measurements](../../future/tokenrig-evaluation.md) |
+| TokenRig disposable overlay                   | Apache-declared Transformers 4.57.1, Diffusers 0.35.1, Hugging Face Hub 0.35.3 and Tokenizers 0.22.1; BSD-declared OmegaConf 2.4.0 and psutil 7.1.0 | Research environment only, reusing existing Torch read-only. Retained package metadata is not a complete redistribution/transitive audit. [Provenance](../../future/tokenrig-evaluation.md#provenance-and-deployment-boundary)               |
+| CPU XPBD-style cloth / Blender Surface Deform | Experimental NumPy code; existing external GPL `bpy` 4.2                                                                                            | No new physics library or Blender installation; candidates rejected on final-surface quality. [Results](../../future/cloth-evaluation.md)                                                                                                    |
 
 ## GUI
 
