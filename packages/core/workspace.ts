@@ -49,6 +49,7 @@ import {
 } from '@spritebook/schema';
 
 import { initializeManifest, readManifest, writeAtomic } from './persistence.ts';
+import { sha256Bytes } from './cache.ts';
 
 /** `r1`, `r2`, ... — creation order, never reused (ResultIdSchema). */
 export type ResultId = string;
@@ -199,14 +200,14 @@ export async function storeSourceImage(
   } catch {
     throw new Error(`Cannot read the source image at "${imagePath}" - does that file exist?`);
   }
-  const sha256 = await sha256OfBytes(bytes);
+  const sha256 = await sha256Bytes(bytes);
   const originalFilename = baseName(imagePath);
   const { sourceDir } = workspacePaths(workspace);
   const storedPath = `${sourceDir}/${sha256}${extName(originalFilename)}`;
   await fs.mkdir(sourceDir, { recursive: true });
   if (
     !(await pathExists(storedPath)) ||
-    await sha256OfBytes(await fs.readFile(storedPath)) !== sha256
+    await sha256Bytes(await fs.readFile(storedPath)) !== sha256
   ) await writeAtomic(storedPath, bytes);
   return { sha256, storedPath, originalFilename };
 }
@@ -263,9 +264,4 @@ async function pathExists(path: string): Promise<boolean> {
     if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return false;
     throw err;
   }
-}
-
-async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

@@ -36,6 +36,7 @@ import {
   nextResultId,
   readWorkspace,
   resultPaths,
+  sha256Bytes as sha256Hex,
   sourceImagePath,
   storeSourceImage,
   workspacePaths,
@@ -88,10 +89,7 @@ class GenFail extends Error {
   }
 }
 
-export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
+export { sha256Hex };
 
 /** Triangle count + texture resolution of canonical bytes, for the receipt. */
 export async function describeMesh(

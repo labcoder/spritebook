@@ -34,6 +34,7 @@ import {
   pickResult,
   readWorkspace,
   resultPaths,
+  sha256Bytes,
   sourceImagePath,
   workspacePaths,
 } from '@spritebook/core';
@@ -57,11 +58,6 @@ export interface PickJobOptions {
   noColorMatch?: boolean;
   /** source image override; defaults to the manifest's stored source */
   imagePath?: string;
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** Standing height in metres from the mesh's Y extent (the D-012 convention). */
@@ -232,7 +228,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
       } else {
         staged = matched;
         colorMatched = true;
-        imageSha = await sha256Hex(new Uint8Array(await fs.readFile(fidelityImage)));
+        imageSha = await sha256Bytes(new Uint8Array(await fs.readFile(fidelityImage)));
         const clamp = stats.clamped.length > 0 ? ` clamped:${stats.clamped.join('')}` : '';
         yield {
           t: 'progress',
@@ -282,7 +278,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
           done: ++done,
           total,
         };
-        imageSha = imageSha ?? await sha256Hex(new Uint8Array(await fs.readFile(image)));
+        imageSha = imageSha ?? await sha256Bytes(new Uint8Array(await fs.readFile(image)));
         if (stats.coverage < 0.05) {
           yield {
             t: 'warn',
@@ -327,7 +323,7 @@ async function* executePickJob(opts: PickJobOptions): AsyncIterable<JobEvent> {
       ...(repainted
         ? {
           canonicalMesh: {
-            gltfSha256: await sha256Hex(finalBytes),
+            gltfSha256: await sha256Bytes(finalBytes),
             ...(colorMatched ? { colorMatched: true } : {}),
             ...(imageSha !== undefined ? { imageSha256: imageSha } : {}),
           },

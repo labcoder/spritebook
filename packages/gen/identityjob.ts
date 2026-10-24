@@ -44,7 +44,13 @@ import type {
   JobEvent,
 } from '@spritebook/schema';
 import { CanonicalBodySchema, parseWith } from '@spritebook/schema';
-import { type IdentityFields, readWorkspace, setIdentity, workspacePaths } from '@spritebook/core';
+import {
+  type IdentityFields,
+  readWorkspace,
+  setIdentity,
+  sha256Bytes,
+  workspacePaths,
+} from '@spritebook/core';
 import { applyAttachments, applyBoneMask, compositeDecals } from './identity.ts';
 
 export interface IdentityJobOptions {
@@ -246,7 +252,7 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
 
     // Core retains both revisions and publishes these staged bytes with the manifest patch.
     const bytes = new Uint8Array(await fs.readFile(current));
-    const gltfSha256 = await sha256Hex(bytes);
+    const gltfSha256 = await sha256Bytes(bytes);
     let meshRepin: { gltfSha256: string; heightM?: number } | undefined;
     if (gltfSha256 !== canonicalMesh.gltfSha256) {
       const heightM = await heightOf(bytes);
@@ -272,7 +278,7 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
         recorded.push({
           id: a.id,
           socketId: a.socketId,
-          meshSha256: await sha256Hex(new Uint8Array(await fs.readFile(a.meshPath))),
+          meshSha256: await sha256Bytes(new Uint8Array(await fs.readFile(a.meshPath))),
         });
       }
       fields.attachments = recorded;
@@ -315,19 +321,6 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
       }
     }
   }
-}
-
-// ---------------------------------------------------------------------------
-// Mirrored from pick.ts. Those two helpers are module-local there (pick
-// exports only its job), and this package's rule is to touch only the job
-// wrappers — so the convention is duplicated rather than pick's surface
-// widened: the sha is of the BYTES on disk, and the height is the mesh's raw
-// Y extent (D-012), exactly as the pick that wrote canonicalMesh measured it.
-// ---------------------------------------------------------------------------
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export function runIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobEvent> {

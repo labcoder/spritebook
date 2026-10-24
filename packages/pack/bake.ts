@@ -29,7 +29,7 @@ import type {
   StylePreset,
 } from '@spritebook/schema';
 import { canonicalJson, RENDER_PASSES } from '@spritebook/schema';
-import { sha256Hex, workspaceJob } from '@spritebook/core';
+import { sha256Bytes, sha256Hex, workspaceJob } from '@spritebook/core';
 import {
   AMBIENT,
   DEFAULT_LIGHT_FRAME,
@@ -154,11 +154,6 @@ function debugRawLit(): boolean {
   return (process.env[DEBUG_RAW_LIT_ENV] ?? '') !== '';
 }
 
-async function sha256OfBytes(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 /**
  * Where a bake's rig and backend facts come from when there IS a character to
  * ask. Absent means there is not one — see the sentinels in `buildCacheInputs`.
@@ -216,7 +211,7 @@ export async function buildCacheInputs(
       } catch {
         throw new Error(`Cannot read clip "${c.clipId}" at "${clipPath}" - is the pack complete?`);
       }
-      withContent.push({ ...c, clipSha256: await sha256OfBytes(bytes) });
+      withContent.push({ ...c, clipSha256: await sha256Bytes(bytes) });
     }
     clipBindings = canonicalJson({ clips: withContent });
   } else {
@@ -225,7 +220,7 @@ export async function buildCacheInputs(
   }
   return {
     characterId: spec.characterId,
-    canonicalMeshSha256: await sha256OfBytes(modelBytes),
+    canonicalMeshSha256: await sha256Bytes(modelBytes),
     // The character's rig when there is a character, and otherwise a sentinel
     // meaning NO RECORDED RIG — the skin is whatever this glb carries, keyed as
     // such. That is the honest answer for `bake --model x.glb`, which has no
