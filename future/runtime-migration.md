@@ -136,7 +136,8 @@ Pass gates:
 4. Device loss and mid-job cancellation produce honest terminal results and never publish a partial
    bake. Missing hardware is reported as unverified, not a passing platform.
 5. Packaged execution works without a source checkout or development toolchain. Inspect every
-   binary's notices/transitives under the [existing dependency policy](../docs/dependencies.md).
+   binary's notices/transitives under the
+   [existing dependency policy](../docs/developer/dependencies.md).
 
 Timebox the Node/Dawn qualification to a representative slice, not a duplicate application. If it
 fails, record the specific condition and evaluate the native-worker contingency only where it can

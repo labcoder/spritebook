@@ -5,17 +5,17 @@ bundled CC0 humanoid or an existing mesh. Existing skinning is preserved and sta
 review walking and jumping in Rig. Static imports still need a rig. Import is reversible and records
 source provenance.
 
-**0.5.0 is a capture/export preview.** Generated rigs may stretch hands or clothing and permit legs
-to intersect loose skirts. Inspect animations before baking; accepting a rig does not fix these
-issues. See the [preview notes](../CHANGELOG.md) for the supported scope.
+**SpriteBook is a Windows capture/export preview.** Generated rigs may stretch hands or clothing and
+permit legs to intersect loose skirts. Inspect animations before baking; accepting a rig does not
+fix these issues. See the [preview notes](../../CHANGELOG.md) for the supported scope.
 
-Studio on main now uses the owned Node runtime. Build a local Windows candidate with `npm run
-build:desktop`; see [development setup](../README.md#development) and the
-[qualification status](../future/runtime-cutover.md). Published/signed target artifacts remain F7
-work. Every action below has a CLI twin — see [the CLI reference](cli.md).
+The installed app includes its core runtime. Contributors can build a local Windows candidate with
+`npm run build:desktop`; see [development setup](../developer/development.md) and
+[platform support](../platform-support.md). Each primary action has a CLI twin in the app; see
+[the CLI reference](cli.md).
 
-SpriteBook turns a character image into engine-ready 2D spritesheets. It runs on your machine.
-Nothing goes to a server.
+SpriteBook turns a character image into engine-ready 2D spritesheets on your machine. Model and
+runtime setup downloads third-party files; character generation and capture run locally.
 
 Studio is the guided editor. It has six stages, from the source image to the exported files. Each
 stage wraps a command of the SpriteBook CLI. The CLI does everything Studio does, and each primary
@@ -30,7 +30,7 @@ is described below; colored demo frames in historical images are not generated c
 
 ## 1. Open a project
 
-![The gallery](img/gallery.png)
+![The gallery](../img/gallery.png)
 
 A **workspace** is one folder for one character. It holds the manifest, the mesh, the bakes, and the
 exports. A **projects root** is a folder that holds many workspaces.
@@ -52,6 +52,11 @@ Language** for a language; **File → Shortcuts** opens the command palette. The
 bottom shows GPU identification, the character count, the bridge (which engine runs your commands:
 `tauri` is the real CLI, a browser preview is a demo), and the log handle (opens the session log —
 every line the CLI writes).
+
+To remove generated files, right-click a character and choose **Delete project…**, or use **Edit →
+Delete project…**. Confirm the named project in the dialog. This permanent cleanup has no undo; it
+preserves original inputs, unknown user files and machine model installations. See
+[projects and files](projects.md#delete-a-project) for the deletion boundary and backup guidance.
 
 To check your machine, select **Run health exam**. It reports the GPU, the sidecar (the local Python
 helper process that runs the AI models), and the installed models.
@@ -77,8 +82,8 @@ To make a character:
    installation requirements remain visible.
 
    Complete TRELLIS.2 and Pixal3D recipes include a separately gated DINOv3 conditioner. Review
-   [licensing](licensing.md) and accept the declared terms before installation. The selected Windows
-   runtimes replace the historical evaluation-only rasterizers; component terms still apply.
+   [licensing](../licensing.md) and accept the declared terms before installation. The selected
+   Windows runtimes replace the historical evaluation-only rasterizers; component terms still apply.
    [Models and local runtimes](models.md) lists each role, hardware requirement and setup.
 
    Development builds expose `fixture-gen` last under **Development tools**. This synthetic stand-in
@@ -279,7 +284,7 @@ The player shows the result:
   sampling, so what you see is the real pixels.
 - **lit**, **albedo**, **normal**, **depth**, **mask** select the render pass. Every pass page has
   the same layout as the lit page. The player loads the page referenced by the selected frame,
-  including when an animation crosses pages.
+  including older bakes whose animations cross pages.
 
 **Quality flags** report problems the bake found. Each flag names the stage that owns the fix, and
 its button takes you there.
@@ -322,16 +327,17 @@ Model delivery copies `model.glb` unchanged and extracts its embedded texture by
 files, with `textures.json` recording filenames, source names and MIME types. It does not create new
 animations or convert the mesh format.
 
-Godot and strips support animations spanning atlas pages. The Aseprite and TexturePacker exporters
-currently refuse animation runs split across pages. Use Godot/strips or smaller cells for those
-bakes. Format validation is separate from importing the files into an engine.
+New bakes keep a complete clip/direction sequence on one page. If a sequence cannot fit, reduce the
+frame count or cell size. Godot and strips can also read older bakes whose animations cross pages;
+Aseprite and TexturePacker refuse such split runs. Format validation is separate from importing the
+files into an engine.
 
 **The CLI twin:** `spritebook export`.
 
 ## 8. Keyboard use
 
-Every control is reachable with the keyboard alone. The full journey was driven this way, and a test
-holds it there.
+Use these keyboard controls throughout the editor. Native platform accessibility qualification
+remains separate from browser and component tests.
 
 | Key                  | What it does                                                              |
 | -------------------- | ------------------------------------------------------------------------- |
@@ -375,6 +381,9 @@ Undo restores recorded decisions and the accepted canonical mesh/texture bytes f
 retexturing and identity edits. It also covers clip bindings and the look. It does not delete the
 files a bake wrote. Review, thumbnails and implicit exports use the recorded `lastBakeId`, including
 after undo; they do not guess the newest bake directory.
+
+Permanent **Delete project** is the exception: after confirming it, undo cannot recover the removed
+generated assets or editing history.
 
 ## 11. Manage extensions
 

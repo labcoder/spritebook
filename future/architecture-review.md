@@ -26,12 +26,12 @@ The audit's findings below describe that historical checkout; F1 repairs are rec
 
 ## What runs today
 
-The [declared architecture](../docs/architecture/architecture.md) describes three process roles:
-Deno/TypeScript core, Python AI sidecar, and Tauri/React desktop. In actual execution, the desktop
-launches a **new CLI process per action**, using ambient `deno run -A` against a checkout path. The
-CLI pumps job executors directly; `JobQueue` has no production instantiation. Cross-process GPU
-admission instead uses filesystem VRAM leases. The diagram's central queue is therefore not the
-production scheduler. [Shell bridge](../apps/studio/src-tauri/src/main.rs),
+The [declared architecture](../docs/developer/architecture/architecture.md) describes three process
+roles: Deno/TypeScript core, Python AI sidecar, and Tauri/React desktop. In actual execution, the
+desktop launches a **new CLI process per action**, using ambient `deno run -A` against a checkout
+path. The CLI pumps job executors directly; `JobQueue` has no production instantiation.
+Cross-process GPU admission instead uses filesystem VRAM leases. The diagram's central queue is
+therefore not the production scheduler. [Shell bridge](../apps/studio/src-tauri/src/main.rs),
 [CLI](../packages/cli/mod.ts), [queue](../packages/core/queue.ts),
 [VRAM lease](../packages/core/vramlease.ts).
 

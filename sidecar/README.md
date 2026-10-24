@@ -5,8 +5,8 @@ wire contract is FROZEN in `packages/schema/sidecar.ts` (contractVersion **1**);
 use the `packages/schema/jobs.ts` vocabulary with strict shapes — no extra fields, ever.
 
 For the current model catalog and dependency cleanup, see
-[models and local runtimes](../docs/models.md), including the separation between model files, Python
-environments and retained workspace assets.
+[models and local runtimes](../docs/user/models.md), including the separation between model files,
+Python environments and retained workspace assets.
 
 ## Installed candidates
 

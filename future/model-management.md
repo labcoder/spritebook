@@ -99,7 +99,7 @@ sources so a same-version app update refreshes adapter code.
    conditioner, preprocessing model, extensions, and required notices separately. Keep existing
    territorial and pre-install acceptance gates. New restrictions need explicit catalog policy; an
    HF badge or authenticated download does not supersede
-   [dependency policy](../docs/dependencies.md).
+   [dependency policy](../docs/developer/dependencies.md).
 
 ## Proposed acceptance gate
 

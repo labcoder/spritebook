@@ -58,7 +58,8 @@ spritebook pick --workspace ./characters/hero --result r1
 Use `models setup pixal3d --accept-license` to repair/recheck the runtime while retaining verified
 weights. The same catalog entry appears in Studio's model manager and generation controls. This
 recipe is single-view 1024 cascade, stage offload, SDPA, 12 steps and 2,048 px PBR texture; it uses
-actual NAF, with no MoGe or BRIA download. [All knobs](../docs/cli.md#the-knobs---adjust-takes).
+actual NAF, with no MoGe or BRIA download.
+[All knobs](../docs/user/cli.md#the-knobs---adjust-takes).
 
 ### TripoSR evaluation variant
 

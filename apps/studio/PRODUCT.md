@@ -13,8 +13,9 @@ behavior; the browser demo is explicitly labeled and uses synthetic data.
 
 Solo and small-team game developers turn character references or imported meshes into rigged,
 animated models and engine-ready sprite sheets. Sprites are the product; 3D is part of production.
-The [PRD](../../docs/prd.md) and [architecture](../../docs/architecture/architecture.md) remain
-canonical for product scope and behavior.
+The [PRD](../../docs/developer/product.md) and
+[architecture](../../docs/developer/architecture/architecture.md) remain canonical for product scope
+and behavior.
 
 ## Capabilities and constraints
 

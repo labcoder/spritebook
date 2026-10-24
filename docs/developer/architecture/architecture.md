@@ -13,14 +13,14 @@ Three application layers, with owned workers for expensive jobs:
   an authenticated loopback service; isolated model workers hold incompatible CUDA dependencies. The
   application bundles its own Python source, frozen recipes and uv executable. uv provisions Python
   and environments in writable machine data; weights and third-party model runtimes are separate
-  downloads behind registry gates. See [model management](../models.md).
-- **GUI shell (Tauri v2 — D-005 ratified, resolved by P0-T3).** React 19 + Vite + Base UI +
-  hand-authored tokens, built by Vite in the same locked npm workspace. A projection of core: it
-  invokes CLI verbs, renders the NDJSON stream, and displays core-produced pixels. Three.js
-  viewports are inspection instruments only — and must be able to degrade to core-rendered PNG
-  sequences where a platform cannot provide the inspection renderer. The bridge uses per-job IPC
-  channels for stdout and stderr, with explicit cancellation and process ownership. Tauri remains
-  the selected shell (D-041); native macOS/Linux/Windows ARM64 execution remains an F7 gate.
+  downloads behind registry gates. See [model management](../../user/models.md).
+- **GUI shell (Tauri v2).** React 19 + Vite + Base UI + hand-authored tokens, built by Vite in the
+  same locked npm workspace. A projection of core: it invokes CLI verbs, renders the NDJSON stream,
+  and displays core-produced pixels. Three.js viewports are inspection instruments only — and must
+  be able to degrade to core-rendered PNG sequences where a platform cannot provide the inspection
+  renderer. The bridge uses per-job IPC channels for stdout and stderr, with explicit cancellation
+  and process ownership. Tauri remains the selected shell (D-041); native macOS/Linux/Windows ARM64
+  execution remains an F7 gate.
 
 ```mermaid
 flowchart TB
@@ -70,8 +70,10 @@ flowchart TB
 6. **BakeManifest is canonical (D-010).** Frames, atlas pages, pivots, metrics, flags. Exporters are
    pure projections; AOV pages (normal/mask/depth) are rect-identical to the lit page — engines can
    swap textures under one layout.
-7. **Undo is core.** Every mutation is a `ManifestPatch {op, inverse}` appended to a journal;
-   `spritebook undo` and the GUI stack replay it. No GUI-only state worth keeping exists.
+7. **Undo is core.** Ordinary durable edits append a `ManifestPatch {op, inverse}` to the journal;
+   `spritebook undo` and the GUI stack replay it. Explicitly confirmed project deletion is the
+   irreversible exception; see
+   [deletion policy](workspace-persistence.md#permanent-character-deletion).
 8. **Determinism.** Fixed, recorded seeds; deterministic quantization; same machine → same bytes
    (double-render canary in CI). Anything stochastic takes its seed from the manifest.
 
@@ -86,7 +88,7 @@ the collapsed status bar.
 
 HTTP on `127.0.0.1`; per-session bearer token minted by core; version handshake on connect; job
 endpoints stream NDJSON back. The wire contract lives in
-[`packages/schema/sidecar.ts`](../../packages/schema/sidecar.ts), mirrored by Python. Adapters
+[`packages/schema/sidecar.ts`](../../../packages/schema/sidecar.ts), mirrored by Python. Adapters
 declare `paramsSchema` (JSON Schema) that both validates `GenerationResult.params` and drives GUI
 option forms. Rig adapters accept optional **joint placement hints** (the re-run-with-markers escape
 hatch). GPL tooling (e.g. Blender/bpy used by upstream UniRig scripts) stays inside the sidecar
@@ -102,9 +104,9 @@ and authentication; no Hugging Face desktop app is required.
   Characters) fitted to generated meshes; identity carried by textures, detail-layer decals,
   attachments, and bone masks; shared UVs enable palette ops at roster scale. Mirroring **opt-in per
   character** (D-008) — asymmetric identity is first-class.
-- **Track B (generic):** UniRig (MIT, code+weights) for arbitrary topologies. Candidate accelerator
-  for A: Make-It-Animatable (<1 s humanoid rig, meshes _and_ splats, arbitrary input pose) —
-  **license gate open; verify before integration.**
+- **Track B (generic):** UniRig (MIT code/weights) predicts skeleton and skin weights for the
+  existing geometry. Model readiness and normalized weights do not prove correct anatomy or clothing
+  ownership. Other riggers remain research candidates until qualified and integrated.
 - Repair verbs are core capabilities (p3): `rig --edits <patch>`, `--face-front`, `--feet-ground`,
   `--center`, `--rerun-with-hints`. The GUI's two-tier repair UI wraps them.
 
@@ -131,8 +133,8 @@ and authentication; no Hugging Face desktop app is required.
 Humanoid retargeting validates mapped ancestry before sampling. Arm bind-pose differences above 15°
 receive a measured rest-reference swing; wrists and digits inherit the forearm correction. Joint
 translations and bone lengths still come from the target. This applies in core to both preview and
-bake. The animated-pixel change advances the shared renderer cache namespace to
-`spritebook-render@0.6.1`; old frame caches are not reused for the changed poses.
+bake. The shared renderer cache namespace follows the version in `packages/render/contracts.ts`; old
+frame caches are not reused after a pixel-affecting change.
 
 Look frame previews are a read-only CLI job over the bake sampling/render/style path, with stable
 full-clip framing. Orthographic scale remains world-locked; perspective expresses pixels per metre
@@ -147,7 +149,7 @@ projections); no cross-machine render determinism assumptions, ever.
 
 ## Contracts and storage
 
-[`packages/schema`](../../packages/schema/mod.ts) is the source of truth; the
+[`packages/schema`](../../../packages/schema/mod.ts) is the source of truth; the
 [data-model index](data-models.ts) points to each contract. Character manifests are version 3;
 Project, BakeManifest and AnimPack remain version 2. Other documents have their own version gates.
 Reads migrate legacy character data in memory; the next mutation persists the current shape.
@@ -157,7 +159,7 @@ rig/animation data and bakes. Project model/pack pins live at the workspace's im
 Machine-level model files and Python/runtime directories are independent of these assets; removing a
 generator does not remove accepted meshes, history or exported sprites. See
 [workspace persistence](workspace-persistence.md), [execution policy](execution-policy.md) and
-[model storage and removal](../models.md#storage-and-removal).
+[model storage and removal](../../user/models.md#storage-and-removal).
 
 Generation prepares opaque references in core through the same `runPrepJob` used by the `prep` verb.
 The original source remains content-addressed; optional `source.prepared` records the PNG cutout
@@ -178,9 +180,9 @@ The [workspace persistence protocol](workspace-persistence.md) defines the recov
 canonical asset revisions, job ownership and consistent read projections. The
 [execution policy](execution-policy.md) defines project pins, receipt verification, declared consent
 and configuration-specific VRAM admission. These protocols preserve the laws above on Node. The
-[Windows renderer proof](../../future/renderer-qualification.md) and
-[F4 cutover evidence](../../future/runtime-cutover.md) record the runtime transition and remaining
-release gates.
+[Windows renderer proof](../../../future/renderer-qualification.md) and
+[F4 cutover evidence](../../../future/runtime-cutover.md) record the runtime transition and
+remaining release gates.
 
 ## Installed ownership
 
@@ -191,7 +193,7 @@ selection, portable installation, checking and removal. It is not a production c
 Existing programs are registered rather than copied/uninstalled; managed portable directories have
 their own verified file inventory, with an atomic machine-local selection. Existing `models`
 commands, model runtime receipts and project pins retain their meaning. See
-[extension lifecycle and qualification limits](../extensions.md).
+[extension lifecycle and qualification limits](../../user/extensions.md).
 
 Tauri launches app-owned Node and `runtime/core/cli.mjs` through the shared native process owner.
 The portable `spritebook` launcher owns the same worker tree. Native code handles process groups/
@@ -212,7 +214,7 @@ between directory renames. This builder guarantee is separate from F7's clean-ma
 upgrade/uninstall qualification.
 
 The Windows x64 F4 cutover, TRELLIS.2/UniRig workflow and optional Pixal3D workflow are complete
-within the recorded RTX 3090 scope. [Platform support](../platform-support.md) separates those runs
-from native targets and experimental model ports. F7 retains clean-machine, installed-app recovery,
-engine import, notices, signing and accessibility gates; current qualification candidates are not
-signed public releases.
+within the recorded RTX 3090 scope. [Platform support](../../platform-support.md) separates those
+runs from native targets and experimental model ports. F7 retains clean-machine, installed-app
+recovery, engine import, notices, signing and accessibility gates; current qualification candidates
+are not signed public releases.

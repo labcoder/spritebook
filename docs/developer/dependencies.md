@@ -250,8 +250,8 @@ Apache-2.0 attention-module notices, BSD OmegaConf 2.4.0, BSD/MIT scikit-image 0
 families. All installed artifacts are prebuilt wheels. The experiment substitutes CPU scikit-image
 extraction for an unavailable torchmcubes wheel and fixes the reference texture baker's CUDA/CPU
 handoff. These are recorded evaluation changes, not a catalog integration or new bundled dependency.
-Exact resolved files remain in `.render-bench/f4/alternatives/triposr/runtime/uv.lock`; see the
-[platform spike](../../future/model-platform-spike.md) for measurements and upstream pins.
+See the [platform spike](../../future/model-platform-spike.md) for measurements and upstream pins.
+The private evaluation lock is not part of the application or its reproducible install recipes.
 
 ## Rigging
 

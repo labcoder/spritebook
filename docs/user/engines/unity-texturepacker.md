@@ -4,8 +4,8 @@ Unity has no dedicated SpriteBook exporter. Use the `texturepacker` target. It w
 Hash" format. The TexturePacker Importer for Unity reads that format.
 
 The native Unity/importer lane remains unverified in the current migration evidence. Follow
-[export validation](../export-validation.md) to run it with your editor and importer before relying
-on a release's Unity support claim.
+[export validation](../../developer/export-validation.md) to run it with your editor and importer
+before relying on a release's Unity support claim.
 
 ## What SpriteBook writes
 

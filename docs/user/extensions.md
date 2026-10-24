@@ -17,8 +17,8 @@ manager. Installing a tool does not enable an automatic repair or change a chara
 Blender 4.5.15 LTS portable has native Windows x64 operator and walk/jump trial evidence. The
 standalone build runs reliably, but **the tested automated clothing correction still fails on real
 characters**. It is an experimental tool, not an adopted deformation provider. Read the
-[maintained-build trial](../future/maintained-blender-trial.md) and
-[binding/clothing follow-up](../future/binding-clothing-followup.md).
+[maintained-build trial](../../future/maintained-blender-trial.md) and
+[binding/clothing follow-up](../../future/binding-clothing-followup.md).
 
 **Use existing Blender** accepts a full executable path and offers bounded PATH/ordinary-location
 discovery. Discovery does not execute programs. **Check and use Blender** runs a bounded background
@@ -64,7 +64,7 @@ not reservations or proof that an arbitrary mesh fits memory.
 
 ## Catalog and licensing boundary
 
-[`tools.json`](../packages/registry/catalog/tools.json) records the external tool's release,
+[`tools.json`](../../packages/registry/catalog/tools.json) records the external tool's release,
 license/source URL, platform archive and storage pins. It contains no install scripts. The manager
 reuses registry downloads, hashing, resource checks, native locks, CLI jobs and Studio cancellation;
 tools and model Python environments keep their own receipts and ownership.

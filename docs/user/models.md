@@ -4,10 +4,11 @@ The shipped catalog has five entries. Model management covers image preparation,
 generic rigging. Textures can come from generation, TRELLIS.2 retexturing or core detail
 reprojection; animation packs and sprite styles are separate assets and code.
 
-The catalog in [`packages/registry/catalog/models.json`](../packages/registry/catalog/models.json)
-defines exact files, versions, capabilities, terms, platform gates, parameters and memory admission.
-Use `spritebook models list` for the current catalog and `spritebook models list --installed` for
-the local weight receipts. A catalog entry is available to install; it is not downloaded with the
+The catalog in
+[`packages/registry/catalog/models.json`](../../packages/registry/catalog/models.json) defines exact
+files, versions, capabilities, terms, platform gates, parameters and memory admission. Use
+`spritebook models list` for the current catalog and `spritebook models list --installed` for the
+local weight receipts. A catalog entry is available to install; it is not downloaded with the
 application.
 
 ## Current model catalog
@@ -23,15 +24,15 @@ application.
 Sizes are decimal GB for declared model files, excluding Python, native wheels, caches, staging and
 generated assets. VRAM values are admission claims for configured paths, not universal model
 minimums. Pixal3D's measured worker reached 24.15 GiB working set and 46.87 GiB private commit on
-the 64 GiB host; see the [qualification](../future/qualification/pixal3d-windows-x64.json) for
+the 64 GiB host; see the [qualification](../../future/qualification/pixal3d-windows-x64.json) for
 limits.
 
 The complete CUDA recipes above have Windows x64 / RTX 3090 qualification. Earlier TRELLIS.2 and
 UniRig versions remain in the catalog for provenance and explicit pins; their historical
 Windows/Linux platform declarations do not provide the complete managed setup recipe. Native Mac,
 Linux and Windows ARM64 application qualification remains F7 work. The
-[platform spike](../future/model-platform-spike.md) lists promising model ports and their reported
-requirements; TripoSR, Hunyuan3D, SF3D and SPAR3D are not integrated catalog choices.
+[platform spike](../../future/model-platform-spike.md) lists promising model ports and their
+reported requirements; TripoSR, Hunyuan3D, SF3D and SPAR3D are not integrated catalog choices.
 
 ## What works without a model download
 
@@ -84,7 +85,7 @@ and wheels; **Verify files** remains a separate model-file check.
 TRELLIS.2 and Pixal3D require personal Hugging Face approval for the declared DINOv3 conditioner,
 authentication through `hf auth login` or `HF_TOKEN`, and explicit acceptance of the catalog terms.
 Hugging Face supplies artifacts and authentication; SpriteBook has no Hugging Face desktop-app
-dependency. Read [licensing](licensing.md) for component and output terms.
+dependency. Read [licensing](../licensing.md) for component and output terms.
 
 `install` verifies every declared model file and records its receipt, then prepares a declared
 runtime recipe. Setup downloads hash-pinned source and frozen prebuilt wheels, installs the owned
@@ -120,7 +121,7 @@ events use `0/1` while running; they do not represent a percentage or ETA.
 
 Before a model job, core resolves exact project pins and rechecks consent, territory, platform,
 files and configuration-specific VRAM admission. Native runtime loading also verifies prepared
-source receipts. See [execution policy](architecture/execution-policy.md).
+source receipts. See [execution policy](../developer/architecture/execution-policy.md).
 
 ## Storage and removal
 
@@ -167,51 +168,22 @@ installations, authentication and unrelated repositories. Never delete `characte
 revisions, bake directories or workspace lock files as a model reset.
 
 To resume source development after removing `sidecar/.venv`, use the frozen setup in
-[the sidecar guide](../sidecar/README.md). To resume a downloaded model workflow, reinstall its
+[the sidecar guide](../../sidecar/README.md). To resume a downloaded model workflow, reinstall its
 model files and run the declared setup. Rust build cleanup is separate: contributors can use `cargo
 clean --manifest-path apps/studio/src-tauri/Cargo.toml` and `cargo clean --manifest-path
 packages/core/native/Cargo.toml`; clean any custom Cargo target directories with their explicit
 `--target-dir` as well.
 
-## UniRig quality checks
+## Rig quality
 
-Adapter 1.3.1 checks humanoid naming against leg, trunk and arm ancestry as well as position. Paired
-arm branches are anchored at the trunk, including arms-down predictions with only one or two hand
-branches. A close reference match cannot place a thigh in the spine; contradictory finger-chain
-labels stay generic and produce a warning. Corrections and rejected names are recorded in
-`rig/rig-run.json`. A named joint or finite, normalized weight row does not prove correct anatomy.
+A completed setup proves that the model/runtime can run, not that a new character has correct
+anatomy or skin weights. Review walking, jumping and an arms-raised pose before accepting a rig.
+Joint counts and finger detail vary; GPU inference does not guarantee articulated fingers.
 
-The CPU merge interpolates nearby samples, attenuates influence from distant bones, and smooths
-weights along mesh edges with nonnegative, anchored updates. Geometric seam copies share weights;
-disconnected surfaces do not exchange them. The four-influence reduction fades the discarded tail so
-neighboring vertices do not suddenly lose a substantial influence when rankings cross. The former
-hierarchical diffusion could produce negative parent weights; clipping those and applying a hard
-influence cutoff created jagged shoulders during motion. Smoothing uses SciPy already in the
-runtime, with no additional download. Neither transfer nor position hints can recover detail missing
-from the model prediction. Deformation thresholds are unchanged.
+Hands touching the body and loose clothing remain difficult inputs. Prefer visible feet and
+separated limbs in an A/T pose. Accepting a report does not fix weight ownership or cloth
+intersections. The [Rig guide](guide.md#3-stage-02--rig) explains bend findings and motion checks;
+[rigging internals](../developer/rigging.md) describes the naming and skin-transfer boundaries.
 
-Existing rigs retain their saved bytes. Rebuilding uses the updated adapter without downloading
-checkpoints again. The saved Bulma skeleton reproduces the corrected hip/trunk/leg naming on CPU;
-fresh GPU runs, remaining deformation findings and viewport measurements are recorded in the
-[roadmap follow-through](../future/roadmap.md#rig-correctness-and-interaction-follow-through).
-
-Animation preview and bake check mapped bone ancestry before transferring motion. Contradictory
-names (for example, a thigh named `pelvis`) refuse with a request to rebuild the rig. Accepting a
-deformation report records review; it does not rename bones or repair saved weights.
-
-Joint counts vary with the prediction. GPU execution does not guarantee five separate fingers:
-generic `bone_N` joints remain at rest relative to their parent during semantic animation. The Rig
-screen reports mapped finger detail and branches at each named wrist; these counts are not an
-anatomy certificate. Arms-down/A/T bind poses now receive a measured arm-reference alignment in core
-before motion transfers, shared by preview and bake.
-
-The Amy qualification still exposes a real limitation: a plausible skeleton can have trouser
-vertices weighted to nearby hands. Two fresh seeds retain deformation findings; the arms-raised
-preview exposes leakage more clearly than walking. Distance, surface-normal, visibility and Blender
-heat-weight experiments did not produce a safe replacement and are not shipping. For generated
-humanoids, separated limbs in an A/T pose remain the safer source; accepting a report does not fix
-weight ownership. F5-T2 remains open for that repair.
-
-Optional Blender is managed under **Tools** with its own external/portable ownership receipts. It is
-separate from UniRig’s Python runtime; selecting it does not switch riggers or enable automatic
-clothing repair. See [extensions](extensions.md).
+Optional Blender is managed under **Tools**, separately from UniRig's Python environment. Selecting
+it does not switch riggers or enable automatic clothing repair. See [extensions](extensions.md).

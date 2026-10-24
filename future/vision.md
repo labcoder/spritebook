@@ -15,7 +15,8 @@ mesh, animating it, changing a roster's look, and exporting to an engine are com
 Keep the six stages: **Generate/import → Rig → Animate → Look → Bake/review → Export**. Preserve
 asymmetric identity, world-locked scale, core-rendered pixel previews, reversible decisions,
 headless automation, incremental rebakes, and honest model readiness. These are product advantages
-independent of TypeScript, Rust, or a desktop framework. See the [current PRD](../docs/prd.md).
+independent of TypeScript, Rust, or a desktop framework. See the
+[current PRD](../docs/developer/product.md).
 
 ## Why remake it now
 
@@ -74,8 +75,9 @@ explains the actual integration.
 
 Keep accessible focus, localization, reduced motion, sentence-case outcome verbs, and dark canvas
 wells in either theme. These are acceptance criteria for a new UI. The existing
-[design system](../docs/design/design-system.md) is the current visual contract; new layout or
-art-direction concepts should be reviewed separately from choosing a rendering or UI library.
+[design system](../docs/developer/design/design-system.md) is the current visual contract; new
+layout or art-direction concepts should be reviewed separately from choosing a rendering or UI
+library.
 
 Text input is an **optional upstream step**: prompt → inspectable reference image → the same
 character pipeline, with both prompt and reference recorded. Do not claim all image-conditioned
@@ -98,10 +100,10 @@ benchmark; it is not supplied by the three named 3D models automatically.
 
 ## Product laws and success criteria
 
-Carry forward all eight [architecture laws](../docs/architecture/architecture.md), and prove them at
-the artifact boundary, not just in JSON. Canonical glTF, one retargeter, one pixel-truth renderer,
-input-derived cache keys, BakeManifest projections, aligned AOV layouts, recorded provenance, and
-journaled edits are mandatory in every technology track.
+Carry forward all eight [architecture laws](../docs/developer/architecture/architecture.md), and
+prove them at the artifact boundary, not just in JSON. Canonical glTF, one retargeter, one
+pixel-truth renderer, input-derived cache keys, BakeManifest projections, aligned AOV layouts,
+recorded provenance, and journaled edits are mandatory in every technology track.
 
 Retain the PRD targets: **mesh → sheet ≤10 minutes; image → engine-imported character ≤30 minutes;
 100-character look pivot overnight; idle flicker ≤1.2% under the defined preset workload; zero

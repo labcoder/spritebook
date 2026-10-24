@@ -1,76 +1,58 @@
-# Platform support and qualification
+# Platform support
 
-The TypeScript core/CLI and Tauri bridge now use app-owned Node 24.22.0 and Dawn 0.6.2.
-[Windows cutover evidence](../future/runtime-cutover.md) and the
-[original F2 proof](../future/renderer-qualification.md) distinguish actual runs from declared
-targets. The maintainer deferred native Mac, Windows ARM64 and Linux qualification to F7 because
-only the Windows x64 machine is available locally. Builds and software rendering do not close those
-gates.
+**The desktop application is a Windows x64 preview.** Native desktop, GPU and model workflows on
+Mac, Linux and Windows ARM64 remain unqualified. CI checks additional operating systems, but a
+successful build or copied CLI smoke test is a narrower result than a complete installed app.
 
-| Layer              | Windows x64                                                                      | Windows ARM64                                  | macOS ARM64 / Intel                                       | Linux                                                       |
-| ------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- |
-| Node core/CLI      | Local and hosted tests; copied payload executed                                  | Target; native addon/loader recipe unqualified | Hosted native copied-payload checks on both architectures | Hosted native copied payload and lavapipe execution         |
-| GPU renderer       | NVIDIA RTX 3090, Vulkan, driver 610.88; paired image/performance checks pass     | F7 native hardware gate                        | F7 Metal gate, architectures recorded separately          | F7 hardware gate; lavapipe is software evidence only        |
-| Tauri desktop      | Windows build/integration qualification in F4                                    | F7 native installed-app gate                   | F7 native installed-app gate                              | Tier 2; F7 WebKitGTK/installed-app gate                     |
-| Base Python/uv     | Fresh writable environment and real U²-Net prep executed                         | CPU target, not run here                       | CPU target, not run here                                  | CPU target, not run here                                    |
-| TRELLIS.2 / UniRig | Complete managed CUDA setup and installed offline workflow qualified on RTX 3090 | Current CUDA recipes unavailable               | Current CUDA recipes unavailable                          | Historical CUDA entries; complete native setup unqualified  |
-| Pixal3D            | Optional managed CUDA setup and installed offline workflow qualified on RTX 3090 | Current CUDA recipe unavailable                | Community ports researched; no catalog runtime            | Upstream CUDA path researched; no qualified catalog runtime |
+## Current support by layer
 
-The model workflows above use exact recipes and configuration-specific admission. They do not
-qualify every NVIDIA card or every upstream mode. [Model management](models.md) lists file sizes,
-memory requirements and available operations; the
-[platform spike](../future/model-platform-spike.md) separates upstream claims, experimental ports
-and local measurements. Model availability is independent of CLI/render and desktop availability.
+| Layer                     | Windows x64                                                                         | Windows ARM64                     | macOS Intel / Apple Silicon                                                | Linux                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Core/CLI                  | Local and hosted tests; copied payload execution                                    | Native loader/addon not qualified | Hosted tests; separate native copied-payload checks for both architectures | Hosted tests and copied payload execution                   |
+| GPU rendering             | Recorded NVIDIA RTX 3090/Vulkan checks                                              | Hardware gate open                | Metal hardware gate open                                                   | Software lavapipe checks; consumer GPU gate open            |
+| Tauri desktop             | Windows installer and integration checks                                            | Installed app not qualified       | Installed app not qualified                                                | Installed app/WebKitGTK not qualified                       |
+| Python preparation        | Fresh environment and real U²-Net execution                                         | Not qualified                     | Not qualified                                                              | Not qualified                                               |
+| TRELLIS.2 / UniRig        | Managed CUDA setup and offline model workflow checked on the recorded configuration | Current CUDA recipes unavailable  | Current CUDA recipes unavailable                                           | Historical entries; complete native setup not qualified     |
+| Pixal3D                   | Managed CUDA setup and offline workflow checked on the recorded configuration       | Current recipe unavailable        | Researched ports; no managed runtime                                       | Upstream CUDA path researched; no qualified managed runtime |
+| Optional portable Blender | Managed Windows x64 download and bounded operator checks                            | No managed download               | Existing-program probes do not qualify a workflow                          | Existing-program probes do not qualify a workflow           |
 
-Model detection reports macOS CPU conservatively until the selected backend has verified its own
-accelerator. Neither an Intel/Apple Silicon host nor the renderer's Metal device proves that a
-Python model supports MPS. CUDA presence is likewise only a candidate lane: exact architecture and
-runtime kernel admission still apply. Driver probes have a bounded timeout; unsupported operating
-systems cannot inherit Linux recipes. These checks do not constitute new native platform execution
-evidence.
+The recorded Windows AI configuration uses an RTX 3090. These measurements do not establish support
+for every NVIDIA card, upstream mode or mesh. [Models and local runtimes](user/models.md) lists
+exact catalog admission values and storage requirements; the
+[platform research](../future/model-platform-spike.md) separates experimental ports from installed
+model support.
 
-`doctor` also reports RAM, process-available memory, destination disk space and per-device NVIDIA
-free/total memory. Failed inventory probes remain unmeasured; they do not assert CPU, Metal or CUDA
-support. CUDA ordering and visibility can differ from this physical inventory. Configured model
-capacity floors are not interchangeable with required free working memory, so the snapshot does not
-become a new free-memory admission threshold without backend-specific measurements.
+Hardware inventory is advisory. A renderer's Metal adapter does not prove that a Python model
+supports MPS; CUDA detection does not prove a particular model kernel supports that architecture.
+Model admission uses the selected recipe's declared platform and measured configuration. Unmeasured
+probes remain unknown rather than asserting CPU, Metal or CUDA readiness.
 
-## What CI covers
+## What CI checks
 
-Optional Blender's maintained portable build and operator/motion trials were executed on Windows x64
-only. Managed downloads currently cover that target. Existing 4.5 LTS program selection can run a
-local version/operator probe on other platforms, but neither a probe nor Blender's upstream platform
-availability qualifies SpriteBook's full workflow there. The new cloth candidates still fail actual
-character quality checks. [Extensions](extensions.md) separates tool readiness from correction
-quality and documents storage/removal.
+[Source CI](../.github/workflows/ci.yml) runs formatting, lint, type checks and tests on hosted
+Windows/macOS/Ubuntu runners. Its Linux lavapipe lane runs rendering, style, packing and export
+checks on a software Vulkan adapter.
 
-[CI](../.github/workflows/ci.yml) uses Node for formatting, linting, separate type checks and tests
-on Ubuntu/macOS/Windows. Its Linux lavapipe lane requires an adapter and runs renderer structural
-and image checks. The [candidate workflow](../.github/workflows/release.yml) builds owned CLI trees
-on native hosted OS runners and a Windows NSIS candidate, then exercises copied CLI trees with an
-empty PATH. Intel and ARM Mac jobs use separate runner labels. Definitions are committed; they were
-executed for the 0.5.0 preview.
-[Fresh source CI](https://github.com/labcoder/spritebook/actions/runs/39990823015) passes on
-Windows/macOS/Ubuntu, including Linux software rendering. Candidate native payload and installer
-results are recorded by the release workflow. Source fixtures and copied-payload checks do not
-qualify native consumer GPU performance, downloaded models or installed Mac/Linux desktops.
+[Candidate builds](../.github/workflows/release.yml) create Windows, Linux, Intel Mac and Apple
+Silicon CLI payloads plus a Windows NSIS installer. They execute copied CLI trees with an empty
+`PATH`; Linux also exercises software rendering and all sprite exporters. These checks establish
+build/payload behavior, not consumer-GPU performance or complete downloaded-model support.
 
-The [v0.5.0 candidate run](https://github.com/labcoder/spritebook/actions/runs/39992515204) passes
-all four native CLI payload jobs and the Windows installer build. The matching
-[source CI](https://github.com/labcoder/spritebook/actions/runs/39992511449) is also green.
+The Windows preview's Vulkan payload excludes private Direct3D/DXC/FXC experiments. Broader release
+qualification still needs native installed-app runs, clean-machine prerequisites, upgrade/uninstall
+recovery, accessibility, signing/notarization and complete native notices. See the
+[release checklist](developer/releases.md).
 
-F7 still needs end-user installed-desktop qualification, native GPU/performance measurements,
-installer recovery, clean-machine runtime prerequisites, signing/notarization, notices and native
-accessibility. The Windows Vulkan payload excludes DXC/FXC; private Direct3D experiments confer no
-redistribution clearance. Windows ARM64 needs its own loader/addon qualification; x64 emulation is
-separate evidence.
+## When support needs rechecking
 
-## Re-check triggers
+- Runtime, codec, renderer, shader or animation changes: repeat affected structural/image and
+  installed-app checks using fresh caches.
+- A new GPU, architecture or operating system: run the actual workload and record the adapter,
+  driver, source version and limits. An emulated x64 run is separate from native ARM evidence.
+- A new model or dependency recipe: repeat setup, native admission, inference and recovery checks.
+- Driver changes without an exposed identity change: use a cold render cache.
 
-- Node/Dawn, codec, shader or renderer changes: repeat affected structural assertions, reviewed
-  image comparisons and installed Windows checks. Never reuse an old cache as renderer evidence.
-- Native hardware or configured GPU CI becomes available: execute F7's workload and installed
-  checks, recording actual OS, architecture, backend, adapter, driver and limitations.
-- Driver-only changes without an exposed identity change: use an empty render cache.
-- Legacy comparison or rollback: archive the pinned source commit into a separate checkout and use
-  preserved workspace copies. Legacy Deno commands are reference-only, never normal development.
+The [renderer proof](../future/renderer-qualification.md),
+[Node cutover](../future/runtime-cutover.md) and
+[model provisioning record](../future/model-provisioning-gate.md) retain dated Windows evidence.
+Historical results apply to their recorded source, machine and recipe.

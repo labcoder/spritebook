@@ -2,8 +2,8 @@
 
 The `aseprite` target writes the Aseprite "JSON (array)" format for tools that consume Aseprite
 sheets. Aseprite itself imports the PNG grid; use the JSON as the record of tags and timing when
-setting up that imported sheet. See [export validation](../export-validation.md) for consumer
-checks.
+setting up that imported sheet. See [export validation](../../developer/export-validation.md) for
+consumer checks.
 
 ## What SpriteBook writes
 

@@ -53,7 +53,9 @@ if (import.meta.main) {
   );
   if (missing.length) {
     console.error(
-      `bom-guard: add role/license rows to docs/developer/dependencies.md for: ${missing.join(', ')}`,
+      `bom-guard: add role/license rows to docs/developer/dependencies.md for: ${
+        missing.join(', ')
+      }`,
     );
     process.exitCode = 1;
   } else {

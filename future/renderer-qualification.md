@@ -215,7 +215,7 @@ existing ignored real-model/engine lanes; the focused path checks pass 29 tests.
   its statically linked third-party notices. The audit also exposes existing `pako` 2.2.0's **MIT
   AND Zlib** declaration and Node's bundled native notices against the repository's strict
   allowlist. Resolve the actual dependency/policy mismatch explicitly before distribution; do not
-  infer clearance from a top-level MIT/BSD label. See the [BOM](../docs/dependencies.md).
+  infer clearance from a top-level MIT/BSD label. See the [BOM](../docs/developer/dependencies.md).
 
 Upstream references: [binding and lifetime contract](https://github.com/dawn-gpu/node-webgpu),
 [exact addon build recipe](https://github.com/dawn-gpu/node-webgpu/blob/9e52a4b5eefbc08188fe4b7f9d96d2dd7040e513/build/build.js),

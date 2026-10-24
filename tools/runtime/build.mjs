@@ -202,7 +202,7 @@ try {
   for (const name of ['LICENSE', 'NOTICE']) await copy(join(repo, name), join(stage, name));
   for (
     const [from, to] of [
-      ['docs/quickstart.md', 'quickstart.md'],
+      ['docs/user/quickstart.md', 'quickstart.md'],
       ['CHANGELOG.md', 'CHANGELOG.md'],
       ['packages/style/fixtures/asymmetric.glb', 'sample/asymmetric.glb'],
     ]

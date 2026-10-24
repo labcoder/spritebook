@@ -57,8 +57,8 @@ system is ratified by these alternatives.
   brand/selection surfaces; no pattern or filter is applied to sprite pixels.
 - New WOFF2 files are design-study assets only. Exact URLs, hashes and complete SIL OFL notices live
   in [assets/](assets/font-sources.json), with a row in the
-  [dependency inventory](../../../docs/dependencies.md). No UI package was added; no fonts were
-  installed into Windows or bundled by Studio.
+  [dependency inventory](../../../docs/developer/dependencies.md). No UI package was added; no fonts
+  were installed into Windows or bundled by Studio.
 - All three screens were captured in Edge at 1440 × 900 after fonts loaded. Checks found no missing
   image/font assets, body overflow or text below 12px (Phosphor's minimum is 13px). Computed default
   text contrast passed the sampled solid-background checks. Impeccable detected a Phosphor hover

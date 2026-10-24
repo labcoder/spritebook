@@ -577,11 +577,12 @@ deformation/cache contract is funded by a clean operator probe.
 Manage extensions now groups Models, optional Tools and bundled Content. Blender supports checked
 existing 4.5 LTS selection and an explicit pinned 4.5.15 portable download, private receipts,
 verification, progress and ownership-aware removal. Existing model commands/pins remain compatible;
-no engine, weights or community code are bundled. See [extensions](../docs/extensions.md). Remaining
-priority: complete trustworthy surface ownership/reference and garment/body correspondence; qualify
-actual walk/jump correction; then implement one shared animated correction consumer/cache. Follow
-with weaker/native hardware, interrupted-install recovery and full F7 qualification. F5-T2/F6-T1
-remain open; the capture/export preview’s known motion limitations are unchanged.
+no engine, weights or community code are bundled. See [extensions](../docs/user/extensions.md).
+Remaining priority: complete trustworthy surface ownership/reference and garment/body
+correspondence; qualify actual walk/jump correction; then implement one shared animated correction
+consumer/cache. Follow with weaker/native hardware, interrupted-install recovery and full F7
+qualification. F5-T2/F6-T1 remain open; the capture/export preview’s known motion limitations are
+unchanged.
 
 F6-T4 qualifies complete production workflows on the same inputs and hardware: a textured prop
 through eight directions; an asymmetric humanoid through idle/walk/action; a roster look change with

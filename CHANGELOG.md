@@ -2,7 +2,7 @@
 
 Notable changes to SpriteBook. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version, tag, and golden policy is in
-`docs/versioning.md` in the repository.
+`docs/developer/versioning.md` in the repository.
 
 ## Unreleased
 
@@ -150,7 +150,7 @@ engine-ready 2D spritesheets come out. One CLI binary, no GUI yet.
 - **Input-hash frame cache** (`--cache`, `--only-invalidated`): keys hash the full recipe — model
   bytes, camera, style, clip, and the D-023 render signature (`<renderer version>#<adapter hash>`) —
   so an adapter change is an honest full cache miss (driver-version-only updates are a documented
-  gap — see docs/versioning.md).
+  gap — see docs/developer/versioning.md).
 - **Journaled undo/redo** (`spritebook undo` / `spritebook redo`): manifest edits are append-only,
   reversible patches with a cursor. Undo/redo is core behavior, not a GUI trick.
 - **`spritebook doctor`**: product and render-pipeline versions, backend env, adapter identity, the
@@ -197,4 +197,4 @@ engine-ready 2D spritesheets come out. One CLI binary, no GUI yet.
   sample ships in the release zip); importing FBX/OBJ/VRM means running from source.
 - Real-engine export validation (Godot/Phaser/Aseprite imports) is deferred to the end of the
   project by design; exports are validated structurally and for byte-stability on every CI run
-  (`docs/export-validation.md` in the repository).
+  (`docs/developer/export-validation.md` in the repository).

@@ -106,8 +106,8 @@ remain F7 scope.
 
 The old nvdiffrast/nvdiffrec artifacts carried evaluation-only use restrictions. They are absent
 from the selected environment; moving them outside the installer would not have cleared their terms.
-A file hash establishes identity, not permission. See the [BOM](../docs/dependencies.md) and exact
-runtime recipes for delivery boundaries.
+A file hash establishes identity, not permission. See the [BOM](../docs/developer/dependencies.md)
+and exact runtime recipes for delivery boundaries.
 
 UniRig's new version does not download the historical OPT config. Its owned architecture description
 comes from MIT fairseq/UniRig declarations, checkpoint tensor shapes and Apache Transformers

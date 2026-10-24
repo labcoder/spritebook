@@ -173,8 +173,8 @@ Imprint is a compact character workshop: condensed indigo headings, precise mono
 fine crosshatch on the light workspace and sparse dither on blue-gray night surfaces. Solid panels
 keep the texture behind the work; reference images and saved sprites occupy dark, untextured wells.
 
-The [public design guidance](../../docs/design/design-system.md) owns the shared visual commitments.
-This app-level record extracts the implemented system from [tokens](src/tokens.css),
+The [public design guidance](../../docs/developer/design/design-system.md) owns the shared visual
+commitments. This app-level record extracts the implemented system from [tokens](src/tokens.css),
 [type](src/fonts.css) and [styles](src/styles.css); those source files remain authoritative.
 [PRODUCT.md](PRODUCT.md) records product truth, while the
 [surface brief](.impeccable/surfaces/apps-studio-src-app-tsx.md) owns this screen's composition.

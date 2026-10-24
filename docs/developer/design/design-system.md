@@ -1,11 +1,11 @@
 # SpriteBook design system
 
 **Imprint was approved by the maintainer on 2026-10-20**, superseding the July diagnostic identity.
-The [approved light/dark study](../../future/ui-concepts/imprint/README.md) establishes the visual
-direction. Studio remains Tauri/React with a TypeScript core on Node. The [guide](../guide.md)
-describes current behavior; remaining editor capabilities belong to [F5](../../future/roadmap.md).
-The [app-level design record](../../apps/studio/DESIGN.md) extracts implemented tokens and component
-patterns for subsequent UI work.
+The [approved light/dark study](../../../future/ui-concepts/imprint/README.md) establishes the
+visual direction. Studio remains Tauri/React with a TypeScript core on Node. The
+[guide](../../user/guide.md) describes current behavior; remaining editor capabilities belong to
+[F5](../../../future/roadmap.md). The [app-level design record](../../../apps/studio/DESIGN.md)
+extracts implemented tokens and component patterns for subsequent UI work.
 
 ## Commitments
 
@@ -88,15 +88,13 @@ Candidates stay below their canvas, deformation reports below the rig mesh, and 
 controls beside core-retargeted motion. Generate/Rig activity shows actual phases and elapsed time
 without fabricated percentages or ETAs. Cancellation and errors retain clear status and focus.
 
-Look shows source and saved sprites on the left, with its recipe and recording action on the right.
-The comparison reuses Bake's atlas player with one clock for its directions. Clip and 1×/2×/4×/6×
-zoom are view controls, not manifest changes. Look opens at 4x, positioning each scrollable full
-cell around its recorded pivot. Subsequent user panning is preserved during playback. The bridge
-currently supplies page 1 of the saved atlas; only frames on that page are shown. Large integer zoom
-scrolls within the well rather than resampling pixels. Missing sources and absent bakes have
-explicit empty states. Extra camera controls remain under "Camera and style details"; stale-frame
-cost and the exact CLI twin stay beside "Record look". A recipe edit leaves saved sprites unchanged
-until another bake.
+Look places a 3D aiming view and a core-rendered flat frame on the left, with the capture recipe in
+the right inspector. Projection, lighting, output size and clip sample are separate controls. The
+aiming viewport is an inspection aid; the rendered frame verifies the actual lighting and finish. A
+changed recipe labels the prior frame stale until the user renders another sample. Saving a look is
+a journaled edit; rendering a sample leaves the selected bake unchanged. Adaptive-palette samples
+remain provisional until the full animation set is baked. Full-color output supports actual-pixel
+inspection; pixel finishes retain nearest-neighbor integer zoom.
 
 Base UI supplies existing headless menu and dialog behavior. Hand-authored CSS supplies the
 identity: square fields, restrained rules, solid action fills and consistent hover/focus states. Do
@@ -149,18 +147,14 @@ without inference. Four-direction core contact sheets retain integer pixel size,
 detailed surface measurements alongside them. Numerical findings are areas to inspect, not a quality
 score or an anatomical diagnosis.
 
-## Implementation verification
+## Validation
 
-The identity implementation has 67 Studio tests, alongside TypeScript and production web-build
-checks. Browser checks cover the six stages, gallery, models, command palette, logs, locked/error
-states and locale growth. Automated WCAG A/AA scans found no violations in those checked states. The
-shared inspector was checked at 1440×900 and the 960×600 desktop minimum without horizontal page
-overflow, including expanded locale text; playback, integer zoom, recipe/reset behavior and
-theme-invariant canvas pixels were checked separately.
+Check gallery, all six stages, extensions, command palette, logs, locked states and failures.
+Exercise both themes, the minimum desktop window and expanded locale text. Inspect keyboard focus,
+dialog cancellation and inspector resizing as well as pointer use. Automated browser accessibility
+checks complement native keyboard and screen-reader review; they do not replace it.
 
-The guide includes current [light](../img/stage-04-look.png) and
-[dark](../img/stage-04-look-dark.png) UI captures from the explicitly synthetic production browser
-demo. The private saved-asset replay separately checks character layouts without writing project
-files or running inference. Native Tauri packaging, platform accessibility and hardware
-qualification were not rerun; F7 remains open. This is an F5-T1 layout refinement, not completion of
-the full editor roadmap.
+Keep viewport/frame captures separate from synthetic browser-demo screenshots. A demo fixture can
+prove control layout without proving generation quality. See the
+[development guide](../development.md) and [platform support](../../platform-support.md) for the
+relevant check boundaries.

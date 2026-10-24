@@ -1,10 +1,10 @@
 # Workspace persistence
 
 Character creation, receipts, rename and undo/redo go through
-[`packages/core/persistence.ts`](../../packages/core/persistence.ts). CLI history operations call
+[`packages/core/persistence.ts`](../../../packages/core/persistence.ts). CLI history operations call
 core; they do not implement their own writer. F1 preserved the existing manifest and patch schemas;
 D-043 records the persistence decision. Current document versions live in
-[`packages/schema/migrate.ts`](../../packages/schema/migrate.ts).
+[`packages/schema/migrate.ts`](../../../packages/schema/migrate.ts).
 
 The persistent `<manifest>.lock` uses an exclusive OS file lock. Ownership covers recovery, reading,
 patch/inverse construction and publication. Closing the handle or killing its process releases
@@ -114,3 +114,23 @@ Candidate `--no-upright` records `upright: false` in a distinct recipe and publi
 front-facing, centering and grounding. The GUI exposes this as an explicit alignment opt-out, never
 an automatic retry. Missing or empty contact/preview files invalidate a derived review so retry can
 regenerate them while retaining the draft rig and original source.
+
+## Permanent character deletion
+
+`delete --workspace <dir> --confirm <character-id>` is the explicit exception to journaled undo.
+Keeping the old generated assets for undo would defeat the user's cleanup request. Studio wraps the
+same core operation with a confirmation dialog; closing a character tab keeps its separate,
+non-destructive behavior.
+
+Deletion takes the job lock without waiting and then the manifest lock, recovering committed state
+before calculating preserved originals. It only removes fixed owned generated paths: results,
+canonical revisions, rig/animation/look data, bakes, workspace-local exports/caches, prepared source
+derivatives, identity reports and editing metadata. Original inputs, original source copies retained
+through history, unrecognized files, external exports and installed models/tools remain. Linked
+targets and arbitrary filesystem roots are outside the deletion boundary.
+
+The manifest is removed last. An active job refuses deletion; a locked file or cleanup error leaves
+the manifest so a retry can finish. Earlier generated files may already be gone, so this is not a
+transactional rollback guarantee. Retained source and lock files can leave the workspace directory
+nonempty. See the [technical decision](../decisions.md#permanent-character-deletion) for the policy
+and [projects guide](../../user/projects.md#delete-a-project) for user-facing instructions.

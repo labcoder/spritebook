@@ -7,8 +7,9 @@ not call SpriteBook.
 
 This uses Impeccable 4.7.0's polish workflow and preserves Imprint's condensed type, monospaced
 controls, open comparison, six stages and real saved sprite output. The production implementation
-lives in `apps/studio`; the [design system](../../../docs/design/design-system.md) records its roles
-and interactions. This HTML sketch remains a design reference, not the application. Do not push.
+lives in `apps/studio`; the [design system](../../../docs/developer/design/design-system.md) records
+its roles and interactions. This HTML sketch remains a design reference, not the application. Do not
+push.
 
 ## The requested changes
 

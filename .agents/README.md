@@ -7,5 +7,5 @@
   dependencies). `docs/internal/` is gitignored planning space (roadmap, decisions, progress) —
   local-only by design (D-015). Keep both in sync with reality: if code changes make a doc wrong,
   fixing the doc is part of the change.
-- **Scoped AGENTS.md files** exist in `docs/architecture/` and `docs/design/` with domain-specific
-  guidance; they supplement, never override, the root file.
+- **Scoped AGENTS.md files** exist in `docs/developer/architecture/` and `docs/developer/design/`
+  with domain-specific guidance; they supplement, never override, the root file.

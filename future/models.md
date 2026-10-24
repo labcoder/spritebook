@@ -282,7 +282,7 @@ Pin engine/workflow/files, use loopback and allowlisted adapter operations, bind
 output directories, validate paths/artifacts, and cancel owned work without killing unrelated jobs.
 Retain the existing authenticated/versioned boundary, retryable errors, logs and artifact
 validation. Local runners execute code.
-[Existing sidecar contract](../docs/architecture/architecture.md#sidecar-contract)
+[Existing sidecar contract](../docs/developer/architecture/architecture.md#sidecar-contract)
 
 **Proposed provenance fields to decide during schema design:** engine revision, workflow hash, model
 hashes/revisions, precision/quantization, backend/GPU/driver, auxiliary models, requested/effective
@@ -311,10 +311,10 @@ seed is provenance, not equivalent sampling between model families.
 | Reproducibility    | Repeat inputs/seed/config/machine                                                    | Validate determinism or label exception before promotion; no cross-engine/GPU byte promise.                 |
 | Batches            | 10 then 100 characters; cancellation/retry/death; residency                          | Resume without corrupt manifests/receipts; record failures and warm throughput.                             |
 
-Use [existing product budgets](../docs/prd.md#success-metrics): image-to-engine ≤30 min,
-mesh-to-sheet ≤10 min, 100-character style pivot overnight. Report median/worst time, success rate,
-retries and repair time separately. Retain measured material-collapse cases; an engine change may
-alter failure frequency without curing a model.
+Use [existing product budgets](../docs/developer/product.md#success-metrics): image-to-engine ≤30
+min, mesh-to-sheet ≤10 min, 100-character style pivot overnight. Report median/worst time, success
+rate, retries and repair time separately. Retain measured material-collapse cases; an engine change
+may alter failure frequency without curing a model.
 
 **Selection rule:** among legally eligible recipes passing deformation and final-sprite quality,
 choose the smallest installation and least maintenance meeting the budget. Keep heavier optional

@@ -1,8 +1,9 @@
 # The CLI, stage by stage
 
 This page covers mesh import and the image-to-character verbs: `import`, `gen`, `pick`, `rig`,
-`anim`, `look`, `retexture`, and `models`. The [quickstart](quickstart.md) covers `bake`, `export`,
-and `doctor`.
+`anim`, `look`, `retexture`, `models`, `extensions` and permanent character deletion. The
+[quickstart](quickstart.md) covers a complete example; [capture and export](capture.md) documents
+`bake` and `export`.
 
 Every verb accepts `--json` (jobs emit NDJSON events; queries emit one JSON document) and
 `--log-append <file>` (append every event to a file). SpriteBook Studio runs these exact commands.
@@ -13,8 +14,8 @@ character. It holds `character.json` and everything the stages record.
 
 Installed candidates include owned Node/uv and production importer assets. For source development,
 `npm run cli -- <verb> ...` invokes the same compiled entry. Real CUDA backends use catalog-managed
-external source/environments and gated assets; read [sidecar setup](../sidecar/README.md) and
-[licensing](licensing.md). `models install` verifies weights and provisions a declared runtime;
+external source/environments and gated assets; read [sidecar setup](../../sidecar/README.md) and
+[licensing](../licensing.md). `models install` verifies weights and provisions a declared runtime;
 `models setup` repairs that runtime while retaining verified weights.
 
 ## import — preserve a mesh or try the offline reference
@@ -66,7 +67,7 @@ spritebook gen --workspace ./characters/hero --character hero \
 Each candidate becomes a result `r1`, `r2`, … with a receipt, a canonical mesh, and a front-view
 `thumb.png`. Nothing is chosen yet.
 
-Read [Licensing](licensing.md) for the selected recipe's model, conditioner and runtime terms.
+Read [Licensing](../licensing.md) for the selected recipe's model, conditioner and runtime terms.
 TRELLIS.2/Pixal3D weights are MIT; the separately gated DINOv3 agreement still applies.
 
 Set your expectation for `fixture-gen`: it turns the image's OUTLINE into a lathe-like solid body.
@@ -351,7 +352,7 @@ provider.
 Model-file sizes exclude runtime environments, caches, download staging and outputs. An install on a
 smaller card warns; job-time admission is the hard gate. Pixal3D's measured 17.53 GiB Torch peak on
 a 24 GiB RTX 3090 does not qualify smaller cards; budget a 64 GiB host and roughly 45–50 GB free
-disk for a fresh stack. See the [hardware/platform report](../future/model-platform-spike.md) for
+disk for a fresh stack. See the [hardware/platform report](../../future/model-platform-spike.md) for
 measurement limits and Mac/Linux candidates.
 
 ## Workspace queries and selected exports
@@ -397,8 +398,9 @@ also accepts `--catalog <file>` for the same catalog override as generation/prep
 
 Memory admission uses the effective configuration's catalog profile, not another configuration's
 minimum. Unmeasured combinations refuse. `models list --json` exposes these profiles; its historical
-single minimum is advisory. See the [execution policy](architecture/execution-policy.md) for the
-consent fingerprint, unmanaged behavior, renderer-pin boundary and qualification limits.
+single minimum is advisory. See the
+[execution policy](../developer/architecture/execution-policy.md) for the consent fingerprint,
+unmanaged behavior, renderer-pin boundary and qualification limits.
 
 `gen --more-like <result>` reuses the result's recorded backend version as well as its parameters.
 Explicit `--model` or `--model-version` requests a different choice; project pins still apply.
@@ -414,3 +416,21 @@ artifact.
 `workspace --workspace <dir> --atlas --pass lit --page 1 --json` reads a specific selected atlas
 page (indices start at 0). `workspace --workspace <dir> --look-preview <20-hex-key> --json` reads
 the metadata for a core-produced frame preview. It cannot read arbitrary paths.
+
+## delete — permanently remove a character's generated files
+
+```sh
+spritebook delete --workspace ./characters/hero --confirm hero
+```
+
+`--confirm` must match the immutable character ID in that workspace. Deletion has no undo and
+refuses while another job owns the character. It removes SpriteBook-owned generated trees,
+preparation derivatives, manifest and journals. The original external input, retained original
+source copies, unrecognized user files, exports outside the workspace and machine installations
+remain. Source and lock files can leave a nonempty directory after the character disappears from the
+gallery.
+
+The manifest is removed last. A locked file or other cleanup failure reports an error and retains
+the manifest so the same command can retry; some generated files may already be gone. Back up the
+complete workspace before deleting if you may need to edit it again. See
+[projects and files](projects.md#delete-a-project) for the equivalent Studio confirmation flow.

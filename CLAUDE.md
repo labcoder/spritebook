@@ -1,5 +1,4 @@
-# CLAUDE.md
+# SpriteBook agent instructions
 
-Canonical agent instructions live in [`AGENTS.md`](./AGENTS.md) at the repo root. Read that file
-first; it defines orientation order, invariants, and working agreements. Repo skills live in
-`.agents/skills/`.
+Follow [AGENTS.md](AGENTS.md), the canonical repository instructions. It links the architecture,
+design, dependency and contribution guidance for this project.

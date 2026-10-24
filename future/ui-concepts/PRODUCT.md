@@ -3,8 +3,9 @@
 <!-- impeccable:product-schema 1 -->
 
 This record applies only to the unapproved visual studies in this folder. The
-[PRD](../../docs/prd.md), [architecture](../../docs/architecture/architecture.md) and
-[current design system](../../docs/design/design-system.md) remain canonical.
+[PRD](../../docs/developer/product.md),
+[architecture](../../docs/developer/architecture/architecture.md) and
+[current design system](../../docs/developer/design/design-system.md) remain canonical.
 
 ## Platform
 

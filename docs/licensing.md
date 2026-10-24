@@ -3,13 +3,12 @@
 This page collects the license facts that matter when you ship work made with SpriteBook. It covers
 SpriteBook's own license, the bundled assets, the on-demand models, and the known traps.
 
-## 1. Your sprites are yours
+## 1. SpriteBook and exported assets
 
-SpriteBook's own license is AGPL-3.0-only with an output exception. The project records this
-license. The exception says: "spritesheets/atlases/manifests/models produced by running SpriteBook
-are not subject to the AGPL". In plain terms: the output you bake is yours. You can sell it. The
-AGPL applies to SpriteBook's code, not to your spritesheets. Downloaded models and other third-party
-components can impose their own terms; the output exception does not override them.
+SpriteBook's code uses AGPL-3.0-only. The output exception in [NOTICE](../NOTICE) says that
+spritesheets, atlases, manifests, models and other assets produced by running SpriteBook are not
+subject to the AGPL solely because SpriteBook produced them. The exception does not grant rights to
+an input character, imported clip or downloaded model component; their own terms still apply.
 
 The `NOTICE` file carries these items:
 
@@ -21,8 +20,10 @@ The `NOTICE` file carries these items:
 
 ## 2. What ships in the box
 
-Everything bundled with SpriteBook is under MIT, Apache-2.0, BSD, ISC, OFL, or CC0. A standing rule
-sets the rule for clips: bundle CC0 clips only.
+The dependency policy permits MIT, Apache-2.0, BSD, ISC, OFL and CC0 third-party components, with
+CC0 clips in the bundled animation pack. The [BOM](developer/dependencies.md) records exact pins,
+component notices and remaining distribution-clearance checks. SpriteBook itself retains its AGPL
+license.
 
 | Bundled item                                                         | Content                                                                                                   | License                      |
 | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------- |
@@ -31,8 +32,9 @@ sets the rule for clips: bundle CC0 clips only.
 | Test-pose pack                                                       | poses for rig deform checks                                                                               | CC0, derived from the UAL    |
 | `fixture-gen`                                                        | a synthetic gen3d backend: no download, no GPU, no weights                                                | MIT, part of SpriteBook      |
 
-The paid UAL Source packs are not bundled; they come in through one-click user import. `fixture-gen`
-is the reason a macOS or win-arm64 user gets a working app with no AI generation, not a broken one.
+Paid UAL Source packs are not bundled. Personal imports retain their own terms. The synthetic
+`fixture-gen` backend exists for development; it does not establish native desktop or model support
+on another platform.
 
 ## 3. Models install on demand, behind gates
 
@@ -75,7 +77,7 @@ evaluation-only rasterizers with MIT DRTK. Their traced O-Voxel build retains MI
 notices/source correspondence. CuMesh and FlexGEMM are MIT. Pixal3D additionally uses MIT NATTEN,
 its BSD-licensed CUTLASS components, and the Apache-2.0 NAF model. These are external downloads, not
 bundled application dependencies. Exact source, wheel, agreement and notice pins are in the
-[BOM](dependencies.md), [runtime recipes](../sidecar/runtimes/) and
+[BOM](developer/dependencies.md), [runtime recipes](../sidecar/runtimes) and
 [F4 gate record](../future/model-provisioning-gate.md).
 
 The earlier runtime's restricted rasterizers and untraced wheel are absent from these selected

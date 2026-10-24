@@ -12,7 +12,7 @@ import { assert, assertEquals } from '@std/assert';
 import { loadCatalog } from '@spritebook/registry';
 import { paramsSchemaFor } from '@spritebook/schema';
 
-const CLI_MD = new URL('../../docs/cli.md', import.meta.url);
+const CLI_MD = new URL('../../docs/user/cli.md', import.meta.url);
 
 async function page(): Promise<string> {
   return await fs.readFile(CLI_MD, 'utf8');

@@ -1,18 +1,20 @@
 # AGENTS.md — canonical agent instructions
 
 This is the single source of agent truth for SpriteBook. `CLAUDE.md` points here. Scoped `AGENTS.md`
-files in `docs/architecture/` and `docs/design/` supplement this file for their domains.
+files in `docs/developer/architecture/` and `docs/developer/design/` supplement this file for their
+domains.
 
 ## Orientation (read in this order, first session in a fresh context)
 
 1. `README.md` — what this is
-2. `docs/prd.md` — the product and its metrics
-3. `docs/architecture/architecture.md` + `docs/architecture/data-models.ts` — the laws and the
-   schema
-4. `docs/design/design-system.md` — if touching GUI
-5. `docs/dependencies.md` — before adding ANY dependency
-6. `docs/internal/roadmap.md` → the active phase file → `docs/internal/progress.md` +
-   `docs/internal/decisions.md`
+2. `docs/developer/product.md` — the product and its metrics
+3. `docs/developer/architecture/architecture.md` + `docs/developer/architecture/data-models.ts` —
+   the laws and the schema
+4. `docs/developer/design/design-system.md` — if touching GUI
+5. `docs/developer/dependencies.md` — before adding ANY dependency
+6. `docs/developer/decisions.md` — binding technical exceptions; `future/roadmap.md` retains the
+   approved migration history. Keep private task/progress and qualification records in the parent
+   management workspace when one is provided.
 
 Then check `.agents/skills/` and read every SKILL.md relevant to the task at hand **before writing
 code**. They encode environment-specific traps (readback alignment, TSL-only materials, prune/dedup
@@ -35,8 +37,9 @@ breakage, dither flicker, golden tolerances) that will cost hours if rediscovere
    (D-009)
 6. **`BakeManifest` is canonical; exporters are pure projections.** AOV atlas pages are
    rect-identical to the lit page. (D-010)
-7. **Every GUI mutation is a journaled, reversible manifest patch** (undo/redo is core, not a GUI
-   trick).
+7. **Ordinary durable edits are journaled, reversible manifest patches.** Undo/redo is core.
+   Explicitly confirmed permanent project deletion is the exception documented in
+   `docs/developer/decisions.md`; preserve original inputs and unrelated user files.
 8. **Determinism:** same inputs on the same machine → identical bytes. Fixed seeds recorded as
    provenance. Cross-machine pixel equality is NOT assumed anywhere.
 
@@ -50,13 +53,13 @@ breakage, dither flicker, golden tolerances) that will cost hours if rediscovere
   Auto-retry on image suites is forbidden.
 - **Docs-sync duty:** if a change makes `docs/` wrong, fixing the doc is part of the change — same
   PR.
-- **Decisions:** anything that binds the future (dependency, format, API shape, invariant exception)
-  gets an append-only entry in `docs/internal/decisions.md` with the next D-number.
-- **Dependencies:** check `docs/dependencies.md` first. New deps need a license row there in the
-  same PR. Never bundle anything outside MIT/Apache-2.0/BSD/ISC/OFL/CC0. FBX goes through ufbx —
-  never FBX2glTF binaries (Autodesk SDK).
-- **Session hygiene:** update `docs/internal/progress.md` at session end — what moved, what's
-  blocked, what's next.
+- **Decisions:** record binding technical changes (dependency, format, API shape, invariant
+  exception) in `docs/developer/decisions.md`, with the reason and compatibility boundary.
+- **Dependencies:** check `docs/developer/dependencies.md` first. New deps need a license row there
+  in the same PR. Never bundle anything outside MIT/Apache-2.0/BSD/ISC/OFL/CC0. FBX goes through
+  ufbx — never FBX2glTF binaries (Autodesk SDK).
+- **Session hygiene:** record progress, blockers and next work in the parent management workspace.
+  Keep private plans and raw qualification output outside the application repository.
 - **Scope:** work the active roadmap task. Adjacent improvements become roadmap notes, not drive-by
   changes.
 

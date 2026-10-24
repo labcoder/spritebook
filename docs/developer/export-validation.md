@@ -34,7 +34,7 @@ These scripts build the current code before running their lane. They skip when t
 unset; a configured but unusable engine/importer fails. Record the exact version, artifact and
 result for a release rather than inferring native consumer support from JSON-only checks. Unity
 remains explicitly unverified in the current migration evidence. See the
-[F7 gates](../future/roadmap.md#f7--release-the-migrated-application).
+[F7 gates](../../future/roadmap.md#f7--release-the-migrated-application).
 
 ## Tier 3 — release review checklist (Godot 4)
 
@@ -51,5 +51,5 @@ remains explicitly unverified in the current migration evidence. See the
 6. Toggle nearest-neighbor filtering on the texture; make sure no bleed shows from neighboring atlas
    cells at the sprite edges.
 7. Repeat 3–5 in Phaser 3 with the TexturePacker JSON (`this.load.atlas`) and in Aseprite (`File →
-   Import Sprite Sheet` on the PNG; Aseprite does not read the JSON — see docs/engines/aseprite.md)
-   as consumer spot-checks.
+   Import Sprite Sheet` on the PNG; Aseprite does not read the JSON — see
+   docs/user/engines/aseprite.md) as consumer spot-checks.

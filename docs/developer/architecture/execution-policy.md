@@ -2,7 +2,7 @@
 
 Core enforces the catalog contract at execution time. Execution refuses missing model files or
 runtime setup; installation is an explicit `models install` / `models setup` operation. See
-[model management](../models.md) for the complete Windows recipes qualified during F4.
+[model management](../../user/models.md) for the complete Windows recipes qualified during F4.
 
 For a workspace `<root>/<character>`, core checks exactly `<root>/pins.json`. An explicit `--pins
 <file>` overrides that discovery, including for standalone `prep` and file-based bakes. This is the
