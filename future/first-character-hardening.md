@@ -31,9 +31,10 @@ prepared-garment walk/jump set passes. See [cohort results](character-cohort-res
 - [ ] **Preparation:** a reviewed ownership/attachment route, refusal of ambiguous regions, and a
       separate authored-template appearance experiment. Preserve identity, asymmetry and source
       bytes. A successful Blender invocation is not a successful correction.
-- [ ] **Delivery/recovery:** sprite framing, alpha, timing, pivots, directions and preview/bake
-      agreement; cancellation/retry, low disk and preservation of accepted assets. Keep capability
-      and resource qualification per operation, with additional native/weaker hardware explicit.
+- [x] **Delivery/recovery (Windows x64):** sprite framing, alpha, timing, pivots, directions and
+      preview/bake agreement; cancellation/retry, low disk and preservation of accepted assets. Keep
+      capability and resource qualification per operation, with additional native/weaker hardware
+      explicit.
 
 ## Delivered behavior and evidence
 
@@ -126,6 +127,16 @@ are the opt-in real-backend monolith, separately configured U²-Net integration,
 engine/tool imports and the native keyboard walkthrough. The 44 actual model trials and
 exported-sheet checks are recorded separately; they do not substitute for those engine/native
 interaction gates.
+
+A copied sealed Windows payload from clean source `5e54d69` passes the native CLI offline journey
+with an empty PATH and a Unicode install/workspace path. Its 6,170 sealed files include 98
+production packages. Import, four-motion audition, rig acceptance, 72 side-view frames and
+Godot/TexturePacker/ strips/model exports complete without render flags or model downloads. Audition
+preserves the manifest, journal and mesh; the exported GLB is byte-identical to the canonical mesh
+and its three textures are present. The Unicode workspace uses an explicit valid `--character` slug.
+The initial harness's invalid directory-derived id is retained as a refused attempt, not silently
+overwritten. Evidence is in `.render-bench/first-character-packaged-2026-10-24/`. This is a copied
+CLI proof, not installed-desktop or engine playback qualification.
 
 ## Implementation order
 
