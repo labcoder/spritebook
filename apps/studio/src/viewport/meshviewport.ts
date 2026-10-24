@@ -19,6 +19,7 @@ import { SkeletonOverlay } from './skeleton';
 import { applyViewportSize, type ViewportSize } from './size';
 import { disposeTree, type MaterialLike, type TreeNode } from './dispose';
 import { solveFraming } from '@spritebook/render/camera';
+import { prepareViewportAttributes } from './attributes';
 export type CaptureCamera = Parameters<typeof solveFraming>[0];
 
 export type ViewMode = 'textured' | 'clay' | 'wire';
@@ -232,6 +233,7 @@ export class MeshViewport {
       return false;
     }
     const selected = this.#selected;
+    prepareViewportAttributes(gltf.scene);
     this.#gizmo?.detach();
     this.#clearModel();
     this.#model = gltf.scene;
