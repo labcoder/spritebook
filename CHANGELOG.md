@@ -4,6 +4,27 @@ Notable changes to SpriteBook. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version, tag, and golden policy is in
 `docs/versioning.md` in the repository.
 
+## Unreleased
+
+- Manage extensions groups models, optional tools and bundled content. Blender can use a checked
+  existing installation or an explicit portable download, with progress and ownership-aware removal.
+- Start from a mesh or the bundled CC0 reference character. Existing skin weights are preserved;
+  imports record source provenance and support undo/redo. Skinned height and grounding now affect
+  the rendered surface as well as its bounds. Integer skin weights decode correctly; invalid weights
+  and unsupported extra influences refuse before publishing an altered rig.
+- Review walking, takeoff, airborne jump and landing before accepting a rig or generated candidate.
+  Candidate auditions use a separate draft workspace and keep the selected character intact. Sampled
+  surface checks assist visual review; they do not certify clothing or anatomical binding. Already
+  upright candidates can explicitly skip automatic straightening in a separate draft. Missing review
+  images or previews can be rebuilt without repeating inference.
+- Keep complete clip/direction sequences together on atlas pages when they fit. Export checks
+  unsupported page/target combinations before writing selected targets.
+- Candidate thumbnails frame the complete mesh, including broad outstretched arms. Uncertain rig
+  labels no longer promise that contradictory joint chains can animate.
+- Retry an interrupted initial import or optional-tool install without replacing accepted assets or
+  deleting unrelated programs. Blender remains optional; experimental garment and ownership
+  corrections are not applied automatically.
+
 ## 0.5.0 - 2026-10-23 · Windows capture/export preview
 
 This unsigned preview focuses on camera composition, rendering and exporting sprites/model assets.

@@ -1,7 +1,10 @@
 # Generator choice and animation readiness
 
-Research date: 2026-10-23. Proposal and primary-source review; no new model runs, downloads,
-production changes or qualification badges. See the
+Research date: 2026-10-23. This records the original primary-source review. The approved
+implementation and its measured outcomes are tracked in
+[the first-character milestone](first-character-hardening.md),
+[cohort results](character-cohort-results.md), [ownership trial](ownership-reference-hardening.md)
+and [prepared-garment trial](prepared-garment-reference.md). See also the
 [current binding/clothing evidence](binding-clothing-followup.md),
 [maintained Blender trial](maintained-blender-trial.md) and
 [platform spike](model-platform-spike.md).
@@ -29,9 +32,10 @@ triangle count is not evidence of correct anatomical ownership or garment attach
 | SF3D / SPAR3D           | UV/material-bearing GLB; optional triangle/quad remesh. SPAR3D adds editable point-cloud conditioning for unseen geometry.                                                                                            | Worth testing as cheaper candidates, without inferring animation quality from mesh count or quads. SF3D's own demo warns remeshing can damage thin surfaces. [SF3D](https://github.com/Stability-AI/stable-fast-3d), [demo warning](https://github.com/Stability-AI/stable-fast-3d/blob/main/gradio_app.py), [SPAR3D](https://github.com/Stability-AI/stable-point-aware-3d) |
 
 The reviewed static-generation interfaces do not make animation readiness a validated output
-contract. This is a scope observation, not proof that every resulting mesh is defective. We have no
-controlled SpriteBook cohort supporting “TRELLIS.2 is worse/better than Pixal3D for animation.” The
-current Pixal3D/TRELLIS.2 relationship also makes them less independent than their names imply.
+contract. This is a scope observation, not proof that every resulting mesh is defective. The
+[matched SpriteBook trial](character-cohort-results.md) compares their actual downstream behavior;
+its small procedural cohort does not establish a general reliability ranking. The current
+Pixal3D/TRELLIS.2 relationship also makes them less independent than their names imply.
 
 ## Alternatives that change the problem
 
@@ -60,7 +64,8 @@ current Pixal3D/TRELLIS.2 relationship also makes them less independent than the
    walk/jump probes, before users invest in look development or a full bake. Keep visual likeness,
    silhouette quality, source integrity and motion checks separate; lower stretch alone already
    selected visibly bad repairs in our experiments. Offer a focused retry or guided repair, not
-   repeated unbounded generation. This uses the existing pipeline; it is not yet implemented.
+   repeated unbounded generation. Explicit draft-rig audition now uses the existing pipeline;
+   automatic quality ranking remains unqualified.
 
 ## A bounded comparison before choosing another default
 
@@ -89,8 +94,9 @@ downloads, intervention and visible defects. “Generated a valid GLB” is an i
 
 ## Recommended next milestone: a dependable first animated character
 
-This is a proposal, not a change to the approved implementation or a claim of qualification. Work
-F5-T2/F6-T1 into an F6-T4 proof in this order:
+Approved by the maintainer on 2026-10-23. Execution and measured acceptance live in
+[the first-character milestone](first-character-hardening.md); approval does not establish quality
+qualification. Work F5-T2/F6-T1 into an F6-T4 proof in this order:
 
 1. **Establish the reference.** Reuse a rights-cleared authored character and bundled clips for a
    small offline project that reaches walk/jump preview, bake and export without model downloads.
@@ -160,5 +166,7 @@ excluding EU/UK/South Korea; they are unsuitable as an unrestricted worldwide de
 require their gated custom terms; a smaller download is not a license exemption.
 [SF3D agreement](https://huggingface.co/stabilityai/stable-fast-3d/blob/main/LICENSE.md).
 
-No new generator, segmentation method or portable engine was executed for this review. Proposed
-routes remain hypotheses until both whole-character motion and final sprite output pass.
+The original primary-source review executed no new generator, segmentation method or portable
+engine. The subsequent matched trials use the two existing generators; their results are linked
+above. Other proposed providers remain hypotheses until whole-character motion and final sprite
+output pass.

@@ -3,7 +3,7 @@
 **One reference image in. Engine-ready character spritesheets out.**
 
 SpriteBook is a free, local-first tool for 2D game developers. It converts a single character
-reference image into a rigged, animated 3D model, then renders that model into stylized,
+reference image into a rigged, animated 3D model, then renders that model into natural or stylized,
 temporally-stable spritesheets — every animation, every direction, every frame — packed into atlases
 and exported for Godot, Aseprite, TexturePacker, and more.
 
@@ -29,6 +29,10 @@ generated motion. Native Mac/Linux/ARM desktop use and signed distribution remai
 Headless-first: everything is a CLI verb driven by manifests; the desktop GUI is a slim wrapper that
 shows its CLI twin for every action. See [`docs/prd.md`](docs/prd.md) for the product spec and
 [`docs/architecture/architecture.md`](docs/architecture/architecture.md) for the system laws.
+
+You can also import an existing mesh and preserve its authored rig. The
+[offline reference](docs/quickstart.md) needs no model downloads. On current `main`, walking and
+jumping can be reviewed before picking a generated candidate, without replacing the selected mesh.
 
 ## Documentation
 
@@ -78,13 +82,14 @@ For iterative work, run `npm run build:watch` and `npm run test:watch` in separa
 exercise emitted modules. Browser mode uses labeled demo data; real workspaces, jobs and thumbnails
 use `dev:desktop`, whose bridge invokes the same compiled CLI.
 
-The [migration roadmap](future/roadmap.md) records F0/F1/F2/F4 as complete within Windows x64 scope;
-F7 release qualification is next. CI uses Node on Linux, macOS and Windows, with a separate Linux
-lavapipe lane. Candidate artifacts are for qualification: additional native platform execution,
-unprovisioned clean-machine workflows, signing and native notices remain release gates. Windows
-installed TRELLIS.2/UniRig and Pixal3D workflows have recorded offline evidence. No Deno executable
-is needed for supported development, CI or application flows. Pinned legacy sources remain available
-through Git for preserved-copy rollback.
+The [migration roadmap](future/roadmap.md) records F0/F1/F2/F4 as complete within Windows x64 scope.
+The [first-character quality milestone](future/first-character-hardening.md) is active; F7 release
+qualification remains open. CI uses Node on Linux, macOS and Windows, with a separate Linux lavapipe
+lane. Candidate artifacts are for qualification: additional native platform execution, unprovisioned
+clean-machine workflows, signing and native notices remain release gates. Windows installed
+TRELLIS.2/UniRig and Pixal3D workflows have recorded offline evidence. No Deno executable is needed
+for supported development, CI or application flows. Pinned legacy sources remain available through
+Git for preserved-copy rollback.
 
 ## License
 

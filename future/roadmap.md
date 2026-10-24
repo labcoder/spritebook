@@ -6,8 +6,11 @@ repository, a parallel replacement app, or a full Rust/GPUI implementation.
 
 This is the execution plan for that approved direction. **F0 baseline capture is complete as of
 2026-10-19; F1 state-safety work, the Windows x64 F2 proof and all F4 tasks are complete, including
-the approved Pixal3D integration and hardware/platform spike. F7 release qualification is next.**
-The [conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
+the approved Pixal3D integration and hardware/platform spike. F7 release qualification remains
+open.** The published 0.5.0 capture/export preview has a deliberately narrower scope. Current
+maintainer-approved work is the [first animated character milestone](first-character-hardening.md),
+spanning F5-T2/F6-T1/F6-T4; it does not close F7 by implication. The
+[conformance/platform matrix](baseline.md) records fresh Windows evidence, known defects and
 unverified targets. Closing baseline capture does not close platform, installed-app, model or
 release qualification gates. A task closes on evidence, not on a compiled binary or an optimistic
 support claim. Exact dependency pins and schema changes follow the existing BOM/decision process;
@@ -19,6 +22,10 @@ model/runtime/platform combinations require their own qualification.
 **Required migration: F0 → F1 → F2 → F4 → F7.** Then improve models, the editor and roster scale
 through **F3 → F5 → F6**. F-numbers retain the earlier task identities; their numeric order is not
 the execution order. Later work must not delay a safe Deno exit.
+
+The maintainer subsequently approved the first-character quality work before final F7 closure. Keep
+its motion, native-platform and release gates separate; the runtime migration is complete on the
+recorded Windows target even while those broader gates remain open.
 
 Use **supported Node LTS** as the replacement runtime target. Qualify **Node/Dawn first**,
 preserving the renderer's TypeScript host code and WGSL. If that fails a specific correctness,
@@ -589,6 +596,23 @@ cohort, early motion audition, reviewed preparation and complete delivery/recove
 is a demonstrated problem; clean cloth jump/loop failures also require a prepared reference. Keep
 original assets and rejected candidates, with no quality claims based solely on process exit.
 
+The authored offline import, isolated candidate audition, complete-sequence packing and interrupted
+tool-stage recovery are implemented. Real reference exports establish selected-frame preview/bake
+parity, alpha/timing/pivots, cache reuse and two 4K cells. The
+[matched valid-reference cohort](character-cohort-results.md) completes 24 of 32 pipelines; all four
+skirts and one relaxed-arm result still fail visual motion review. Technical completion does not
+establish accepted appearance or motion. [Ownership](ownership-reference-hardening.md) and
+[prepared garment](prepared-garment-reference.md) trials reject automatic promotion: better average
+stretch or a finished simulation still permits severe local damage, coverage loss or failed jump
+motions. Keep this quality milestone open, preserve the successful capture/export path and retain
+Blender as an optional extension.
+
+The matched valid-reference cases also expose contradictory semantic joint names. The next binding
+work must repair mapping from supported hierarchy/anatomical evidence in a separately versioned
+recipe, replaying frozen failures and retaining refusal when uncertain. Do not weaken retarget
+ancestry validation, silently bypass upright estimation, or count a completed sprite export as
+clothing acceptance. The explicit upright opt-out is a separate user-selected draft recipe.
+
 ## Feature preservation map
 
 | Existing capability                                                      | Migration protection                                                | Later improvement                  |
@@ -615,9 +639,10 @@ original assets and rejected candidates, with no quality claims based solely on 
 4. **Completed — F4:** package, renderer, application/tooling and Windows installed proofs pass,
    including existing-model provisioning/licensing, Pixal3D integration, real offline inference,
    byte-exact fresh-worker replay, recovery and the model hardware/platform spike.
-5. **Next — F7:** qualify release artifacts, additional native platforms, clean-machine
-   prerequisites, signing and upgrades. Put unrelated model, editor, dependency and performance work
-   in the later tasks above.
+5. **Active — F5-T2/F6-T1/F6-T4:** complete the approved
+   [first-character quality work](first-character-hardening.md), keeping measured binding and
+   garment failures open. F7 remains the next migration qualification gate: release artifacts,
+   additional native platforms, clean-machine prerequisites, signing and upgrades.
 
 Use these task IDs in implementation changes, include the relevant original P-task IDs where
 behavior is carried forward, and update the progress log with actual measurements and remaining
