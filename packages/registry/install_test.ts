@@ -573,3 +573,31 @@ test('rm: removes a version (sweeping the empty model dir) or the whole model', 
     await fs.rm(rig.tmp, { recursive: true });
   }
 });
+
+test('rm refuses path-like model identifiers and linked parents without touching sibling files', async () => {
+  const rig = await installRig();
+  const marker = `${rig.tmp}/keep.txt`;
+  try {
+    await fs.writeFile(marker, 'keep');
+    await collect(install(rig));
+    for (const modelId of ['..', '../sibling', '..\\sibling', '/outside', 'C:\\outside', '']) {
+      const events = await collect(runRmJob({ jobId: 'job-rm', root: rig.root, modelId }));
+      assertEquals(events.at(-1)?.t, 'error');
+      assertEquals(await fs.readFile(marker, 'utf8'), 'keep');
+      assert(await resolveInstalled(rig.root, 'toy-rig'));
+    }
+    await fs.symlink(
+      rig.tmp,
+      `${rig.root}/linked-model`,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const events = await collect(
+      runRmJob({ jobId: 'job-rm', root: rig.root, modelId: 'linked-model', version: '1.0' }),
+    );
+    assertEquals(events.at(-1)?.t, 'error');
+    assertEquals(await fs.readFile(marker, 'utf8'), 'keep');
+    await fs.unlink(`${rig.root}/linked-model`);
+  } finally {
+    await fs.rm(rig.tmp, { recursive: true, force: true });
+  }
+});

@@ -11,14 +11,23 @@ import { type InstallReceipt, InstallReceiptSchema, parseWith } from '@spriteboo
 
 export const RECEIPT_FILE = 'receipt.json';
 
+/** A validated model directory, including operations on all its versions. */
+export function modelDir(root: string, id: string): string {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) {
+    throw Object.assign(new Error(`Invalid model id path: ${id}`), { code: 'invalid-pins' });
+  }
+  return `${root}/${id}`;
+}
+
 /** `<root>/<modelId>/<version>` — one spelling for every module. */
 export function versionDir(root: string, id: string, version: string): string {
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(id) || !/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(version)) {
+  const dir = modelDir(root, id);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(version)) {
     throw Object.assign(new Error(`Invalid model id/version path: ${id}@${version}`), {
       code: 'invalid-pins',
     });
   }
-  return `${root}/${id}/${version}`;
+  return `${dir}/${version}`;
 }
 
 /**

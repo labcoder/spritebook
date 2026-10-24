@@ -51,6 +51,7 @@ import {
   compareVersions,
   getReceipt,
   listInstalled,
+  modelDir,
   RECEIPT_FILE,
   resolveInstalled,
   versionDir,
@@ -466,7 +467,7 @@ export async function* runVerifyJob(opts: VerifyJobOpts): AsyncIterable<JobEvent
     }
     if (version === undefined || receipt === null) {
       const dir = version === undefined
-        ? `${opts.root}/${opts.modelId}`
+        ? modelDir(opts.root, opts.modelId)
         : versionDir(opts.root, opts.modelId, version);
       const remnant = await dirExists(dir);
       throw new JobFail(
@@ -566,8 +567,17 @@ export async function* runRmJob(opts: RmJobOpts): AsyncIterable<JobEvent> {
 
   try {
     const target = opts.version === undefined
-      ? `${opts.root}/${opts.modelId}`
+      ? modelDir(opts.root, opts.modelId)
       : versionDir(opts.root, opts.modelId, opts.version);
+    const parent = modelDir(opts.root, opts.modelId);
+    if (
+      (await fs.lstat(parent).catch((error) => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      }))?.isSymbolicLink()
+    ) {
+      throw new JobFail('rm-failed', `Refusing to remove a linked model directory: ${parent}`);
+    }
     if (!(await dirExists(target))) {
       throw new JobFail(
         'not-installed',
@@ -579,7 +589,6 @@ export async function* runRmJob(opts: RmJobOpts): AsyncIterable<JobEvent> {
     if (opts.version !== undefined) {
       // sweep the model dir when the last version is gone — an empty dir is
       // not "installed" and must not linger in listings or on disk
-      const parent = `${opts.root}/${opts.modelId}`;
       const left = await fs.readdir(parent, { withFileTypes: true }).catch(() => null);
       if (left !== null && left.length === 0) await fs.rmdir(parent);
     }
