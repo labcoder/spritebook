@@ -6,6 +6,22 @@ Notable changes to SpriteBook. The format follows
 
 ## Unreleased
 
+## 0.6.0 - 2026-10-24 · Windows workbench preview
+
+Automatic binding and clothing motion still need review. This preview improves the workflow and
+capture/export reliability; it does not certify generated rigs or collision-free animation.
+
+- Delete a character project from its context menu, Edit menu or command palette, with explicit
+  confirmation. Generated assets are removed; original inputs and unrelated user files remain.
+- Export validates atlas paths, stages delivery and restores the previous files after a failed or
+  cancelled publication. A later export recovers interrupted publication before writing again.
+- Keep decoded atlas memory bounded during strip export. Release GPU resources after failed jobs,
+  partial setup and early event-consumer closure.
+- Reject unsafe model-removal paths and prototype traversal in saved journal patches. Bound native
+  preview/log reads and release file-drop subscriptions when their form closes.
+- Reorganize public documentation into user and developer guides, with a real workbench screenshot.
+  Patch Vite, Zod and URI parsing dependencies to resolve reported advisories.
+
 - Manage extensions groups models, optional tools and bundled content. Blender can use a checked
   existing installation or an explicit portable download, with progress and ownership-aware removal.
 - Start from a mesh or the bundled CC0 reference character. Existing skin weights are preserved;
