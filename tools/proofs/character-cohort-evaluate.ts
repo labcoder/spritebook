@@ -11,7 +11,7 @@ const refs = JSON.parse(await fs.readFile(join(root, 'references.json'), 'utf8')
   id: string;
   imageSha256: string;
 }[];
-assert.equal(refs.length, 8);
+assert([1, 2, 8].includes(refs.length), 'Use a frozen baseline or corrected-control cohort');
 const deadline = Date.now() + 4 * 60 * 60 * 1000;
 const digest = async (path: string) => sha256Bytes(await fs.readFile(path));
 while (Date.now() < deadline) {
@@ -218,7 +218,7 @@ while (Date.now() < deadline) {
       }
     }
   }
-  if (complete === 32) break;
+  if (complete === refs.length * 4) break;
   await new Promise((resolve) => setTimeout(resolve, 20000));
 }
 assert(Date.now() < deadline, 'Cohort exceeded its four-hour bound; retained partial evidence');

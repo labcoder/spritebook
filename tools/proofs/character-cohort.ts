@@ -1,4 +1,4 @@
-/** Rights-cleared controlled designs; explicit --run executes the 32-case local qualification. */
+/** Frozen CC0 inputs; --run executes bounded inference. Corrected controls retain invalid inputs separately. */
 import { strict as assert } from 'node:assert';
 import { promises as fs } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -14,6 +14,7 @@ import { resourcePath, sha256Bytes } from '@spritebook/core';
 import { BUNDLED_PACK } from '@spritebook/pack';
 import { disposeGpu, runRenderJob } from '@spritebook/render';
 import { resolveCamera } from '@spritebook/core';
+import { decode } from '@spritebook/image';
 import {
   documentToRiggedAsset,
   mat4Multiply,
@@ -36,7 +37,20 @@ const designs = [
   { id: 'skirt', body: 'ubc-female', scale: [1, 1, 1], skirt: true },
   { id: 'loose-cuffs', body: 'ubc-male', scale: [1, 1, 1], cuffs: true },
   { id: 'asymmetric-mark', body: 'ubc-female', scale: [1, 1, 1], asymmetric: true },
-];
+  { id: 'attached-cuffs', body: 'ubc-male', scale: [1, 1, 1], cuffs: true, attached: true },
+  {
+    id: 'attached-asymmetry',
+    body: 'ubc-female',
+    scale: [1, 1, 1],
+    asymmetric: true,
+    attached: true,
+  },
+  { id: 'framed-broad', body: 'ubc-male', scale: [1.3, .8, 1.2], framed: true },
+].filter((design) =>
+  process.argv.includes('--framed-broad')
+    ? design.framed === true
+    : (design.attached === true) === process.argv.includes('--attached-controls') && !design.framed
+);
 const references: { id: string; image: string; imageSha256: string; recipe: unknown }[] = [];
 let frozenText: string | undefined;
 try {
@@ -68,6 +82,14 @@ if (references.length === 0) {
       await fs.mkdir(dir, { recursive: true });
       const source = resourcePath('rig', `bodies/${design.body}/body.glb`);
       const doc = await io.read(source);
+      const forearms = new Map(['l', 'r'].map((side) => {
+        const point = (name: string) =>
+          doc.getRoot().listNodes().find((n) => n.getName() === name)!.getWorldMatrix().slice(
+            12,
+            15,
+          );
+        return [side, { elbow: point(`lowerarm_${side}`), wrist: point(`hand_${side}`) }];
+      }));
       const asset = documentToRiggedAsset(doc, design.id);
       let positions = asset.positions;
       if (design.relaxed) {
@@ -151,6 +173,7 @@ if (references.length === 0) {
           );
         const node = doc.createNode(name).setMesh(doc.createMesh(name).addPrimitive(prim));
         doc.getRoot().listScenes()[0].addChild(node);
+        return node;
       };
       if (design.skirt) {
         addRingSurface(
@@ -168,7 +191,33 @@ if (references.length === 0) {
           ],
         );
       }
-      if (design.cuffs) {
+      if (design.attached) {
+        for (const side of design.asymmetric ? ['l'] : ['l', 'r']) {
+          const { elbow, wrist } = forearms.get(side)!;
+          const center = wrist.map((value, index) => .3 * elbow[index] + .7 * value) as [
+            number,
+            number,
+            number,
+          ];
+          const radius = design.asymmetric ? .05 : .085;
+          const cuff = addRingSurface(
+            'Reviewed forearm band',
+            0,
+            -.055,
+            .055,
+            radius,
+            radius,
+            design.asymmetric ? [.85, .08, .1, 1] : [.3, .55, .25, 1],
+          );
+          cuff.setRotation([0, 0, Math.SQRT1_2, Math.SQRT1_2]).setTranslation(center);
+          const world = cuff.getWorldMatrix();
+          assert(Math.hypot(...center.map((value, index) => value - world[12 + index])) < 1e-6);
+          assert(
+            Math.abs(world[4]) > .99 && Math.abs(world[5]) < 1e-6,
+            'Cuff axis follows the horizontal forearm',
+          );
+        }
+      } else if (design.cuffs) {
         for (const side of [-1, 1]) {
           addRingSurface(
             'Loose cuff',
@@ -181,7 +230,7 @@ if (references.length === 0) {
           );
         }
       }
-      if (design.asymmetric) {
+      if (design.asymmetric && !design.attached) {
         addRingSurface(
           'Asymmetric red accessory',
           height * .28,
@@ -201,7 +250,7 @@ if (references.length === 0) {
           camera: resolveCamera('standard-30', {
             elevationDeg: 0,
             directions: 2,
-            pixelsPerMeter: 200 / design.scale[1],
+            pixelsPerMeter: design.framed ? 170 : 200 / design.scale[1],
             cellPx: { w: 512, h: 512 },
             paddingPx: 12,
           }),
@@ -226,7 +275,7 @@ if (references.length === 0) {
   } finally {
     disposeGpu();
   }
-  assert.equal(references.length, 8);
+  assert.equal(references.length, designs.length);
   await fs.writeFile(
     join(root, 'references.json'),
     JSON.stringify(
@@ -241,6 +290,33 @@ if (references.length === 0) {
     ),
   );
 }
+
+const inputAudit = [];
+for (const reference of references) {
+  const pixels = decode(await fs.readFile(reference.image));
+  const edges = { left: 0, right: 0, top: 0, bottom: 0 };
+  for (let y = 0; y < pixels.height; y++) {
+    for (let x = 0; x < pixels.width; x++) {
+      if (!pixels.data[(y * pixels.width + x) * 4 + 3]) continue;
+      if (x === 0) edges.left++;
+      if (x === pixels.width - 1) edges.right++;
+      if (y === 0) edges.top++;
+      if (y === pixels.height - 1) edges.bottom++;
+    }
+  }
+  const touchesEdge = Object.values(edges).some((count) => count > 0);
+  if (reference.id.startsWith('attached-') || reference.id === 'framed-broad') {
+    assert(!touchesEdge, 'A corrected full-body reference must not crop its silhouette');
+  }
+  inputAudit.push({
+    id: reference.id,
+    imageSha256: reference.imageSha256,
+    edges,
+    touchesEdge,
+    scope: 'Pixel framing only; ownership and anatomy need visual review',
+  });
+}
+await fs.writeFile(join(root, 'input-audit.json'), JSON.stringify(inputAudit, null, 2));
 
 if (execute) {
   for (const reference of references) {
