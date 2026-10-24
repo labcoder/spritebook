@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import { test } from 'node:test';
 import { assert, assertEquals, assertThrows } from '@std/assert';
 import { canonicalJson, ManifestPatchSchema, parseWith } from '@spritebook/schema';
-import { ManifestJournal } from './dist/journal.js';
+import { applyPatchOps, ManifestJournal } from './dist/journal.js';
 
 const now = () => '2026-07-12T00:00:00Z';
 const target = { kind: 'character', id: 'brave-knight' } as const;
@@ -231,4 +231,34 @@ test('JSON Pointer escapes (~0 ~1) resolve correctly', () => {
     label: 'escaped',
   });
   assertEquals(journal.doc, { 'a/b': { 'c~d': 2 } });
+});
+
+test('patch commit and replay refuse prototype paths without changing state or globals', () => {
+  for (
+    const path of [
+      '/source/__proto__/auditFlag',
+      '/source/constructor/prototype/auditFlag',
+      '/__proto__',
+    ]
+  ) {
+    const journal = new ManifestJournal({ source: {}, keep: 1 }, { now });
+    const op = { op: 'add', path, value: { auditFlag: 1 } } as const;
+    assertThrows(() => journal.commit({ target, op: [op], label: 'Unsafe patch' }));
+    assertThrows(() => applyPatchOps(journal.doc, [op]));
+    assertThrows(() =>
+      journal.replay({
+        seq: 0,
+        at: now(),
+        target,
+        op: [op],
+        inverse: [{ op: 'remove', path }],
+        label: 'Unsafe stored patch',
+      })
+    );
+    assertEquals(journal.doc, { source: {}, keep: 1 });
+    assertEquals(journal.undoDepth, 0);
+    assertEquals(Object.hasOwn(Object.prototype, 'auditFlag'), false);
+  }
+  assertThrows(() => applyPatchOps({}, [{ op: 'replace', path: '/toString', value: 1 }]));
+  assertThrows(() => applyPatchOps({}, [{ op: 'add', path: '/toString/nested', value: 1 }]));
 });

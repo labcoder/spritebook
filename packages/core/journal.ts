@@ -19,7 +19,13 @@ type Doc = Record<string, unknown>;
 function segments(path: string): string[] {
   if (path === '') return [];
   if (!path.startsWith('/')) throw new Error(`invalid JSON Pointer: "${path}"`);
-  return path.slice(1).split('/').map((s) => s.replaceAll('~1', '/').replaceAll('~0', '~'));
+  const parts = path.slice(1).split('/').map((s) => s.replaceAll('~1', '/').replaceAll('~0', '~'));
+  if (
+    parts.some((part) => part === '__proto__' || part === 'prototype' || part === 'constructor')
+  ) {
+    throw new Error(`unsafe JSON Pointer: "${path}"`);
+  }
+  return parts;
 }
 
 interface Site {
@@ -65,7 +71,7 @@ function child(node: unknown, seg: string, path: string): unknown {
   }
   if (node !== null && typeof node === 'object') {
     const obj = node as Record<string, unknown>;
-    if (!(seg in obj)) throw new Error(`path segment "${seg}" not found in "${path}"`);
+    if (!Object.hasOwn(obj, seg)) throw new Error(`path segment "${seg}" not found in "${path}"`);
     return obj[seg];
   }
   throw new Error(`cannot descend into non-object at "${path}"`);
@@ -74,7 +80,7 @@ function child(node: unknown, seg: string, path: string): unknown {
 function has(site: Site): boolean {
   return Array.isArray(site.parent)
     ? (site.key as number) < site.parent.length
-    : (site.key as string) in site.parent;
+    : Object.hasOwn(site.parent, site.key);
 }
 
 function read(site: Site): unknown {
