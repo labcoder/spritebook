@@ -63,7 +63,14 @@ test('motion audition preserves the authored rig and binds evidence to its exact
     assert.deepEqual(await fs.readFile(join(workspace, 'anim/motion-review.json')), saved);
     const pack = JSON.parse(await fs.readFile(join(BUNDLED_PACK, 'pack.json'), 'utf8'));
     const explicit = join(root, 'allowed-pins.json');
-    await fs.writeFile(explicit, JSON.stringify({ models: {}, packs: { [pack.id]: pack.version }, rendererVersion: 'reserved' }));
+    await fs.writeFile(
+      explicit,
+      JSON.stringify({
+        models: {},
+        packs: { [pack.id]: pack.version },
+        rendererVersion: 'reserved',
+      }),
+    );
     assert.equal(await run(['anim', '--review', '--workspace', workspace, '--pins', explicit]), 0);
     assert.equal(JSON.parse(lines.at(-1)!).sourceSha256, report.sourceSha256);
   } finally {

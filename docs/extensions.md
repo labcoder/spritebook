@@ -46,15 +46,16 @@ spritebook extensions rm blender               # forget external / remove select
 spritebook extensions rm blender@4.5.15        # remove only this managed copy
 ```
 
-``install --from <archive.zip>`` reuses an offline archive with the same hash checks. `--tools-dir
-
-<dir>` overrides tool storage; it does not change model storage or project pins. Normal storage is
-`tools/` beside the existing `models/` and `runtime/` directories in platform application data.
-`tools/blender.json` records the explicit choice; `tools/blender/<version>/` owns the downloaded
-program and receipt. Invalid selections never silently fall back to another installation. Choose
-again or forget the invalid selection; managed directories require a valid ownership receipt to
-remove. Failed installs leave the prior selection intact. A killed process can leave an unselected
-`.staging-*` directory; interrupted-install cleanup is still an F7 gate.
+`install --from <archive.zip>` reuses an offline archive with the same hash checks.
+`--tools-dir <dir>` overrides tool storage; it does not change model storage or project pins. Normal
+storage is `tools/` beside the existing `models/` and `runtime/` directories in platform application
+data. `tools/blender.json` records the explicit choice; `tools/blender/<version>/` owns the
+downloaded program and receipt. Invalid selections never silently fall back to another installation.
+Choose again or forget the invalid selection; managed directories require a valid ownership receipt
+to remove. Failed installs leave the prior selection intact. On retry, the exclusive installer lock
+allows cleanup of abandoned `.staging-*` directories carrying SpriteBook's matching ownership
+marker. Unmarked directories, malformed ownership markers and junctions are preserved. Older
+unmarked stages need explicit cleanup; they are never guessed to be disposable.
 
 Managed downloads currently cover Windows x64. Existing-program checks on Mac/Linux/ARM do not
 constitute native qualification. No RTX 3090 requirement applies to selecting Blender; resource and
