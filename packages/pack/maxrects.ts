@@ -165,3 +165,58 @@ export function packLayout(cells: PackCell[], opts: PackOptions = {}): PackLayou
   }
   return layout;
 }
+
+/** Keep each uniform clip/direction together when it fits a page; retain honest overflow otherwise. */
+export function packAnimationLayout(cells: PackCell[], opts: PackOptions = {}): PackLayout {
+  const original = packLayout(cells, opts);
+  if (original.pageCount <= 1) return original;
+  const { w, h } = cells[0];
+  if (cells.some((cell) => cell.w !== w || cell.h !== h)) return original;
+  const gap = opts.gapPx ?? DEFAULT_GAP_PX;
+  const cap = original.pageSizePx;
+  const groups = new Map<string, PackCell[]>();
+  for (const cell of cells) {
+    const key = JSON.stringify([cell.id.clipId, cell.id.direction]);
+    const group = groups.get(key) ?? [];
+    group.push(cell);
+    groups.set(key, group);
+  }
+  const blocks: (PackCell & { columns: number; cells: PackCell[] })[] = [];
+  for (const group of groups.values()) {
+    group.sort((a, b) => a.id.frame - b.id.frame);
+    let best: { columns: number; w: number; h: number } | undefined;
+    for (
+      let columns = 1;
+      columns <= Math.min(group.length, Math.floor((cap + gap) / (w + gap)));
+      columns++
+    ) {
+      const width = columns * (w + gap) - gap;
+      const height = Math.ceil(group.length / columns) * (h + gap) - gap;
+      if (height > cap) continue;
+      if (
+        !best || width * height < best.w * best.h ||
+        width * height === best.w * best.h && Math.max(width, height) < Math.max(best.w, best.h)
+      ) {
+        best = { columns, w: width, h: height };
+      }
+    }
+    if (!best) return original;
+    blocks.push({ id: group[0].id, ...best, cells: group });
+  }
+  const layout = packLayout(blocks, opts);
+  const byKey = new Map(blocks.map((block) => [frameIdKey(block.id), block]));
+  return {
+    ...layout,
+    rects: layout.rects.flatMap((rect) => {
+      const block = byKey.get(frameIdKey(rect.id))!;
+      return block.cells.map((cell, index) => ({
+        id: cell.id,
+        pageIndex: rect.pageIndex,
+        x: rect.x + index % block.columns * (w + gap),
+        y: rect.y + Math.floor(index / block.columns) * (h + gap),
+        w,
+        h,
+      }));
+    }).sort((a, b) => frameIdKey(a.id) < frameIdKey(b.id) ? -1 : 1),
+  };
+}

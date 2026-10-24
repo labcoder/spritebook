@@ -71,7 +71,7 @@ import { artifactKey, bakeKey, BlobCache, frameKey, rigForKey } from './cache.ts
 import { assembleManifest, frameGrid } from './manifest.ts';
 import { assertRenderedPrefix, flipCellPng, type MirrorPlan, mirrorPlan } from './mirror.ts';
 import { composePage, encodePagePng } from './atlas.ts';
-import { packLayout } from './maxrects.ts';
+import { packAnimationLayout } from './maxrects.ts';
 import { aov1x } from './aov1x.ts';
 import { buildContactSheet, contactThumbnail } from './contactsheet.ts';
 
@@ -259,7 +259,7 @@ export async function buildCacheInputs(
       ambient: spec.style.lighting?.ambient ?? AMBIENT,
       lightFrame: spec.lightFrame ?? spec.style.lighting?.frame ?? DEFAULT_LIGHT_FRAME,
     })),
-    rendererVersion: renderSig,
+    rendererVersion: `${renderSig}|animation-atlas@1`,
     // The backend that made this character, when one did. `source-mesh@0` is
     // the sentinel for NOT GENERATED HERE — a mesh that came in through the
     // importer border — which is the truth for a bare-file bake and was a lie
@@ -762,7 +762,7 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
     // that disagrees with its lit rect refuses to composite); asserting rect
     // identity on five references to this one object would be theater (m5) —
     // assertRectIdentity remains for callers holding genuinely separate layouts.
-    const layout = packLayout(
+    const layout = packAnimationLayout(
       grid.map((id) => {
         return { id, w: spec.camera.cellPx.w, h: spec.camera.cellPx.h };
       }),

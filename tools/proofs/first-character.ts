@@ -55,6 +55,8 @@ try {
       yaw,
       '--ppm',
       ppm,
+      '--padding',
+      name === 'iso-256' ? '64' : '8',
       '--cache',
       join(root, 'cache'),
     ]);
@@ -63,6 +65,7 @@ try {
     assert.equal(bake.manifest.frames.length, 52 * Number(directions));
     assert.equal(bake.manifest.frames.some((frame) => frame.mirroredFrom), false);
     assert.equal(bake.manifest.flags.some((flag) => flag.severity === 'error'), false);
+    assert.equal(bake.manifest.flags.some((flag) => flag.code === 'silhouette-clipped'), false);
     for (const page of bake.manifest.atlases) {
       const image = decode(await readFile(join(bake.dir, page.png)));
       assert.equal(image.width, page.sizePx);

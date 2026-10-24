@@ -1,7 +1,12 @@
 import { test } from 'node:test';
 import { assert, assertEquals, assertThrows } from '@std/assert';
 import { frameIdKey, type PackLayout } from './dist/contracts.js';
-import { type PackCell, packLayout, PINNED_PACKER_OPTIONS } from './dist/maxrects.js';
+import {
+  packAnimationLayout,
+  type PackCell,
+  packLayout,
+  PINNED_PACKER_OPTIONS,
+} from './dist/maxrects.js';
 
 function cell(clipId: string, direction: number, frame: number, w: number, h: number): PackCell {
   return { id: { clipId, direction, frame }, w, h };
@@ -15,6 +20,37 @@ function uniform16(): PackCell[] {
   }
   return cells;
 }
+
+test('multi-page animation packing keeps complete sequences together without overlap or dropped frames', () => {
+  const cells = Array.from(
+    { length: 8 },
+    (_, direction) =>
+      Array.from({ length: 16 }, (_, frame) => cell('walk', direction, frame, 256, 320)),
+  ).flat();
+  const layout = packAnimationLayout(cells);
+  assert(layout.pageCount > 1);
+  assertEquals(layout.rects.length, cells.length);
+  assertEquals(new Set(layout.rects.map((rect) => frameIdKey(rect.id))).size, cells.length);
+  for (let direction = 0; direction < 8; direction++) {
+    assertEquals(
+      new Set(
+        layout.rects.filter((rect) => rect.id.direction === direction).map((rect) =>
+          rect.pageIndex
+        ),
+      ).size,
+      1,
+    );
+  }
+  assertSeparated(layout, 2);
+  assertEquals(layout, packAnimationLayout([...cells].reverse()));
+});
+
+test('animation larger than a page retains every frame for multi-page-capable exporters', () => {
+  const cells = Array.from({ length: 8 }, (_, frame) => cell('large', 0, frame, 512, 512));
+  const layout = packAnimationLayout(cells, { maxPageSizePx: 512 });
+  assertEquals(layout.pageCount, 8);
+  assertEquals(layout.rects.length, 8);
+});
 
 /** Mixed sizes — packLayout must not assume uniform cells. */
 function mixed(): PackCell[] {
