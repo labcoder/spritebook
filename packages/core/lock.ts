@@ -4,10 +4,13 @@ import { createInterface } from 'node:readline';
 import { resourcePath } from './resources.ts';
 
 /** Kernel locking is native; acquisition order and reentrancy stay in persistence. */
-export async function acquireFileLock(path: string) {
+export async function acquireFileLock(path: string, nonblocking = false) {
   const binary = resourcePath('core', 'spritebook-lock') +
     (process.platform === 'win32' ? '.exe' : '');
-  const child = spawn(binary, [path], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(binary, [path, ...(nonblocking ? ['--try'] : [])], {
+    windowsHide: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
   const closed = once(child, 'close');
   let stderr = '';
   child.stderr.setEncoding('utf8').on('data', (text) => stderr = (stderr + text).slice(-8192));
@@ -19,6 +22,9 @@ export async function acquireFileLock(path: string) {
         throw new Error(stderr || 'Workspace lock helper exited before acquisition.');
       }),
     ]);
+    if (line === 'busy') {
+      throw new Error('This project is busy. Finish or cancel its current operation, then retry.');
+    }
     if (line !== 'locked') throw new Error('Invalid workspace lock helper response.');
   } catch (error) {
     child.kill();

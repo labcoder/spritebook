@@ -2395,4 +2395,13 @@ textarea {
 .motion-review-pixels { overflow: auto; background: var(--sb-check-a); }
 .motion-review-pixels img { display: block; max-width: none; image-rendering: pixelated; }
 .motion-review-results .rig-posebar { justify-content: space-between; }
+.delete-project { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow: auto; padding: 24px; background: var(--sb-panel); border: 1px solid var(--sb-line-strong); box-shadow: 0 16px 50px #0005; }
+.delete-project h2 { margin: 0 0 18px; font-size: 18px; }
+.delete-project h2 span { font-weight: 600; }
+.delete-project p { line-height: 1.7; }
+.delete-preserved { color: var(--sb-dim); }
+.delete-path { overflow-wrap: anywhere; font-size: 12px; }
+.delete-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.delete-actions .danger { color: var(--sb-on-danger); background: var(--sb-danger); border-color: var(--sb-danger); }
+.menuitem.destructive { color: var(--sb-danger); }
 @media(min-width: 1200px) { .capture-workspace { display: grid; grid-template-columns: minmax(0,1fr) minmax(240px,0.6fr); align-items: stretch; } .capture-output { align-self: center; } .capture-flat { height: 320px; } }

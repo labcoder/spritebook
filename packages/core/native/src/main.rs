@@ -11,7 +11,17 @@ fn main() -> io::Result<()> {
         .create(true)
         .truncate(false)
         .open(path)?;
-    lock(&file)?;
+    let nonblocking = std::env::args_os().nth(2).is_some_and(|arg| arg == "--try");
+    if let Err(error) = lock(&file, nonblocking) {
+        if nonblocking
+            && (error.kind() == io::ErrorKind::WouldBlock
+                || (cfg!(windows) && error.raw_os_error() == Some(33)))
+        {
+            writeln!(io::stdout(), "busy")?;
+            return Ok(());
+        }
+        return Err(error);
+    }
     writeln!(io::stdout(), "locked")?;
     io::stdout().flush()?;
     // The dedicated pipe closes on parent death; dropping File releases the kernel lock.
@@ -20,14 +30,21 @@ fn main() -> io::Result<()> {
 }
 
 #[cfg(windows)]
-fn lock(file: &File) -> io::Result<()> {
+fn lock(file: &File, nonblocking: bool) -> io::Result<()> {
     use std::os::windows::io::AsRawHandle;
-    use windows_sys::Win32::Storage::FileSystem::{LockFileEx, LOCKFILE_EXCLUSIVE_LOCK};
+    use windows_sys::Win32::Storage::FileSystem::{
+        LockFileEx, LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
+    };
     unsafe {
         let mut overlapped = std::mem::zeroed();
         if LockFileEx(
             file.as_raw_handle(),
-            LOCKFILE_EXCLUSIVE_LOCK,
+            LOCKFILE_EXCLUSIVE_LOCK
+                | if nonblocking {
+                    LOCKFILE_FAIL_IMMEDIATELY
+                } else {
+                    0
+                },
             0,
             u32::MAX,
             u32::MAX,
@@ -41,10 +58,11 @@ fn lock(file: &File) -> io::Result<()> {
 }
 
 #[cfg(unix)]
-fn lock(file: &File) -> io::Result<()> {
+fn lock(file: &File, nonblocking: bool) -> io::Result<()> {
     use std::os::fd::AsRawFd;
     loop {
-        if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } == 0 {
+        let flags = libc::LOCK_EX | if nonblocking { libc::LOCK_NB } else { 0 };
+        if unsafe { libc::flock(file.as_raw_fd(), flags) } == 0 {
             return Ok(());
         }
         let error = io::Error::last_os_error();

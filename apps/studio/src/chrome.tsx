@@ -7,6 +7,7 @@ import { Menu } from '@base-ui/react/menu';
 import { type Locale, t } from './i18n';
 import { log, type Severity } from './log';
 import type { StudioBridge } from './bridge';
+import { ProjectMenu } from './projectmenu';
 
 /* ---------------- menu bar ---------------- */
 
@@ -37,6 +38,7 @@ export function MenuBar(
     onModels,
     onUndo,
     onRedo,
+    onDelete,
   }: {
     theme: 'light' | 'dark';
     locale: Locale;
@@ -50,6 +52,7 @@ export function MenuBar(
     onModels: () => void;
     onUndo: () => void;
     onRedo: () => void;
+    onDelete: () => void;
   },
 ) {
   return (
@@ -91,6 +94,7 @@ export function MenuBar(
                 onClick={onRedo}
                 disabled={!canEdit}
               />
+              <MenuEntry label={t('Delete project…')} onClick={onDelete} disabled={!canEdit} />
               <Menu.SubmenuRoot>
                 <Menu.SubmenuTrigger className='menuitem submenu-trigger'>
                   {t('Language')}
@@ -170,14 +174,16 @@ export interface TabItem {
   label: string;
   detail?: string;
   closable?: boolean;
+  deletable?: boolean;
 }
 
-export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
+export function Tabs({ tabs, active, onSelect, onClose, onNew, onDelete }: {
   tabs: TabItem[];
   active: string;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onNew: () => void;
+  onDelete: (id: string) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   // roving arrows per the tabs pattern; Home/End for completeness
@@ -212,52 +218,56 @@ export function Tabs({ tabs, active, onSelect, onClose, onNew }: {
         ref={listRef}
       >
         {tabs.map((tab) => (
-          <button
+          <ProjectMenu
             key={tab.id}
-            type='button'
-            role='tab'
-            data-tabid={tab.id}
-            aria-selected={tab.id === active}
-            aria-controls='main-panel'
-            tabIndex={tab.id === active ? 0 : -1}
-            className={`ctab-btn ${tab.id === active ? 'on' : ''}`}
-            onClick={() => onSelect(tab.id)}
-            onKeyDown={(e) => {
-              if (e.key === 'Delete' && tab.closable) {
-                e.preventDefault();
-                onClose(tab.id);
-                // the focused tab is about to unmount - without this the
-                // keyboard user falls to <body> and must re-tab from the top
-                // (walkthrough finding). The app falls back to the gallery
-                // tab, so focus follows the selection.
-                requestAnimationFrame(() => {
-                  listRef.current?.querySelector<HTMLElement>('[data-tabid="gallery"]')?.focus();
-                });
-                return;
-              }
-              onKeyDown(e);
-            }}
+            onDelete={tab.deletable ? () => onDelete(tab.id) : undefined}
           >
-            <span className='ctab-label'>
-              <span className='ctab-name'>{tab.label}</span>
-              {tab.detail && <span className='ctab-detail'>{tab.detail}</span>}
-            </span>
-            {tab.closable && (
-              <span
-                className='ctab-close'
-                title={`${t('Close')} (${t('Delete key')})`}
-                aria-hidden='true'
-                onClick={(e) => {
-                  e.stopPropagation();
+            <button
+              type='button'
+              role='tab'
+              data-tabid={tab.id}
+              aria-selected={tab.id === active}
+              aria-controls='main-panel'
+              tabIndex={tab.id === active ? 0 : -1}
+              className={`ctab-btn ${tab.id === active ? 'on' : ''}`}
+              onClick={() => onSelect(tab.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Delete' && tab.closable) {
+                  e.preventDefault();
                   onClose(tab.id);
-                }}
-              >
-                <svg viewBox='0 0 20 20' aria-hidden='true'>
-                  <path d='m5 5 10 10M5 15 15 5' />
-                </svg>
+                  // the focused tab is about to unmount - without this the
+                  // keyboard user falls to <body> and must re-tab from the top
+                  // (walkthrough finding). The app falls back to the gallery
+                  // tab, so focus follows the selection.
+                  requestAnimationFrame(() => {
+                    listRef.current?.querySelector<HTMLElement>('[data-tabid="gallery"]')?.focus();
+                  });
+                  return;
+                }
+                onKeyDown(e);
+              }}
+            >
+              <span className='ctab-label'>
+                <span className='ctab-name'>{tab.label}</span>
+                {tab.detail && <span className='ctab-detail'>{tab.detail}</span>}
               </span>
-            )}
-          </button>
+              {tab.closable && (
+                <span
+                  className='ctab-close'
+                  title={`${t('Close')} (${t('Delete key')})`}
+                  aria-hidden='true'
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose(tab.id);
+                  }}
+                >
+                  <svg viewBox='0 0 20 20' aria-hidden='true'>
+                    <path d='m5 5 10 10M5 15 15 5' />
+                  </svg>
+                </span>
+              )}
+            </button>
+          </ProjectMenu>
         ))}
       </div>
       <button

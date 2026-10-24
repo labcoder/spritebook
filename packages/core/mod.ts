@@ -10,6 +10,7 @@ export * from './events.ts';
 export * from './queue.ts';
 export * from './journal.ts';
 export * from './workspace.ts';
+export * from './delete.ts';
 export * from './receipts.ts';
 export * from './roster.ts';
 export * from './vramlease.ts';
@@ -26,6 +27,7 @@ export {
   withManifestLock,
   withManifestWrite,
   workspaceJob,
+  writeAtomic,
 } from './persistence.ts';
 
 export * from './queries.ts';

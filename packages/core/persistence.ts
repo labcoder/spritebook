@@ -23,7 +23,7 @@ interface State {
 }
 
 /** OS locks release on process death. Never unlink the lock file (inode races). */
-async function acquireLock(path: string) {
+async function acquireLock(path: string, nonblocking = false) {
   let realDir: string;
   try {
     realDir = await fs.realpath(dirname(resolve(path)));
@@ -37,12 +37,16 @@ async function acquireLock(path: string) {
   const id = process.platform === 'win32' ? key.toLowerCase() : key;
   const keys = new Set([...(held.getStore() ?? []), id]);
   if (held.getStore()?.has(id)) return { keys };
-  const file = await acquireFileLock(`${key}.lock`);
+  const file = await acquireFileLock(`${key}.lock`, nonblocking);
   return { keys, file };
 }
 
-export async function withManifestLock<T>(path: string, run: () => Promise<T>): Promise<T> {
-  const lock = await acquireLock(path);
+export async function withManifestLock<T>(
+  path: string,
+  run: () => Promise<T>,
+  nonblocking = false,
+): Promise<T> {
+  const lock = await acquireLock(path, nonblocking);
   try {
     return await held.run(lock.keys, run);
   } finally {
@@ -51,8 +55,12 @@ export async function withManifestLock<T>(path: string, run: () => Promise<T>): 
 }
 
 /** Lock order: the long job lease, then the short recoverable state transaction. */
-export async function withManifestWrite<T>(path: string, run: () => Promise<T>): Promise<T> {
-  return await withManifestLock(`${path}.job`, run);
+export async function withManifestWrite<T>(
+  path: string,
+  run: () => Promise<T>,
+  nonblocking = false,
+): Promise<T> {
+  return await withManifestLock(`${path}.job`, run, nonblocking);
 }
 
 /** Keep generator work inside its lease, including cleanup after an early return. */

@@ -6,6 +6,16 @@
  * purpose — they match the CLI the GUI mirrors.
  */
 export const es: Record<string, string> = {
+  'Cancel': 'Cancelar',
+  'Delete project': 'Eliminar proyecto',
+  'Delete project…': 'Eliminar proyecto…',
+  'Deleting project…': 'Eliminando proyecto…',
+  'Could not delete this project. Open the log for details.':
+    'No se pudo eliminar este proyecto. Abre el log para ver los detalles.',
+  'Permanently delete generated meshes, textures, rigs, animations and sprite sheets for this character? This cannot be undone.':
+    '¿Eliminar permanentemente las mallas, texturas, rigs, animaciones y hojas de sprites generadas para este personaje? Esta acción no se puede deshacer.',
+  'Your original source input is kept in the source folder. Installed extensions, files outside this project and unrecognized user files are kept.':
+    'Tu archivo de origen original se conserva en la carpeta source. Se conservan las extensiones instaladas, los archivos externos y los archivos de usuario no reconocidos.',
   '3D model & textures': 'Modelo 3D y texturas',
   'Actual pixels': 'Píxeles reales',
   'Aim the camera, then render a frame to check the final lighting and style.':

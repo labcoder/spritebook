@@ -101,6 +101,10 @@ export function journalArgs(workspace: string, verb: 'undo' | 'redo'): string[] 
   return [verb, '--manifest', `${workspace}/character.json`];
 }
 
+export function deleteProjectArgs(workspace: string, characterId: string): string[] {
+  return ['delete', '--workspace', workspace, '--confirm', characterId];
+}
+
 export function modelsArgs(
   action: 'list' | 'install' | 'setup' | 'verify' | 'rm',
   ref?: string,

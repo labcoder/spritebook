@@ -27,6 +27,7 @@ export default defineConfig({
       'react/jsx-runtime',
       'react-dom/client',
       '@base-ui/react/menu',
+      '@base-ui/react/context-menu',
       '@lingui/core',
       '@lingui/react',
     ],

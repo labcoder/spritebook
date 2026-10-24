@@ -13,6 +13,7 @@ import { ManageExtensions } from './extensions';
 import { GenerateNew } from './gen';
 import { journalArgs } from './args';
 import { useLandFocus } from './focus';
+import { DeleteProject } from './delete-project';
 
 const bridge = makeBridge();
 
@@ -51,6 +52,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CharacterCard | null>(null);
   // bumped when Manage extensions closes, so the + tab's backend cards re-read
   // the catalog in the very flow that installs
   const [catalogEpoch, setCatalogEpoch] = useState(0);
@@ -182,6 +184,7 @@ export default function App() {
   // Z is left to the browser inside text fields — native input undo wins there.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (deleteTarget) return;
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
       const inField = e.target instanceof HTMLElement &&
@@ -199,7 +202,7 @@ export default function App() {
     };
     globalThis.addEventListener('keydown', onKey);
     return () => globalThis.removeEventListener('keydown', onKey);
-  }, [runJournal]);
+  }, [runJournal, deleteTarget]);
 
   const byDir = useMemo(
     () => new Map((workspaces ?? []).map((w) => [w.raw.dir, w])),
@@ -214,6 +217,7 @@ export default function App() {
       label: card.displayName,
       detail: card.id !== card.displayName ? card.id : card.stylePresetId,
       closable: openDirs.includes(card.dir),
+      deletable: !card.problem,
     })),
     ...openDirs.filter((dir) => !byDir.has(dir)).map((dir) => ({
       id: dir,
@@ -224,6 +228,10 @@ export default function App() {
   ];
 
   const activeWs = activeTab === 'gallery' ? undefined : byDir.get(activeTab);
+  const requestDelete = (dir: string) => {
+    const target = byDir.get(dir)?.card;
+    if (target && !target.problem) setDeleteTarget(target);
+  };
   const adapter = exam.report?.adapter as { description?: string } | undefined;
 
   // the palette lists ONLY actions that exist elsewhere in the chrome
@@ -265,6 +273,12 @@ export default function App() {
       run: openNew,
     },
     {
+      id: 'delete',
+      title: t('Delete project…'),
+      enabled: activeWs !== undefined && !activeWs.card.problem,
+      run: () => requestDelete(activeTab),
+    },
+    {
       id: 'gallery',
       title: t('Go to gallery'),
       enabled: activeTab !== 'gallery',
@@ -291,7 +305,7 @@ export default function App() {
       <MenuBar
         theme={theme}
         locale={locale}
-        canEdit={activeWs !== undefined}
+        canEdit={activeWs !== undefined && !activeWs.card.problem}
         onThemeChange={setThemeState}
         onLocaleChange={setLocaleState}
         onReload={load}
@@ -300,7 +314,25 @@ export default function App() {
         onModels={() => setModelsOpen(true)}
         onUndo={() => runJournal('undo')}
         onRedo={() => runJournal('redo')}
+        onDelete={() => requestDelete(activeTab)}
       />
+      {deleteTarget && (
+        <DeleteProject
+          key={deleteTarget.dir}
+          bridge={bridge}
+          project={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={() => {
+            ++loadEpoch.current;
+            setWorkspaces((current) =>
+              current?.filter((ws) => ws.raw.dir !== deleteTarget.dir) ?? null
+            );
+            closeTab(deleteTarget.dir);
+            setDeleteTarget(null);
+            void load();
+          }}
+        />
+      )}
       <Palette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
@@ -328,6 +360,7 @@ export default function App() {
             }}
             onClose={closeTab}
             onNew={openNew}
+            onDelete={requestDelete}
           />
         )}
         <div className='workarea'>
@@ -397,6 +430,7 @@ export default function App() {
                   cards={workspaces?.map((w) => w.card) ?? null}
                   loadError={loadError}
                   onOpen={openCharacter}
+                  onDelete={requestDelete}
                   onUseDefault={() => setRoot(DEFAULT_ROOT)}
                 />
               )

@@ -694,6 +694,7 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
   identity: ['workspace', 'decals', 'attachments', 'bone-mask', 'body'],
   rename: ['workspace', 'name'],
   clone: ['workspace', 'to', 'id', 'name'],
+  delete: ['workspace', 'confirm'],
   rig: [
     'preview-joint',
     'upright',
@@ -1328,6 +1329,33 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
 
   const flagError = valuedFlagError(verb, args);
   if (flagError) return fail(verb as JobEvent['jobId'], 'bad-args', flagError);
+
+  if (verb === 'delete') {
+    const workspace = flag(args, 'workspace'), confirmation = flag(args, 'confirm');
+    if (!workspace || !confirmation) {
+      return fail(
+        'delete' as JobEvent['jobId'],
+        'bad-args',
+        'Use delete --workspace <dir> --confirm <character-id>. This permanently deletes generated project files and preserves the original source.',
+      );
+    }
+    try {
+      const { deleteWorkspace } = await import('@spritebook/core');
+      const result = await deleteWorkspace(workspace, confirmation);
+      io.stdout(
+        json
+          ? canonicalJson(result).trimEnd()
+          : `Deleted project "${result.id}". Original source files remain in ${workspace}/source.`,
+      );
+      return 0;
+    } catch (error) {
+      return fail(
+        'delete' as JobEvent['jobId'],
+        'project-delete-failed',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
 
   if (verb === 'workspace') {
     try {
@@ -3069,7 +3097,7 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       'unknown-verb',
       `Unknown verb "${
         verb ?? ''
-      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, models, extensions, anim, look, bake, export, workspace, doctor, undo, redo (--version)`,
+      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, delete, models, extensions, anim, look, bake, export, workspace, doctor, undo, redo (--version)`,
     );
   }
 
