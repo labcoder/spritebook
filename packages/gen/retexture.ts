@@ -403,7 +403,7 @@ async function* executeRetextureJob(
     // W5b: a repaint earns a card too - same best-effort front view as gen
     const thumbPath = `${rp.dir}/thumb.png`;
     if (
-      await writeResultThumb(rp.model, await heightOf(canonical.bytes), thumbPath) === 'written'
+      await writeResultThumb(rp.model, thumbPath) === 'written'
     ) {
       yield { t: 'artifact', jobId, at: at(), kind: 'gen-thumb', path: thumbPath };
     }

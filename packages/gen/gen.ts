@@ -439,8 +439,7 @@ async function* executeGenJob(opts: GenJobOptions): AsyncIterable<JobEvent> {
       // lit render per result, through the bake's own pipeline. Best-effort:
       // no GPU or a render failure means no thumb, never a failed gen.
       const thumbPath = `${crp.dir}/thumb.png`;
-      const thumbHeight = await heightOf(canonical.bytes);
-      if (await writeResultThumb(crp.model, thumbHeight, thumbPath) === 'written') {
+      if (await writeResultThumb(crp.model, thumbPath) === 'written') {
         yield { t: 'artifact', jobId, at: at(), kind: 'gen-thumb', path: thumbPath };
       }
 
