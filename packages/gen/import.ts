@@ -5,9 +5,11 @@ import { importToCanonical } from '@spritebook/importer';
 import {
   commitManifest,
   createWorkspace,
+  readWorkspace,
   sha256Bytes,
   workspaceJob,
   workspacePaths,
+  writeAtomic,
 } from '@spritebook/core';
 import { canonicalJson, type JobEvent, type JsonPatchOp } from '@spritebook/schema';
 import { heightOf } from './pick.ts';
@@ -39,14 +41,31 @@ async function* executeImport(opts: ImportJobOptions): AsyncIterable<JobEvent> {
     if (!(heightM > 0)) throw new Error('The imported mesh has no standing height.');
     const sha256 = await sha256Bytes(source);
     const paths = workspacePaths(opts.workspace, opts.characterId);
-    await createWorkspace({
-      ...opts,
-      source: { kind: 'mesh', originalFilename: basename(opts.input), sha256 },
-    });
+    let existing;
+    try {
+      await fs.stat(paths.manifest);
+      existing = await readWorkspace(opts.workspace);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    if (existing) {
+      // Only an interrupted initial import is resumable; undo is not permission to overwrite.
+      if (
+        existing.id !== opts.characterId || existing.source.kind !== 'mesh' ||
+        existing.source.sha256 !== sha256 || existing.canonicalMesh || existing.rig ||
+        existing.generation.results.length ||
+        (await fs.stat(paths.journal)).size !== 0
+      ) throw new Error('A character already exists here. Use a different workspace directory.');
+    } else {
+      await createWorkspace({
+        ...opts,
+        source: { kind: 'mesh', originalFilename: basename(opts.input), sha256 },
+      });
+    }
     const staged = `${paths.sourceDir}/${await sha256Bytes(imported.bytes)}.glb`;
-    await fs.writeFile(`${paths.sourceDir}/${sha256}${extname(opts.input).toLowerCase()}`, source);
-    await fs.writeFile(staged, imported.bytes);
-    await fs.writeFile(`${paths.sourceDir}/preflight.json`, canonicalJson(imported.report));
+    await writeAtomic(`${paths.sourceDir}/${sha256}${extname(opts.input).toLowerCase()}`, source);
+    await writeAtomic(staged, imported.bytes);
+    await writeAtomic(`${paths.sourceDir}/preflight.json`, canonicalJson(imported.report));
     const op: JsonPatchOp[] = [
       {
         op: 'add',

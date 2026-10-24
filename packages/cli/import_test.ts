@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
-import { readWorkspace } from '@spritebook/core';
+import { createWorkspace, readWorkspace, resourcePath, sha256Bytes } from '@spritebook/core';
 import { runCli } from './dist/mod.js';
 
 test('offline example preserves its authored rig and import is an asset-aware undo step', async () => {
@@ -59,5 +59,76 @@ test('import requires an explicit source and refuses unknown switches', async ()
       1,
     );
     assert(lines.some((line) => /bad-args|unknown-flag/.test(line)));
+  }
+});
+
+test('an interrupted initial import resumes without allowing an overwrite after undo', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'spritebook-import-retry-'));
+  try {
+    const model = resourcePath('rig', 'bodies/ubc-male/body.glb');
+    const original = new Uint8Array(await readFile(model));
+    await createWorkspace({
+      workspace: root,
+      characterId: 'retry',
+      displayName: 'Retry',
+      source: { kind: 'mesh', originalFilename: 'body.glb', sha256: await sha256Bytes(original) },
+    });
+    await writeFile(join(root, 'source/preflight.json'), 'interrupted');
+    const lines: string[] = [];
+    const io = {
+      stdout: (line: string) => lines.push(line),
+      stderr: (line: string) => lines.push(line),
+    };
+    assert.equal(
+      await runCli([
+        'import',
+        '--workspace',
+        root,
+        '--character',
+        'retry',
+        '--model',
+        model,
+        '--json',
+      ], io),
+      0,
+      lines.join('\n'),
+    );
+    const doc = await new NodeIO().readBinary(
+      new Uint8Array(await readFile(join(root, 'canonical/model.glb'))),
+    );
+    const source = await new NodeIO().readBinary(original);
+    for (const [index, mesh] of source.getRoot().listMeshes().entries()) {
+      for (const [p, primitive] of mesh.listPrimitives().entries()) {
+        const weights = (prim: typeof primitive) =>
+          prim.getAttribute('WEIGHTS_0')
+            ? Array.from(prim.getIndices()!.getArray()!).flatMap((vertex) =>
+              prim.getAttribute('WEIGHTS_0')!.getElement(vertex, [])
+            )
+            : undefined;
+        assert.deepEqual(
+          weights(doc.getRoot().listMeshes()[index].listPrimitives()[p]),
+          weights(primitive),
+        );
+      }
+    }
+    assert.equal(
+      await runCli(['undo', '--manifest', join(root, 'character.json'), '--json'], io),
+      0,
+    );
+    assert.equal(
+      await runCli([
+        'import',
+        '--workspace',
+        root,
+        '--character',
+        'retry',
+        '--model',
+        model,
+        '--json',
+      ], io),
+      1,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
