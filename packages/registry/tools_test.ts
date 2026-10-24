@@ -66,7 +66,8 @@ test('tool install gates consent, disk and platform before downloading', async (
       assertEquals((events.at(-1) as Extract<JobEvent, { t: 'error' }>).code, code);
     }
     assertEquals(f.downloads(), 0);
-    assertEquals(await fs.readdir(f.root), ['blender.lock']);
+    assertEquals((await fs.readdir(f.root)).sort(), ['blender', 'blender.lock']);
+    assertEquals(await fs.readdir(join(f.root, 'blender')), []);
   } finally {
     await f.cleanup();
   }
@@ -208,5 +209,34 @@ test('invalid selection can be forgotten or replaced without following its paths
     assertEquals(await fs.readFile(external, 'utf8'), 'user-owned');
   } finally {
     await f.cleanup();
+  }
+});
+
+test('retry removes only marked abandoned tool stages, preserving unowned directories and junctions', async () => {
+  const f = await fixture();
+  const outside = await fs.mkdtemp(join(tmpdir(), 'spritebook-stage-outside-'));
+  try {
+    const parent = join(f.root, 'blender');
+    await fs.mkdir(parent);
+    const owned = join(parent, '.staging-abandoned');
+    const unowned = join(parent, '.staging-user');
+    const linked = join(parent, '.staging-linked');
+    await fs.mkdir(owned);
+    await fs.mkdir(unowned);
+    await fs.writeFile(
+      join(owned, '.spritebook-stage.json'),
+      JSON.stringify({ tool: 'blender', root: await fs.realpath(f.root), stage: owned }),
+    );
+    await fs.writeFile(join(owned, 'partial.zip'), 'abandoned');
+    await fs.writeFile(join(unowned, 'keep'), 'unowned');
+    await fs.writeFile(join(outside, 'keep'), 'external');
+    await fs.symlink(outside, linked, process.platform === 'win32' ? 'junction' : 'dir');
+    assertEquals((await f.run()).at(-1)?.t, 'done');
+    assertEquals(await fs.stat(owned).catch(() => null), null);
+    assertEquals(await fs.readFile(join(unowned, 'keep'), 'utf8'), 'unowned');
+    assertEquals(await fs.readFile(join(outside, 'keep'), 'utf8'), 'external');
+  } finally {
+    await f.cleanup();
+    await fs.rm(outside, { recursive: true, force: true });
   }
 });

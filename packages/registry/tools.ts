@@ -21,6 +21,7 @@ import { availableDiskBytes } from './resources.ts';
 const execute = promisify(execFile);
 export const defaultToolsRoot = () => join(dirname(runtimeDataDir()), 'tools');
 const selection = (root: string) => join(root, 'blender.json');
+const STAGE_OWNER = '.spritebook-stage.json';
 const at = () => new Date().toISOString();
 const failure = (code: string, message: string, retryable = false) =>
   Object.assign(new Error(message), { code, retryable });
@@ -47,6 +48,26 @@ async function readReceipt(path: string): Promise<ToolReceipt | null> {
 function inside(root: string, path: string): boolean {
   const rel = relative(resolve(root), resolve(path));
   return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+async function removeOwnedStage(root: string, path: string): Promise<void> {
+  const info = await fs.lstat(path);
+  if (
+    !info.isDirectory() || info.isSymbolicLink() ||
+    !inside(await fs.realpath(root), await fs.realpath(path))
+  ) return;
+  let owner;
+  try {
+    owner = JSON.parse(await fs.readFile(join(path, STAGE_OWNER), 'utf8'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT' || error instanceof SyntaxError) return;
+    throw error;
+  }
+  if (
+    !owner || owner.tool !== 'blender' || owner.root !== await fs.realpath(root) ||
+    owner.stage !== path
+  ) return;
+  await fs.rm(path, { recursive: true });
 }
 
 async function managedReceipt(root: string, version: string) {
@@ -387,6 +408,21 @@ export async function* runToolJob(opts: ToolJobOptions): AsyncIterable<JobEvent>
           );
         }
         const target = managedDir(root, tool.version);
+        const parent = dirname(target);
+        await fs.mkdir(parent, { recursive: true });
+        if (
+          (await fs.lstat(parent)).isSymbolicLink() ||
+          !inside(await fs.realpath(root), await fs.realpath(parent))
+        ) {
+          throw failure(
+            'tool-path-invalid',
+            'Managed Blender directory must stay inside the tools root.',
+          );
+        }
+        // The exclusive tool lock means marked stages have no remaining installer owner.
+        for (const entry of await fs.readdir(parent)) {
+          if (entry.startsWith('.staging-')) await removeOwnedStage(root, join(parent, entry));
+        }
         if (
           await fs.lstat(target).then(() => true).catch((e) => {
             if (e.code !== 'ENOENT') throw e;
@@ -417,8 +453,11 @@ export async function* runToolJob(opts: ToolJobOptions): AsyncIterable<JobEvent>
             message: 'Could not measure free disk space for Blender.',
           };
         }
-        await fs.mkdir(dirname(target), { recursive: true });
-        stage = await fs.mkdtemp(join(dirname(target), '.staging-'));
+        stage = await fs.mkdtemp(join(parent, '.staging-'));
+        await fs.writeFile(
+          join(stage, STAGE_OWNER),
+          canonicalJson({ tool: 'blender', root: await fs.realpath(root), stage }),
+        );
         const archive = join(stage, download.archive.path);
         yield* downloadFile(
           opts.fetcher ?? (opts.from
@@ -485,7 +524,10 @@ export async function* runToolJob(opts: ToolJobOptions): AsyncIterable<JobEvent>
       retryable: err.retryable ?? false,
     };
   } finally {
-    if (stage) await fs.rm(stage, { recursive: true, force: true });
-    await lock?.close();
+    try {
+      if (stage) await removeOwnedStage(resolve(opts.root ?? defaultToolsRoot()), stage);
+    } finally {
+      await lock?.close();
+    }
   }
 }

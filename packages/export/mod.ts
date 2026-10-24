@@ -14,6 +14,7 @@ import { exportStrips } from './strips.ts';
 import { exportAseprite } from './aseprite.ts';
 import { exportTexturePacker } from './texturepacker.ts';
 import { exportModel } from './model.ts';
+import { assertNoSplitAnimations } from './split-guard.ts';
 export { exportModel } from './model.ts';
 
 export { exportAseprite } from './aseprite.ts';
@@ -67,6 +68,11 @@ export async function* runExportJob(spec: ExportJobSpec): AsyncIterable<JobEvent
       : undefined;
     const targets = [...new Set(spec.targets)];
     const opts = { fps: spec.fps ?? DEFAULT_FPS };
+    for (const target of targets) {
+      if (target === 'texturepacker' || target === 'aseprite') {
+        assertNoSplitAnimations(manifest!, target);
+      }
+    }
 
     let done = 0;
     for (const target of targets) {

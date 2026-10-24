@@ -101,3 +101,30 @@ test('export seam: empty targets is an error event, not a throw', async () => {
     await fs.rm(out, { recursive: true });
   }
 });
+
+test('a later incompatible format refuses before overwriting an earlier accepted export', async () => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'spritebook-export-preflight-'));
+  try {
+    const manifest = JSON.parse(await fs.readFile(join(BAKE, 'manifest.json'), 'utf8'));
+    manifest.frames[1].atlas.pageIndex = 1;
+    await fs.writeFile(join(root, 'manifest.json'), JSON.stringify(manifest));
+    const out = join(root, 'export');
+    await fs.mkdir(join(out, 'godot'), { recursive: true });
+    const accepted = join(out, 'godot', `${manifest.characterId}.tres`);
+    await fs.writeFile(accepted, 'accepted export');
+    const events = await Array.fromAsync(
+      runExportJob({
+        jobId: 'refuse',
+        bakeDir: root,
+        outDir: out,
+        targets: ['godot', 'texturepacker'],
+      }),
+    );
+    assert(events.at(-1)?.t === 'error');
+    assertEquals(events.some((event) => event.t === 'artifact'), false);
+    assertEquals(await fs.readFile(accepted, 'utf8'), 'accepted export');
+    assertEquals(await fs.readdir(out), ['godot']);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
