@@ -15,6 +15,7 @@
 import { log } from './log';
 import { DEMO_MESH_B64 } from './demo-mesh';
 import TOOL_CATALOG from '../../../packages/registry/catalog/tools.json' with { type: 'json' };
+import { listenFileDrop } from './filedrop';
 
 export interface RawWorkspace {
   dir: string;
@@ -70,7 +71,7 @@ export interface StudioBridge {
   /** Write a joint-edits patch into the character's rig dir; returns its path. */
   writeRigEdits(dir: string, json: string): Promise<string>;
   /** Native file drop with real paths, when the shell provides it. */
-  onFileDrop?(cb: (paths: string[]) => void): void;
+  onFileDrop?(cb: (paths: string[]) => void): () => void;
 }
 
 type TauriGlobal = {
@@ -196,10 +197,16 @@ function tauriBridge(t: TauriGlobal): StudioBridge {
     },
     onFileDrop(cb) {
       // v2 emits webview drag/drop as tauri://drag-drop with { paths, position }
-      t.event.listen('tauri://drag-drop', (e) => {
-        const payload = e.payload as { paths?: string[] };
-        if (payload?.paths?.length) cb(payload.paths);
-      });
+      return listenFileDrop(
+        (receive) =>
+          t.event.listen('tauri://drag-drop', (e) => {
+            const payload = e.payload as { paths?: string[] };
+            if (payload?.paths?.length) receive(payload.paths);
+          }),
+        cb,
+        (error) =>
+          log.append('file-drop', `Could not register file drop: ${error}`, Date.now(), 'stderr'),
+      );
     },
   };
 }

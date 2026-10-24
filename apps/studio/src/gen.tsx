@@ -447,7 +447,7 @@ export function GenerateNew(
   const problem = slugProblem(slug);
 
   useEffect(() => {
-    bridge.onFileDrop?.((paths) => {
+    return bridge.onFileDrop?.((paths) => {
       const img = paths.find((p) => /\.(png|jpe?g|webp)$/i.test(p));
       if (img) setImagePath(img);
     });
