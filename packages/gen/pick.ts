@@ -38,7 +38,7 @@ import {
   workspacePaths,
 } from '@spritebook/core';
 import { loadCatalog } from '@spritebook/registry';
-import { NodeIO } from '@gltf-transform/core';
+import { getBounds, NodeIO } from '@gltf-transform/core';
 import { reprojectTexture } from './reproject.ts';
 import { colorMatchTexture } from './colormatch.ts';
 
@@ -67,19 +67,11 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 /** Standing height in metres from the mesh's Y extent (the D-012 convention). */
 export async function heightOf(bytes: Uint8Array): Promise<number> {
   const doc = await new NodeIO().readBinary(bytes);
-  let min = Infinity, max = -Infinity;
-  for (const mesh of doc.getRoot().listMeshes()) {
-    for (const prim of mesh.listPrimitives()) {
-      const pos = prim.getAttribute('POSITION');
-      if (!pos) continue;
-      const arr = pos.getArray()!;
-      for (let i = 1; i < arr.length; i += 3) {
-        min = Math.min(min, arr[i]);
-        max = Math.max(max, arr[i]);
-      }
-    }
-  }
-  return Number.isFinite(min) && Number.isFinite(max) ? Number((max - min).toFixed(6)) : 0;
+  const scene = doc.getRoot().getDefaultScene() ?? doc.getRoot().listScenes()[0];
+  if (!scene) return 0;
+  const { min, max } = getBounds(scene);
+  const height = max[1] - min[1];
+  return Number.isFinite(height) ? Number(height.toFixed(6)) : 0;
 }
 
 /**

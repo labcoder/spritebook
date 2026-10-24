@@ -35,7 +35,7 @@ import { workspaceJob } from '@spritebook/core';
  * and the final rename happens only after ALL of them succeeded, so a failed
  * run leaves canonical/model.glb byte-for-byte what it was.
  */
-import { NodeIO } from '@gltf-transform/core';
+import { heightOf } from './pick.ts';
 import type {
   AttachmentPlacement,
   BoneMask,
@@ -328,24 +328,6 @@ async function* executeIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobE
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-/** Standing height in metres from the mesh's Y extent (the D-012 convention). */
-async function heightOf(bytes: Uint8Array): Promise<number> {
-  const doc = await new NodeIO().readBinary(bytes);
-  let min = Infinity, max = -Infinity;
-  for (const mesh of doc.getRoot().listMeshes()) {
-    for (const prim of mesh.listPrimitives()) {
-      const pos = prim.getAttribute('POSITION');
-      if (!pos) continue;
-      const arr = pos.getArray()!;
-      for (let i = 1; i < arr.length; i += 3) {
-        min = Math.min(min, arr[i]);
-        max = Math.max(max, arr[i]);
-      }
-    }
-  }
-  return Number.isFinite(min) && Number.isFinite(max) ? Number((max - min).toFixed(6)) : 0;
 }
 
 export function runIdentityJob(opts: IdentityJobOptions): AsyncIterable<JobEvent> {

@@ -88,11 +88,14 @@ test('an interrupted initial import resumes without allowing an overwrite after 
         'retry',
         '--model',
         model,
+        '--height',
+        '1.6',
         '--json',
       ], io),
       0,
       lines.join('\n'),
     );
+    assert.equal((await readWorkspace(root)).canonicalMesh?.heightM, 1.6);
     const doc = await new NodeIO().readBinary(
       new Uint8Array(await readFile(join(root, 'canonical/model.glb'))),
     );
