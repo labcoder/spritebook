@@ -331,7 +331,8 @@ async function* executeRigJob(opts: RigJobOptions): AsyncIterable<JobEvent> {
         code: 'rig-generic-names',
         message:
           `Some predicted joints retain positional names (bone_0, bone_1, ...). Review the ` +
-          `name-based retarget mapping before using animation packs; unmapped joints stay at rest. It will still bake.`,
+          `name-based retarget mapping before using animation packs. Unmapped joints stay at rest; ` +
+          `contradictory joint chains block animation until their mapping is corrected.`,
       };
     }
     if (skeleton.validation.retries > 0) {
