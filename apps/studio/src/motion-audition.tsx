@@ -17,7 +17,8 @@ export function MotionAudition({ bridge, dir, busy, running, sourceKey, resultId
   const [report, setReport] = useState<MotionReview | null>(null);
   const [images, setImages] = useState<Record<string, string | null>>({});
   const [error, setError] = useState('');
-  const candidate = resultId ? ['--result', resultId] : [];
+  const [upright, setUpright] = useState(true);
+  const candidate = resultId ? ['--result', resultId, ...(upright ? [] : ['--no-upright'])] : [];
   const args = ['anim', '--audition', '--workspace', dir, ...candidate];
   const read = useCallback(async () => {
     const result = await bridge.runCli([
@@ -26,6 +27,7 @@ export function MotionAudition({ bridge, dir, busy, running, sourceKey, resultId
       '--workspace',
       dir,
       ...(resultId ? ['--result', resultId] : []),
+      ...(resultId && !upright ? ['--no-upright'] : []),
       '--json',
     ]);
     if (result.exitCode !== 0) {
@@ -33,7 +35,7 @@ export function MotionAudition({ bridge, dir, busy, running, sourceKey, resultId
     }
     const value = JSON.parse(result.lines.at(-1) ?? 'null');
     return value?.version === 1 ? value as MotionReview : null;
-  }, [bridge, dir, resultId]);
+  }, [bridge, dir, resultId, upright]);
   useEffect(() => {
     let live = true;
     setReport(null);
@@ -69,6 +71,24 @@ export function MotionAudition({ bridge, dir, busy, running, sourceKey, resultId
   }, [bridge, report]);
   return (
     <section className='motion-audition'>
+      {resultId && (
+        <>
+          <label className='check-field'>
+            <input
+              type='checkbox'
+              checked={upright}
+              disabled={busy}
+              onChange={(event) => setUpright(event.target.checked)}
+            />
+            {t('Stand model upright')}
+          </label>
+          <p className='inote'>
+            {t(
+              'If alignment is uncertain and the model is already upright, turn this off. A different recipe makes a separate draft rig.',
+            )}
+          </p>
+        </>
+      )}
       <button
         type='button'
         className='btn'

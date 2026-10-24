@@ -50,8 +50,15 @@ async function location(
   sourceSha256: string,
   pins: unknown,
   backendVersion: string,
+  upright: boolean,
 ) {
-  const recipe = { method: RECIPE, sourceSha256, pins: pins ?? null, backendVersion };
+  const recipe = {
+    method: RECIPE,
+    sourceSha256,
+    pins: pins ?? null,
+    backendVersion,
+    ...(upright ? {} : { upright: false }),
+  };
   const root = join(workspace, 'anim/candidates', id, await digest(canonicalJson(recipe)));
   return { recipe, root, child: join(root, 'character') };
 }
@@ -61,6 +68,7 @@ export async function* runCandidateAudition(
   workspace: string,
   id: string,
   pinsPath?: string,
+  upright = true,
 ): AsyncIterable<JobEvent> {
   const jobId = 'candidate-motion' as JobEvent['jobId'];
   const at = () => new Date().toISOString();
@@ -86,6 +94,7 @@ export async function* runCandidateAudition(
       result.output.gltfSha256,
       pins,
       installed.version,
+      upright,
     );
     await fs.mkdir(root, { recursive: true });
     if (pins) await writeAtomic(join(root, 'pins.json'), canonicalJson(pins));
@@ -121,7 +130,12 @@ export async function* runCandidateAudition(
           sidecarDir: process.env['SPRITEBOOK_SIDECAR_DIR'] ?? resourcePath('sidecar'),
           modelDir: versionDir(modelsRoot, 'unirig', installed.version),
           seed: 0,
-          orientationFixes: ['upright', 'face-front', 'feet-ground', 'center'],
+          orientationFixes: [
+            ...(upright ? ['upright' as const] : []),
+            'face-front',
+            'feet-ground',
+            'center',
+          ],
         })
       ) {
         yield event;
@@ -134,7 +148,12 @@ export async function* runCandidateAudition(
         if (event.t === 'error') return;
       }
     }
-    const pointer = join(workspace, 'anim/candidates', id, 'review.json');
+    const pointer = join(
+      workspace,
+      'anim/candidates',
+      id,
+      upright ? 'review.json' : 'review-no-upright.json',
+    );
     await writeAtomic(pointer, canonicalJson(recipe));
     yield { t: 'artifact', jobId, at: at(), kind: 'candidate-workspace', path: child };
     yield { t: 'artifact', jobId, at: at(), kind: 'candidate-motion-review', path: pointer };
@@ -155,12 +174,16 @@ export async function readCandidateReview(
   workspace: string,
   id: string,
   pinsPath?: string,
+  upright = true,
 ): Promise<MotionReview | null> {
   const { result, pins } = await source(workspace, id, pinsPath);
   let pointer;
   try {
     pointer = JSON.parse(
-      await fs.readFile(join(workspace, 'anim/candidates', id, 'review.json'), 'utf8'),
+      await fs.readFile(
+        join(workspace, 'anim/candidates', id, upright ? 'review.json' : 'review-no-upright.json'),
+        'utf8',
+      ),
     );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -175,6 +198,7 @@ export async function readCandidateReview(
     result.output.gltfSha256,
     pins,
     pointer.backendVersion,
+    upright,
   );
   if (canonicalJson(recipe) !== canonicalJson(pointer)) return null;
   return await readMotionReview(child);

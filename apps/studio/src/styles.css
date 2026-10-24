@@ -1689,7 +1689,7 @@ textarea {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 260px;
+  min-height: 400px;
 }
 .cands .candvp .vpwrap {
   flex: 1;

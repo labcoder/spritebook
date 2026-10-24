@@ -625,6 +625,7 @@ export const VERB_FLAGS: Record<string, readonly string[]> = {
   anim: [
     'audition',
     'review',
+    'no-upright',
     'result',
     'list',
     'packs',
@@ -759,7 +760,7 @@ const BOOLEAN_FLAGS: Record<string, readonly string[]> = {
   import: ['example'],
   export: ['mesh'],
   bake: ['all', 'plan', 'only-invalidated', 'mirror', 'no-mirror'],
-  anim: ['list', 'audition', 'review'],
+  anim: ['list', 'audition', 'review', 'no-upright'],
   look: ['list', 'preview'],
   pick: ['reproject', 'color-match', 'no-reproject', 'no-color-match'],
   rig: [
@@ -1621,11 +1622,21 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
       if (
         !workspace || args.some((arg) =>
           arg.startsWith('--') &&
-          !['--audition', '--review', '--workspace', '--result', '--json', '--log-append', '--pins']
+          ![
+            '--audition',
+            '--review',
+            '--workspace',
+            '--result',
+            '--no-upright',
+            '--json',
+            '--log-append',
+            '--pins',
+          ]
             .includes(
               arg,
             )
         ) ||
+        (args.includes('--no-upright') && !flag(args, 'result')) ||
         ['--audition', '--review', '--preview', '--enable', '--disable', '--list', '--import-pack']
             .filter((key) => args.includes(key)).length !== 1
       ) {
@@ -1643,10 +1654,25 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
             './candidate-audition.ts'
           );
           if (args.includes('--audition')) {
-            return await pump(runCandidateAudition(workspace, result, flag(args, 'pins')), emit);
+            return await pump(
+              runCandidateAudition(
+                workspace,
+                result,
+                flag(args, 'pins'),
+                !args.includes('--no-upright'),
+              ),
+              emit,
+            );
           }
           io.stdout(
-            canonicalJson(await readCandidateReview(workspace, result, flag(args, 'pins')))
+            canonicalJson(
+              await readCandidateReview(
+                workspace,
+                result,
+                flag(args, 'pins'),
+                !args.includes('--no-upright'),
+              ),
+            )
               .trimEnd(),
           );
           return 0;
@@ -1664,11 +1690,11 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
         );
       }
     }
-    if (args.includes('--result')) {
+    if (args.includes('--result') || args.includes('--no-upright')) {
       return fail(
         'anim' as JobEvent['jobId'],
         'bad-args',
-        '--result needs --audition or --review.',
+        '--result and --no-upright need --audition or --review.',
       );
     }
     // query/install verbs over animation packs (P3-T1). Like doctor, --json

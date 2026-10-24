@@ -108,3 +108,9 @@ workspace. The recipe pins source bytes, the UniRig version and the project's mo
 internal journal never replaces the parent character. An interrupted candidate can resume its
 existing draft; there is no hidden retry or automatic quality acceptance. These derivatives can be
 deleted independently of originals, but remain on disk until explicitly removed.
+
+Candidate `--no-upright` records `upright: false` in a distinct recipe and publishes
+`review-no-upright.json`; the default recipe and `review.json` remain compatible. Both still apply
+front-facing, centering and grounding. The GUI exposes this as an explicit alignment opt-out, never
+an automatic retry. Missing or empty contact/preview files invalidate a derived review so retry can
+regenerate them while retaining the draft rig and original source.

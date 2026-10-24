@@ -165,6 +165,13 @@ export async function readMotionReview(
     if (clip.sourceSha256 !== await digest(join(BUNDLED_PACK, `clips/${clip.clipId}.glb`))) {
       return null;
     }
+    try {
+      const artifacts = await Promise.all([fs.stat(clip.preview), fs.stat(clip.contact)]);
+      if (artifacts.some((file) => !file.isFile() || file.size === 0)) return null;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
   }
   return report;
 }

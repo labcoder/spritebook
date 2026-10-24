@@ -197,6 +197,11 @@ its draft rig. `anim --review --result r1 --workspace <dir> --json` reads its so
 Changing candidate bytes or project pins invalidates that evidence. The parent selection and its
 accepted rig are untouched; derived files still consume disk space.
 
+If upright alignment refuses a candidate that is already standing correctly, uncheck **Stand model
+upright** in its motion review, or add `--no-upright` to both candidate audition and review
+commands. This preserves its up axis and makes a separate draft recipe; front-facing, centering and
+grounding still apply. It never replaces the default attempt or retries automatically.
+
 ```
 spritebook anim --list
 spritebook anim --enable idle-loop:6,walk-loop:8@1.5 --workspace ./characters/hero

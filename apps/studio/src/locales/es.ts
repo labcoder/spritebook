@@ -759,6 +759,8 @@ export const es: Record<string, string> = {
   'One GPU rigging attempt, then four motions. Your selected mesh and rig stay unchanged. Repeating this recipe reuses its result.':
     'Un intento de rig con GPU y cuatro movimientos. La malla y el rig seleccionados se conservan. Repetir esta receta reutiliza el resultado.',
   'Review motion': 'Revisar movimiento',
+  'If alignment is uncertain and the model is already upright, turn this off. A different recipe makes a separate draft rig.':
+    'Si la alineación es incierta y el modelo ya está erguido, desactiva esta opción. Una receta distinta crea otro rig de prueba.',
   'Motion review': 'Revisión de movimiento',
   'Imported character': 'Personaje importado',
   'Source materials and authored skinning are preserved. Continue to Rig to review movement.':
