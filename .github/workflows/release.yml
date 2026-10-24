@@ -76,6 +76,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci --ignore-scripts
       - run: npm run build:desktop
+      - name: native preview and log I/O regressions
+        run: cargo test --release --locked --manifest-path apps/studio/src-tauri/Cargo.toml --bin spritebook-studio
       - uses: actions/upload-artifact@v4
         with:
           name: candidate-windows-installer

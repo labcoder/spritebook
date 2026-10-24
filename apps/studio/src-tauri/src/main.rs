@@ -3,7 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use spritebook_lock::jobs::Jobs;
-use std::io::{BufRead, Write};
+use std::io::{BufRead, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -206,27 +206,91 @@ async fn read_thumb(app: tauri::AppHandle, dir: String) -> Result<Option<String>
 
 /// Lines of the newest session file BEFORE this run's — the drawer's replay.
 #[tauri::command]
-fn read_prev_session(max_lines: usize) -> Result<Option<Vec<String>>, String> {
-    let dir = session_dir();
-    let current = session_path();
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return Ok(None);
-    };
-    let mut files: Vec<PathBuf> = entries
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p != current && p.extension().is_some_and(|x| x == "ndjsonl"))
-        .collect();
-    files.sort(); // session-<millis> sorts chronologically
-    match files.last() {
-        Some(p) => {
-            let text = std::fs::read_to_string(p).map_err(|e| e.to_string())?;
-            let lines: Vec<String> = text.lines().map(String::from).collect();
-            let start = lines.len().saturating_sub(max_lines);
-            Ok(Some(lines[start..].to_vec()))
+async fn read_prev_session(max_lines: usize) -> Result<Option<Vec<String>>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let current = session_path();
+        let entries = match std::fs::read_dir(session_dir()) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(e.to_string()),
+        };
+        let mut latest: Option<PathBuf> = None;
+        for entry in entries {
+            let path = entry.map_err(|e| e.to_string())?.path();
+            if path.as_path() != current.as_path()
+                && path.extension().is_some_and(|x| x == "ndjsonl")
+                && latest.as_ref().is_none_or(|last| path > *last)
+            {
+                latest = Some(path);
+            }
         }
-        None => Ok(None),
+        latest
+            .map(|path| {
+                let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+                read_log_tail(&mut file, max_lines).map_err(|e| e.to_string())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn read_log_tail(
+    reader: &mut (impl Read + Seek),
+    max_lines: usize,
+) -> std::io::Result<Vec<String>> {
+    const MAX_BYTES: u64 = 2 * 1024 * 1024;
+    let end = reader.seek(SeekFrom::End(0))?;
+    let start = end.saturating_sub(MAX_BYTES);
+    reader.seek(SeekFrom::Start(start))?;
+    let mut bytes = Vec::new();
+    reader.take(MAX_BYTES).read_to_end(&mut bytes)?;
+    // A bounded tail can begin inside a UTF-8 character or an NDJSON record.
+    let first = if start == 0 {
+        0
+    } else {
+        bytes
+            .iter()
+            .position(|b| *b == b'\n')
+            .map_or(bytes.len(), |i| i + 1)
+    };
+    let text = String::from_utf8_lossy(&bytes[first..]);
+    let mut lines: Vec<String> = text
+        .lines()
+        .rev()
+        .take(max_lines.min(2000))
+        .map(String::from)
+        .collect();
+    lines.reverse();
+    Ok(lines)
+}
+
+fn read_preview_bytes(path: &Path, max_bytes: u64) -> Result<Option<Vec<u8>>, String> {
+    let metadata = match std::fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.to_string()),
+    };
+    if !metadata.is_file() {
+        return Err("Preview requires a regular file".into());
     }
+    if metadata.len() > max_bytes {
+        return Err(format!(
+            "{} exceeds the {} MiB preview limit",
+            path.display(),
+            max_bytes / 1_048_576
+        ));
+    }
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    std::fs::File::open(path)
+        .map_err(|e| e.to_string())?
+        .take(max_bytes + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > max_bytes {
+        return Err("File grew beyond the preview limit while reading".into());
+    }
+    Ok(Some(bytes))
 }
 
 /// The rig's deform report, verbatim — a core-written artifact the Rig stage
@@ -294,28 +358,32 @@ async fn read_look_preview(
 /// Source-image preview bytes. Read-only, and only image extensions — the
 /// webview must not become a generic file reader.
 #[tauri::command]
-fn read_image(path: String) -> Result<Option<(String, String)>, String> {
-    use base64::Engine;
-    let p = PathBuf::from(&path);
-    let mime = match p
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase())
-        .as_deref()
-    {
-        Some("png") => "image/png",
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("webp") => "image/webp",
-        Some("gif") => "image/gif",
-        _ => return Ok(None),
-    };
-    match std::fs::read(&p) {
-        Ok(bytes) => Ok(Some((
-            mime.to_string(),
-            base64::engine::general_purpose::STANDARD.encode(bytes),
-        ))),
-        Err(_) => Ok(None),
-    }
+async fn read_image(path: String) -> Result<Option<(String, String)>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use base64::Engine;
+        let p = PathBuf::from(&path);
+        let mime = match p
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .as_deref()
+        {
+            Some("png") => "image/png",
+            Some("jpg") | Some("jpeg") => "image/jpeg",
+            Some("webp") => "image/webp",
+            Some("gif") => "image/gif",
+            _ => return Ok(None),
+        };
+        match read_preview_bytes(&p, 64 * 1024 * 1024)? {
+            Some(bytes) => Ok(Some((
+                mime.to_string(),
+                base64::engine::general_purpose::STANDARD.encode(bytes),
+            ))),
+            None => Ok(None),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// A canonical glTF for the inspection viewport. The viewport skill's asset
@@ -339,22 +407,11 @@ async fn read_mesh(path: String) -> Result<Option<String>, String> {
             Some("glb") | Some("gltf") => {}
             _ => return Ok(None),
         }
-        let meta = match std::fs::metadata(&p) {
-            Ok(m) => m,
-            Err(_) => return Ok(None),
-        };
-        if meta.len() > MAX_BYTES {
-            return Err(format!(
-                "{path} is {:.1} MB; the viewport reads up to {} MB over the IPC channel",
-                meta.len() as f64 / 1_048_576.0,
-                MAX_BYTES / 1_048_576
-            ));
-        }
-        match std::fs::read(&p) {
-            Ok(bytes) => Ok(Some(
+        match read_preview_bytes(&p, MAX_BYTES)? {
+            Some(bytes) => Ok(Some(
                 base64::engine::general_purpose::STANDARD.encode(bytes),
             )),
-            Err(e) => Err(format!("could not read {path}: {e}")),
+            None => Ok(None),
         }
     })
     .await
@@ -430,4 +487,54 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::*;
+
+    #[test]
+    fn log_tail_keeps_complete_recent_records_with_bounded_reads() {
+        let mut bytes = vec![b'x'; 3 * 1024 * 1024];
+        bytes.extend_from_slice("\nolder\r\nlast é\nfinal\n".as_bytes());
+        assert_eq!(
+            read_log_tail(&mut std::io::Cursor::new(bytes), 2).unwrap(),
+            ["last é", "final"]
+        );
+        let mut long_line = std::io::Cursor::new(vec![b'x'; 3 * 1024 * 1024]);
+        assert!(read_log_tail(&mut long_line, 20).unwrap().is_empty());
+    }
+
+    #[test]
+    fn log_tail_caps_caller_requested_history() {
+        let text: String = (0..3000).map(|i| format!("{i}\n")).collect();
+        let lines = read_log_tail(&mut std::io::Cursor::new(text), usize::MAX).unwrap();
+        assert_eq!(lines.len(), 2000);
+        assert_eq!(lines.first().unwrap(), "1000");
+        assert_eq!(lines.last().unwrap(), "2999");
+    }
+
+    #[test]
+    fn preview_reads_refuse_oversized_files_but_keep_absence_distinct() {
+        let path = std::env::temp_dir().join(format!(
+            "spritebook-preview-{}-{}.png",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        assert!(path.starts_with(std::env::temp_dir()));
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
+        file.set_len(1025).unwrap();
+        drop(file);
+        let result = read_preview_bytes(&path, 1024);
+        std::fs::remove_file(&path).unwrap();
+        assert!(result.unwrap_err().contains("preview limit"));
+        assert_eq!(read_preview_bytes(&path, 1024).unwrap(), None);
+    }
 }
