@@ -206,3 +206,57 @@ test('retry after journal removal and failed manifest unlink retains every histo
     await fs.rm(f.root, { recursive: true, force: true });
   }
 });
+
+test('delete reclaims only owner-verified default export stages and respects the external-export lease', async (t) => {
+  const f = await fixture();
+  try {
+    const output = join(f.workspace, 'export');
+    const stage = join(f.workspace, '.export.spritebook-export-owned1');
+    const unrelated = join(f.workspace, '.export.spritebook-export-other1');
+    for (const dir of [stage, unrelated]) {
+      await fs.mkdir(dir);
+      await fs.writeFile(join(dir, 'backup.bin'), 'keep until ownership checked');
+    }
+    await fs.writeFile(join(stage, 'owner.json'), JSON.stringify({ root: output, stage }));
+    await fs.writeFile(
+      join(unrelated, 'owner.json'),
+      JSON.stringify({ root: join(f.root, 'elsewhere'), stage: unrelated }),
+    );
+    const pending = `${output}.spritebook-export.pending.json`;
+    await fs.writeFile(
+      pending,
+      JSON.stringify({ version: 1, root: output, stage, state: 'publishing', files: [] }),
+    );
+    const lease = await acquireFileLock(`${output}.spritebook-export.lock`);
+    try {
+      await assert.rejects(deleteWorkspace(f.workspace, 'hero'), /project is busy/);
+      assert.equal(
+        await fs.readFile(join(stage, 'backup.bin'), 'utf8'),
+        'keep until ownership checked',
+      );
+    } finally {
+      await lease.close();
+    }
+    const rm = fs.rm;
+    const mock = t.mock.method(fs, 'rm', async (...args: Parameters<typeof fs.rm>) => {
+      if (String(args[0]) === stage) {
+        throw Object.assign(new Error('stage file is in use'), { code: 'EBUSY' });
+      }
+      return rm(...args);
+    });
+    await assert.rejects(deleteWorkspace(f.workspace, 'hero'), /Deletion did not finish/);
+    mock.mock.restore();
+    await assert.rejects(fs.stat(pending), { code: 'ENOENT' });
+    await deleteWorkspace(f.workspace, 'hero');
+    await assert.rejects(fs.stat(stage), { code: 'ENOENT' });
+    await assert.rejects(fs.stat(pending), { code: 'ENOENT' });
+    assert.equal(
+      await fs.readFile(join(unrelated, 'backup.bin'), 'utf8'),
+      'keep until ownership checked',
+    );
+    assert.deepEqual(await fs.readFile(f.original), f.source);
+    assert.equal((await fs.stat(`${output}.spritebook-export.lock`)).size, 0);
+  } finally {
+    await fs.rm(f.root, { recursive: true, force: true });
+  }
+});

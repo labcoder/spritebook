@@ -33,6 +33,52 @@ async function validateTree(path: string): Promise<void> {
   }
 }
 
+/** Default exports stage beside export/, so only exact owner receipts admit their cleanup. */
+async function exportArtifacts(root: string): Promise<string[]> {
+  const out = resolve(root, 'export');
+  const owned: string[] = [];
+  for (const name of await fs.readdir(root)) {
+    if (!/^\.export\.spritebook-export-[a-z0-9]+$/i.test(name)) continue;
+    const stage = resolve(root, name);
+    const stat = await fs.lstat(stage);
+    if (stat.isSymbolicLink()) throw new Error('An export stage is linked; no files were deleted.');
+    if (!stat.isDirectory()) continue;
+    const marker = resolve(stage, 'owner.json');
+    const info = await present(marker);
+    if (info?.isSymbolicLink()) {
+      throw new Error('An export owner record is linked; no files were deleted.');
+    }
+    if (!info?.isFile() || info.size > 65536) continue;
+    const owner = await fs.readFile(marker, 'utf8').then((text) => {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    });
+    if (owner?.root === out && owner.stage === stage) owned.push(stage);
+  }
+  const pending = `${out}.spritebook-export.pending.json`;
+  const info = await present(pending);
+  if (info?.isSymbolicLink()) {
+    throw new Error('The export recovery record is linked; no files were deleted.');
+  }
+  if (info?.isFile() && info.size <= 1024 * 1024) {
+    const intent = await fs.readFile(pending, 'utf8').then((text) => {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    });
+    if (intent?.version === 1 && intent.root === out && owned.includes(intent.stage)) {
+      // Remove the recovery marker first: a failed stage removal remains owner-discoverable on retry.
+      owned.unshift(pending);
+    }
+  }
+  return owned;
+}
+
 /** Irreversible by explicit confirmation; keep original inputs and unrecognized user files. */
 export async function deleteWorkspace(workspace: string, confirmation: string) {
   const expectedId = parseWith(CharacterIdSchema, confirmation, 'confirmed character id');
@@ -48,7 +94,15 @@ export async function deleteWorkspace(workspace: string, confirmation: string) {
   const paths = workspacePaths(root);
   const sourceDir = resolve(paths.sourceDir);
   const state = [paths.journal, paths.cursor, `${paths.manifest}.pending.json`, paths.manifest];
-  for (const path of [...state, `${paths.manifest}.lock`, `${paths.manifest}.job.lock`]) {
+  const exportLock = resolve(root, 'export.spritebook-export');
+  for (
+    const path of [
+      ...state,
+      `${paths.manifest}.lock`,
+      `${paths.manifest}.job.lock`,
+      `${exportLock}.lock`,
+    ]
+  ) {
     const stat = await present(path);
     if (stat && (stat.isSymbolicLink() || !stat.isFile())) {
       throw new Error('The project record or lock is linked or invalid; no files were deleted.');
@@ -58,109 +112,110 @@ export async function deleteWorkspace(workspace: string, confirmation: string) {
   return await withManifestWrite(
     paths.manifest,
     () =>
-      withManifestLock(paths.manifest, async () => {
-        const manifest = await readWorkspace(root);
-        if (manifest.id !== expectedId) {
-          throw new Error('The project identity changed. Reopen it and confirm deletion again.');
-        }
-        const sourceHashes = new Set([manifest.source.sha256]);
-        const journal = await fs.readFile(paths.journal, 'utf8').catch((error) => {
-          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
-          throw error;
-        });
-        // Earlier source inputs belong to the user too, including those retained for undo.
-        for (const line of journal.split('\n').filter(Boolean)) {
-          const patch = JSON.parse(line);
-          for (const op of [...patch.op, ...patch.inverse]) {
-            const hash = op.path === '/source'
-              ? op.value?.sha256
-              : op.path === '/source/sha256'
-              ? op.value
-              : undefined;
-            if (typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash)) sourceHashes.add(hash);
+      withManifestLock(exportLock, () =>
+        withManifestLock(paths.manifest, async () => {
+          const manifest = await readWorkspace(root);
+          if (manifest.id !== expectedId) {
+            throw new Error('The project identity changed. Reopen it and confirm deletion again.');
           }
-        }
-        const targets: string[] = [];
-        for (const name of [...OUTPUTS, ...REPORTS]) {
-          const path = resolve(root, name);
-          const stat = await present(path);
-          if (!stat) continue;
-          if (!stat.isSymbolicLink() && stat.isDirectory() !== OUTPUTS.includes(name)) {
-            throw new Error(`Unexpected project output at "${path}"; no files were deleted.`);
+          const sourceHashes = new Set([manifest.source.sha256]);
+          const journal = await fs.readFile(paths.journal, 'utf8').catch((error) => {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+            throw error;
+          });
+          // Earlier source inputs belong to the user too, including those retained for undo.
+          for (const line of journal.split('\n').filter(Boolean)) {
+            const patch = JSON.parse(line);
+            for (const op of [...patch.op, ...patch.inverse]) {
+              const hash = op.path === '/source'
+                ? op.value?.sha256
+                : op.path === '/source/sha256'
+                ? op.value
+                : undefined;
+              if (typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash)) sourceHashes.add(hash);
+            }
           }
-          targets.push(path);
-        }
-        const preservedSource: string[] = [];
-        const originalsRecord = resolve(sourceDir, '.spritebook-originals.json');
-        if (await present(sourceDir)) {
-          const sourceStat = await fs.lstat(sourceDir);
-          if (sourceStat.isSymbolicLink() || !sourceStat.isDirectory()) {
-            throw new Error(
-              'The source folder is linked or invalid; no project files were deleted.',
-            );
+          const targets: string[] = await exportArtifacts(root);
+          for (const name of [...OUTPUTS, ...REPORTS]) {
+            const path = resolve(root, name);
+            const stat = await present(path);
+            if (!stat) continue;
+            if (!stat.isSymbolicLink() && stat.isDirectory() !== OUTPUTS.includes(name)) {
+              throw new Error(`Unexpected project output at "${path}"; no files were deleted.`);
+            }
+            targets.push(path);
           }
-          const recordStat = await present(originalsRecord);
-          if (recordStat) {
-            if (
-              recordStat.isSymbolicLink() || !recordStat.isFile() || recordStat.size > 1024 * 1024
-            ) {
+          const preservedSource: string[] = [];
+          const originalsRecord = resolve(sourceDir, '.spritebook-originals.json');
+          if (await present(sourceDir)) {
+            const sourceStat = await fs.lstat(sourceDir);
+            if (sourceStat.isSymbolicLink() || !sourceStat.isDirectory()) {
               throw new Error(
-                'The retained source record is linked or invalid; no files were deleted.',
+                'The source folder is linked or invalid; no project files were deleted.',
               );
             }
-            const record = JSON.parse(await fs.readFile(originalsRecord, 'utf8'));
-            if (
-              record?.schemaVersion !== 1 || !Array.isArray(record.sha256) ||
-              Object.keys(record).some((key) => !['schemaVersion', 'sha256'].includes(key)) ||
-              !record.sha256.every((hash: unknown) =>
-                typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash)
-              )
-            ) throw new Error('The retained source record is invalid; no files were deleted.');
-            for (const hash of record.sha256) sourceHashes.add(hash);
-          }
-          for (const name of await fs.readdir(sourceDir)) {
-            const path = resolve(sourceDir, name);
-            if (sourceHashes.has(name.split('.')[0].toLowerCase())) {
-              preservedSource.push(path);
-            } else if (
-              /^(?:[a-f0-9]{64}(?:\.[a-z0-9]+)?|prep-[a-f0-9]{64}|preflight\.json)$/i.test(name)
-            ) {
-              targets.push(path);
+            const recordStat = await present(originalsRecord);
+            if (recordStat) {
+              if (
+                recordStat.isSymbolicLink() || !recordStat.isFile() || recordStat.size > 1024 * 1024
+              ) {
+                throw new Error(
+                  'The retained source record is linked or invalid; no files were deleted.',
+                );
+              }
+              const record = JSON.parse(await fs.readFile(originalsRecord, 'utf8'));
+              if (
+                record?.schemaVersion !== 1 || !Array.isArray(record.sha256) ||
+                Object.keys(record).some((key) => !['schemaVersion', 'sha256'].includes(key)) ||
+                !record.sha256.every((hash: unknown) =>
+                  typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash)
+                )
+              ) throw new Error('The retained source record is invalid; no files were deleted.');
+              for (const hash of record.sha256) sourceHashes.add(hash);
+            }
+            for (const name of await fs.readdir(sourceDir)) {
+              const path = resolve(sourceDir, name);
+              if (sourceHashes.has(name.split('.')[0].toLowerCase())) {
+                preservedSource.push(path);
+              } else if (
+                /^(?:[a-f0-9]{64}(?:\.[a-z0-9]+)?|prep-[a-f0-9]{64}|preflight\.json)$/i.test(name)
+              ) {
+                targets.push(path);
+              }
             }
           }
-        }
-        for (const path of targets) {
-          if (dirname(path) !== root && dirname(path) !== sourceDir) {
-            throw new Error('Deletion target escaped the project.');
+          for (const path of targets) {
+            if (dirname(path) !== root && dirname(path) !== sourceDir) {
+              throw new Error('Deletion target escaped the project.');
+            }
+            await validateTree(path);
           }
-          await validateTree(path);
-        }
-        // Validate the complete plan before removing anything; manifest last keeps failures retryable.
-        for (const path of state) if (await present(path)) await validateTree(path);
-        // A locked manifest can outlive its journal; keep every original input safe on retry.
-        await fs.mkdir(sourceDir, { recursive: true });
-        await writeAtomic(
-          originalsRecord,
-          JSON.stringify({ schemaVersion: 1, sha256: [...sourceHashes].sort() }) + '\n',
-        );
-        try {
-          for (const path of [...targets, ...state]) {
-            await fs.rm(path, { recursive: true, force: true });
-          }
-        } catch (error) {
-          throw new Error(
-            'Deletion did not finish. Some generated files may already be removed. ' +
-              'The original source is preserved; close programs using this project and retry. ' +
-              (error instanceof Error ? error.message : String(error)),
+          // Validate the complete plan before removing anything; manifest last keeps failures retryable.
+          for (const path of state) if (await present(path)) await validateTree(path);
+          // A locked manifest can outlive its journal; keep every original input safe on retry.
+          await fs.mkdir(sourceDir, { recursive: true });
+          await writeAtomic(
+            originalsRecord,
+            JSON.stringify({ schemaVersion: 1, sha256: [...sourceHashes].sort() }) + '\n',
           );
-        }
-        return {
-          id: manifest.id,
-          workspace: root,
-          preservedSource: preservedSource.map((path) => relative(root, path)),
-          removed: [...targets, ...state].map((path) => relative(root, path)),
-        };
-      }),
+          try {
+            for (const path of [...targets, ...state]) {
+              await fs.rm(path, { recursive: true, force: true });
+            }
+          } catch (error) {
+            throw new Error(
+              'Deletion did not finish. Some generated files may already be removed. ' +
+                'The original source is preserved; close programs using this project and retry. ' +
+                (error instanceof Error ? error.message : String(error)),
+            );
+          }
+          return {
+            id: manifest.id,
+            workspace: root,
+            preservedSource: preservedSource.map((path) => relative(root, path)),
+            removed: [...targets, ...state].map((path) => relative(root, path)),
+          };
+        }), true),
     true,
   );
 }
