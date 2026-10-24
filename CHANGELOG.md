@@ -19,6 +19,8 @@ capture/export reliability; it does not certify generated rigs or collision-free
   partial setup and early event-consumer closure.
 - Reject unsafe model-removal paths and prototype traversal in saved journal patches. Bound native
   preview/log reads and release file-drop subscriptions when their form closes.
+- Retry brief Windows VRAM mutex permission failures without bypassing the memory budget. Failed
+  acquisitions now remove their claim and stop its heartbeat; persistent permission errors refuse.
 - Reorganize public documentation into user and developer guides, with a real workbench screenshot.
   Patch Vite, Zod and URI parsing dependencies to resolve reported advisories.
 

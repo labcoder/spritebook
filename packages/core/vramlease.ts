@@ -149,21 +149,28 @@ async function readClaims(
 /** The directory mutex: mkdir is atomic everywhere, including Windows. */
 async function withLock<T>(dir: string, now: () => number, fn: () => Promise<T>): Promise<T> {
   const lock = `${dir}/${LOCK}`;
+  let permissionRetries = 0;
   for (;;) {
     try {
       await fs.mkdir(lock);
       break;
     } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      // Windows may still be closing a deleted directory. Bound genuine ACL failures to 100 ms.
+      if (process.platform === 'win32' && code === 'EPERM' && permissionRetries++ < 4) {
+        await sleep(25);
+        continue;
+      }
       // The lease directory lives in machine temp, which OS cleaners do sweep.
       // A waiter that crashed the moment its directory vanished would take the
       // job down for a housekeeping task, so it is rebuilt instead. The cost is
       // stated rather than hidden: any live claims that were swept are gone
       // with it, and the machine's accounting restarts from empty.
-      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      if (code === 'ENOENT') {
         await fs.mkdir(dir, { recursive: true });
         continue;
       }
-      if (!((err as NodeJS.ErrnoException)?.code === 'EEXIST')) throw err;
+      if (code !== 'EEXIST') throw err;
       const stat = await fs.stat(lock).catch(() => null);
       // held for longer than any critical section here can take: the holder
       // died between mkdir and remove, and without this everyone stalls
@@ -225,79 +232,75 @@ export async function acquireVramLease(opts: VramLeaseOptions): Promise<VramLeas
 
   const started = now();
   let told = false;
-  const done = (): VramLease => ({
-    gb,
-    path,
-    release: async () => {
-      clearInterval(beat);
-      await fs.rm(path).catch(() => {});
-    },
-  });
-  const abandon = async (message: string): Promise<never> => {
+  const release = async () => {
     clearInterval(beat);
     await fs.rm(path).catch(() => {});
-    throw new Error(message);
   };
 
-  for (;;) {
-    if (opts.signal?.aborted) await abandon('Cancelled while waiting for VRAM');
-    let reason: string | null = null;
-    const granted = await withLock(dir, now, async () => {
-      const claims = await readClaims(dir, staleMs, now());
-      const mine = claims.get(name);
-      if (mine === undefined) {
-        // our own claim was reaped: this process was stalled longer than
-        // staleMs, so the machine had every right to take it back
-        return 'reaped' as const;
-      }
-      const held = [...claims.values()].filter((c) => c.state === 'held');
-      const committed = g1(held.reduce((n, c) => n + c.gb, 0));
-      const free = g1(budget - committed);
-      // FIFO across processes: the oldest waiter, and only the oldest waiter,
-      // may take what fits. Ties break on the filename, which carries the pid
-      // and a uuid, so the order is total and every process agrees on it.
-      const waiting = [...claims.entries()]
-        .filter(([, c]) => c.state === 'waiting')
-        .sort(([a, ca], [b, cb]) => ca.at - cb.at || (a < b ? -1 : a > b ? 1 : 0));
-      const head = waiting[0];
-      if (head !== undefined && head[0] === name && gb <= free) {
-        await fs.writeFile(path, canonicalJson({ ...mine, state: 'held' }));
-        return 'granted' as const;
-      }
-      // Name WHO, not just how many. "1 other job(s) holding 20 GiB" tells a
-      // user staring at a stuck job nothing they can act on; a jobId and a pid
-      // let them find it, watch it, or kill it.
-      const who = held
-        .map((c) => `${c.jobId} (pid ${c.pid}, ${c.gb} GiB)`)
-        .join(', ');
-      const ahead = head !== undefined && head[0] !== name ? head[1] : null;
-      reason = ahead
-        ? `${ahead.jobId} (pid ${ahead.pid}) is ahead in the queue and needs ${ahead.gb} GiB; ` +
-          `${free} GiB of the machine's ${budget} GiB is free` +
-          (who ? `, held by ${who}` : '')
-        : `this job needs ${gb} GiB and ${free} GiB of the machine's ${budget} GiB is free` +
-          (who ? `, held by ${who}` : '');
-      return 'waiting' as const;
-    });
+  try {
+    for (;;) {
+      if (opts.signal?.aborted) throw new Error('Cancelled while waiting for VRAM');
+      let reason: string | null = null;
+      const granted = await withLock(dir, now, async () => {
+        const claims = await readClaims(dir, staleMs, now());
+        const mine = claims.get(name);
+        if (mine === undefined) {
+          // our own claim was reaped: this process was stalled longer than
+          // staleMs, so the machine had every right to take it back
+          return 'reaped' as const;
+        }
+        const held = [...claims.values()].filter((c) => c.state === 'held');
+        const committed = g1(held.reduce((n, c) => n + c.gb, 0));
+        const free = g1(budget - committed);
+        // FIFO across processes: the oldest waiter, and only the oldest waiter,
+        // may take what fits. Ties break on the filename, which carries the pid
+        // and a uuid, so the order is total and every process agrees on it.
+        const waiting = [...claims.entries()]
+          .filter(([, c]) => c.state === 'waiting')
+          .sort(([a, ca], [b, cb]) => ca.at - cb.at || (a < b ? -1 : a > b ? 1 : 0));
+        const head = waiting[0];
+        if (head !== undefined && head[0] === name && gb <= free) {
+          await fs.writeFile(path, canonicalJson({ ...mine, state: 'held' }));
+          return 'granted' as const;
+        }
+        // Name WHO, not just how many. "1 other job(s) holding 20 GiB" tells a
+        // user staring at a stuck job nothing they can act on; a jobId and a pid
+        // let them find it, watch it, or kill it.
+        const who = held
+          .map((c) => `${c.jobId} (pid ${c.pid}, ${c.gb} GiB)`)
+          .join(', ');
+        const ahead = head !== undefined && head[0] !== name ? head[1] : null;
+        reason = ahead
+          ? `${ahead.jobId} (pid ${ahead.pid}) is ahead in the queue and needs ${ahead.gb} GiB; ` +
+            `${free} GiB of the machine's ${budget} GiB is free` +
+            (who ? `, held by ${who}` : '')
+          : `this job needs ${gb} GiB and ${free} GiB of the machine's ${budget} GiB is free` +
+            (who ? `, held by ${who}` : '');
+        return 'waiting' as const;
+      });
 
-    if (granted === 'granted') {
-      if (told) opts.onAcquired?.((now() - started) / 1000);
-      return done();
+      if (granted === 'granted') {
+        if (told) opts.onAcquired?.((now() - started) / 1000);
+        return { gb, path, release };
+      }
+      if (granted === 'reaped') {
+        throw new Error(
+          `This job's VRAM claim was reaped after ${staleMs} ms without a heartbeat, which means ` +
+            `the process was stalled long enough for the machine to reclaim its budget.`,
+        );
+      }
+      if (!told && reason !== null) {
+        told = true;
+        opts.onWait?.(reason);
+      }
+      if (opts.timeoutMs !== undefined && now() - started > opts.timeoutMs) {
+        throw new Error(`Waited ${Math.round((now() - started) / 1000)}s for VRAM: ${reason}`);
+      }
+      await sleep(pollMs);
     }
-    if (granted === 'reaped') {
-      await abandon(
-        `This job's VRAM claim was reaped after ${staleMs} ms without a heartbeat, which means ` +
-          `the process was stalled long enough for the machine to reclaim its budget.`,
-      );
-    }
-    if (!told && reason !== null) {
-      told = true;
-      opts.onWait?.(reason);
-    }
-    if (opts.timeoutMs !== undefined && now() - started > opts.timeoutMs) {
-      await abandon(`Waited ${Math.round((now() - started) / 1000)}s for VRAM: ${reason}`);
-    }
-    await sleep(pollMs);
+  } catch (error) {
+    await release();
+    throw error;
   }
 }
 

@@ -133,6 +133,82 @@ test('the OLDEST waiter goes first, even when a later one would fit', async () =
   }
 });
 
+test('a Windows delete-pending mutex does not lose a waiter or oversubscribe VRAM', {
+  skip: process.platform !== 'win32',
+}, async (t) => {
+  const dir = await tmp();
+  const holder = await acquireVramLease({ gb: 20, jobId: 'holder', budgetGb: 24, dir, ...FAST });
+  let waiter: Awaited<ReturnType<typeof acquireVramLease>> | undefined;
+  const mkdir = fs.mkdir;
+  let blocked = 2;
+  t.mock.method(fs, 'mkdir', async (...args: Parameters<typeof fs.mkdir>) => {
+    if (args[0] === `${dir}/.lock` && blocked-- > 0) {
+      throw Object.assign(new Error('directory deletion is pending'), { code: 'EPERM' });
+    }
+    return mkdir(...args);
+  });
+  try {
+    let announce!: () => void;
+    const waiting = new Promise<void>((resolve) => announce = resolve);
+    const pending = acquireVramLease({
+      gb: 8,
+      jobId: 'waiting',
+      budgetGb: 24,
+      dir,
+      ...FAST,
+      onWait: announce,
+    });
+    await Promise.race([waiting, pending]);
+    assertEquals(await vramCommittedGb(dir, FAST.staleMs), 20, 'the budget remains enforced');
+    await holder.release();
+    waiter = await pending;
+    assertEquals(await vramCommittedGb(dir, FAST.staleMs), 8, 'the waiter eventually holds');
+  } finally {
+    await holder.release();
+    await waiter?.release();
+    await fs.rm(dir, { recursive: true });
+  }
+});
+
+test('fatal mutex errors fail promptly and abandon both the claim and its heartbeat', {
+  timeout: 2_000,
+}, async (t) => {
+  const dir = await tmp();
+  const mkdir = fs.mkdir;
+  const utimes = fs.utimes;
+  let denied: Error & { code: string };
+  let attempts = 0;
+  let beats = 0;
+  t.mock.method(fs, 'mkdir', async (...args: Parameters<typeof fs.mkdir>) => {
+    if (args[0] === `${dir}/.lock`) {
+      attempts++;
+      throw denied;
+    }
+    return mkdir(...args);
+  });
+  t.mock.method(fs, 'utimes', async (...args: Parameters<typeof fs.utimes>) => {
+    if (String(args[0]).startsWith(`${dir}/`)) beats++;
+    return utimes(...args);
+  });
+  try {
+    for (const code of ['EPERM', 'EACCES', 'EIO']) {
+      denied = Object.assign(new Error(`injected ${code}`), { code });
+      attempts = 0;
+      const error = await assertRejects(() =>
+        acquireVramLease({ gb: 8, jobId: 'denied', budgetGb: 24, dir, ...FAST, heartbeatMs: 5 })
+      );
+      assertEquals(error, denied, 'retain the real filesystem error');
+      assert(attempts < 20, 'permission errors have a short, finite retry budget');
+      assertEquals(await fs.readdir(dir), [], 'no abandoned claim remains');
+      const before = beats;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      assertEquals(beats, before, 'no heartbeat keeps touching an abandoned claim');
+    }
+  } finally {
+    await fs.rm(dir, { recursive: true });
+  }
+});
+
 test('a KILLED holder gives its VRAM back when its heartbeat lapses', async () => {
   // what a killed process actually leaves behind: a held claim whose mtime
   // stops moving. Nothing else about it is distinguishable from a live one.
