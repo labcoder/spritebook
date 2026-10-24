@@ -200,7 +200,12 @@ export function packAnimationLayout(cells: PackCell[], opts: PackOptions = {}): 
         best = { columns, w: width, h: height };
       }
     }
-    if (!best) return original;
+    if (!best) {
+      // Only this sequence must span pages. Falling back for the whole bake
+      // would also split smaller animations that can stay intact.
+      blocks.push(...group.map((cell) => ({ ...cell, columns: 1, cells: [cell] })));
+      continue;
+    }
     blocks.push({ id: group[0].id, ...best, cells: group });
   }
   const layout = packLayout(blocks, opts);

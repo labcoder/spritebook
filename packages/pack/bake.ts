@@ -254,7 +254,7 @@ export async function buildCacheInputs(
       ambient: spec.style.lighting?.ambient ?? AMBIENT,
       lightFrame: spec.lightFrame ?? spec.style.lighting?.frame ?? DEFAULT_LIGHT_FRAME,
     })),
-    rendererVersion: `${renderSig}|animation-atlas@1`,
+    rendererVersion: `${renderSig}|animation-atlas@2`,
     // The backend that made this character, when one did. `source-mesh@0` is
     // the sentinel for NOT GENERATED HERE — a mesh that came in through the
     // importer border — which is the truth for a bare-file bake and was a lie
@@ -763,7 +763,9 @@ async function* executeBakeJob(spec: BakeJobSpec): AsyncIterable<JobEvent> {
       }),
       {
         maxPageSizePx: Math.max(
-          2048,
+          // 512px walk cycles need more than the nine cells a 2048px page
+          // holds with gutters. Bound normal pages at 4096 (64 MiB RGBA).
+          4096,
           2 ** Math.ceil(Math.log2(Math.max(spec.camera.cellPx.w, spec.camera.cellPx.h))),
         ),
       },

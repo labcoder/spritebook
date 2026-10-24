@@ -52,6 +52,73 @@ test('animation larger than a page retains every frame for multi-page-capable ex
   assertEquals(layout.rects.length, 8);
 });
 
+test('512px walk and jump cycles stay complete within the bounded 4096px bake budget', () => {
+  const cells = ['walk-loop', 'jump-start', 'jump-loop', 'jump-land'].flatMap((clipId) =>
+    Array.from(
+      { length: 8 },
+      (_, direction) =>
+        Array.from(
+          { length: clipId === 'walk-loop' ? 12 : 6 },
+          (_, frame) => cell(clipId, direction, frame, 512, 512),
+        ),
+    ).flat()
+  );
+  const layout = packAnimationLayout(cells, { maxPageSizePx: 4096 });
+  assertEquals(layout.rects.length, 240);
+  assertEquals(new Set(layout.rects.map((rect) => frameIdKey(rect.id))).size, 240);
+  assert(layout.pageSizePx <= 4096);
+  for (const clipId of ['walk-loop', 'jump-start', 'jump-loop', 'jump-land']) {
+    for (let direction = 0; direction < 8; direction++) {
+      const frames = layout.rects.filter((rect) =>
+        rect.id.clipId === clipId && rect.id.direction === direction
+      );
+      assertEquals(new Set(frames.map((rect) => rect.pageIndex)).size, 1);
+    }
+  }
+  assertSeparated(layout, 2);
+  assertEquals(layout, packAnimationLayout([...cells].reverse(), { maxPageSizePx: 4096 }));
+
+  const single4k = packAnimationLayout([cell('still', 0, 0, 4096, 4096)], {
+    maxPageSizePx: 4096,
+  });
+  assertEquals(single4k.pageSizePx, 4096);
+  assertEquals(single4k.pageCount, 1);
+  assertEquals(single4k.rects[0], {
+    id: { clipId: 'still', direction: 0, frame: 0 },
+    pageIndex: 0,
+    x: 0,
+    y: 0,
+    w: 4096,
+    h: 4096,
+  });
+});
+
+test('an oversized sequence does not split neighboring animations that fit their page', () => {
+  const cells = ['jump', 'walk'].flatMap((clipId) =>
+    Array.from(
+      { length: 3 },
+      (_, direction) =>
+        Array.from(
+          { length: clipId === 'walk' ? 12 : 6 },
+          (_, frame) => cell(clipId, direction, frame, 512, 512),
+        ),
+    ).flat()
+  );
+  const layout = packAnimationLayout(cells, { maxPageSizePx: 2048 });
+  assertEquals(layout.rects.length, cells.length);
+  for (let direction = 0; direction < 3; direction++) {
+    const pages = (clipId: string) =>
+      new Set(
+        layout.rects.filter((rect) => rect.id.clipId === clipId && rect.id.direction === direction)
+          .map((rect) => rect.pageIndex),
+      ).size;
+    assertEquals(pages('jump'), 1, 'the six-frame jump fits and remains complete');
+    assert(pages('walk') > 1, 'the twelve-frame walk honestly exceeds the page budget');
+  }
+  assertSeparated(layout, 2);
+  assertEquals(layout, packAnimationLayout([...cells].reverse(), { maxPageSizePx: 2048 }));
+});
+
 /** Mixed sizes — packLayout must not assume uniform cells. */
 function mixed(): PackCell[] {
   return [
