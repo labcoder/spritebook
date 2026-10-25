@@ -6,6 +6,8 @@
  * purpose — they match the CLI the GUI mirrors.
  */
 export const es: Record<string, string> = {
+  'About SpriteBook': 'Acerca de SpriteBook',
+  'Version': 'Versión',
   'Cancel': 'Cancelar',
   'Delete project': 'Eliminar proyecto',
   'Delete project…': 'Eliminar proyecto…',

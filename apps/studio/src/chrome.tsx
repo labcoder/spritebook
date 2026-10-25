@@ -6,8 +6,10 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { Menu } from '@base-ui/react/menu';
 import { type Locale, t } from './i18n';
 import { log, type Severity } from './log';
-import type { StudioBridge } from './bridge';
+import { openProjectWebsite, PROJECT_URL, type StudioBridge } from './bridge';
 import { ProjectMenu } from './projectmenu';
+import { Modal } from './modal';
+import { SPRITEBOOK_VERSION } from '../../../packages/cli/version';
 
 /* ---------------- menu bar ---------------- */
 
@@ -55,115 +57,146 @@ export function MenuBar(
     onDelete: () => void;
   },
 ) {
+  const [aboutOpen, setAboutOpen] = useState(false);
   return (
-    <header className='menubar'>
-      <div className='logo'>
-        <span className='wordmark'>SpriteBook</span>
-      </div>
-      <Menu.Root>
-        <Menu.Trigger className='menubtn'>{t('File')}</Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Positioner sideOffset={4}>
-            <Menu.Popup className='menupop'>
-              <MenuEntry label={t('Shortcuts…')} hint='Ctrl+K' onClick={onPalette} />
-              <MenuEntry label={t('Reload gallery')} onClick={onReload} />
-              <MenuEntry label={t('Run health exam')} onClick={onExam} />
-              <MenuEntry
-                label={t('Manage extensions…')}
-                hint='Ctrl+M'
-                onClick={onModels}
-              />
-            </Menu.Popup>
-          </Menu.Positioner>
-        </Menu.Portal>
-      </Menu.Root>
-      <Menu.Root>
-        <Menu.Trigger className='menubtn'>{t('Edit')}</Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Positioner sideOffset={4}>
-            <Menu.Popup className='menupop'>
-              <MenuEntry
-                label={t('Undo')}
-                hint='Ctrl+Z'
-                onClick={onUndo}
-                disabled={!canEdit}
-              />
-              <MenuEntry
-                label={t('Redo')}
-                hint='Ctrl+Shift+Z'
-                onClick={onRedo}
-                disabled={!canEdit}
-              />
-              <MenuEntry label={t('Delete project…')} onClick={onDelete} disabled={!canEdit} />
-              <Menu.SubmenuRoot>
-                <Menu.SubmenuTrigger className='menuitem submenu-trigger'>
-                  {t('Language')}
-                  <svg viewBox='0 0 20 20' aria-hidden='true'>
-                    <path d='m8 5 5 5-5 5' />
-                  </svg>
-                </Menu.SubmenuTrigger>
-                <Menu.Portal>
-                  <Menu.Positioner sideOffset={4}>
-                    <Menu.Popup className='menupop'>
-                      <Menu.RadioGroup
-                        value={locale}
-                        onValueChange={onLocaleChange}
-                        aria-label={t('Language')}
-                      >
-                        {([
-                          'en',
-                          'es',
-                          ...(import.meta.env.DEV ? ['pseudo' as const] : []),
-                        ] as Locale[]).map((value) => (
-                          <Menu.RadioItem
-                            key={value}
-                            value={value}
-                            closeOnClick
-                            className='menuitem language-item'
-                          >
-                            <span>
-                              {value === 'en' ? 'English' : value === 'es' ? 'Español' : 'Pseudo'}
-                            </span>
-                            <Menu.RadioItemIndicator>
-                              <svg viewBox='0 0 20 20' aria-hidden='true'>
-                                <path d='m4 10 4 4 8-8' />
-                              </svg>
-                            </Menu.RadioItemIndicator>
-                          </Menu.RadioItem>
-                        ))}
-                      </Menu.RadioGroup>
-                    </Menu.Popup>
-                  </Menu.Positioner>
-                </Menu.Portal>
-              </Menu.SubmenuRoot>
-            </Menu.Popup>
-          </Menu.Positioner>
-        </Menu.Portal>
-      </Menu.Root>
-      <button type='button' className='menubtn' onClick={onModels}>
-        {t('Manage extensions…')}
-      </button>
-      <div className='menur'>
-        <button
-          type='button'
-          className='icon-button'
-          onClick={() => onThemeChange(theme === 'light' ? 'dark' : 'light')}
-          aria-label={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')}
-          title={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')}
-        >
-          <svg viewBox='0 0 20 20' aria-hidden='true'>
-            {theme === 'dark'
-              ? (
-                <>
-                  <circle cx='10' cy='10' r='3.5' />
-                  <path d='M10 1v2m0 14v2M1 10h2m14 0h2M3.6 3.6 5 5m10 10 1.4 1.4M3.6 16.4 5 15M15 5l1.4-1.4' />
-                </>
-              )
-              : <path d='M16.8 12.2A7.2 7.2 0 0 1 7.8 3.2a7.2 7.2 0 1 0 9 9Z' />}
-          </svg>
+    <>
+      <header className='menubar'>
+        <div className='logo'>
+          <span className='wordmark'>SpriteBook</span>
+        </div>
+        <Menu.Root>
+          <Menu.Trigger className='menubtn'>{t('File')}</Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner sideOffset={4}>
+              <Menu.Popup className='menupop'>
+                <MenuEntry label={t('Shortcuts…')} hint='Ctrl+K' onClick={onPalette} />
+                <MenuEntry label={t('Reload gallery')} onClick={onReload} />
+                <MenuEntry label={t('Run health exam')} onClick={onExam} />
+                <MenuEntry
+                  label={t('Manage extensions…')}
+                  hint='Ctrl+M'
+                  onClick={onModels}
+                />
+                <MenuEntry label={t('About SpriteBook')} onClick={() => setAboutOpen(true)} />
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
+        <Menu.Root>
+          <Menu.Trigger className='menubtn'>{t('Edit')}</Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner sideOffset={4}>
+              <Menu.Popup className='menupop'>
+                <MenuEntry
+                  label={t('Undo')}
+                  hint='Ctrl+Z'
+                  onClick={onUndo}
+                  disabled={!canEdit}
+                />
+                <MenuEntry
+                  label={t('Redo')}
+                  hint='Ctrl+Shift+Z'
+                  onClick={onRedo}
+                  disabled={!canEdit}
+                />
+                <MenuEntry label={t('Delete project…')} onClick={onDelete} disabled={!canEdit} />
+                <Menu.SubmenuRoot>
+                  <Menu.SubmenuTrigger className='menuitem submenu-trigger'>
+                    {t('Language')}
+                    <svg viewBox='0 0 20 20' aria-hidden='true'>
+                      <path d='m8 5 5 5-5 5' />
+                    </svg>
+                  </Menu.SubmenuTrigger>
+                  <Menu.Portal>
+                    <Menu.Positioner sideOffset={4}>
+                      <Menu.Popup className='menupop'>
+                        <Menu.RadioGroup
+                          value={locale}
+                          onValueChange={onLocaleChange}
+                          aria-label={t('Language')}
+                        >
+                          {([
+                            'en',
+                            'es',
+                            ...(import.meta.env.DEV ? ['pseudo' as const] : []),
+                          ] as Locale[]).map((value) => (
+                            <Menu.RadioItem
+                              key={value}
+                              value={value}
+                              closeOnClick
+                              className='menuitem language-item'
+                            >
+                              <span>
+                                {value === 'en' ? 'English' : value === 'es' ? 'Español' : 'Pseudo'}
+                              </span>
+                              <Menu.RadioItemIndicator>
+                                <svg viewBox='0 0 20 20' aria-hidden='true'>
+                                  <path d='m4 10 4 4 8-8' />
+                                </svg>
+                              </Menu.RadioItemIndicator>
+                            </Menu.RadioItem>
+                          ))}
+                        </Menu.RadioGroup>
+                      </Menu.Popup>
+                    </Menu.Positioner>
+                  </Menu.Portal>
+                </Menu.SubmenuRoot>
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
+        <button type='button' className='menubtn' onClick={onModels}>
+          {t('Manage extensions…')}
         </button>
-      </div>
-    </header>
+        <div className='menur'>
+          <button
+            type='button'
+            className='icon-button'
+            onClick={() => onThemeChange(theme === 'light' ? 'dark' : 'light')}
+            aria-label={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')}
+            title={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')}
+          >
+            <svg viewBox='0 0 20 20' aria-hidden='true'>
+              {theme === 'dark'
+                ? (
+                  <>
+                    <circle cx='10' cy='10' r='3.5' />
+                    <path d='M10 1v2m0 14v2M1 10h2m14 0h2M3.6 3.6 5 5m10 10 1.4 1.4M3.6 16.4 5 15M15 5l1.4-1.4' />
+                  </>
+                )
+                : <path d='M16.8 12.2A7.2 7.2 0 0 1 7.8 3.2a7.2 7.2 0 1 0 9 9Z' />}
+            </svg>
+          </button>
+        </div>
+      </header>
+      <Modal
+        open={aboutOpen}
+        onClose={() => setAboutOpen(false)}
+        label={t('About SpriteBook')}
+        className='pal about'
+        initialFocus='button'
+      >
+        <img src='/app-icon.png' width='96' height='96' alt='' />
+        <h2>SpriteBook Studio</h2>
+        <p>{t('Version')} {SPRITEBOOK_VERSION}</p>
+        <a
+          href={PROJECT_URL}
+          target='_blank'
+          rel='noreferrer'
+          onClick={(event) => {
+            event.preventDefault();
+            void openProjectWebsite().catch((error) => {
+              log.append('about', String(error), Date.now(), 'stderr');
+            });
+          }}
+        >
+          github.com/labcoder/spritebook
+        </a>
+        <button type='button' className='btn' onClick={() => setAboutOpen(false)}>
+          {t('Close')}
+        </button>
+      </Modal>
+    </>
   );
 }
 

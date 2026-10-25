@@ -463,6 +463,18 @@ fn open_folder(path: String) -> Result<(), String> {
         .map_err(|e| format!("could not open {path}: {e}"))
 }
 
+#[tauri::command]
+fn open_project_website() -> Result<(), String> {
+    const URL: &str = "https://github.com/labcoder/spritebook";
+    #[cfg(windows)]
+    let mut cmd = Command::new("explorer");
+    #[cfg(target_os = "macos")]
+    let mut cmd = Command::new("open");
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut cmd = Command::new("xdg-open");
+    cmd.arg(URL).spawn().map(|_| ()).map_err(|e| format!("could not open project website: {e}"))
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(Arc::new(Jobs::default()))
@@ -482,6 +494,7 @@ fn main() {
             read_bake_atlas,
             read_look_preview,
             open_folder,
+            open_project_website,
             read_mesh,
             write_rig_edits
         ])

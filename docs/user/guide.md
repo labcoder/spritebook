@@ -51,7 +51,8 @@ sun/moon icon in the compact title bar to switch between light and dark appearan
 Language** for a language; **File → Shortcuts** opens the command palette. The status bar at the
 bottom shows GPU identification, the character count, the bridge (which engine runs your commands:
 `tauri` is the real CLI, a browser preview is a demo), and the log handle (opens the session log —
-every line the CLI writes).
+every line the CLI writes). **File → About SpriteBook** shows the installed version and a link to
+the project on GitHub.
 
 To remove generated files, right-click a character and choose **Delete project…**, or use **Edit →
 Delete project…**. Confirm the named project in the dialog. This permanent cleanup has no undo; it

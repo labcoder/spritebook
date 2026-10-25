@@ -786,6 +786,19 @@ textarea {
 .menuitem[data-disabled] {
   opacity: 0.5;
 }
+.pal.about {
+  width: min(400px, 92vw);
+  padding: 24px;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+.about h2 {
+  margin: 0;
+}
+.about p {
+  margin: 0;
+}
 .pal-backdrop {
   position: fixed;
   inset: 0;
