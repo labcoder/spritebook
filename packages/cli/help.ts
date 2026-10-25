@@ -13,8 +13,10 @@ const COMMANDS: Record<string, { description: string; usage: string; example: st
   gen: {
     description:
       'Generate candidate meshes from an image; opaque images are prepared automatically.',
-    usage: 'gen --workspace <dir> --image <file> [--model <id>] [--candidates <1..8>]',
-    example: 'gen --workspace ./characters/hero --image hero.png --candidates 2 --height 1.7',
+    usage:
+      'gen --workspace <dir> --character <id> --image <file> --model <id> [--candidates <1..8>]',
+    example:
+      'gen --workspace ./characters/hero --character hero --image hero.png --model pixal3d --candidates 2 --height 1.7',
   },
   pick: {
     description: 'Save a generated candidate as the canonical mesh for the character.',
@@ -112,7 +114,8 @@ const COMMANDS: Record<string, { description: string; usage: string; example: st
 
 const OPTIONS: Record<string, string> = {
   workspace: 'Character project directory containing character.json.',
-  model: 'Generation backend ID, or input mesh path for import/rig/bake (see Usage).',
+  model:
+    'Generation backend ID (CLI default: synthetic fixture-gen), or mesh path for import/rig/bake.',
   character: 'Character ID: lowercase letters, digits and dashes.',
   name: 'Human-readable character name. Quote names containing spaces.',
   height: 'Standing height in metres; normalizes the mesh scale.',
