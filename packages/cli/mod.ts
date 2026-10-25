@@ -1271,6 +1271,34 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
   const json = args.includes('--json');
   const verb = args[0];
 
+  // Help is read-only, even when workspace or log flags are present.
+  if (!verb || verb === 'help' || args.includes('--help') || args.includes('-h')) {
+    const { cliHelp, formatHelp } = await import('./help.ts');
+    const command = verb === 'help' ? args[1] : verb;
+    const name = command?.startsWith('-') ? undefined : command;
+    const sub = args[verb === 'help' ? 2 : 1];
+    try {
+      const help = cliHelp(name, sub?.startsWith('-') ? undefined : sub, VERB_FLAGS, BOOLEAN_FLAGS);
+      io.stdout(json ? JSON.stringify(help) : formatHelp(help));
+      return 0;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (json) {
+        io.stdout(
+          encodeEvent({
+            t: 'error',
+            jobId: 'cli' as JobEvent['jobId'],
+            at: now(),
+            code: 'bad-args',
+            message,
+            retryable: false,
+          }).trimEnd(),
+        );
+      } else io.stderr(`error: ${message}`);
+      return 1;
+    }
+  }
+
   // --log-append <file>: every JobEvent also lands in this file as NDJSON,
   // REGARDLESS of --json — the sink is machine-facing (the studio's log
   // drawer replays it), the terminal branch stays human. Job events only:
@@ -3096,9 +3124,9 @@ async function dispatchCli(args: string[], io: CliIo, owned: boolean): Promise<n
     return fail(
       'cli' as JobEvent['jobId'],
       'unknown-verb',
-      `Unknown verb "${
-        verb ?? ''
-      }" - available: prep, gen, pick, retexture, rig, identity, clone, rename, delete, models, extensions, anim, look, bake, export, workspace, doctor, undo, redo (--version)`,
+      `Unknown verb "${verb ?? ''}" - available: ${
+        Object.keys(VERB_FLAGS).join(', ')
+      }. Run spritebook --help.`,
     );
   }
 

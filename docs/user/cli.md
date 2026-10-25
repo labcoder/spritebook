@@ -18,6 +18,49 @@ external source/environments and gated assets; read [sidecar setup](../../sideca
 [licensing](../licensing.md). `models install` verifies weights and provisions a declared runtime;
 `models setup` repairs that runtime while retaining verified weights.
 
+## Find a command
+
+```sh
+spritebook --help
+spritebook gen --help
+spritebook help rig
+spritebook models setup --help
+spritebook --version
+```
+
+Running `spritebook` without arguments also shows help. Every command accepts `--help` or `-h`:
+usage, options and examples appear before any model loads or project writes. Help does not append to
+job logs. Add `--json` to return help as one JSON document, for example `spritebook rig --help
+--json`. Invalid help commands return exit code 1 with an error.
+
+Use space-separated option values (`--cell 512`, not `--cell=512`) and quote paths or names
+containing spaces. Boolean switches such as `--upright` and `--face-front` take no value. Normal
+commands return 0 on success and 1 on failure; jobs report the failure in their JSON event stream
+when `--json` is selected. Keep stderr separate from stdout when parsing output.
+
+For source development, build once with `npm run build`, then use `npm run cli -- --help` or `npm
+run cli -- gen --help`. To parse JSON without npm's lifecycle banner, invoke `node
+packages/cli/dist/entry.js <command> --json` directly. The installed runtime needs no separate Node
+installation.
+
+| Task                                        | Command                                   |
+| ------------------------------------------- | ----------------------------------------- |
+| Create from an existing mesh                | `import`                                  |
+| Remove a background explicitly              | `prep` (also automatic in `gen`)          |
+| Generate, select or repaint a candidate     | `gen`, `pick`, `retexture`                |
+| Fit and review a skeleton                   | `rig`                                     |
+| Select clips and check motion               | `anim`                                    |
+| Set camera, light and sprite finish         | `look`                                    |
+| Render and deliver sprite sheets            | `bake`, `export`                          |
+| Read, rename, copy or delete projects       | `workspace`, `rename`, `clone`, `delete`  |
+| Update decals and attachments               | `identity`                                |
+| Move through manifest edit history          | `undo`, `redo`                            |
+| Install or repair models and optional tools | `extensions` (`models` remains supported) |
+| Diagnose runtime/GPU setup                  | `doctor`                                  |
+
+Deletion requires the exact character ID in `--confirm`; it has no undo. Journal commands take a
+manifest path, for example `spritebook undo --manifest ./characters/hero/character.json`.
+
 ## import — preserve a mesh or try the offline reference
 
 ```sh

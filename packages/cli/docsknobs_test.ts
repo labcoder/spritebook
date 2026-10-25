@@ -60,7 +60,7 @@ test('docs/cli.md: the retexture-only knob is never listed as a gen knob', async
 test('docs/cli.md: every command it prints is a verb the CLI answers', async () => {
   const md = await page();
   const { VERB_FLAGS, runCli } = await import('./dist/mod.js');
-  const verbs = new Set(Object.keys(VERB_FLAGS));
+  const verbs = new Set([...Object.keys(VERB_FLAGS), 'help']);
   for (const cmd of commandsIn(md)) {
     const [verb, sub] = cmd.split(' ');
     assert(verbs.has(verb), `docs/cli.md runs \`spritebook ${verb}\`, which is not a verb`);
