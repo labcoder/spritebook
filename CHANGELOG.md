@@ -6,6 +6,19 @@ Notable changes to SpriteBook. The format follows
 
 ## Unreleased
 
+## 0.7.0 - 2026-10-24 · Imprint desktop update
+
+- Adopt the off-white Imprint app icon, with a blue folded corner and peeking mouse, in the Windows
+  application and installer.
+- Add **File → About SpriteBook** with the app version and project link. The editor layout is
+  unchanged.
+- Show CLI usage with no arguments, `--help`, `-h` or `help <command>`. Command help includes
+  descriptions, accepted options and examples, including model runtime repair. Help exits before
+  project writes or model work and supports a single JSON document with `--json`.
+- Expand the user CLI guide with command discovery, quoting, output formats and exit codes.
+
+The Windows preview's existing animation/clothing limitations still apply; see 0.6.0 below.
+
 ## 0.6.0 - 2026-10-24 · Windows workbench preview
 
 Automatic binding and clothing motion still need review. This preview improves the workflow and
