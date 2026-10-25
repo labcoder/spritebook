@@ -58,6 +58,11 @@ export function MenuBar(
   },
 ) {
   const [aboutOpen, setAboutOpen] = useState(false);
+  const fileMenuRef = useRef<HTMLButtonElement>(null);
+  const closeAbout = () => {
+    setAboutOpen(false);
+    fileMenuRef.current?.focus();
+  };
   return (
     <>
       <header className='menubar'>
@@ -65,7 +70,7 @@ export function MenuBar(
           <span className='wordmark'>SpriteBook</span>
         </div>
         <Menu.Root>
-          <Menu.Trigger className='menubtn'>{t('File')}</Menu.Trigger>
+          <Menu.Trigger ref={fileMenuRef} className='menubtn'>{t('File')}</Menu.Trigger>
           <Menu.Portal>
             <Menu.Positioner sideOffset={4}>
               <Menu.Popup className='menupop'>
@@ -171,7 +176,7 @@ export function MenuBar(
       </header>
       <Modal
         open={aboutOpen}
-        onClose={() => setAboutOpen(false)}
+        onClose={closeAbout}
         label={t('About SpriteBook')}
         className='pal about'
         initialFocus='button'
@@ -192,7 +197,7 @@ export function MenuBar(
         >
           github.com/labcoder/spritebook
         </a>
-        <button type='button' className='btn' onClick={() => setAboutOpen(false)}>
+        <button type='button' className='btn' onClick={closeAbout}>
           {t('Close')}
         </button>
       </Modal>

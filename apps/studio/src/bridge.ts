@@ -89,7 +89,7 @@ type TauriGlobal = {
 export const PROJECT_URL = 'https://github.com/labcoder/spritebook';
 
 export async function openProjectWebsite(): Promise<void> {
-  const tauri = (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__;
+  const tauri = (globalThis as { __TAURI__?: TauriGlobal }).__TAURI__;
   if (tauri) await tauri.core.invoke('open_project_website');
   else window.open(PROJECT_URL, '_blank', 'noopener,noreferrer');
 }

@@ -472,7 +472,10 @@ fn open_project_website() -> Result<(), String> {
     let mut cmd = Command::new("open");
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut cmd = Command::new("xdg-open");
-    cmd.arg(URL).spawn().map(|_| ()).map_err(|e| format!("could not open project website: {e}"))
+    cmd.arg(URL)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("could not open project website: {e}"))
 }
 
 fn main() {
