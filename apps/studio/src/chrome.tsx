@@ -61,7 +61,7 @@ export function MenuBar(
   const fileMenuRef = useRef<HTMLButtonElement>(null);
   const closeAbout = () => {
     setAboutOpen(false);
-    fileMenuRef.current?.focus();
+    requestAnimationFrame(() => fileMenuRef.current?.focus());
   };
   return (
     <>
