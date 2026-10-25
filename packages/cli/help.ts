@@ -141,7 +141,7 @@ const OPTIONS: Record<string, string> = {
   'feet-ground': 'Place the lowest point on the ground.',
   center: 'Center the mesh horizontally.',
   rotate: 'Turn around the upright axis in degrees.',
-  'track-a': 'Fit the bundled template body on CPU instead of predicting with UniRig.',
+  'track-a': 'Fit a template body on CPU instead of predicting with UniRig; requires --body.',
   body: 'Template body asset path.',
   target: 'Template fitting target mesh path.',
   backend: 'Rig backend ID (default: unirig).',
@@ -151,7 +151,7 @@ const OPTIONS: Record<string, string> = {
   accept: 'Accept the reviewed rig and unlock animation/capture.',
   unaccept: 'Clear the accepted status of the rig.',
   'no-deform-check': 'Skip deform checks; visual motion review is still necessary.',
-  'preview-joint': 'Render a bend preview for this joint ID.',
+  'preview-joint': 'Write a bend-preview GLB for this joint ID.',
   audition: 'Build draft walk/jump review images for a generated candidate.',
   review: 'Build motion review images for the current rig.',
   'no-upright': 'Skip automatic straightening during a candidate audition.',
@@ -213,10 +213,10 @@ const OPTIONS: Record<string, string> = {
   id: 'New character ID for the clone.',
   confirm: 'Exact character ID required for permanent deletion.',
   manifest: 'Path to character.json for journal undo/redo.',
-  installed: 'Only list installed items.',
+  installed: 'list: only show installed items.',
   'accept-license': 'Record explicit acceptance of the third-party license after reviewing it.',
   territory: 'Territory code for license eligibility checks.',
-  from: 'Install from local files instead of downloading; checksums still apply.',
+  from: 'install: use local files instead of downloading; checksums still apply.',
   'tools-dir': 'Override the optional-tools directory.',
   path: 'Existing Blender executable to detect and register; no download.',
   json: 'Queries return one JSON document; jobs stream NDJSON events.',
@@ -280,7 +280,19 @@ export function cliHelp(
       flag: `--${name}${name === 'json' || booleans[command]?.includes(name) ? '' : ' <value>'}`,
       description: OPTIONS[name] ?? name,
     })).concat({ flag: '--help, -h', description: 'Show this help without starting a job.' }),
-    examples: [`spritebook ${info.example}`],
+    examples: [
+      `spritebook ${
+        subcommand
+          ? `${command} ${subcommand}${
+            subcommand === 'list'
+              ? ' --installed'
+              : subcommand === 'use'
+              ? ' blender --accept-license'
+              : ' unirig'
+          }`
+          : info.example
+      }`,
+    ],
   };
 }
 
@@ -296,6 +308,6 @@ export function formatHelp(help: ReturnType<typeof cliHelp>): string {
     'subcommands' in help && help.subcommands ? `Subcommands:\n${rows(help.subcommands)}` : '',
     `Options:\n${rows(help.options)}`,
     `Examples:\n${help.examples.map((example) => `  ${example}`).join('\n')}`,
-    'Use space-separated option values, and quote paths containing spaces.\nGuide: docs/user/cli.md',
+    'Use space-separated option values, and quote paths containing spaces.\nGuide: https://github.com/labcoder/spritebook/blob/main/docs/user/cli.md',
   ].filter(Boolean).join('\n\n');
 }
